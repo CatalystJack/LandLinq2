@@ -1,0 +1,70 @@
+# ============================================
+# DEPLOYMENT SIZE OPTIMIZATION
+# Jan 5, 2026 - Reduce image size below 8 GiB
+# ============================================
+
+# CRITICAL: Exclude attached_assets (696MB)
+attached_assets/
+
+# Exclude backup directory
+backups/
+
+# Exclude migrations and drizzle folders
+migrations/
+drizzle/
+
+# Exclude scripts
+scripts/
+
+# Exclude temporary files
+tmp/
+temp/
+*.tmp
+.cache/
+
+# Development and build artifacts
+.git/
+.gitignore
+tsconfig.tsbuildinfo
+
+# Source maps
+*.map
+dist/**/*.map
+
+# Test files
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__/
+coverage/
+
+# Development configs
+.env.local
+.env.development.local
+.env.test.local
+
+# IDE and OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Root-level files not needed in production
+*.sql
+*.html
+*.md
+!README.md
+*_cookies.txt
+cookies.txt
+
+# Root-level images (debug screenshots etc)
+email_*.png
+generated-icon.png
+
+# Debug and utility files
+debug-*.js
+debug-*.cjs
+cleanup-*.ts

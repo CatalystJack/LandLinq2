@@ -1,0 +1,5 @@
+id,first_name,last_name,email,phone,brokerage,company,markets_covered,state_region,years_experience,license_number,is_active,is_archived,sms_opt_in,preferred_contact,crm_tags,crm_notes,assigned_to,last_contacted_at,website_url,bio,created_at,updated_at
+7ec6df1c-6f4e-4279-acb4-92d93f441e09,Bryse,Toothaker,btooth77@gmail.com,"",,,"{""Not specified""}",,,,t,f,f,email,,,,,,,2026-08-05T20:21:57.153Z,2026-08-05T20:21:57.153Z
+b615189a-5593-4c8d-a2e6-1e21b5aa0488,Dorian,Bell,dorian@apexresi.com,"",,,"{""Not specified""}",,,,t,f,f,email,,,,,,,2026-06-24T13:21:21.085Z,2026-06-24T13:21:21.085Z
+13ba281d-320c-4842-904c-41690ae59879,Aj,Klenk,,"",,,,,,,t,f,f,email,,,,,,,2025-10-15T15:45:11.445Z,2026-06-16T14:20:14.597Z
+c3351faf-5dfb-4bd1-b374-ffa6533e90f9,Jack,Team,jack@catalystcp.com,"",,,Not specified,,,,f,f,f,email,"[""Developer Network""]",,,,,,2025-09-03T19:34:15.634Z,2026-07-08T17:58:21.190Z

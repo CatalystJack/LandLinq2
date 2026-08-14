@@ -1,0 +1,26 @@
+[
+  {
+    "eventType": "deal_submitted",
+    "channel": "sms",
+    "subject": "",
+    "content": "Received: {{address}}!\n\nUnder review. Decision in 24hrs.\n\n-Catalyst\n(Reply STOP to opt out)"
+  },
+  {
+    "eventType": "rejected",
+    "channel": "sms",
+    "subject": "",
+    "content": "Thanks for {{address}}.\n\nUnfortunately, we're passing: {{declineReason}}\n\nKeep sending deals!\n\n-Catalyst\n(Reply STOP to opt out)"
+  },
+  {
+    "eventType": "sms_help",
+    "channel": "sms",
+    "subject": "",
+    "content": "Text us land deals! Format:\n\nAddress\nPrice (optional)\nAcres (optional)\n\nExample:\n123 Main St Charlotte NC\n$2M\n10 acres\n\n-Catalyst"
+  },
+  {
+    "eventType": "info_missing",
+    "channel": "sms",
+    "subject": "",
+    "content": "Quick question about {{address}}:\n\nWhat's the {{missingFields}}?\n\n-Catalyst"
+  }
+]

@@ -1,0 +1,1121 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Email Preview Bullet Indentation Classes - High Specificity */
+.email-preview-bullet {
+  display: flex !important;
+  align-items: flex-start !important;
+  margin-bottom: 4px !important;
+}
+.email-preview-bullet-symbol {
+  margin-right: 8px !important;
+  flex-shrink: 0 !important;
+}
+.email-preview-indent-0 { margin-left: 0 !important; }
+.email-preview-indent-1 { margin-left: 20px !important; }
+.email-preview-indent-2 { margin-left: 40px !important; }
+.email-preview-indent-3 { margin-left: 60px !important; }
+.email-preview-indent-4 { margin-left: 80px !important; }
+
+/* Email Preview - Tighter List Spacing */
+.prose ul, .prose ol {
+  padding-left: 1.25em !important;
+  margin-top: 0.5em !important;
+  margin-bottom: 0.5em !important;
+}
+.prose ul ul, .prose ol ol, .prose ul ol, .prose ol ul {
+  padding-left: 1em !important;
+  margin-top: 0.25em !important;
+  margin-bottom: 0.25em !important;
+}
+.prose li {
+  margin-top: 0.15em !important;
+  margin-bottom: 0.15em !important;
+  padding-left: 0.25em !important;
+}
+.prose li::marker {
+  color: inherit !important;
+}
+
+/* Prevent hyphenation on headings and important text */
+h1, h2, h3, h4, h5, h6 {
+  hyphens: none;
+  -webkit-hyphens: none;
+  -ms-hyphens: none;
+}
+
+/* Mobile Performance Optimizations */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Table container scrollbar - hidden (use sticky scrollbar at bottom of page instead) */
+.table-scroll-container::-webkit-scrollbar {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.table-scroll-container {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Interactive Tour Styles */
+
+/* Prevent zoom on input focus on mobile */
+input, select, textarea {
+  font-size: 16px;
+}
+
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+:root {
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(210 25% 7.8431%);
+  --card: hsl(180 6.6667% 97.0588%);
+  --card-foreground: hsl(210 25% 7.8431%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(210 25% 7.8431%);
+  --primary: hsl(210 100% 12%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(210 24% 16%);
+  --secondary-foreground: hsl(0 0% 100%);
+  --muted: hsl(220 14.3% 95.9%);
+  --muted-foreground: hsl(220 8.9% 46.1%);
+  --accent: hsl(220 14.3% 95.9%);
+  --accent-foreground: hsl(220 8.9% 46.1%);
+  --destructive: hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(220 13% 91%);
+  --input: hsl(220 13% 91%);
+  --ring: hsl(229 84% 43%);
+  --chart-1: hsl(12 76% 61%);
+  --chart-2: hsl(173 58% 39%);
+  --chart-3: hsl(197 37% 24%);
+  --chart-4: hsl(43 74% 66%);
+  --chart-5: hsl(27 87% 67%);
+  --radius: 0.5rem;
+  
+  /* Catalyst Brand Colors - Official */
+  --catalyst-navy: #081729;
+  --catalyst-blue: #4A90E2;
+  --catalyst-gold: #d4af37;
+  --catalyst-white: #FDFFFF;
+  
+  /* AI/Tech Colors */
+  --ai-cyan: #00D4FF;
+  --ai-blue: #0070F3;
+  --ai-purple: #7C3AED;
+  --ai-teal: #14B8A6;
+  --ai-gradient: linear-gradient(135deg, var(--ai-cyan) 0%, var(--ai-blue) 50%, var(--ai-purple) 100%);
+  --tech-gradient: linear-gradient(90deg, rgba(0,212,255,0.1) 0%, rgba(0,112,243,0.1) 50%, rgba(124,58,237,0.1) 100%);
+  --catalyst-gray-50: hsl(210 20% 98%);
+  --catalyst-gray-100: hsl(210 20% 96%);
+  --catalyst-gray-200: hsl(210 16% 93%);
+  --catalyst-gray-300: hsl(210 14% 89%);
+  --catalyst-gray-400: hsl(210 14% 71%);
+  --catalyst-gray-500: hsl(210 12% 55%);
+  --catalyst-gray-600: hsl(210 18% 30%);
+  --catalyst-gray-700: hsl(210 24% 16%);
+  --catalyst-gray-800: hsl(210 24% 10%);
+  --catalyst-gray-900: hsl(210 29% 6%);
+  
+  --font-sans: 'Inter', sans-serif;
+}
+
+/* Responsive Design Utilities */
+.responsive-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .responsive-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .responsive-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+.touch-friendly {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@media (max-width: 768px) {
+  .mobile-spacing {
+    padding: 1rem;
+  }
+  
+  .mobile-text-center {
+    text-align: center;
+  }
+  
+  .mobile-stack {
+    flex-direction: column;
+  }
+}
+
+/* Improved mobile performance */
+@media (max-width: 768px) {
+  * {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+  
+  .no-animations {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* AI/Tech Animation Classes */
+@keyframes aiPulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* Subtle Pulse Animation for Logo */
+@keyframes pulse-subtle {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  50% { 
+    transform: scale(1.05);
+    box-shadow: 0 20px 25px -5px rgba(74, 144, 226, 0.3), 0 10px 10px -5px rgba(74, 144, 226, 0.2);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2.5s ease-in-out infinite;
+}
+
+@keyframes aiScan {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes aiTyping {
+  0%, 20% { opacity: 0; }
+  40% { opacity: 0.5; }
+  60%, 100% { opacity: 1; }
+}
+
+@keyframes aiGradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes slideInUp {
+  0% { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+.ai-pulse {
+  animation: aiPulse 2s ease-in-out infinite;
+}
+
+.ai-scan {
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-scan::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(0,212,255,0.3) 50%, transparent 100%);
+  animation: aiScan 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.ai-typing::after {
+  content: '▋';
+  animation: aiTyping 1s infinite;
+  color: var(--ai-cyan);
+}
+
+.ai-gradient-bg {
+  background: var(--ai-gradient);
+  background-size: 200% 200%;
+  animation: aiGradientShift 3s ease infinite;
+}
+
+/* Gold Glow Effect */
+.glow-gold {
+  text-shadow: 0 0 5px #4A90E2, 0 0 10px #4A90E2, 0 0 15px #4A90E2;
+}
+
+.tech-overlay {
+  background: var(--tech-gradient);
+  backdrop-filter: blur(2px);
+}
+
+.ai-border {
+  border: 1px solid;
+  border-image: linear-gradient(45deg, var(--ai-cyan), var(--ai-blue), var(--ai-purple)) 1;
+}
+
+/* Status Timeline Styles */
+.status-timeline {
+  position: relative;
+}
+
+.status-timeline::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--ai-cyan), var(--ai-blue));
+}
+
+.timeline-step {
+  position: relative;
+  padding-left: 50px;
+  margin-bottom: 20px;
+}
+
+.timeline-step::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ai-cyan);
+  border: 3px solid white;
+  z-index: 1;
+}
+
+.timeline-step.active::before {
+  background: var(--ai-blue);
+  box-shadow: 0 0 10px rgba(0,112,243,0.5);
+}
+
+.timeline-step.completed::before {
+  background: var(--catalyst-gold);
+}
+
+/* Advanced AI Tech Animations */
+@keyframes grid-move {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(50px, 50px); }
+}
+
+@keyframes float-particle {
+  0%, 100% { 
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.6;
+  }
+  50% { 
+    transform: translateY(-20px) rotate(180deg);
+    opacity: 1;
+  }
+}
+
+@keyframes float {
+  0%, 100% { 
+    transform: translateY(0);
+  }
+  50% { 
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes slide-in-from-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-80px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  opacity: 0 !important;
+  animation: slide-in-from-left 0.6s ease-out forwards;
+}
+
+.animate-slide-in-delay-1 {
+  opacity: 0 !important;
+  animation: slide-in-from-left 0.6s ease-out 0.4s forwards;
+}
+
+.animate-slide-in-delay-2 {
+  opacity: 0 !important;
+  animation: slide-in-from-left 0.6s ease-out 0.8s forwards;
+}
+
+@keyframes hologram-pulse {
+  0%, 100% { 
+    opacity: 0.3;
+    box-shadow: 0 0 5px currentColor;
+  }
+  50% { 
+    opacity: 0.8;
+    box-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
+  }
+}
+
+/* Glow Text Effects */
+.glow-text {
+  text-shadow: 
+    0 0 5px currentColor,
+    0 0 10px currentColor,
+    0 0 15px currentColor;
+}
+
+/* Tech Border Animation */
+@keyframes tech-border-flow {
+  0% { border-image-source: linear-gradient(45deg, var(--ai-cyan), var(--ai-blue), var(--ai-purple), var(--ai-cyan)); }
+  25% { border-image-source: linear-gradient(45deg, var(--ai-blue), var(--ai-purple), var(--ai-cyan), var(--ai-blue)); }
+  50% { border-image-source: linear-gradient(45deg, var(--ai-purple), var(--ai-cyan), var(--ai-blue), var(--ai-purple)); }
+  75% { border-image-source: linear-gradient(45deg, var(--ai-cyan), var(--ai-blue), var(--ai-purple), var(--ai-cyan)); }
+  100% { border-image-source: linear-gradient(45deg, var(--ai-blue), var(--ai-purple), var(--ai-cyan), var(--ai-blue)); }
+}
+
+/* Holographic Corner Effects */
+.holo-corner {
+  animation: hologram-pulse 2s ease-in-out infinite;
+}
+
+.dark {
+  --background: hsl(222 84% 5%);
+  --foreground: hsl(210 40% 98%);
+  --card: hsl(222 84% 5%);
+  --card-foreground: hsl(210 40% 98%);
+  --popover: hsl(222 84% 5%);
+  --popover-foreground: hsl(210 40% 98%);
+  --primary: hsl(229 84% 43%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(217 32.6% 17.5%);
+  --secondary-foreground: hsl(210 40% 98%);
+  --muted: hsl(217 32.6% 17.5%);
+  --muted-foreground: hsl(215 20.2% 65.1%);
+  --accent: hsl(217 32.6% 17.5%);
+  --accent-foreground: hsl(210 40% 98%);
+  --destructive: hsl(0 62.8% 30.6%);
+  --destructive-foreground: hsl(210 40% 98%);
+  --border: hsl(217 32.6% 17.5%);
+  --input: hsl(217 32.6% 17.5%);
+  --ring: hsl(229 84% 43%);
+  --chart-1: hsl(220 70% 50%);
+  --chart-2: hsl(160 60% 45%);
+  --chart-3: hsl(30 80% 55%);
+  --chart-4: hsl(280 65% 60%);
+  --chart-5: hsl(340 75% 55%);
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent hyphenation, keep words together */
+  hyphens: none;
+  -webkit-hyphens: none;
+  -moz-hyphens: none;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* NEVER HYPHENATE - Global anti-hyphenation rules with maximum specificity */
+*, *::before, *::after {
+  hyphens: none !important;
+  -webkit-hyphens: none !important;
+  -moz-hyphens: none !important;
+  -ms-hyphens: none !important;
+}
+
+/* Ensure proper word wrapping without breaking words - NEVER HYPHENATE */
+p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header, main, footer {
+  hyphens: none !important;
+  -webkit-hyphens: none !important;
+  -moz-hyphens: none !important;
+  -ms-hyphens: none !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
+}
+
+/* Catalyst Brand Colors */
+.catalyst-navy {
+  color: #0A2B4A;
+}
+
+.bg-catalyst-navy {
+  background-color: #0A2B4A;
+}
+
+.catalyst-blue {
+  color: #0A2B4A;
+}
+
+.bg-catalyst-blue {
+  background-color: #0A2B4A;
+}
+
+.catalyst-gold {
+  color: #4A90E2;
+}
+
+.bg-catalyst-gold {
+  background-color: #4A90E2;
+}
+
+.catalyst-white {
+  color: #FDFFFF;
+}
+
+.bg-catalyst-white {
+  background-color: #FDFFFF;
+}
+
+.text-catalyst-white {
+  color: #FDFFFF;
+}
+
+.text-catalyst-gold {
+  color: #4A90E2;
+}
+
+.text-catalyst-navy {
+  color: #0A2B4A;
+}
+
+.text-catalyst-blue {
+  color: #0A2B4A;
+}
+
+.border-catalyst-gold {
+  border-color: #4A90E2;
+}
+
+.catalyst-gray-50 {
+  color: var(--catalyst-gray-50);
+}
+
+.bg-catalyst-gray-50 {
+  background-color: var(--catalyst-gray-50);
+}
+
+.catalyst-gray-100 {
+  color: var(--catalyst-gray-100);
+}
+
+.bg-catalyst-gray-100 {
+  background-color: var(--catalyst-gray-100);
+}
+
+.catalyst-gray-200 {
+  color: var(--catalyst-gray-200);
+}
+
+.bg-catalyst-gray-200 {
+  background-color: var(--catalyst-gray-200);
+}
+
+.catalyst-gray-300 {
+  color: var(--catalyst-gray-300);
+}
+
+.bg-catalyst-gray-300 {
+  background-color: var(--catalyst-gray-300);
+}
+
+.catalyst-gray-400 {
+  color: var(--catalyst-gray-400);
+}
+
+.bg-catalyst-gray-400 {
+  background-color: var(--catalyst-gray-400);
+}
+
+.catalyst-gray-500 {
+  color: var(--catalyst-gray-500);
+}
+
+.bg-catalyst-gray-500 {
+  background-color: var(--catalyst-gray-500);
+}
+
+.catalyst-gray-600 {
+  color: var(--catalyst-gray-600);
+}
+
+.bg-catalyst-gray-600 {
+  background-color: var(--catalyst-gray-600);
+}
+
+.catalyst-gray-700 {
+  color: var(--catalyst-gray-700);
+}
+
+.bg-catalyst-gray-700 {
+  background-color: var(--catalyst-gray-700);
+}
+
+.catalyst-gray-800 {
+  color: var(--catalyst-gray-800);
+}
+
+.bg-catalyst-gray-800 {
+  background-color: var(--catalyst-gray-800);
+}
+
+.catalyst-gray-900 {
+  color: var(--catalyst-gray-900);
+}
+
+.bg-catalyst-gray-900 {
+  background-color: var(--catalyst-gray-900);
+}
+
+/* Mobile text overflow fixes */
+@media (max-width: 768px) {
+  /* Ensure all text wraps properly on mobile */
+  * {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+  
+  /* Prevent horizontal overflow */
+  body, html {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  
+  /* Force long text to wrap in table cells */
+  td, th {
+    word-break: break-word;
+    max-width: 200px;
+  }
+  
+  /* Ensure containers don't extend beyond viewport */
+  .container, .max-w-7xl, .max-w-4xl, .max-w-6xl, .max-w-5xl {
+    max-width: 100% !important;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Hero section specific mobile fixes */
+  h1, h2, h3 {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    line-height: 1.2;
+  }
+  
+  /* Ensure full-width buttons on mobile */
+  .w-full {
+    width: 100%;
+  }
+  
+  /* Mobile spacing optimization */
+  .py-20 {
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+  }
+  
+  /* Mobile section spacing */
+  section {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Navigation mobile fixes */
+  nav {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Form mobile optimizations */
+  input, textarea, select {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+  }
+  
+  /* Checkbox mobile optimizations */
+  input[type="checkbox"] {
+    min-width: 18px;
+    min-height: 18px;
+  }
+  
+  /* Radix checkbox mobile square shape */
+  [data-radix-collection-item] {
+    aspect-ratio: 1;
+  }
+  
+  /* Ensure checkboxes are square on mobile */
+  button[role="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px;
+    min-height: 18px;
+    flex-shrink: 0;
+  }
+  
+  /* Button mobile optimizations */
+  button {
+    min-height: 44px; /* iOS touch target size */
+    touch-action: manipulation;
+  }
+  
+  /* Form labels mobile optimizations */
+  label {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  
+  /* Text overflow mobile fixes */
+  .truncate-mobile {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* Prevent text from breaking layout on mobile */
+  .text-responsive {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+  
+  /* Navigation button fixes */
+  .nav-button-mobile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+}
+
+/* Dashboard Animations */
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-count-up {
+  animation: count-up 0.8s ease-out forwards;
+}
+
+/* Mobile-first form optimizations */
+@media (max-width: 768px) {
+  /* Larger touch targets for mobile */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  textarea,
+  select,
+  button {
+    min-height: 48px;
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 12px 16px;
+  }
+  
+  /* Better spacing for mobile forms */
+  .form-field-mobile {
+    margin-bottom: 24px;
+  }
+  
+  /* Optimized button sizing */
+  .mobile-button {
+    min-height: 52px;
+    padding: 16px 24px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    touch-action: manipulation; /* Prevents double-tap zoom */
+  }
+  
+  /* Better mobile card spacing */
+  .mobile-card {
+    margin: 0 8px;
+    border-radius: 12px;
+  }
+  
+  /* Optimized mobile navigation */
+  .mobile-nav-button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px;
+    border-radius: 8px;
+  }
+  
+  /* Better mobile form labels */
+  .mobile-form-label {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--foreground);
+  }
+  
+  /* Mobile-optimized step indicators */
+  .mobile-step-dot {
+    min-width: 12px;
+    min-height: 12px;
+    transition: all 0.3s ease;
+  }
+  
+  .mobile-step-dot.active {
+    min-width: 24px;
+  }
+  
+  /* Better mobile error messages */
+  .mobile-error-message {
+    font-size: 14px;
+    margin-top: 4px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background-color: rgb(254 242 242);
+    color: rgb(185 28 28);
+  }
+  
+  /* Mobile keyboard optimization */
+  input[inputmode="numeric"] {
+    text-align: right;
+  }
+  
+  input[inputmode="email"] {
+    text-transform: lowercase;
+  }
+  
+  /* Mobile-friendly focus states */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-color: var(--ring);
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover effects on touch devices */
+  .hover\\:scale-105:hover {
+    transform: none;
+  }
+  
+  /* Better touch feedback */
+  button:active,
+  .touchable:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+  
+  /* Larger click areas for small elements */
+  .touch-target {
+    position: relative;
+  }
+  
+  .touch-target::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    right: -8px;
+    bottom: -8px;
+  }
+}
+
+/* Sticky Horizontal Scrollbar Styles */
+.sticky-scrollbar-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
+  border-top: 1px solid #e5e7eb;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.sticky-scrollbar-container.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.sticky-scrollbar {
+  width: 100%;
+  height: 20px;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #f3f4f6;
+}
+
+.sticky-scrollbar::-webkit-scrollbar {
+  height: 20px;
+  background: transparent;
+}
+
+.sticky-scrollbar::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 0;
+}
+
+.sticky-scrollbar::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 10px;
+  border: 3px solid #f3f4f6;
+  transition: background 0.2s ease;
+}
+
+.sticky-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+.sticky-scrollbar-content {
+  height: 1px;
+  pointer-events: none;
+}
+
+/* Enhanced table scroll container to work with sticky scrollbar */
+.enhanced-table-scroll-container {
+  overflow-x: auto;
+  overflow-y: visible;
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #f3f4f6;
+}
+
+.enhanced-table-scroll-container::-webkit-scrollbar {
+  height: 16px;
+  background: transparent;
+}
+
+.enhanced-table-scroll-container::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 8px;
+  margin: 2px;
+}
+
+.enhanced-table-scroll-container::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 8px;
+  border: 2px solid #f3f4f6;
+  transition: background 0.2s ease;
+}
+
+.enhanced-table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Dark mode sticky scrollbar */
+.dark .sticky-scrollbar-container {
+  background: rgba(17, 24, 39, 0.95);
+  border-top: 1px solid #374151;
+}
+
+.dark .sticky-scrollbar::-webkit-scrollbar-track {
+  background: #374151;
+}
+
+.dark .sticky-scrollbar::-webkit-scrollbar-thumb {
+  background: #6b7280;
+  border: 3px solid #374151;
+}
+
+.dark .sticky-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.dark .sticky-scrollbar {
+  scrollbar-color: #6b7280 #374151;
+}
+
+/* Scrolling Stats Animations */
+@keyframes scrollingAnimation {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.scrolling-stats-white,
+.scrolling-stats-dark {
+  animation: scrollingAnimation 45s linear infinite;
+  will-change: transform;
+}
+
+@media (max-width: 640px) {
+  .scrolling-stats-white,
+  .scrolling-stats-dark {
+    animation: scrollingAnimation 22s linear infinite;
+  }
+}
+/* Signature Editor: restore browser-default rendering for pasted Outlook HTML.
+   Key fixes:
+   - img: Tailwind sets display:block globally, breaking inline social icons → restore to inline
+   - table/td: Do NOT force padding:0 or border-collapse — Outlook inline styles must win
+   - p/span: allow Outlook's own margin/padding to show through (Tailwind Preflight sets p{margin:0})
+   - font-size/line-height: inherit naturally rather than being compressed by text-sm */
+[data-signature-editor] {
+  font-size: initial;
+  line-height: initial;
+}
+[data-signature-editor] img {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  max-width: none !important;
+}
+[data-signature-editor] table {
+  display: table !important;
+  border-spacing: 0;
+}
+[data-signature-editor] tr {
+  display: table-row !important;
+}
+[data-signature-editor] td,
+[data-signature-editor] th {
+  display: table-cell !important;
+}
+[data-signature-editor] p {
+  margin: revert;
+}

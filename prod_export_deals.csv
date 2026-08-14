@@ -1,0 +1,109 @@
+id,deal_number,status,classification,priority,address,city,state,zip,county,asking_price,size_acres,unit_count,yield_on_cost,qct_status,dda_status,oz_status,lihtc_score_total,product_types,analyst_notes,rejection_reason,deal_step,assigned_analyst,submission_method,broker_id,broker_name,broker_email,brokerage,created_at,updated_at
+ab536530-f4d5-4237-be80-56a20d849415,460,under_review,dead,medium,3500 Levon Drive,Wilmington,NC,28412,New Hanover,,13.57,46,,NO,NO,NO,,[],"",,,Austin Blondell,analyst_quick_add,,,,,2026-07-21T17:44:35.705Z,2026-08-07T17:49:49.606Z
+9f03cf66-f6e2-43e2-b138-698a8ccd660f,455,clear_no,red,medium,5350 Atlanta Highway,Bogart,GA,30622,Clarke County,,35.05,,,NO,MDDA,NO,,[],"","Found 5 multifamily properties within 3 miles, but none meet our acquisition criteria (built 2020+ with 150+ units). The market here is composed of older or smaller assets that don't reflect institutional multifamily benchmarks.
+
+Properties found nearby:
+• Cottages at Ridge Pointe — 1.8 mi: built 2019 (need 2020+)
+• Wellington Park — 2.1 mi: built 1995 (need 2020+), 112 units (need 150+)
+• 0012 -  WELLINGTON PARK - POWER FAM PRTNSHP — 2.2 mi: built 1993 (need 2020+), 112 units (need 150+)
+• Rev3 at Mill Creek — 2.6 mi: 90 units (need 150+)
+• Meadowland — 2.6 mi: built 1984 (need 2020+), 60 units (need 150+)",,Austin Blondell,analyst_quick_add,,,,,2026-07-21T17:02:06.480Z,2026-07-23T15:35:52.648Z
+769e7623-6032-4533-8b74-67bac7be1d4e,449,pending_review,unclassified,medium,1648 Loves Ln,Charlotte,NC,28216,Mecklenburg,,34.22,161,,NO,NO,NO,,[],"",,,Austin Blondell,analyst_quick_add,,,,,2026-07-20T18:57:35.590Z,2026-08-07T17:52:00.142Z
+98d46efe-73d6-4a1b-a99a-cd4a4ea91709,444,clear_no,red,medium,4537 W Market St,Greensboro,NC,27407,Guilford County,5000000.00,7.95,,,NO,NO,NO,,[],"",1968 vintage is below the 2000 minimum for acquisitions,,Austin Blondell,analyst_quick_add,,,,,2026-07-17T20:07:40.274Z,2026-08-07T17:53:34.723Z
+29db12c2-b5ba-4c2a-bc02-1bd281bca57a,429,clear_no,red,medium,Highlands Glen Drive Phase 5,Shallotte,NC,28470,Brunswick County,3000000.00,20.30,,,NO,NO,NO,,[],"","Found 1 comparable property meeting age/size criteria (2020+, 150+ units), but market rents don't support our $1.75/sqft minimum:
+
+• The Tides of Shallotte: $1.60/sqft ($0.15 below minimum) — 2024 vintage, 294 units, 0.8 mi
+
+Best market rent in this area is $1.60/sqft — $0.15/sqft short of our minimum. This gap would materially impact development economics.",,Austin Blondell,analyst_quick_add,,,,,2026-07-10T18:04:55.656Z,2026-08-07T17:56:17.062Z
+4e974cad-def4-4c90-bc14-6cda70931ab0,421,under_review,yellow,medium,151 Parkway North,Newnan,GA,30265,Coweta,,17.30,192,,N/A,NO,,,[],"",,,Austin Blondell,analyst_quick_add,,,,,2026-07-09T21:17:27.135Z,2026-07-16T17:20:23.490Z
+45b2051b-daa5-493d-8036-bec42214723e,414,clear_no,red,medium,0 lefty rd,Kenly,NC,27542,,1050000.00,96.00,,,NO,NO,NO,,[],"1,700+/-' of Paved Road Frontage
+Excellent Location within Kenly ETJ
+Underground Power
+Rocked Entrance Road","Found 2 multifamily properties within 3 miles, but none meet our acquisition criteria (built 2020+ with 150+ units). The market here is composed of older or smaller assets that don't reflect institutional multifamily benchmarks.
+
+Properties found nearby:
+• KENLY COURT APARTMENTS — 0.9 mi: built 1979 (need 2020+), 48 units (need 150+)
+• KENLY VILLAGE APTS — 1.1 mi: 24 units (need 150+)",,Austin Blondell,analyst_quick_add,,,,,2026-07-08T19:58:46.142Z,2026-08-07T17:58:28.537Z
+a214a4dd-9aeb-41cf-ab95-464be763bbf9,401,clear_no,red,medium,"Coordinates: 35.850778, -79.087833",,,,,,,,,NO,NO,NO,19,[],"","Found 1 multifamily property within 3 miles, but none meet our acquisition criteria (built 2020+ with 150+ units). The market here is composed of older or smaller assets that don't reflect institutional multifamily benchmarks.
+
+Properties found nearby:
+• 76 Bell Cir — 0.4 mi: built 1990 (need 2020+), 19 units (need 150+)",,Austin Blondell,analyst_quick_add,,,,,2026-07-06T13:23:52.624Z,2026-07-06T17:58:10.806Z
+dc8275c1-37ba-4761-8e55-8ea7bb165fbe,397,clear_no,red,medium,Currituck County NLR Opp,Jarvisburg,NC,27964,Currituck,599000.00,41.42,,,NO,NO,NO,,[],"","Property located in Currituck County, NC is not within Catalyst's target acquisition markets. We are currently only acquiring in specific MSAs for Active Adult, BTR/Conventional Apartments, and Lot Development projects.",,Austin Blondell,analyst_quick_add,,,,,2026-07-02T16:03:05.264Z,2026-08-07T18:00:40.790Z
+f71f0954-9b84-4bb4-97de-88e17be4a2e2,396,clear_no,red,medium,1817 LAKESIDE DR,Franklin,NC,28734,Macon,1500000.00,42.49,,,NO,NMDDA,NO,,[],"","Found 7 multifamily properties within 3 miles, but none meet our acquisition criteria (built 2020+ with 150+ units). The market here is composed of older or smaller assets that don't reflect institutional multifamily benchmarks.
+
+Properties found nearby:
+• HOLLY HAVEN — 1.2 mi: built 2004 (need 2020+), 48 units (need 150+)
+• 43 Heritage Hollow — 1.4 mi: built 1977 (need 2020+), 22 units (need 150+)
+• ULCO BLUFFS APARTMENTS — 1.7 mi: built 1983 (need 2020+), 38 units (need 150+)
+• Indigo Apartments — 2.4 mi: built 2017 (need 2020+), 48 units (need 150+)
+• ORCHARD VIEW APTS — 2.7 mi: 48 units (need 150+)",,Austin Blondell,analyst_quick_add,,,,,2026-07-02T15:55:18.120Z,2026-08-07T18:00:58.498Z
+fb65bf59-9541-42f8-9429-673de4d5af36,395,clear_no,red,medium,595 Rock Creek Ridge,Bakersville,NC,28705,Mitchell,,20.58,,,NO,NO,NO,,[],"","Found 9 multifamily properties within 3 miles, but none meet our acquisition criteria (built 2020+ with 150+ units). The market here is composed of older or smaller assets that don't reflect institutional multifamily benchmarks.
+
+Properties found nearby:
+• Ridge Run Apartments — 0.3 mi: built 2001 (need 2020+), 48 units (need 150+)
+• RIDGE RUN APTS — 0.4 mi: 48 units (need 150+)
+• Chimneys Apartments — 0.5 mi: built 1994 (need 2020+), 112 units (need 150+)
+• HEATHFIELD APTS — 0.6 mi: built 1989 (need 2020+), 72 units (need 150+)
+• UWHARRIE TRAIL — 0.7 mi: 80 units (need 150+)",,Austin Blondell,analyst_quick_add,,,,,2026-07-02T15:53:20.785Z,2026-08-07T18:01:16.832Z
+d33edec0-f629-4382-9c93-cefaaa5226e0,394,clear_no,red,medium,568 NC HIGHWAY 62 E,Pleasant Garden,NC,27313,Guilford,1973400.00,47.35,,,NO,NO,NO,,[],"","Found 3 multifamily properties within 3 miles, but none meet our acquisition criteria (built 2020+ with 150+ units). The market here is composed of older or smaller assets that don't reflect institutional multifamily benchmarks.
+
+Properties found nearby:
+• Shiloh Ridge — 3.9 mi: 5 units (need 150+)
+• 235 235 A-X East Dameron Avenue — 4.5 mi: 24 units (need 150+)
+• 235 A-X East Dameron Avenue — 4.5 mi: 24 units (need 150+)",,Austin Blondell,analyst_quick_add,,,,,2026-07-02T15:50:10.643Z,2026-08-07T18:01:37.088Z
+44bc7053-f360-4b89-af83-53ca8bacfbbb,387,clear_no,red,medium,4136 ROSE CREEK RD,Franklin,NC,28734,Macon,979000.00,85.84,,,NO,NMDDA,NO,,[],"","Property located in Macon County, NC is not within Catalyst's target acquisition markets. We are currently only acquiring in specific MSAs for Active Adult, BTR/Conventional Apartments, and Lot Development projects.",,Austin Blondell,analyst_quick_add,,,,,2026-07-02T13:19:28.316Z,2026-08-07T18:03:11.114Z
+455f506d-fa4d-4bb2-b432-1bace27276ae,386,clear_no,red,medium,628 Faith Farm Rd,Rockwell,NC,,rowan,1229760.00,95.00,,,NO,NO,NO,,[],"","Found 2 multifamily properties within 3 miles, but none meet our acquisition criteria (built 2020+ with 150+ units). The market here is composed of older or smaller assets that don't reflect institutional multifamily benchmarks.
+
+Properties found nearby:
+• RO-WELL APARTMENTS — 1.0 mi: built 1987 (need 2020+), 36 units (need 150+)
+• White Rock Gardens — 4.7 mi: built 1984 (need 2020+), 30 units (need 150+)",,Austin Blondell,analyst_quick_add,,,,,2026-07-02T13:16:52.680Z,2026-08-07T18:03:30.802Z
+9d826954-f388-47b0-9dbe-eb878144c016,382,clear_no,red,medium,Spring Branch NLR opp,"",NC,27542,Johnston,273675.00,,,,NO,NO,NO,,[],"","Found 3 multifamily properties within 3 miles, but none meet our acquisition criteria (built 2020+ with 150+ units). The market here is composed of older or smaller assets that don't reflect institutional multifamily benchmarks.
+
+Properties found nearby:
+• Creekridge Apartments — 1.7 mi: 25 units (need 150+)
+• CREEKRIDGE APTS — 4.7 mi: 25 units (need 150+)
+• MOORLAND COVE — 4.7 mi: 60 units (need 150+)",,Austin Blondell,analyst_quick_add,,,,,2026-07-02T13:12:23.581Z,2026-07-08T20:01:38.671Z
+8ca6142b-512f-4a87-a6b4-ef656aec3be9,379,clear_no,red,medium,0 COLON RD PC 9/70E DB 734/01 (DOT ROWY),sanford,NC,27330,sanford,,,,,YES,NO,NO,61,[],"Sanford Plating Co is a superfund site located at 1/4 Mi. Sw Of Colon & Rt.5, Sanford, NC 27330. The Environmental Protection Agency (EPA) identifies sites such as Sanford Plating Co because they pose or had once posed a potential risk to human health and/or the environment due to contamination by one or more hazardous wastes. Sanford Plating Co is currently registered as an Archived superfund site by the EPA and does not require any further clean up action or further investigation.","Property located in sanford County, NC is not within Catalyst's target acquisition markets. We are currently only acquiring in specific MSAs for Active Adult, BTR/Conventional Apartments, and Lot Development projects.",,Austin Blondell,analyst_quick_add,,,,,2026-07-01T16:07:57.301Z,2026-07-08T20:01:41.672Z
+84ca7785-c735-402b-b48c-3c9ac56875c5,371,clear_no,red,medium,"Coordinates: 34.962616, -80.106426",,,,,,,,,YES,NO,NO,23,[],"","Property located in Anson County, NC is not within Catalyst's target acquisition markets. We are currently only acquiring in specific MSAs for Active Adult, BTR/Conventional Apartments, and Lot Development projects.",,Austin Blondell,analyst_quick_add,,,,,2026-06-29T20:14:49.764Z,2026-07-13T18:24:17.254Z
+66b18d17-fd2b-48dd-83a4-d6d82e510175,356,clear_no,red,medium,1 Eastern Way,Durham,NC,27703,Wayne,,0.33,,,YES,NO,NO,57,[],"","Property located in Wayne County, NC is not within Catalyst's target acquisition markets. We are currently only acquiring in specific MSAs for Active Adult, BTR/Conventional Apartments, and Lot Development projects.",,Austin Blondell,analyst_quick_add,,,,,2026-06-24T16:27:41.506Z,2026-07-13T18:24:23.141Z
+f49187c0-634f-4f9e-872d-61455b627be8,351,clear_no,red,medium,975 Ziglar Rd,Winston-Salem,NC,27105,Forsyth County,,20.83,,,NO,NO,NO,,[],"","Found 10 multifamily properties within 3 miles, but none meet our acquisition criteria (built 2020+ with 150+ units). The market here is composed of older or smaller assets that don't reflect institutional multifamily benchmarks.
+
+Properties found nearby:
+• Lofts at Mill Creek Apartments — 0.4 mi: built 1978 (need 2020+)
+• Beltway Park at Winston — 0.5 mi: built 1984 (need 2020+), 78 units (need 150+)
+• Abbington Gardens — 0.6 mi: built 2016 (need 2020+), 96 units (need 150+)
+• Abbington Gardens of Winston-Salem — 0.6 mi: 96 units (need 150+)
+• Mill Creek Flats — 1.2 mi: built 1984 (need 2020+)",,Austin Blondell,analyst_quick_add,,,,,2026-06-22T18:28:56.003Z,2026-07-20T19:02:43.943Z
+0f88d5b8-d857-42fc-b41a-77a1556249c5,285,clear_no,red,medium,Parcel ID: 2103401008,,GA,,Savannah,,,,,N/A,NO,,,[],"","Property located in Savannah County, GA is not within Catalyst's target acquisition markets. We are currently only acquiring in specific MSAs for Active Adult, BTR/Conventional Apartments, and Lot Development projects.",,Austin Blondell,analyst_quick_add,,,,,2026-05-05T14:44:43.671Z,2026-07-13T18:25:30.253Z
+8a926298-3cb3-435f-90d2-0e3abe755502,275,clear_no,red,medium,5315 SOARING EAGLE LN,mint hill,NC,28227,Mecklenburg County,,4.14,,,NO,NO,NO,,[],"","Found 5 multifamily properties within 3 miles, but none meet our acquisition criteria (built 2020+ with 150+ units). The market here is composed of older or smaller assets that don't reflect institutional multifamily benchmarks.
+
+Properties found nearby:
+• 4229 PEGGY LN — 0.8 mi: built 1967 (need 2020+), 5 units (need 150+)
+• Holiday Willow Grove — 2.1 mi: built 2007 (need 2020+), 120 units (need 150+)
+• 13931 Thompson Road — 2.1 mi: 6 units (need 150+)
+• Album Matthews 55+ Active Adult Apartments — 2.3 mi: 128 units (need 150+)
+• Residences at West Mint — 2.3 mi: built 1998 (need 2020+)",,Austin Blondell,analyst_quick_add,,,,,2026-04-28T20:29:12.460Z,2026-07-09T14:28:50.283Z
+872096a3-c03d-42e7-92a8-73e23537bd20,274,under_review,green,1,1023 YORKMONT RD,CHARLOTTE,NC,28217,Mecklenburg County,,7.92,,3.95%,NO,NO,NO,,"[""aa-4-story-flats""]",Dorian to call owner to see if interested in selling.,,Initial UW,Austin Blondell,analyst_quick_add,,,,,2026-04-28T20:25:21.984Z,2026-07-13T17:30:54.708Z
+a60ae596-dc11-4d48-b499-118a916be671,273,pending_review,unclassified,medium,5606 WILGROVE-MINT HILL RD,MINT HILL,NC,28227,Mecklenburg,,6.51,,,NO,NO,NO,,[],"",,,Austin Blondell,analyst_quick_add,,,,,2026-04-28T20:24:39.383Z,2026-07-09T14:29:29.286Z
+c9a2a032-0507-48e4-8a70-b67bee8d6dd9,272,pending_review,unclassified,medium,5520 WILGROVE-MINT HILL RD,MINT HILL,NC,28227,Mecklenburg,,4.92,,,NO,NO,NO,,[],"",,,Austin Blondell,analyst_quick_add,,,,,2026-04-28T20:23:38.234Z,2026-07-08T18:34:42.580Z
+be0857c8-15cc-40aa-acc3-0de2f4060029,271,clear_no,red,medium,8045 WILSON WOODS DR,MINT HILL,NC,28227,Mecklenburg County,,50.50,,,NO,NO,NO,,[],"","Found 1 comparable property meeting age/size criteria (2020+, 150+ units), but market rents don't support our $1.75/sqft minimum:
+
+• Lemmond Farm: $1.47/sqft ($0.28 below minimum) — 2020 vintage, 336 units, 1.3 mi
+
+Best market rent in this area is $1.47/sqft — $0.28/sqft short of our minimum. This gap would materially impact development economics.",,Austin Blondell,analyst_quick_add,,,,,2026-04-28T20:22:55.072Z,2026-07-06T17:50:33.245Z
+caee3443-d1ba-4b7a-ba60-7bed0e387b00,270,clear_no,red,medium,10900 PINE GROVE AV,MINT HILL,NC,28227,Mecklenburg County,,29.84,,,NO,NO,NO,,[],"","Found 1 comparable property meeting age/size criteria (2020+, 150+ units), but market rents don't support our $1.75/sqft minimum:
+
+• Lemmond Farm: $1.47/sqft ($0.28 below minimum) — 2020 vintage, 336 units, 0.8 mi
+
+Best market rent in this area is $1.47/sqft — $0.28/sqft short of our minimum. This gap would materially impact development economics.",,Austin Blondell,analyst_quick_add,,,,,2026-04-28T20:21:51.687Z,2026-07-06T17:51:01.359Z
+85cfda3c-9b78-4b2f-9d5b-733ddeaf52dc,269,pending_review,unclassified,medium,6200 WILGROVE-MINT HILL RD,MINT HILL,NC,28227,Mecklenburg County,,7.42,,,NO,NO,NO,,[],"",,,Austin Blondell,analyst_quick_add,,,,,2026-04-28T20:21:00.445Z,2026-07-06T17:51:24.089Z
+c0bdd40a-6365-4a99-8036-65b5a392a1c3,265,under_review,yellow,medium,Parcel ID: 201-031-17,Huntersville,NC,,Mecklenburg,,,,4 Story AA - 3.42%,NO,NO,NO,,"[""aa-4-story-flats""]","",,,Austin Blondell,analyst_quick_add,,,,,2026-04-28T17:13:40.354Z,2026-07-13T17:29:23.107Z
+276dfeb3-fa44-4c2c-ac54-65e2a4fae83e,246,under_review,red,medium,1 Medical Center Dr SW,Supply,NC,28462,Brunswick,,31.60,,,NO,NO,NO,,[],"",,,Austin Blondell,analyst_quick_add,,,,,2026-04-22T18:29:27.014Z,2026-07-13T18:25:39.712Z
+ba5b7d22-3bb4-452a-9823-09e08b334fb4,221,clear_no,red,medium,5613 Clark Rd,Harrison,TN,37341,Hamilton,,,,,NO,NO,NO,,,,"Found 1 comparable property meeting age/size criteria (2020+, 150+ units), but market rents don't support our $1.75/sqft minimum:
+
+• Anchor Point: $1.51/sqft ($0.24 below minimum) — 2024 vintage, 156 units, 1.0 mi
+
+Best market rent in this area is $1.51/sqft — $0.24/sqft short of our minimum. This gap would materially impact development economics.",,Austin Blondell,email,,,,,2026-04-10T14:59:41.045Z,2026-06-25T17:49:43.995Z
+5ec187b2-b427-48a1-a5c1-f2e812cb5a93,219,pending_review,unclassified,medium,0 Dutchtown Rd,Knoxville,TN,37932,Knox,,,,,NO,MDDA,NO,,,,,,Austin Blondell,email,,,,,2026-04-08T16:12:41.555Z,2026-07-01T17:34:34.561Z
+3562974f-01cc-43c7-a68a-3ee7e8f3a641,218,clear_no,red,medium,5139 Spring Valley Dr,Grantham,NH,03753,Sullivan County,,,,,NO,NMDDA,NO,,,,"Property located in Sullivan County, NH is not within Catalyst's target acquisition markets. We are currently only acquiring in specific MSAs for Active Adult, BTR/Conventional Apartments, and Lot Development projects.",,Austin Blondell,email,,,,,2026-04-08T16:12:33.753Z,2026-07-01T17:35:36.566Z
+b5ec4e61-0552-43c1-bbd4-6f6acf848563,9,clear_no,dead,medium,2201 Mechanic Street,Charlotte,NC,28205,Mecklenburg,40.00,25.25,,,NO,NO,NO,,,,"Found 12 multifamily properties within 3 miles, but none meet our criteria (built 2020+ with 150+ units). The properties in this area are older or smaller than our investment requirements.",,Austin Blondell,email,13ba281d-320c-4842-904c-41690ae59879,Aj Klenk,,,2025-12-11T20:45:07.776Z,2026-06-25T17:49:48.205Z

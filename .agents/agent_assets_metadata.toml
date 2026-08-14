@@ -1,0 +1,116 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "9FEujoL8mBCEsUPIYEw8v"
+uri = "file://attached_assets/brokers_cleaned.csv"
+type = "table"
+title = "brokers_cleaned.csv — 1,020 records with person-specific tags"
+
+[[outputs]]
+id = "c9OxEhqscCgXARcNOp3jp"
+uri = "file://attached_assets/intracoastal-jack-import.csv"
+type = "table"
+title = "Full CRM Import — 1,761 contacts with Sophisticated tags"
+
+[[outputs]]
+id = "Dzj1ixaogXKe16LUxrjiG"
+uri = "file://attached_assets/aj_jack_unknown_sophisticated_brokers.csv"
+type = "table"
+title = "AJ & Jack — Unknown Sophisticated Brokers (1,761 contacts)"
+
+[[outputs]]
+id = "PwToZb7nyJ_3x2PgNjBXg"
+uri = "file://attached_assets/AJ_Known_Unknown_Sophisticated_Import.xlsx"
+type = "table"
+title = "AJ Known + Unknown Sophisticated (158 contacts)"
+
+[[outputs]]
+id = "oceDFWvLJbqhkBcrDNo8B"
+uri = "file://attached_assets/Jack_Unknown_Sophisticated_Import.xlsx"
+type = "table"
+title = "Jack - Unknown Sophisticated (1,034 contacts)"
+
+[[outputs]]
+id = "xYhPMjgUt6SPbhVpwpFL8"
+uri = "file://attached_assets/TN_Unknown_Sophisticated_Import.xlsx"
+type = "table"
+title = "TN_Unknown_Sophisticated_Import.xlsx"
+
+[[outputs]]
+id = "ZkDxaXjqmSCjcPBilqD4k"
+uri = "file://attached_assets/Jack_Unknown_Sophisticated_CRE_Import.xlsx"
+type = "table"
+title = "Jack_Unknown_Sophisticated_CRE_Import.xlsx — 334 contacts"
+
+[[outputs]]
+id = "j4Nb7nrSdjwq0h9hxy9qK"
+uri = "file://attached_assets/AJ_Unknown_Sophisticated_CRE_Import.xlsx"
+type = "table"
+title = "AJ_Unknown_Sophisticated_CRE_Import.xlsx — 36 contacts"
+
+[[outputs]]
+id = "8MR0GmBtcUdwzrP4IxRsl"
+uri = "file://attached_assets/Jack_Unknown_Sophisticated_CRE_v2.xlsx"
+type = "table"
+title = "Jack_Unknown_Sophisticated_CRE_v2.xlsx — 334 contacts"
+
+[[outputs]]
+id = "VHN_vijV3ehF1dicvdw6W"
+uri = "file://attached_assets/AJ_Unknown_Sophisticated_CRE_v2.xlsx"
+type = "table"
+title = "AJ_Unknown_Sophisticated_CRE_v2.xlsx — 36 contacts"
+
+[[outputs]]
+id = "lwmsWF68W-Ly3E336oPLp"
+uri = "file://attached_assets/Jack_TN_Unknown_Sophisticated.xlsx"
+type = "table"
+title = "Jack_TN_Unknown_Sophisticated.xlsx — 34 contacts"
+
+[[outputs]]
+id = "dkDykF2i5NYo9ZXnxEwzb"
+uri = "file://attached_assets/AJ_TN_Unknown_Sophisticated.xlsx"
+type = "table"
+title = "AJ_TN_Unknown_Sophisticated.xlsx — 34 contacts"
+
+[[outputs]]
+id = "TjMT2vTUwEGqV5mMPfE-h"
+uri = "file://attached_assets/Jack_TN_Unknown_Sophisticated.csv"
+type = "table"
+title = "Jack_TN_Unknown_Sophisticated.csv — 34 contacts"
+
+[[outputs]]
+id = "9LwLdHz_6gY38xHDgEpgj"
+uri = "file://attached_assets/AJ_TN_Unknown_Sophisticated.csv"
+type = "table"
+title = "AJ_TN_Unknown_Sophisticated.csv — 34 contacts"
+
+[[outputs]]
+id = "5kkeQYMcB2H8awrvz3iQO"
+uri = "file://attached_assets/jack_berg_unknown_sophisticated.csv"
+type = "table"
+title = "Jack Berg — Unknown Sophisticated (2,965 contacts)"
+
+[[outputs]]
+id = "jsGspW7dqW3yDbhDLjRc9"
+uri = "file://exports/landlinq_code.tar.gz"
+type = "unspecified"
+title = "LandLinq Full Project Code"
+
+[[outputs]]
+id = "wZ-cgO9WNhvnfZz2in4pu"
+uri = "file://exports/landlinq_website_code.tar.gz"
+type = "unspecified"
+title = "LandLinq Website Source Code"
+
+[[outputs]]
+id = "E1_oFrgEYRFOWDYmnBMod"
+uri = "file://exports/landlinq_website_code.zip"
+type = "unspecified"
+title = "LandLinq Website Source Code (.zip)"
+
+[[outputs]]
+id = "D4zQQXDHS4FwqkaRFbBmN"
+uri = "file://landlinq-makecom-guide.pdf"
+type = "pdf"
+title = "LandLinq × Make.com Integration Guide"

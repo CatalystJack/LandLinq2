@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Templates Gallery - LandLinq</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 50px;
+    }
+    .header h1 {
+      font-size: 36px;
+      margin-bottom: 10px;
+    }
+    .header p {
+      font-size: 18px;
+      opacity: 0.9;
+    }
+    .templates-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 30px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .template-card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .template-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    .template-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    .template-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-success { background: #d1fae5; color: #065f46; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-info { background: #dbeafe; color: #1e40af; }
+    .badge-danger { background: #fee2e2; color: #991b1b; }
+    .email-preview {
+      background: #f9fafb;
+      border-radius: 8px;
+      overflow: hidden;
+      transform: scale(0.85);
+      transform-origin: top center;
+    }
+    @media (max-width: 1100px) {
+      .templates-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📧 Email Templates Gallery</h1>
+    <p>Updated with clean spacing & light blue separator line</p>
+  </div>
+
+  <div class="templates-grid">
+    
+    <!-- Template 1: Deal Submitted -->
+    <div class="template-card">
+      <div class="template-header">
+        <span class="template-name">Deal Submission Confirmation</span>
+        <span class="template-badge badge-success">Confirmation</span>
+      </div>
+      <div class="email-preview">
+        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb; padding: 20px;">
+          <div style="text-align: center; background-color: #ffffff; padding: 40px 20px 30px 20px; margin-bottom: 0; border-radius: 8px 8px 0 0;">
+            <img src="https://landlinq.ai/landlinq-logo.png" alt="LandLinq" style="max-height: 60px; width: auto; margin-bottom: 30px;" />
+          </div>
+          <div style="border-bottom: 1px solid #4A90E2; margin-bottom: 30px;"></div>
+          <div style="background-color: #ffffff; padding: 40px 30px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">Hi Jack Berg,</p>
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+              Your LandLinq™ property submission has been received!
+            </p>
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 5px 0; color: #374151;"><strong>Property:</strong> 1600 Camden Road, Charlotte, NC 28203</p>
+              <p style="margin: 5px 0; color: #374151;"><strong>Status:</strong> Under Review</p>
+            </div>
+            <p style="color: #374151; margin: 0; font-size: 16px;">Someone from the Catalyst Acquisition Team will respond within 24 hours.</p>
+          </div>
+          <div style="text-align: center; margin-top: 30px; padding: 20px; font-size: 13px; color: #6b7280;">
+            <p style="margin: 0;">© 2025 LandLinq</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Template 2: Deal Rejected -->
+    <div class="template-card">
+      <div class="template-header">
+        <span class="template-name">Deal Rejection Notice</span>
+        <span class="template-badge badge-danger">Rejection</span>
+      </div>
+      <div class="email-preview">
+        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb; padding: 20px;">
+          <div style="text-align: center; background-color: #ffffff; padding: 40px 20px 30px 20px; margin-bottom: 0; border-radius: 8px 8px 0 0;">
+            <img src="https://landlinq.ai/landlinq-logo.png" alt="LandLinq" style="max-height: 60px; width: auto; margin-bottom: 30px;" />
+          </div>
+          <div style="border-bottom: 1px solid #4A90E2; margin-bottom: 30px;"></div>
+          <div style="background-color: #ffffff; padding: 40px 30px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">Dear Jack Berg,</p>
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+              Thank you for submitting <strong>1600 Camden Road, Charlotte, NC</strong> for our consideration. After thorough review, this property doesn't align with our current acquisition criteria.
+            </p>
+            <div style="background-color: #f3f4f6; padding: 20px; margin: 0 0 25px 0; border-radius: 4px;">
+              <p style="color: #374151; margin: 0 0 8px 0; font-size: 14px; font-weight: bold;">Review Summary:</p>
+              <p style="color: #6b7280; margin: 0; font-size: 14px;">
+                Property: 1600 Camden Road<br>
+                Deal ID: #208<br>
+                Review Date: October 13, 2025
+              </p>
+            </div>
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+              Please keep us in mind for future opportunities! We value our relationship and want to work together on the right deal.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Template 3: High Priority -->
+    <div class="template-card">
+      <div class="template-header">
+        <span class="template-name">High Priority Deal</span>
+        <span class="template-badge badge-success">Pursuing</span>
+      </div>
+      <div class="email-preview">
+        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb; padding: 20px;">
+          <div style="text-align: center; background-color: #ffffff; padding: 40px 20px 30px 20px; margin-bottom: 0; border-radius: 8px 8px 0 0;">
+            <img src="https://landlinq.ai/landlinq-logo.png" alt="LandLinq" style="max-height: 60px; width: auto; margin-bottom: 30px;" />
+          </div>
+          <div style="border-bottom: 1px solid #4A90E2; margin-bottom: 30px;"></div>
+          <div style="background-color: #ffffff; padding: 40px 30px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">Hi Jack Berg,</p>
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+              🎉 <strong>FANTASTIC NEWS!</strong> We are very excited about your submission!
+            </p>
+            <div style="background-color: #d1fae5; border-left: 4px solid #10b981; padding: 20px; margin: 0 0 25px 0; border-radius: 4px;">
+              <p style="color: #065f46; margin: 0; font-size: 14px; line-height: 1.8;">
+                <strong>📍 Property:</strong> 1600 Camden Road<br>
+                <strong>🆔 Deal ID:</strong> #208<br>
+                <strong>🟢 Status:</strong> HIGH PRIORITY - Excellent Fit!
+              </p>
+            </div>
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+              <strong>Why We Love This Deal:</strong><br>
+              This property hits all the marks for our acquisition criteria - great location, proper sizing, and strong market fundamentals.
+            </p>
+            <p style="color: #374151; margin: 0; font-size: 16px;">
+              Austin Blondell will be reaching out within 24 hours!
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Template 4: Welcome Email -->
+    <div class="template-card">
+      <div class="template-header">
+        <span class="template-name">Broker Welcome</span>
+        <span class="template-badge badge-info">Onboarding</span>
+      </div>
+      <div class="email-preview">
+        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb; padding: 20px;">
+          <div style="text-align: center; background-color: #ffffff; padding: 40px 20px 30px 20px; margin-bottom: 0; border-radius: 8px 8px 0 0;">
+            <img src="https://landlinq.ai/landlinq-logo.png" alt="LandLinq" style="max-height: 60px; width: auto; margin-bottom: 30px;" />
+          </div>
+          <div style="border-bottom: 1px solid #4A90E2; margin-bottom: 30px;"></div>
+          <div style="background-color: #ffffff; padding: 40px 30px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">Dear Jack Berg,</p>
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+              Welcome to LandLinq! We're excited to have you join our land acquisition network. Here's how to get started:
+            </p>
+            <div style="background-color: #fef3c7; border-left: 4px solid #d4af37; padding: 20px; margin: 0 0 25px 0; border-radius: 4px;">
+              <p style="color: #92400e; margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">Submission Methods:</p>
+              <p style="color: #92400e; margin: 0; font-size: 14px; line-height: 1.8;">
+                📧 Email: catalyst@landlinq.ai<br>
+                📱 SMS: (704) 610-1549<br>
+                🌐 Web: landlinq.ai/submit-deal
+              </p>
+            </div>
+            <p style="color: #374151; margin: 0; font-size: 16px;">
+              We respond within 2 hours and provide decisions in 24-48 hours.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Template 5: Info Request -->
+    <div class="template-card">
+      <div class="template-header">
+        <span class="template-name">Information Request</span>
+        <span class="template-badge badge-warning">Action Needed</span>
+      </div>
+      <div class="email-preview">
+        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb; padding: 20px;">
+          <div style="text-align: center; background-color: #ffffff; padding: 40px 20px 30px 20px; margin-bottom: 0; border-radius: 8px 8px 0 0;">
+            <img src="https://landlinq.ai/landlinq-logo.png" alt="LandLinq" style="max-height: 60px; width: auto; margin-bottom: 30px;" />
+          </div>
+          <div style="border-bottom: 1px solid #4A90E2; margin-bottom: 30px;"></div>
+          <div style="background-color: #ffffff; padding: 40px 30px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">Hi Jack Berg,</p>
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+              Our Acquisitions team is requesting additional information for <strong>1600 Camden Road</strong>:
+            </p>
+            <div style="background-color: #fef3c7; border-left: 4px solid #d4af37; padding: 20px; margin: 0 0 25px 0; border-radius: 4px;">
+              <p style="color: #92400e; margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">Missing Information:</p>
+              <p style="color: #92400e; margin: 0; font-size: 14px; line-height: 1.8;">
+                • Property size (acres)<br>
+                • Asking price
+              </p>
+            </div>
+            <p style="color: #374151; margin: 0; font-size: 16px;">
+              Please reply with this info so we can continue our analysis and pursuit.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Template 6: Password Reset -->
+    <div class="template-card">
+      <div class="template-header">
+        <span class="template-name">Password Reset</span>
+        <span class="template-badge badge-info">Security</span>
+      </div>
+      <div class="email-preview">
+        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb; padding: 20px;">
+          <div style="text-align: center; background-color: #ffffff; padding: 40px 20px 30px 20px; margin-bottom: 0; border-radius: 8px 8px 0 0;">
+            <img src="https://landlinq.ai/landlinq-logo.png" alt="LandLinq" style="max-height: 60px; width: auto; margin-bottom: 30px;" />
+          </div>
+          <div style="border-bottom: 1px solid #4A90E2; margin-bottom: 30px;"></div>
+          <div style="background-color: #ffffff; padding: 40px 30px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">Hi jack@catalystcp.com,</p>
+            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+              You recently requested to reset your password for your LandLinq account.
+            </p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="#" style="background-color: #4A90E2; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 16px;">🔐 Reset Your Password</a>
+            </div>
+            <div style="background-color: #dbeafe; border: 1px solid #93c5fd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+              <p style="margin: 0; font-weight: bold; color: #1e40af;">🔒 Security tip:</p>
+              <p style="margin: 5px 0 0 0; color: #1e40af; font-size: 14px;">This link expires in 1 hour for your security.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="text-align: center; margin: 50px 0; color: white;">
+    <p style="font-size: 14px; opacity: 0.9;">
+      ✨ All templates updated with clean spacing & light blue (#4A90E2) separator line
+    </p>
+  </div>
+
+</body>
+</html>

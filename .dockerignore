@@ -1,0 +1,70 @@
+# ============================================
+# DEPLOYMENT SIZE OPTIMIZATION
+# Feb 6, 2026 - Reduce image below 8 GiB
+# ============================================
+
+# CRITICAL: Large directories (total ~11.3GB savings)
+# Version control (2.1GB)
+.git/
+.gitignore
+.gitmodules
+
+# Backups directory (7.4GB!)
+backups/
+
+# Replit internal directories (1.7GB)
+.local/
+.upm/
+.config/
+
+# Attached assets not needed at runtime (117MB)
+attached_assets/
+
+# Cache and temp directories (34MB)
+.cache/
+tmp/
+temp/
+*.tmp
+
+# Scripts not needed in production
+scripts/
+
+# Source maps
+*.map
+dist/**/*.map
+
+# Test files
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__/
+coverage/
+
+# Development environment files
+.env.local
+.env.development.local
+.env.test.local
+
+# IDE and OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Debug artifacts and screenshots at root
+email_*.png
+sms_*.png
+sms_panel_*.png
+generated-icon.png
+debug-*.js
+debug-*.cjs
+cleanup-*.ts
+
+# Files not needed in production
+*.sql
+*_cookies.txt
+cookies.txt
+tsconfig.tsbuildinfo

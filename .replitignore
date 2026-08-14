@@ -1,0 +1,52 @@
+# ============================================
+# REPLIT DEPLOYMENT SIZE OPTIMIZATION
+# Feb 6, 2026 - Reduce image below 8 GiB
+# ============================================
+
+# Database backups (7.4GB!) - not needed in production
+backups/
+
+# Replit internal state (1.7GB)
+.local/
+
+# Version control (2.2GB)
+.git/
+
+# Attached assets (117MB) - referenced via object storage in production
+attached_assets/
+
+# Cache and temp
+.cache/
+tmp/
+temp/
+
+# Development scripts
+scripts/
+
+# Source maps
+*.map
+
+# Test files
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__/
+coverage/
+
+# Debug artifacts
+email_*.png
+sms_*.png
+sms_panel_*.png
+generated-icon.png
+debug-*.js
+debug-*.cjs
+cleanup-*.ts
+
+# Other dev files
+*.sql
+*_cookies.txt
+cookies.txt
+tsconfig.tsbuildinfo
+.upm/
+.config/

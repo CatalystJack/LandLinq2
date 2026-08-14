@@ -1,0 +1,2700 @@
+import React, { useState, useMemo, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
+import Navigation from "@/components/navigation";
+import Footer from "@/components/footer";
+import NotificationSystem from "@/components/notification-system";
+import AnalyticsDashboard from "@/components/analytics-dashboard";
+import EmailTemplateSystem from "@/components/email-template-system";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  FileText, 
+  Download, 
+  Filter, 
+  Calendar,
+  MapPin,
+  DollarSign,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Eye,
+  Edit,
+  ArrowUpDown,
+  Save,
+  Search,
+  Calculator,
+  Plus,
+  X,
+  TrendingUp,
+  AlertCircle,
+  BarChart3,
+  Bell,
+  PieChart,
+  MessageSquare,
+  Zap
+} from "lucide-react";
+import type { Deal, Broker } from "@shared/schema";
+import { evaluateFormula, validateFormula, COLUMN_MAPPING, REVERSE_COLUMN_MAPPING } from "@/utils/formulaEvaluator";
+import FormulaBuilder from "@/components/formula-builder";
+import PropertyDataPanel from "@/components/property-data-panel";
+import StatusTimeline from "@/components/status-timeline";
+
+interface DealWithBroker extends Deal {
+  broker: Broker;
+}
+
+export default function AnalystDashboard() {
+  const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [filterClassification, setFilterClassification] = useState<string>("all");
+  const [filterMarket, setFilterMarket] = useState<string>("all");
+  const [filterProductType, setFilterProductType] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [sortColumn, setSortColumn] = useState<string>("createdAt");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [editingRow, setEditingRow] = useState<string | null>(null);
+  const [editData, setEditData] = useState<{[key: string]: any}>({});
+  const [editingCell, setEditingCell] = useState<{dealId: string, field: string} | null>(null);
+  const [cellEditValue, setCellEditValue] = useState<string>('');
+  const [calculatedFields, setCalculatedFields] = useState<{[dealId: string]: {[fieldName: string]: any}}>({});
+  const [showFormulaBuilder, setShowFormulaBuilder] = useState(false);
+  const [customFormulas, setCustomFormulas] = useState<{[key: string]: string}>({});
+  const [selectedDealForProperty, setSelectedDealForProperty] = useState<string | null>(null);
+  const [formulaError, setFormulaError] = useState<string>("");
+  const [selectedDeals, setSelectedDeals] = useState<string[]>([]);
+  const [bulkOperation, setBulkOperation] = useState<string>("");
+  const [autoMode, setAutoMode] = useState<boolean>(false);
+  const [aiSuggestions, setAiSuggestions] = useState<{[dealId: string]: string}>({});
+
+
+  // Fetch team members dynamically
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ['/api/team-members'],
+    queryFn: async () => {
+      const response = await fetch('/api/team-members', {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch team members');
+      }
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    retry: false
+  });
+
+  // Check if user is a Catalyst analyst (you may need to adjust this logic based on your user system)
+  const userEmail = (user as any)?.claims?.email || (user as any)?.email || '';
+  const isAnalyst = userEmail.endsWith('@catalystcp.com');
+
+  // Mock data for demo purposes
+  const mockDeals: DealWithBroker[] = [
+    {
+      id: '1',
+      brokerId: '1',
+      brokerPhone: '(888) 486-6346',
+      teamMemberEmails: [],
+      address: '4850 Research Forest Dr, The Woodlands, TX 77381',
+      askingPrice: '2850000',
+      sizeAcres: '12.5',
+      hasEntitlements: true,
+      parcelId: 'R123456-7890',
+      sewerAvailable: true,
+      rentComparable: '1650',
+      additionalNotes: 'Prime development site in The Woodlands with existing utilities and approved site plan. Ready for immediate development.',
+      status: 'under_review',
+      classification: 'yellow',
+      aiAnalysisData: {
+        zoning_analysis: "Compliant PUD zoning",
+        sewer_analysis: "Municipal sewer available",
+        market_analysis: "Strong rental market with 95% occupancy rates"
+      },
+      submissionMethod: 'web',
+      documentUrls: null,
+      analystNotes: 'Strong location with excellent market fundamentals. Recommend further due diligence on construction costs.',
+      reviewedBy: null,
+      reviewedAt: null,
+      createdAt: new Date('2024-01-15'),
+      updatedAt: new Date('2024-01-15'),
+      productTypes: ['3-story-walk-up', 'wrap-podium'],
+      pricingType: null,
+      unitCount: 280,
+      constructionCostPerSF: null,
+      projectedRentPerSF: null,
+      totalProjectCost: null,
+      projectedNOI: null,
+      marketCapRate: null,
+      developmentTimelineMonths: null,
+      unitSize: null,
+      calculatedFields: null,
+      propertyName: 'Woodlands Village Apartments',
+      developer: 'Highland Development Group',
+      partner: null,
+      nextSteps: null,
+      assignedAnalyst: null,
+      population55Plus5Mile: null,
+      income75Plus55Plus: null,
+      demographicsNotes: null,
+      zoning: 'PUD',
+      broker: {
+        id: '1',
+        firstName: 'Sarah',
+        lastName: 'Thompson',
+        email: 'sarah.thompson@email.com',
+        phone: '(555) 123-4567',
+        brokerage: 'Thompson Commercial Realty',
+        yearsExperience: '8',
+        marketsCovered: 'Austin, TX',
+        preferredContact: 'email',
+        isActive: true,
+        userId: null,
+        createdAt: new Date('2024-01-10'),
+        updatedAt: new Date('2024-01-10')
+      }
+    },
+    {
+      id: '2',
+      brokerId: '1',
+      brokerPhone: '(888) 486-6346',
+      teamMemberEmails: [],
+      address: '1250 Lake Robbins Dr, The Woodlands, TX 77380',
+      askingPrice: '4200000',
+      sizeAcres: '18.3',
+      hasEntitlements: true,
+      parcelId: 'R789012-3456',
+      sewerAvailable: true,
+      rentComparable: '1850',
+      additionalNotes: 'Exceptional mixed-use development opportunity in premier location. Transit-oriented development with retail component.',
+      status: 'high_priority',
+      classification: 'green',
+      aiAnalysisData: {
+        zoning_analysis: "Mixed-use zoning allows retail + residential",
+        sewer_analysis: "Direct municipal connection",
+        market_analysis: "Premium location with strong demographic support",
+        transit_score: "Excellent - adjacent to transit hub"
+      },
+      submissionMethod: 'email',
+      documentUrls: null,
+      analystNotes: 'PRIORITY DEAL - Excellent fundamentals, strong location, experienced developer. Recommend moving quickly.',
+      reviewedBy: null,
+      reviewedAt: null,
+      createdAt: new Date('2024-01-14'),
+      updatedAt: new Date('2024-01-14'),
+      productTypes: ['4-story-elevatored', 'wrap-podium'],
+      pricingType: null,
+      unitCount: 420,
+      constructionCostPerSF: null,
+      projectedRentPerSF: null,
+      totalProjectCost: null,
+      projectedNOI: null,
+      marketCapRate: null,
+      developmentTimelineMonths: null,
+      unitSize: null,
+      calculatedFields: null,
+      propertyName: 'Lake Robbins Commons',
+      developer: 'Meridian Development',
+      partner: null,
+      nextSteps: null,
+      assignedAnalyst: null,
+      population55Plus5Mile: null,
+      income75Plus55Plus: null,
+      demographicsNotes: null,
+      zoning: 'MU-3',
+      broker: {
+        id: '1',
+        firstName: 'Sarah',
+        lastName: 'Thompson',
+        email: 'sarah.thompson@email.com',
+        phone: '(555) 123-4567',
+        brokerage: 'Thompson Commercial Realty',
+        yearsExperience: '8',
+        marketsCovered: 'Austin, TX',
+        preferredContact: 'email',
+        isActive: true,
+        userId: null,
+        createdAt: new Date('2024-01-10'),
+        updatedAt: new Date('2024-01-10')
+      }
+    }
+  ];
+
+  // Fetch real deals data
+  const { data: deals = [], isLoading } = useQuery({
+    queryKey: ['/api/analyst/deals'],
+    queryFn: async () => {
+      const response = await fetch('/api/analyst/deals', {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch deals');
+      }
+      return response.json();
+    },
+  });
+
+  const updateDealMutation = useMutation({
+    mutationFn: async (data: { 
+      dealId: string; 
+      classification?: string; 
+      analystNotes?: string; 
+      status?: string; 
+      calculatedFields?: any;
+      // Property details
+      address?: string;
+      propertyName?: string;
+      unitCount?: number;
+      sizeAcres?: number;
+      askingPrice?: string;
+      rentComparable?: string;
+      // Developer/Partner info
+      developer?: string;
+      partner?: string;
+      // Broker details
+      nextSteps?: string;
+      assignedAnalyst?: string;
+      // Demographics for Active Adult
+      population55Plus5Mile?: number;
+      income75Plus55Plus?: number;
+      demographicsNotes?: string;
+      // For creating new deals
+      isNewDeal?: boolean;
+    }) => {
+      if (data.isNewDeal) {
+        return await apiRequest("POST", `/api/analyst/deals`, data);
+      } else {
+        return await apiRequest("PUT", `/api/analyst/deals/${data.dealId}`, data);
+      }
+    },
+    onSuccess: () => {
+      // Invalidate both analyst and broker queries to ensure real-time updates across all pages
+      queryClient.invalidateQueries({ queryKey: ['/api/analyst/deals'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/broker/deals'] });
+      toast({
+        title: "Deal Updated",
+        description: "Deal has been successfully updated.",
+      });
+      setEditingRow(null);
+      setEditData({});
+      setEditingCell(null);
+      setCellEditValue('');
+    },
+    onError: (error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Auto-fill mutation for populating deal data from APIs
+  const autoFillDealMutation = useMutation({
+    mutationFn: async (dealId: string) => {
+      return await apiRequest("POST", `/api/deals/${dealId}/auto-populate`);
+    },
+    onSuccess: (data: any) => {
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/analyst/deals'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/broker/deals'] });
+      toast({
+        title: "Auto-Fill Complete",
+        description: `Updated ${data.updatedFields?.length || 0} fields using ${data.dataSources?.join(', ') || 'API data'}`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Auto-Fill Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Bulk operations mutation
+  const bulkOperationMutation = useMutation({
+    mutationFn: async ({ dealIds, operation, data }: { dealIds: string[], operation: string, data?: any }) => {
+      return await apiRequest("POST", `/api/analyst/deals/bulk`, { dealIds, operation, data });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/analyst/deals'] });
+      toast({
+        title: "Bulk Operation Complete",
+        description: `Successfully updated ${selectedDeals.length} deals`,
+      });
+      setSelectedDeals([]);
+      setBulkOperation("");
+    },
+    onError: (error) => {
+      toast({
+        title: "Bulk Operation Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Auto-classification mutation
+  const autoClassifyMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/analyst/auto-classify`);
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/analyst/deals'] });
+      toast({
+        title: "Auto-Classification Complete",
+        description: `Classified ${data.processedDeals || 0} deals using AI analysis`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Auto-Classification Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const exportToExcelMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/analyst/deals/export', {
+        method: 'GET',
+      });
+      if (!response.ok) throw new Error('Export failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `deals-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      return response;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Export Successful",
+        description: "Excel file has been downloaded.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Export Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Bypass authentication for demo purposes
+  // if (!isAuthenticated) {
+  //   return (
+  //     <div className="min-h-screen bg-catalyst-gray-50 flex items-center justify-center">
+  //       <Card className="w-96">
+  //         <CardContent className="p-8 text-center">
+  //           <h2 className="text-2xl font-bold mb-4">Access Restricted</h2>
+  //           <p className="text-catalyst-gray-600 mb-6">Please sign in to access the analyst dashboard.</p>
+  //           <Button onClick={() => window.location.href = "/api/login"}>
+  //             Sign In
+  //           </Button>
+  //         </CardContent>
+  //       </Card>
+  //     </div>
+  //   );
+  // }
+
+  // Remove frontend authentication check - let backend handle this
+  // if (!isAnalyst) {
+  //   return (
+  //     <div className="min-h-screen bg-catalyst-gray-50 flex items-center justify-center">
+  //       <Card className="w-96">
+  //         <CardContent className="p-8 text-center">
+  //           <XCircle className="mx-auto mb-4 text-catalyst-navy" size={48} />
+  //           <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
+  //           <p className="text-catalyst-gray-600">This dashboard is restricted to Catalyst analysts only.</p>
+  //         </CardContent>
+  //       </Card>
+  //     </div>
+  //   );
+  // }
+
+  // Optimized filtering and sorting with memoization
+  const filteredAndSortedDeals = useMemo(() => {
+    return deals?.filter((deal: any) => {
+      // Classification filter
+      if (filterClassification !== "all" && deal.classification !== filterClassification) {
+        return false;
+      }
+      
+      // Market filter
+      if (filterMarket !== "all" && deal.broker.marketsCovered !== filterMarket) {
+        return false;
+      }
+      
+      // Filter by product type
+      if (filterProductType !== "all") {
+        const dealProductTypes = deal.productTypes as string[] || [];
+        if (!dealProductTypes.includes(filterProductType)) {
+          return false;
+        }
+      }
+      
+      // Search filter
+      if (searchQuery.trim() !== "") {
+        const query = searchQuery.toLowerCase();
+        const searchableFields = [
+          deal.address?.toLowerCase() || "",
+          deal.broker.firstName?.toLowerCase() || "",
+          deal.broker.lastName?.toLowerCase() || "",
+          deal.broker.email?.toLowerCase() || "",
+          deal.broker.phone?.toLowerCase() || "",
+          deal.broker.marketsCovered?.toLowerCase() || "",
+          deal.hasEntitlements ? "with entitlements" : "without entitlements",
+          deal.parcelId?.toLowerCase() || "",
+          deal.askingPrice?.toString() || "",
+          deal.sizeAcres?.toString() || "",
+          deal.analystNotes?.toLowerCase() || "",
+          deal.additionalNotes?.toLowerCase() || "",
+          getClassificationLabel(deal.classification || "").toLowerCase()
+        ];
+        
+        return searchableFields.some(field => field.includes(query));
+      }
+      
+      return true;
+    })
+    ?.sort((a: DealWithBroker, b: DealWithBroker) => {
+      let aVal = a[sortColumn as keyof DealWithBroker];
+      let bVal = b[sortColumn as keyof DealWithBroker];
+      
+      // Handle nested broker properties
+      if (sortColumn.startsWith('broker.')) {
+        const prop = sortColumn.split('.')[1];
+        aVal = a.broker[prop as keyof Broker];
+        bVal = b.broker[prop as keyof Broker];
+      }
+      
+      if (aVal === null || aVal === undefined) aVal = '';
+      if (bVal === null || bVal === undefined) bVal = '';
+      
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === 'asc' 
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+      
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      
+      return sortDirection === 'asc' 
+        ? String(aVal).localeCompare(String(bVal))
+        : String(bVal).localeCompare(String(aVal));
+    }) || [];
+  }, [deals, filterClassification, filterMarket, filterProductType, searchQuery, sortColumn, sortDirection]);
+
+  const getClassificationColor = (classification: string) => {
+    switch (classification) {
+      case 'green': return 'bg-green-500 text-white border-green-500';
+      case 'yellow': return 'bg-yellow-500 text-white border-yellow-500';
+      case 'red': return 'bg-red-500 text-white border-red-500';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getClassificationLabel = (classification: string) => {
+    switch (classification) {
+      case 'green': return 'Pursuing';
+      case 'yellow': return 'Reviewing';
+      case 'red': return 'Passed';
+      default: return 'Unclassified';
+    }
+  };
+
+  const formatPrice = (price: string | null) => {
+    if (!price) return 'N/A';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+    }).format(parseFloat(price));
+  };
+
+  const formatDate = (date: string | Date | null) => {
+    if (!date) return 'N/A';
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  // Handle bulk operations
+  const handleBulkOperation = (operation: string) => {
+    if (selectedDeals.length === 0) {
+      toast({
+        title: "No Deals Selected",
+        description: "Please select deals to perform bulk operations",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const operationData: { [key: string]: any } = {
+      'approve-all': { classification: 'green', status: 'high_priority' },
+      'review-all': { status: 'under_review' },
+      'reject-all': { classification: 'red', status: 'clear_no' },
+      'auto-fill-all': { operation: 'auto-fill' },
+    };
+
+    if (operationData[operation]) {
+      bulkOperationMutation.mutate({
+        dealIds: selectedDeals,
+        operation,
+        data: operationData[operation]
+      });
+    }
+  };
+
+  // Toggle deal selection
+  const toggleDealSelection = (dealId: string) => {
+    setSelectedDeals(prev => 
+      prev.includes(dealId) 
+        ? prev.filter(id => id !== dealId)
+        : [...prev, dealId]
+    );
+  };
+
+  // Select all deals
+  const selectAllDeals = () => {
+    const allDealIds = filteredAndSortedDeals.map((deal: DealWithBroker) => deal.id);
+    setSelectedDeals(allDealIds);
+  };
+
+  // Clear selection
+  const clearSelection = () => {
+    setSelectedDeals([]);
+  };
+
+  // Generate AI suggestions
+  const generateAiSuggestions = async () => {
+    try {
+      const response = await apiRequest("POST", `/api/analyst/ai-suggestions`) as any;
+      setAiSuggestions(response.suggestions || {});
+      toast({
+        title: "AI Suggestions Generated",
+        description: "Smart recommendations are now available for your deals",
+      });
+    } catch (error) {
+      toast({
+        title: "AI Suggestions Failed",
+        description: "Could not generate AI recommendations",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Memoized counts and filter options
+  const { uniqueMarkets, uniqueProductTypes, pursuingCount, reviewingCount, passedCount } = useMemo(() => {
+    if (!deals) return {
+      uniqueMarkets: [],
+      uniqueProductTypes: [],
+      pursuingCount: 0,
+      reviewingCount: 0,
+      passedCount: 0
+    };
+
+    const markets = deals
+      .map((deal: DealWithBroker) => deal.broker.marketsCovered)
+      .filter((market: string, index: number, arr: string[]) => market && arr.indexOf(market) === index)
+      .sort();
+
+    const productTypes = Array.from(new Set(
+      deals
+        .flatMap((deal: DealWithBroker) => deal.productTypes as string[] || [])
+        .filter(Boolean)
+      )).sort();
+
+    const pursuing = deals.filter((deal: DealWithBroker) => deal.classification === 'green').length;
+    const reviewing = deals.filter((deal: DealWithBroker) => deal.classification === 'yellow').length;
+    const passed = deals.filter((deal: DealWithBroker) => deal.classification === 'red').length;
+
+    return {
+      uniqueMarkets: markets,
+      uniqueProductTypes: productTypes,
+      pursuingCount: pursuing,
+      reviewingCount: reviewing,
+      passedCount: passed
+    };
+  }, [deals]);
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const startEditing = (deal: DealWithBroker) => {
+    setEditingRow(deal.id);
+    setEditData({
+      classification: deal.classification || '',
+      analystNotes: deal.analystNotes || '',
+      address: deal.address || '',
+      propertyName: deal.propertyName || '',
+      unitCount: deal.unitCount || 0,
+      sizeAcres: deal.sizeAcres || 0,
+      askingPrice: deal.askingPrice || '',
+      rentComparable: deal.rentComparable || '',
+      developer: deal.developer || '',
+      partner: deal.partner || '',
+      nextSteps: deal.nextSteps || '',
+      assignedAnalyst: deal.assignedAnalyst || '',
+      // New editable fields
+      productTypes: deal.productTypes || [],
+      hasEntitlements: deal.hasEntitlements || false,
+      sewerAvailable: deal.sewerAvailable || false,
+      yieldOnCost: (deal as any).yieldOnCost || 0,
+      marginsPerLot: (deal as any).marginsPerLot || 0,
+      pricePerUnit: (deal as any).pricePerUnit || 0,
+      dua: (deal as any).dua || 0,
+      brokerName: (deal as any).brokerName || `${deal.broker.firstName} ${deal.broker.lastName}`,
+      brokerEmail: (deal as any).brokerEmail || deal.broker.email,
+      brokerPhone: deal.brokerPhone || deal.broker.phone || '',
+      market: (deal as any).market || deal.broker.marketsCovered || '',
+      submittedDate: (deal as any).submittedDate || (deal.createdAt ? new Date(deal.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+      population55Plus5Mile: deal.population55Plus5Mile || 0,
+      income75Plus55Plus: deal.income75Plus55Plus || 0,
+      demographicsNotes: deal.demographicsNotes || ''
+    });
+  };
+
+  const saveChanges = (dealId: string) => {
+    const isNewDeal = dealId.startsWith('new-deal-');
+    updateDealMutation.mutate({
+      dealId,
+      classification: editData.classification,
+      analystNotes: editData.analystNotes,
+      address: editData.address,
+      propertyName: editData.propertyName,
+      unitCount: editData.unitCount,
+      sizeAcres: editData.sizeAcres,
+      askingPrice: editData.askingPrice,
+      rentComparable: editData.rentComparable,
+      developer: editData.developer,
+      partner: editData.partner,
+      nextSteps: editData.nextSteps,
+      assignedAnalyst: editData.assignedAnalyst,
+      // Active Adult Demographics
+      population55Plus5Mile: editData.population55Plus5Mile,
+      income75Plus55Plus: editData.income75Plus55Plus,
+      demographicsNotes: editData.demographicsNotes,
+      calculatedFields: calculatedFields[dealId] || {},
+      isNewDeal
+    });
+  };
+
+  const addCustomColumn = (columnName: string, formula: string) => {
+    const validation = validateFormula(formula);
+    if (!validation.isValid) {
+      setFormulaError(validation.error || "Invalid formula");
+      return;
+    }
+    
+    setFormulaError("");
+    setCustomFormulas(prev => ({ ...prev, [columnName]: formula }));
+    
+    // Calculate values for all deals
+    const newCalculatedFields = { ...calculatedFields };
+    deals?.forEach((deal: any, index: number) => {
+      if (!newCalculatedFields[deal.id]) {
+        newCalculatedFields[deal.id] = {};
+      }
+      
+      try {
+        const result = evaluateFormula(formula, deals, index, newCalculatedFields);
+        newCalculatedFields[deal.id][columnName] = result;
+      } catch (error) {
+        newCalculatedFields[deal.id][columnName] = '#ERROR';
+      }
+    });
+    
+    setCalculatedFields(newCalculatedFields);
+    setShowFormulaBuilder(false);
+  };
+
+  const removeCustomColumn = (columnName: string) => {
+    setCustomFormulas(prev => {
+      const { [columnName]: removed, ...rest } = prev;
+      return rest;
+    });
+    
+    setCalculatedFields(prev => {
+      const newFields = { ...prev };
+      Object.keys(newFields).forEach(dealId => {
+        delete newFields[dealId][columnName];
+      });
+      return newFields;
+    });
+  };
+
+  // Helper function to check if a field is empty or missing
+  const isFieldEmpty = (value: any): boolean => {
+    return !value || value === '' || value === '-' || value === 'N/A' || value === 0;
+  };
+
+  // Start editing a specific cell
+  const startCellEdit = (dealId: string, field: string, currentValue: any) => {
+    setEditingCell({ dealId, field });
+    setCellEditValue(currentValue?.toString() || '');
+  };
+
+  // Save cell edit
+  const saveCellEdit = async () => {
+    if (!editingCell) return;
+    
+    const { dealId, field } = editingCell;
+    let processedValue: any = cellEditValue;
+    
+    // Process value based on field type
+    if (field === 'unitCount' || field === 'population55Plus5Mile' || field === 'income75Plus55Plus') {
+      processedValue = parseInt(cellEditValue) || 0;
+    } else if (field === 'sizeAcres' || field === 'askingPrice' || field === 'rentComparable') {
+      processedValue = parseFloat(cellEditValue) || 0;
+    }
+    
+    try {
+      await updateDealMutation.mutateAsync({
+        dealId,
+        [field]: processedValue
+      });
+    } catch (error) {
+      // console.error('Error updating cell:', error);
+    }
+  };
+
+  // Cancel cell edit
+  const cancelCellEdit = () => {
+    setEditingCell(null);
+    setCellEditValue('');
+  };
+
+  // Handle key press in cell edit
+  const handleCellKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      saveCellEdit();
+    } else if (e.key === 'Escape') {
+      cancelCellEdit();
+    }
+  };
+
+  // Recalculate formulas when data changes
+  const recalculateFormulas = () => {
+    if (Object.keys(customFormulas).length === 0 || !deals) return;
+    
+    const newCalculatedFields = { ...calculatedFields };
+    deals.forEach((deal: any, index: number) => {
+      if (!newCalculatedFields[deal.id]) {
+        newCalculatedFields[deal.id] = {};
+      }
+      
+      Object.entries(customFormulas).forEach(([columnName, formula]) => {
+        try {
+          const result = evaluateFormula(formula, deals, index, newCalculatedFields);
+          newCalculatedFields[deal.id][columnName] = result;
+        } catch (error) {
+          newCalculatedFields[deal.id][columnName] = '#ERROR';
+        }
+      });
+    });
+    
+    setCalculatedFields(newCalculatedFields);
+  };
+
+  // Recalculate when deals change
+  if (deals && Object.keys(customFormulas).length > 0) {
+    recalculateFormulas();
+  }
+
+  return (
+    <div className="min-w-full overflow-x-hidden">
+      <Navigation />
+      <div className="min-h-screen bg-catalyst-gray-50 py-2 sm:py-6">
+        <div className="mx-auto px-2 sm:px-3 lg:px-4 max-w-full overflow-hidden">
+          {/* Optimized Header */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl lg:text-3xl font-bold text-catalyst-gray-900 mb-2 flex items-center gap-3">
+                  <BarChart3 className="h-6 w-6 lg:h-7 lg:w-7 text-catalyst-dark-blue" />
+                  Deal Dashboard
+                </h1>
+                <p className="text-sm lg:text-base text-catalyst-gray-600">
+                  Comprehensive deal management and analysis
+                </p>
+              </div>
+              <div className="hidden lg:flex items-center gap-3">
+                <Button
+                  onClick={() => exportToExcelMutation.mutate()}
+                  disabled={exportToExcelMutation.isPending}
+                  className="px-6 py-2 text-sm font-bold uppercase tracking-wider bg-catalyst-gold text-white hover:bg-white hover:text-catalyst-gold hover:border hover:border-catalyst-gold rounded transition-all duration-200"
+                  data-testid="button-export-excel"
+                >
+                  <Download size={16} className="mr-2" />
+                  {exportToExcelMutation.isPending ? 'Exporting...' : 'Export Excel'}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Optimized Controls */}
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Search Section */}
+                <div className="lg:col-span-1">
+                  <div className="relative">
+                    <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-catalyst-gray-400" />
+                    <Input
+                      placeholder="Search deals by address, broker, notes..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 h-11 border-2 focus:border-catalyst-dark-blue"
+                      data-testid="input-search-deals"
+                    />
+                  </div>
+                </div>
+                
+                {/* Classification Filter */}
+                <div className="lg:col-span-2">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Filter size={18} className="text-catalyst-gray-500" />
+                      <span className="text-sm font-semibold text-catalyst-gray-700">Classification Filter</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => setFilterClassification("all")}
+                        size="sm"
+                        variant={filterClassification === "all" ? "default" : "outline"}
+                        className={`font-semibold transition-all duration-200 ${
+                          filterClassification === "all" 
+                            ? "bg-catalyst-navy text-white shadow-lg" 
+                            : "border-catalyst-navy text-catalyst-navy hover:bg-catalyst-navy hover:text-white"
+                        }`}
+                        data-testid="button-filter-all-analyst"
+                      >
+                        All ({deals?.length || 0})
+                      </Button>
+                      <Button
+                        onClick={() => setFilterClassification("green")}
+                        size="sm"
+                        variant={filterClassification === "green" ? "default" : "outline"}
+                        className={`font-semibold transition-all duration-200 ${
+                          filterClassification === "green" 
+                            ? "bg-green-600 text-white shadow-lg" 
+                            : "border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+                        }`}
+                        data-testid="button-filter-green-analyst"
+                      >
+                        Pursuing ({pursuingCount})
+                      </Button>
+                      <Button
+                        onClick={() => setFilterClassification("yellow")}
+                        size="sm"
+                        variant={filterClassification === "yellow" ? "default" : "outline"}
+                        className={`font-semibold transition-all duration-200 ${
+                          filterClassification === "yellow" 
+                            ? "bg-yellow-600 text-white shadow-lg" 
+                            : "border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white"
+                        }`}
+                        data-testid="button-filter-yellow-analyst"
+                      >
+                        Reviewing ({reviewingCount})
+                      </Button>
+                      <Button
+                        onClick={() => setFilterClassification("red")}
+                        size="sm"
+                        variant={filterClassification === "red" ? "default" : "outline"}
+                        className={`font-semibold transition-all duration-200 ${
+                          filterClassification === "red" 
+                            ? "bg-red-600 text-white shadow-lg" 
+                            : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                        }`}
+                        data-testid="button-filter-red-analyst"
+                      >
+                        Passed ({passedCount})
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Compact Automation Controls */}
+              <div className="flex items-center justify-between mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-blue-600" />
+                    <span className="font-semibold text-blue-800 text-sm">AI Automation</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => autoClassifyMutation.mutate()}
+                      disabled={autoClassifyMutation.isPending}
+                      className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-catalyst-gold text-white hover:bg-white hover:text-catalyst-gold hover:border hover:border-catalyst-gold rounded transition-all duration-200 flex items-center space-x-1"
+                      data-testid="button-auto-classify"
+                    >
+                      <Zap className="h-3 w-3" />
+                      <span>{autoClassifyMutation.isPending ? 'Classifying...' : 'Auto-Classify All'}</span>
+                    </Button>
+                    
+                    <Button
+                      onClick={generateAiSuggestions}
+                      className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-catalyst-gold text-white hover:bg-white hover:text-catalyst-gold hover:border hover:border-catalyst-gold rounded transition-all duration-200 flex items-center space-x-1"
+                      data-testid="button-ai-suggestions"
+                    >
+                      <MessageSquare className="h-3 w-3" />
+                      <span>Get AI Suggestions</span>
+                    </Button>
+                  </div>
+
+                  {selectedDeals.length > 0 && (
+                    <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-300">
+                      <span className="text-xs text-gray-600 font-medium">
+                        {selectedDeals.length} selected:
+                      </span>
+                      <Button
+                        onClick={() => handleBulkOperation('approve-all')}
+                        disabled={bulkOperationMutation.isPending}
+                        className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-green-600 text-white hover:bg-white hover:text-green-600 hover:border hover:border-green-600 rounded transition-all duration-200 flex items-center space-x-1"
+                        data-testid="button-bulk-approve"
+                      >
+                        <CheckCircle className="h-3 w-3" />
+                        <span>Approve</span>
+                      </Button>
+                      <Button
+                        onClick={() => handleBulkOperation('review-all')}
+                        disabled={bulkOperationMutation.isPending}
+                        className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-yellow-600 text-white hover:bg-white hover:text-yellow-600 hover:border hover:border-yellow-600 rounded transition-all duration-200 flex items-center space-x-1"
+                        data-testid="button-bulk-review"
+                      >
+                        <Eye className="h-3 w-3" />
+                        <span>Review</span>
+                      </Button>
+                      <Button
+                        onClick={() => handleBulkOperation('reject-all')}
+                        disabled={bulkOperationMutation.isPending}
+                        className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-red-600 text-white hover:bg-white hover:text-red-600 hover:border hover:border-red-600 rounded transition-all duration-200 flex items-center space-x-1"
+                        data-testid="button-bulk-reject"
+                      >
+                        <XCircle className="h-3 w-3" />
+                        <span>Reject</span>
+                      </Button>
+                      <Button
+                        onClick={clearSelection}
+                        className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-gray-600 text-white hover:bg-white hover:text-gray-600 hover:border hover:border-gray-600 rounded transition-all duration-200"
+                        data-testid="button-clear-selection"
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-600">Auto Mode</span>
+                  <Button
+                    onClick={() => setAutoMode(!autoMode)}
+                    className={autoMode ? "px-2 py-1 text-xs font-bold uppercase tracking-wider bg-green-600 text-white hover:bg-white hover:text-green-600 hover:border hover:border-green-600 rounded transition-all duration-200" : "px-2 py-1 text-xs font-bold uppercase tracking-wider bg-gray-400 text-white hover:bg-white hover:text-gray-400 hover:border hover:border-gray-400 rounded transition-all duration-200"}
+                    data-testid="button-toggle-auto-mode"
+                  >
+                    {autoMode ? "ON" : "OFF"}
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mt-4 pt-3 border-t">
+                <div className="flex items-center gap-3">
+                  <Select value={filterMarket} onValueChange={setFilterMarket}>
+                    <SelectTrigger className="w-48 h-9">
+                      <SelectValue placeholder="All Markets" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Markets</SelectItem>
+                      {uniqueMarkets.map((market: string) => (
+                        <SelectItem key={market} value={market}>
+                          {market}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={filterProductType} onValueChange={setFilterProductType}>
+                    <SelectTrigger className="w-48 h-9">
+                      <SelectValue placeholder="All Product Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Product Types</SelectItem>
+                      {(uniqueProductTypes as string[]).map((productType: string) => (
+                        <SelectItem key={productType} value={productType}>
+                          {productType === "3-story-walk-up" ? "3 Story Walk Up" :
+                           productType === "4-story-elevatored" ? "4 Story Elevatored" :
+                           productType === "btr" ? "Build to Rent (BTR)" :
+                           productType === "btr-forward-sale" ? "BTR Forward Sale" :
+                         productType === "lot-development" ? "SFD/TH Lots" :
+                         productType === "wrap-podium" ? "Wrap/Podium" :
+                         productType === "retail" ? "Retail" :
+                         productType === "office" ? "Office" :
+                         productType === "industrial" ? "Industrial" :
+                         productType}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <div className="lg:hidden">
+                  <Button
+                    onClick={() => exportToExcelMutation.mutate()}
+                    disabled={exportToExcelMutation.isPending}
+                    className="w-full h-11 font-bold uppercase tracking-wider bg-catalyst-gold text-white hover:bg-white hover:text-catalyst-gold hover:border hover:border-catalyst-gold transition-all duration-200"
+                    data-testid="button-export-excel-mobile"
+                  >
+                    <Download size={16} className="mr-2" />
+                    {exportToExcelMutation.isPending ? 'Exporting...' : 'Export Excel'}
+                  </Button>
+                </div>
+              </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* AI Insights Section */}
+          <div className="mb-6">
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4">
+            <Card>
+              <CardContent className="p-3 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 sm:gap-0">
+                  <div>
+                    <p className="text-xs md:text-sm text-catalyst-gray-600">Total Deals</p>
+                    <p className="text-lg md:text-2xl font-bold text-catalyst-gray-900">{deals?.length || 0}</p>
+                  </div>
+                  <FileText className="text-catalyst-gold" size={18} />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-3 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 sm:gap-0">
+                  <div>
+                    <p className="text-xs md:text-sm text-catalyst-gray-600">Yes</p>
+                    <p className="text-lg md:text-2xl font-bold text-catalyst-gold">
+                      {deals?.filter((d: any) => d.classification === 'green').length || 0}
+                    </p>
+                  </div>
+                  <CheckCircle className="text-catalyst-gold" size={18} />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-3 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 sm:gap-0">
+                  <div>
+                    <p className="text-xs md:text-sm text-catalyst-gray-600">Maybe</p>
+                    <p className="text-lg md:text-2xl font-bold text-yellow-600">
+                      {deals?.filter((d: any) => d.classification === 'yellow').length || 0}
+                    </p>
+                  </div>
+                  <Clock className="text-yellow-500" size={18} />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-3 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 sm:gap-0">
+                  <div>
+                    <p className="text-xs md:text-sm text-catalyst-gray-600">No</p>
+                    <p className="text-lg md:text-2xl font-bold text-catalyst-navy">
+                      {deals?.filter((d: any) => d.classification === 'red').length || 0}
+                    </p>
+                  </div>
+                  <XCircle className="text-catalyst-navy" size={18} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Mobile vs Desktop Table Layout */}
+          <Card>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="text-center py-8">Loading deals...</div>
+              ) : !filteredAndSortedDeals?.length ? (
+                <div className="text-center py-8 text-catalyst-gray-500">No deals found</div>
+              ) : (
+                <>
+                  {/* Mobile Card Layout */}
+                  <div className="block md:hidden">
+                    <div className="space-y-4 p-4">
+                      {filteredAndSortedDeals.map((deal: DealWithBroker) => (
+                        <Card key={deal.id} className="border-l-4 border-l-yellow-500">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <Badge 
+                                variant={deal.classification === 'green' ? 'default' : 
+                                        deal.classification === 'yellow' ? 'secondary' : 'destructive'}
+                                className={deal.classification === 'green' ? 'bg-green-100 text-green-800 border-green-200' :
+                                          deal.classification === 'yellow' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                                          'bg-red-100 text-red-800 border-red-200'}
+                              >
+                                {deal.classification === 'green' && <TrendingUp className="mr-1" size={12} />}
+                                {deal.classification === 'yellow' && <Clock className="mr-1" size={12} />}
+                                {deal.classification === 'red' && <AlertCircle className="mr-1" size={12} />}
+                                {deal.classification === 'green' ? 'Pursuing' : 
+                                 deal.classification === 'yellow' ? 'Reviewing' : 'Passed'}
+                              </Badge>
+                              <span className="text-sm text-gray-500">
+                                {formatDate(deal.createdAt)}
+                              </span>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <div className="font-semibold text-sm text-gray-800">
+                                {deal.propertyName || 'Property Details'}
+                              </div>
+                              
+                              <div className="text-sm space-y-1">
+                                <div><span className="font-medium">Product Type:</span> {(deal.productTypes as string[])?.[0] || 'N/A'}</div>
+                                <div><span className="font-medium">Unit Count:</span> {deal.unitCount || 'N/A'}</div>
+                                <div><span className="font-medium">Address:</span> {deal.address}</div>
+                                <div><span className="font-medium">Acres:</span> {deal.sizeAcres}</div>
+                                <div><span className="font-medium">Price:</span> ${parseInt(deal.askingPrice || '0').toLocaleString()}</div>
+                              </div>
+                              
+                              <div className="border-t pt-2 mt-2">
+                                <div className="text-xs text-gray-600">
+                                  <div><span className="font-medium">Broker:</span> {deal.broker?.firstName} {deal.broker?.lastName}</div>
+                                  <div><span className="font-medium">Market:</span> {deal.broker?.marketsCovered || 'N/A'}</div>
+                                </div>
+                              </div>
+                              
+                              {deal.analystNotes && (
+                                <div className="border-t pt-2 mt-2">
+                                  <div className="text-xs">
+                                    <span className="font-medium">Notes:</span> {deal.analystNotes}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Desktop Table Layout */}
+                  <div className="hidden md:block">
+                    <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-catalyst-gray-300 scrollbar-track-catalyst-gray-100">
+                      <table className="w-full min-w-[1750px]">
+                    <thead className="bg-catalyst-gray-100 border-b-2 border-catalyst-gray-300">
+                      <tr>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[50px] sticky left-0 bg-catalyst-gray-100 z-10 shadow-lg">
+                          <input
+                            type="checkbox"
+                            checked={selectedDeals.length === filteredAndSortedDeals.length && filteredAndSortedDeals.length > 0}
+                            onChange={(e) => e.target.checked ? selectAllDeals() : clearSelection()}
+                            className="rounded"
+                            data-testid="checkbox-select-all"
+                          />
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[140px] sticky left-[50px] bg-catalyst-gray-100 z-10 shadow-lg">
+                          <button
+                            onClick={() => handleSort('classification')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>Classification</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[120px]">
+                          <span>Next Steps</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[120px]">
+                          <span>Assigned Analyst</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[120px]">
+                          <span>Assigned Developer</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[120px]">
+                          <span>Assigned Partner</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[200px]">
+                          <button
+                            onClick={() => handleSort('address')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>Property Address</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[180px]">
+                          <span>Property Name</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[140px]">
+                          <span>Product Type</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[100px]">
+                          <button
+                            onClick={() => handleSort('unitCount')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>Unit Count</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[80px]">
+                          <button
+                            onClick={() => handleSort('sizeAcres')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>Acres</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[80px]">
+                          <span>DUA</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[140px]">
+                          <button
+                            onClick={() => handleSort('hasEntitlements')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>Zoning</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[140px]">
+                          <button
+                            onClick={() => handleSort('askingPrice')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>Total Asking Price</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[140px]">
+                          <span>Price Per Unit/Lot</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[120px]">
+                          <span>Rents per Unit</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[120px]">
+                          <span>Yield on Cost</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[140px]">
+                          <span>Margins per Finished Lot</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[80px]">
+                          <span>Sewer</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[150px]">
+                          <button
+                            onClick={() => handleSort('broker.firstName')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>Broker Name</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[200px]">
+                          <button
+                            onClick={() => handleSort('broker.email')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>Broker Email</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[120px]">
+                          <span>Broker Phone</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[150px]">
+                          <button
+                            onClick={() => handleSort('broker.marketsCovered')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>Market</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[140px]">
+                          <button
+                            onClick={() => handleSort('population55Plus5Mile')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>55+ Pop (5mi)</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[140px]">
+                          <button
+                            onClick={() => handleSort('income75Plus55Plus')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>55+ $75k+ Income</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[140px]">
+                          <span>Demo Notes</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[100px]">
+                          <button
+                            onClick={() => handleSort('createdAt')}
+                            className="flex items-center space-x-1 hover:text-catalyst-navy"
+                          >
+                            <span>Submitted</span>
+                            <ArrowUpDown size={14} />
+                          </button>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[200px]">
+                          <span>Notes</span>
+                        </th>
+                        <th className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[120px]">
+                          <span>Property Data</span>
+                        </th>
+                        {/* Custom Formula Columns */}
+                        {Object.keys(customFormulas).map((columnName: string) => (
+                          <th key={columnName} className="text-left p-2 font-semibold text-catalyst-gray-700 border-r border-catalyst-gray-200 min-w-[120px]">
+                            <div className="flex items-center justify-between">
+                              <span className="truncate">{columnName}</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => removeCustomColumn(columnName)}
+                                className="h-5 w-5 p-0 hover:bg-red-100"
+                              >
+                                <X size={12} className="text-red-600" />
+                              </Button>
+                            </div>
+                            <div className="text-xs text-gray-500 font-mono truncate">
+                              {customFormulas[columnName]}
+                            </div>
+                          </th>
+                        ))}
+                        
+                        {/* No Actions header needed */}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Show new deal row if creating */}
+                      {editingRow && editingRow.startsWith('new-deal-') && (
+                        <tr 
+                          key={editingRow} 
+                          className="border-b border-catalyst-gray-200 bg-green-50"
+                        >
+                          {/* 1. Classification */}
+                          <td className="p-2 border-r border-catalyst-gray-200 sticky left-0 bg-green-50 z-10">
+                            <Select 
+                              value={editData.classification} 
+                              onValueChange={(value) => setEditData({...editData, classification: value})}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Classification" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="green">Yes</SelectItem>
+                                <SelectItem value="yellow">Maybe</SelectItem>
+                                <SelectItem value="red">No</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          {/* 2. Next Steps */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Input
+                              value={editData.nextSteps || ''}
+                              onChange={(e) => setEditData({...editData, nextSteps: e.target.value})}
+                              className="h-8 text-xs"
+                              placeholder="Enter next steps..."
+                            />
+                          </td>
+                          {/* 3. Assigned Analyst */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Select 
+                              value={editData.assignedAnalyst || ''} 
+                              onValueChange={(value) => setEditData({...editData, assignedAnalyst: value})}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Select analyst..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {teamMembers.map((member: string) => (
+                                  <SelectItem key={member} value={member}>{member}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          {/* 4. Developer */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Select 
+                              value={editData.developer || ''} 
+                              onValueChange={(value) => setEditData({...editData, developer: value})}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Select developer..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {teamMembers.map((member: string) => (
+                                  <SelectItem key={member} value={member}>{member}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          {/* 5. Partner */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Input
+                              value={editData.partner || ''}
+                              onChange={(e) => setEditData({...editData, partner: e.target.value})}
+                              className="h-8 text-xs"
+                              placeholder="Partner name..."
+                            />
+                          </td>
+                          {/* 6. Property Address */}
+                          <td className="p-2 border-r border-catalyst-gray-200 font-medium text-catalyst-gray-900">
+                            <Input
+                              value={editData.address || ''}
+                              onChange={(e) => setEditData({...editData, address: e.target.value})}
+                              className="h-8 text-xs"
+                              placeholder="Property address..."
+                            />
+                          </td>
+                          {/* 7. Property Name */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Input
+                              value={editData.propertyName || ''}
+                              onChange={(e) => setEditData({...editData, propertyName: e.target.value})}
+                              className="h-8 text-xs"
+                              placeholder="Property name..."
+                            />
+                          </td>
+                          {/* 8. Product Type */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <div className="text-xs text-gray-500">N/A</div>
+                          </td>
+                          {/* 9. Unit Count */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Input
+                              type="number"
+                              value={editData.unitCount || ''}
+                              onChange={(e) => setEditData({...editData, unitCount: parseInt(e.target.value) || 0})}
+                              className="h-8 text-xs"
+                              placeholder="Units..."
+                            />
+                          </td>
+                          {/* 10. Acres */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={editData.sizeAcres || ''}
+                              onChange={(e) => setEditData({...editData, sizeAcres: parseFloat(e.target.value) || 0})}
+                              className="h-8 text-xs"
+                              placeholder="Acres..."
+                            />
+                          </td>
+                          {/* 11. DUA */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editData.unitCount && editData.sizeAcres ? 
+                              (editData.unitCount / editData.sizeAcres).toFixed(1) 
+                              : 'N/A'}
+                          </td>
+                          {/* 12. Zoning */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <div className="text-xs text-gray-500">N/A</div>
+                          </td>
+                          {/* 13. Total Asking Price */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Input
+                              type="number"
+                              value={editData.askingPrice || ''}
+                              onChange={(e) => setEditData({...editData, askingPrice: e.target.value})}
+                              className="h-8 text-xs"
+                              placeholder="Price..."
+                            />
+                          </td>
+                          {/* 14. Price Per Unit/Lot */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editData.askingPrice && editData.unitCount ? 
+                              `$${(parseFloat(editData.askingPrice) / editData.unitCount).toLocaleString()}` 
+                              : 'N/A'}
+                          </td>
+                          {/* 15. Rents per Unit */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Input
+                              type="number"
+                              value={editData.rentComparable || ''}
+                              onChange={(e) => setEditData({...editData, rentComparable: e.target.value})}
+                              className="h-8 text-xs"
+                              placeholder="Rent/unit..."
+                            />
+                          </td>
+                          {/* Skip other columns for new deal */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">-</td>
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">-</td>
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">-</td>
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">Manual Entry</td>
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">manual@catalystcp.com</td>
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">000-000-0000</td>
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">Manual Entry</td>
+                          {/* Demographics for Active Adult */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Input
+                              type="number"
+                              value={editData.population55Plus5Mile || ''}
+                              onChange={(e) => setEditData({...editData, population55Plus5Mile: parseInt(e.target.value) || 0})}
+                              className="h-8 text-xs"
+                              placeholder="55+ pop..."
+                            />
+                          </td>
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Input
+                              type="number"
+                              value={editData.income75Plus55Plus || ''}
+                              onChange={(e) => setEditData({...editData, income75Plus55Plus: parseInt(e.target.value) || 0})}
+                              className="h-8 text-xs"
+                              placeholder="$75k+ pop..."
+                            />
+                          </td>
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            <Input
+                              value={editData.demographicsNotes || ''}
+                              onChange={(e) => setEditData({...editData, demographicsNotes: e.target.value})}
+                              className="h-8 text-xs"
+                              placeholder="Demo notes..."
+                            />
+                          </td>
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">{new Date().toLocaleDateString()}</td>
+                          {/* Notes */}
+                          <td className="p-2 border-r border-catalyst-gray-200">
+                            <Textarea
+                              value={editData.analystNotes || ''}
+                              onChange={(e) => setEditData({...editData, analystNotes: e.target.value})}
+                              className="h-20 text-xs resize-none"
+                              placeholder="Add notes..."
+                            />
+                          </td>
+                          
+                          {/* Custom Formula Columns */}
+                          {Object.keys(customFormulas).map((columnName: string) => (
+                            <td key={columnName} className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                              <div className="font-mono text-sm">N/A</div>
+                            </td>
+                          ))}
+                          
+                          {/* Actions */}
+                          <td className="p-2">
+                            <div className="flex space-x-1">
+                              <Button
+                                size="sm"
+                                onClick={() => saveChanges(editingRow)}
+                                disabled={updateDealMutation.isPending}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                <Save size={14} />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingRow(null);
+                                  setEditData({});
+                                }}
+                              >
+                                <X size={14} />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      
+                      {filteredAndSortedDeals.map((deal: DealWithBroker, index: number) => (
+                        <tr 
+                          key={deal.id} 
+                          className={`border-b border-catalyst-gray-200 hover:bg-catalyst-gray-50 ${
+                            index % 2 === 0 ? 'bg-white' : 'bg-catalyst-gray-25'
+                          } ${selectedDeals.includes(deal.id) ? 'ring-2 ring-blue-200' : ''}`}
+                        >
+                          {/* Selection Checkbox */}
+                          <td className="p-2 border-r border-catalyst-gray-200 sticky left-0 bg-white z-10 shadow-lg">
+                            <input
+                              type="checkbox"
+                              checked={selectedDeals.includes(deal.id)}
+                              onChange={() => toggleDealSelection(deal.id)}
+                              className="rounded"
+                              data-testid={`checkbox-select-${deal.id}`}
+                            />
+                          </td>
+                          {/* 1. Classification */}
+                          <td className="p-2 border-r border-catalyst-gray-200 sticky left-[50px] bg-white z-10 shadow-lg">
+                            {editingCell?.dealId === deal.id && editingCell?.field === 'classification' ? (
+                              <Select 
+                                value={cellEditValue} 
+                                onValueChange={(value) => {
+                                  setCellEditValue(value);
+                                  const { dealId, field } = editingCell;
+                                  updateDealMutation.mutate({
+                                    dealId,
+                                    [field]: value
+                                  });
+                                  setEditingCell(null);
+                                  setCellEditValue('');
+                                }}
+                                open={true}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="green">Yes</SelectItem>
+                                  <SelectItem value="yellow">Maybe</SelectItem>
+                                  <SelectItem value="red">No</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div 
+                                className="cursor-pointer hover:bg-gray-100 flex justify-center items-center"
+                                onClick={() => startCellEdit(deal.id, 'classification', deal.classification || '')}
+                              >
+                                <Badge className={`${getClassificationColor(deal.classification || '')} text-xs`}>
+                                  {getClassificationLabel(deal.classification || '')}
+                                </Badge>
+                              </div>
+                            )}
+                          </td>
+                          {/* 2. Next Steps */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingCell?.dealId === deal.id && editingCell?.field === 'nextSteps' ? (
+                              <Input
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Enter next steps..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className="max-w-[140px] truncate cursor-pointer hover:bg-gray-100"
+                                onClick={() => startCellEdit(deal.id, 'nextSteps', deal.nextSteps || '')}
+                                title={deal.nextSteps || 'Click to add next steps'}
+                              >
+                                {deal.nextSteps || 'Click to add...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 3. Assigned Analyst */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Select 
+                                value={editData.assignedAnalyst || ''} 
+                                onValueChange={(value) => setEditData({...editData, assignedAnalyst: value})}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Select analyst..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {teamMembers.map((member: string) => (
+                                    <SelectItem key={member} value={member}>{member}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'assignedAnalyst' ? (
+                              <Select 
+                                value={cellEditValue} 
+                                onValueChange={(value) => {
+                                  setCellEditValue(value);
+                                  const { dealId, field } = editingCell;
+                                  updateDealMutation.mutate({
+                                    dealId,
+                                    [field]: value
+                                  });
+                                  setEditingCell(null);
+                                  setCellEditValue('');
+                                }}
+                                open={true}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Select analyst..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {teamMembers.map((member: string) => (
+                                    <SelectItem key={member} value={member}>{member}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div 
+                                className={`max-w-[120px] truncate cursor-pointer hover:bg-gray-100 ${
+                                  isFieldEmpty(deal.assignedAnalyst) ? 'text-gray-400' : ''
+                                }`}
+                                onClick={() => startCellEdit(deal.id, 'assignedAnalyst', deal.assignedAnalyst)}
+                                title={isFieldEmpty(deal.assignedAnalyst) ? 'Click to assign analyst' : (deal.assignedAnalyst || '')}
+                              >
+                                {deal.assignedAnalyst || 'Click to assign...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 4. Developer */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Select 
+                                value={editData.developer || ''} 
+                                onValueChange={(value) => setEditData({...editData, developer: value})}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Select developer..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {teamMembers.map((dev: string) => (
+                                    <SelectItem key={dev} value={dev}>{dev}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'developer' ? (
+                              <Select 
+                                value={cellEditValue} 
+                                onValueChange={(value) => {
+                                  setCellEditValue(value);
+                                  // Auto-save when selection is made
+                                  const { dealId, field } = editingCell;
+                                  updateDealMutation.mutate({
+                                    dealId,
+                                    [field]: value
+                                  });
+                                  setEditingCell(null);
+                                  setCellEditValue('');
+                                }}
+                                open={true}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Select developer..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {teamMembers.map((dev: string) => (
+                                    <SelectItem key={dev} value={dev}>{dev}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div 
+                                className={`max-w-[140px] truncate cursor-pointer hover:bg-gray-100 ${
+                                  isFieldEmpty(deal.developer) ? 'text-gray-400' : ''
+                                }`}
+                                onClick={() => startCellEdit(deal.id, 'developer', deal.developer)}
+                                title={isFieldEmpty(deal.developer) ? 'Click to assign developer' : (deal.developer || '')}
+                              >
+                                {deal.developer || 'Click to assign...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 5. Partner */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                value={editData.partner || ''}
+                                onChange={(e) => setEditData({...editData, partner: e.target.value})}
+                                className="h-8 text-xs"
+                                placeholder="Partner name..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'partner' ? (
+                              <Input
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Partner name..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className={`max-w-[120px] truncate ${
+                                  isFieldEmpty(deal.partner) ? 'cursor-pointer hover:bg-gray-100 text-gray-400' : ''
+                                }`}
+                                onClick={() => isFieldEmpty(deal.partner) && startCellEdit(deal.id, 'partner', deal.partner)}
+                                title={isFieldEmpty(deal.partner) ? 'Click to add partner' : (deal.partner || '')}
+                              >
+                                {deal.partner || 'Click to add...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 6. Property Address */}
+                          <td className="p-2 border-r border-catalyst-gray-200 font-medium text-catalyst-gray-900">
+                            {editingCell?.dealId === deal.id && editingCell?.field === 'address' ? (
+                              <Input
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Property address..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className="max-w-[180px] truncate cursor-pointer hover:bg-gray-100" 
+                                title={deal.address}
+                                onClick={() => startCellEdit(deal.id, 'address', deal.address)}
+                              >
+                                {deal.address}
+                              </div>
+                            )}
+                          </td>
+                          {/* 7. Property Name */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingCell?.dealId === deal.id && editingCell?.field === 'propertyName' ? (
+                              <Input
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Property name..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className={`max-w-[160px] truncate cursor-pointer hover:bg-gray-100 ${
+                                  !deal.propertyName ? 'text-gray-400' : ''
+                                }`}
+                                onClick={() => startCellEdit(deal.id, 'propertyName', deal.propertyName || '')}
+                              >
+                                {deal.propertyName || 'Click to add...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 8. Product Type */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Select 
+                                value={Array.isArray(editData.productTypes) ? editData.productTypes[0] || '' : ''} 
+                                onValueChange={(value) => setEditData({...editData, productTypes: [value]})}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Select type..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="3-story-walk-up">3 Story Walk Up</SelectItem>
+                                  <SelectItem value="4-story-elevatored">4 Story Elevatored</SelectItem>
+                                  <SelectItem value="btr">BTR</SelectItem>
+                                  <SelectItem value="btr-forward-sale">BTR Forward Sale</SelectItem>
+                                  <SelectItem value="lot-development">SFD/TH Lots</SelectItem>
+                                  <SelectItem value="wrap-podium">Wrap/Podium</SelectItem>
+                                  <SelectItem value="retail">Retail</SelectItem>
+                                  <SelectItem value="office">Office</SelectItem>
+                                  <SelectItem value="industrial">Industrial</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'productTypes' ? (
+                              <Select 
+                                value={cellEditValue} 
+                                onValueChange={(value) => {
+                                  setCellEditValue(value);
+                                  const { dealId, field } = editingCell;
+                                  updateDealMutation.mutate({
+                                    dealId,
+                                    [field]: [value]
+                                  });
+                                  setEditingCell(null);
+                                  setCellEditValue('');
+                                }}
+                                open={true}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Select type..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="3-story-walk-up">3 Story Walk Up</SelectItem>
+                                  <SelectItem value="4-story-elevatored">4 Story Elevatored</SelectItem>
+                                  <SelectItem value="btr">BTR</SelectItem>
+                                  <SelectItem value="btr-forward-sale">BTR Forward Sale</SelectItem>
+                                  <SelectItem value="lot-development">SFD/TH Lots</SelectItem>
+                                  <SelectItem value="wrap-podium">Wrap/Podium</SelectItem>
+                                  <SelectItem value="retail">Retail</SelectItem>
+                                  <SelectItem value="office">Office</SelectItem>
+                                  <SelectItem value="industrial">Industrial</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div 
+                                className="max-w-[120px] truncate cursor-pointer hover:bg-gray-100"
+                                onClick={() => startCellEdit(deal.id, 'productTypes', (deal.productTypes as string[])?.[0] || '')}
+                              >
+                                {(deal.productTypes as string[])?.map(type => {
+                                  const displayName = 
+                                    type === "3-story-walk-up" ? "3 Story Walk Up" :
+                                    type === "4-story-elevatored" ? "4 Story Elevatored" :
+                                    type === "btr" ? "BTR" :
+                                    type === "btr-forward-sale" ? "BTR Forward Sale" :
+                                    type === "lot-development" ? "SFD/TH Lots" :
+                                    type === "wrap-podium" ? "Wrap/Podium" :
+                                    type === "retail" ? "Retail" :
+                                    type === "office" ? "Office" :
+                                    type === "industrial" ? "Industrial" :
+                                    type;
+                                  return displayName;
+                                }).join(", ") || 'Click to edit...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 9. Unit Count */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingCell?.dealId === deal.id && editingCell?.field === 'unitCount' ? (
+                              <Input
+                                type="number"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Units..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className={`cursor-pointer hover:bg-gray-100 ${
+                                  !deal.unitCount ? 'text-gray-400' : ''
+                                }`}
+                                onClick={() => startCellEdit(deal.id, 'unitCount', deal.unitCount?.toString() || '')}
+                              >
+                                {deal.unitCount || 'Click to add...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 10. Acres */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingCell?.dealId === deal.id && editingCell?.field === 'sizeAcres' ? (
+                              <Input
+                                type="number"
+                                step="0.1"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Acres..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className={`cursor-pointer hover:bg-gray-100 ${
+                                  !deal.sizeAcres ? 'text-gray-400' : ''
+                                }`}
+                                onClick={() => startCellEdit(deal.id, 'sizeAcres', deal.sizeAcres?.toString() || '')}
+                                title={deal.sizeAcres ? String(deal.sizeAcres) : 'Click to add acres'}
+                              >
+                                {deal.sizeAcres || 'Click to add...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 11. DUA */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingCell?.dealId === deal.id && editingCell?.field === 'dua' ? (
+                              <Input
+                                type="number"
+                                step="0.1"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="DUA..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className="cursor-pointer hover:bg-gray-100"
+                                onClick={() => startCellEdit(deal.id, 'dua', deal.unitCount && deal.sizeAcres ? (parseInt(deal.unitCount.toString()) / parseFloat(deal.sizeAcres.toString())).toFixed(1) : '')}
+                              >
+                                {deal.unitCount && deal.sizeAcres ? 
+                                  (parseInt(deal.unitCount.toString()) / parseFloat(deal.sizeAcres.toString())).toFixed(1) 
+                                  : 'Click to edit...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 12. Zoning */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Select 
+                                value={editData.hasEntitlements ? 'with' : 'without'} 
+                                onValueChange={(value) => setEditData({...editData, hasEntitlements: value === 'with'})}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="with">With Entitlements</SelectItem>
+                                  <SelectItem value="without">Without Entitlements</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'hasEntitlements' ? (
+                              <Select 
+                                value={cellEditValue} 
+                                onValueChange={(value) => {
+                                  setCellEditValue(value);
+                                  const { dealId, field } = editingCell;
+                                  updateDealMutation.mutate({
+                                    dealId,
+                                    [field]: value === 'with'
+                                  });
+                                  setEditingCell(null);
+                                  setCellEditValue('');
+                                }}
+                                open={true}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="with">With Entitlements</SelectItem>
+                                  <SelectItem value="without">Without Entitlements</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div 
+                                className="cursor-pointer hover:bg-gray-100"
+                                onClick={() => startCellEdit(deal.id, 'hasEntitlements', deal.hasEntitlements ? 'with' : 'without')}
+                              >
+                                <span className={`px-2 py-1 rounded text-xs ${
+                                  deal.hasEntitlements 
+                                    ? 'bg-green-100 text-green-700' 
+                                    : 'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {deal.hasEntitlements ? 'With Entitlements' : 'Without Entitlements'}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          {/* 13. Total Asking Price */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingCell?.dealId === deal.id && editingCell?.field === 'askingPrice' ? (
+                              <Input
+                                type="number"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Price..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className={`cursor-pointer hover:bg-gray-100 ${
+                                  !deal.askingPrice ? 'text-gray-400' : ''
+                                }`}
+                                onClick={() => startCellEdit(deal.id, 'askingPrice', deal.askingPrice || '')}
+                                title={deal.askingPrice ? formatPrice(deal.askingPrice) : 'Click to add price'}
+                              >
+                                {formatPrice(deal.askingPrice) === 'N/A' ? 'Click to add...' : formatPrice(deal.askingPrice)}
+                              </div>
+                            )}
+                          </td>
+                          {/* 14. Price Per Unit/Lot */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                type="number"
+                                value={editData.pricePerUnit || (editData.askingPrice && editData.unitCount ? (parseFloat(editData.askingPrice) / editData.unitCount).toFixed(0) : '')}
+                                onChange={(e) => setEditData({...editData, pricePerUnit: parseFloat(e.target.value) || 0})}
+                                className="h-8 text-xs"
+                                placeholder="Price/unit..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'pricePerUnit' ? (
+                              <Input
+                                type="number"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Price/unit..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className="cursor-pointer hover:bg-gray-100"
+                                onClick={() => startCellEdit(deal.id, 'pricePerUnit', deal.askingPrice && deal.unitCount ? (parseFloat(deal.askingPrice) / parseInt(deal.unitCount.toString())).toFixed(0) : '')}
+                              >
+                                {deal.askingPrice && deal.unitCount ? 
+                                  formatPrice((parseFloat(deal.askingPrice) / parseInt(deal.unitCount.toString())).toString()) 
+                                  : 'Click to edit...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 15. Rents per Unit */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                type="number"
+                                value={editData.rentComparable || ''}
+                                onChange={(e) => setEditData({...editData, rentComparable: e.target.value})}
+                                className="h-8 text-xs"
+                                placeholder="Rent/unit..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'rentComparable' ? (
+                              <Input
+                                type="number"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Rent/unit..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className={`cursor-pointer hover:bg-gray-100 ${
+                                  isFieldEmpty(deal.rentComparable) ? 'text-gray-400' : ''
+                                }`}
+                                onClick={() => isFieldEmpty(deal.rentComparable) && startCellEdit(deal.id, 'rentComparable', deal.rentComparable)}
+                                title={isFieldEmpty(deal.rentComparable) ? 'Click to add rent' : `$${deal.rentComparable}`}
+                              >
+                                {deal.rentComparable ? `$${deal.rentComparable}` : 'Click to add...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 16. Yield on Cost */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={editData.yieldOnCost || ''}
+                                onChange={(e) => setEditData({...editData, yieldOnCost: parseFloat(e.target.value) || 0})}
+                                className="h-8 text-xs"
+                                placeholder="Yield %..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'yieldOnCost' ? (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Yield %..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className="cursor-pointer hover:bg-gray-100 text-gray-400"
+                                onClick={() => startCellEdit(deal.id, 'yieldOnCost', '')}
+                              >
+                                Click to add...
+                              </div>
+                            )}
+                          </td>
+                          {/* 17. Margins per Finished Lot */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                type="number"
+                                value={editData.marginsPerLot || ''}
+                                onChange={(e) => setEditData({...editData, marginsPerLot: parseFloat(e.target.value) || 0})}
+                                className="h-8 text-xs"
+                                placeholder="Margin/lot..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'marginsPerLot' ? (
+                              <Input
+                                type="number"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Margin/lot..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className="cursor-pointer hover:bg-gray-100 text-gray-400"
+                                onClick={() => startCellEdit(deal.id, 'marginsPerLot', '')}
+                              >
+                                Click to add...
+                              </div>
+                            )}
+                          </td>
+                          {/* 18. Sewer */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Select 
+                                value={editData.sewerAvailable ? 'yes' : 'no'} 
+                                onValueChange={(value) => setEditData({...editData, sewerAvailable: value === 'yes'})}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="yes">Yes</SelectItem>
+                                  <SelectItem value="no">No</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'sewerAvailable' ? (
+                              <Select 
+                                value={cellEditValue} 
+                                onValueChange={(value) => {
+                                  setCellEditValue(value);
+                                  const { dealId, field } = editingCell;
+                                  updateDealMutation.mutate({
+                                    dealId,
+                                    [field]: value === 'yes'
+                                  });
+                                  setEditingCell(null);
+                                  setCellEditValue('');
+                                }}
+                                open={true}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="yes">Yes</SelectItem>
+                                  <SelectItem value="no">No</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div 
+                                className="cursor-pointer hover:bg-gray-100"
+                                onClick={() => startCellEdit(deal.id, 'sewerAvailable', deal.sewerAvailable ? 'yes' : 'no')}
+                              >
+                                <span className={`px-2 py-1 rounded text-xs ${
+                                  deal.sewerAvailable 
+                                    ? 'bg-green-100 text-green-700' 
+                                    : 'bg-red-100 text-red-700'
+                                }`}>
+                                  {deal.sewerAvailable ? 'Yes' : 'No'}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          {/* 19. Broker Name */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                value={editData.brokerName || `${deal.broker.firstName} ${deal.broker.lastName}`}
+                                onChange={(e) => setEditData({...editData, brokerName: e.target.value})}
+                                className="h-8 text-xs"
+                                placeholder="Broker name..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'brokerName' ? (
+                              <Input
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Broker name..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className="cursor-pointer hover:bg-gray-100"
+                                onClick={() => startCellEdit(deal.id, 'brokerName', `${deal.broker.firstName} ${deal.broker.lastName}`)}
+                              >
+                                {deal.broker.firstName} {deal.broker.lastName}
+                              </div>
+                            )}
+                          </td>
+                          {/* 20. Broker Email */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                type="email"
+                                value={editData.brokerEmail || deal.broker.email}
+                                onChange={(e) => setEditData({...editData, brokerEmail: e.target.value})}
+                                className="h-8 text-xs"
+                                placeholder="Broker email..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'brokerEmail' ? (
+                              <Input
+                                type="email"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Broker email..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <a 
+                                  href={`mailto:${deal.broker.email}`}
+                                  className="text-catalyst-gold hover:text-catalyst-navy transition-colors max-w-[140px] truncate"
+                                  title={`Email ${deal.broker.email}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {deal.broker.email}
+                                </a>
+                                <button
+                                  className="text-gray-400 hover:text-gray-600 text-xs"
+                                  onClick={() => startCellEdit(deal.id, 'brokerEmail', deal.broker.email)}
+                                  title="Edit email"
+                                >
+                                  ✎
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                          {/* 21. Broker Phone */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                type="tel"
+                                value={editData.brokerPhone || deal.broker.phone || ''}
+                                onChange={(e) => setEditData({...editData, brokerPhone: e.target.value})}
+                                className="h-8 text-xs"
+                                placeholder="Broker phone..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'brokerPhone' ? (
+                              <Input
+                                type="tel"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Broker phone..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                {deal.broker.phone ? (
+                                  <>
+                                    <a 
+                                      href={`tel:${deal.broker.phone.replace(/[^\d]/g, '')}`}
+                                      className="text-catalyst-gold hover:text-catalyst-navy transition-colors"
+                                      title={`Call ${deal.broker.phone}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {deal.broker.phone}
+                                    </a>
+                                    <a 
+                                      href={`sms:${deal.broker.phone.replace(/[^\d]/g, '')}`}
+                                      className="text-gray-400 hover:text-gray-600 text-xs"
+                                      title={`Text ${deal.broker.phone}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      SMS
+                                    </a>
+                                  </>
+                                ) : (
+                                  <span className="text-gray-400">No phone</span>
+                                )}
+                                <button
+                                  className="text-gray-400 hover:text-gray-600 text-xs"
+                                  onClick={() => startCellEdit(deal.id, 'brokerPhone', deal.broker.phone || '')}
+                                  title="Edit phone"
+                                >
+                                  ✎
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                          {/* 22. Market */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                value={editData.market || deal.broker.marketsCovered || ''}
+                                onChange={(e) => setEditData({...editData, market: e.target.value})}
+                                className="h-8 text-xs"
+                                placeholder="Market..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'market' ? (
+                              <Input
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Market..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className={`max-w-[130px] truncate cursor-pointer hover:bg-gray-100 ${
+                                  !deal.broker.marketsCovered ? 'text-gray-400' : ''
+                                }`}
+                                title={deal.broker.marketsCovered}
+                                onClick={() => startCellEdit(deal.id, 'market', deal.broker.marketsCovered || '')}
+                              >
+                                {deal.broker.marketsCovered || 'Click to add...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 23. 55+ Population 5 Mile */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                type="number"
+                                value={editData.population55Plus5Mile || ''}
+                                onChange={(e) => setEditData({...editData, population55Plus5Mile: parseInt(e.target.value) || 0})}
+                                className="h-8 text-xs"
+                                placeholder="55+ pop..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'population55Plus5Mile' ? (
+                              <Input
+                                type="number"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="55+ pop..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className={`cursor-pointer hover:bg-gray-100 ${
+                                  isFieldEmpty(deal.population55Plus5Mile) ? 'text-gray-400' : ''
+                                }`}
+                                onClick={() => (!deal.population55Plus5Mile || deal.population55Plus5Mile === 0) && startCellEdit(deal.id, 'population55Plus5Mile', deal.population55Plus5Mile)}
+                                title={(!deal.population55Plus5Mile || deal.population55Plus5Mile === 0) ? 'Click to add 55+ population' : deal.population55Plus5Mile?.toString()}
+                              >
+                                {deal.population55Plus5Mile ? deal.population55Plus5Mile.toLocaleString() : 'Click to add...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 24. 55+ $75k+ Income */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                type="number"
+                                value={editData.income75Plus55Plus || ''}
+                                onChange={(e) => setEditData({...editData, income75Plus55Plus: parseInt(e.target.value) || 0})}
+                                className="h-8 text-xs"
+                                placeholder="$75k+ pop..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'income75Plus55Plus' ? (
+                              <Input
+                                type="number"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="$75k+ pop..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className={`cursor-pointer hover:bg-gray-100 ${
+                                  isFieldEmpty(deal.income75Plus55Plus) ? 'text-gray-400' : ''
+                                }`}
+                                onClick={() => (!deal.income75Plus55Plus || deal.income75Plus55Plus === 0) && startCellEdit(deal.id, 'income75Plus55Plus', deal.income75Plus55Plus)}
+                                title={(!deal.income75Plus55Plus || deal.income75Plus55Plus === 0) ? 'Click to add 55+ income data' : deal.income75Plus55Plus?.toString()}
+                              >
+                                {deal.income75Plus55Plus ? deal.income75Plus55Plus.toLocaleString() : 'Click to add...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 25. Demo Notes */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                            {editingRow === deal.id ? (
+                              <Input
+                                value={editData.demographicsNotes || ''}
+                                onChange={(e) => setEditData({...editData, demographicsNotes: e.target.value})}
+                                className="h-8 text-xs"
+                                placeholder="Demo notes..."
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'demographicsNotes' ? (
+                              <Input
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                placeholder="Demo notes..."
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className={`max-w-[140px] truncate cursor-pointer hover:bg-gray-100 ${
+                                  isFieldEmpty(deal.demographicsNotes) ? 'text-gray-400' : ''
+                                }`}
+                                onClick={() => isFieldEmpty(deal.demographicsNotes) && startCellEdit(deal.id, 'demographicsNotes', deal.demographicsNotes)}
+                                title={isFieldEmpty(deal.demographicsNotes) ? 'Click to add demo notes' : (deal.demographicsNotes || '')}
+                              >
+                                {deal.demographicsNotes || 'Click to add...'}
+                              </div>
+                            )}
+                          </td>
+                          {/* 26. Submitted */}
+                          <td className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700 text-sm break-words max-w-[200px] overflow-hidden">
+                            {editingRow === deal.id ? (
+                              <Input
+                                type="date"
+                                value={editData.submittedDate || (deal.createdAt ? new Date(deal.createdAt).toISOString().split('T')[0] : '')}
+                                onChange={(e) => setEditData({...editData, submittedDate: e.target.value})}
+                                className="h-8 text-xs"
+                              />
+                            ) : editingCell?.dealId === deal.id && editingCell?.field === 'submittedDate' ? (
+                              <Input
+                                type="date"
+                                value={cellEditValue}
+                                onChange={(e) => setCellEditValue(e.target.value)}
+                                onBlur={saveCellEdit}
+                                onKeyDown={handleCellKeyPress}
+                                className="h-8 text-xs"
+                                autoFocus
+                              />
+                            ) : (
+                              <div 
+                                className="cursor-pointer hover:bg-gray-100"
+                                onClick={() => startCellEdit(deal.id, 'submittedDate', deal.createdAt ? new Date(deal.createdAt).toISOString().split('T')[0] : '')}
+                              >
+                                {formatDate(deal.createdAt)}
+                              </div>
+                            )}
+                          </td>
+                          {/* 27. Notes */}
+                          <td className="p-2 border-r border-catalyst-gray-200">
+                            {editingRow === deal.id ? (
+                              <Textarea
+                                value={editData.analystNotes || ''}
+                                onChange={(e) => setEditData({...editData, analystNotes: e.target.value})}
+                                className="h-20 text-xs resize-none"
+                                placeholder="Add notes..."
+                              />
+                            ) : (
+                              <div className="max-w-[180px] max-h-16 overflow-hidden text-xs text-catalyst-gray-600">
+                                {deal.analystNotes || 'No notes'}
+                              </div>
+                            )}
+                          </td>
+                          
+                          {/* Custom Formula Columns */}
+                          {Object.keys(customFormulas).map((columnName: string) => (
+                            <td key={columnName} className="p-2 border-r border-catalyst-gray-200 text-catalyst-gray-700">
+                              <div className="font-mono text-sm">
+                                {calculatedFields[deal.id]?.[columnName] !== undefined ? (
+                                  typeof calculatedFields[deal.id][columnName] === 'number' ? 
+                                    calculatedFields[deal.id][columnName].toLocaleString() :
+                                    calculatedFields[deal.id][columnName]
+                                ) : (
+                                  'N/A'
+                                )}
+                              </div>
+                            </td>
+                          ))}
+                          
+                          {/* Property Data Action */}
+                          <td className="p-2 border-r border-catalyst-gray-200">
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setSelectedDealForProperty(deal.id)}
+                                className="h-8 px-2 text-xs"
+                                disabled={!deal.address}
+                                data-testid={`button-property-data-${deal.id}`}
+                              >
+                                <BarChart3 size={14} className="mr-1" />
+                                Property Data
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => autoFillDealMutation.mutate(deal.id)}
+                                className="h-8 px-2 text-xs bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                                disabled={!deal.address || autoFillDealMutation.isPending}
+                                data-testid={`button-auto-fill-${deal.id}`}
+                              >
+                                <Zap size={14} className="mr-1" />
+                                {autoFillDealMutation.isPending ? 'Filling...' : 'Auto-Fill'}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+        </div>
+      </div>
+      
+      {/* Formula Builder Modal */}
+      {showFormulaBuilder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <FormulaBuilder
+            onAddFormula={addCustomColumn}
+            onClose={() => {
+              setShowFormulaBuilder(false);
+              setFormulaError("");
+            }}
+            existingFormulas={customFormulas}
+            error={formulaError}
+          />
+        </div>
+      )}
+
+      {/* Property Data Modal */}
+      {selectedDealForProperty && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Property Intelligence</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedDealForProperty(null)}
+                  data-testid="button-close-property-modal"
+                >
+                  <X size={16} />
+                </Button>
+              </div>
+              <PropertyDataPanel
+                dealId={selectedDealForProperty}
+                address={deals?.find((d: any) => d.id === selectedDealForProperty)?.address || ''}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <Footer />
+      </div>
+    </div>
+  );
+}

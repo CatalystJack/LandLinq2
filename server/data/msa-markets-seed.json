@@ -1,0 +1,1388 @@
+[
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Mecklenburg",
+    "state": "NC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Union",
+    "state": "NC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Cabarrus",
+    "state": "NC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Rowan",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Iredell",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Lincoln",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Gaston",
+    "state": "NC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "York",
+    "state": "SC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Greenville",
+    "state": "SC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Spartanburg",
+    "state": "SC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Wilkes",
+    "state": "NC",
+    "productTypes": ["Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Catawba",
+    "state": "NC",
+    "productTypes": ["Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Lancaster",
+    "state": "SC",
+    "productTypes": ["Lot Development"]
+  },
+  {
+    "msaName": "Charlotte-Concord-Gastonia, NC-SC",
+    "county": "Richland",
+    "state": "SC",
+    "productTypes": ["Lot Development"]
+  },
+  {
+    "msaName": "Asheville, NC",
+    "county": "Buncombe",
+    "state": "NC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Asheville, NC",
+    "county": "Henderson",
+    "state": "NC",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Asheville, NC",
+    "county": "Haywood",
+    "state": "NC",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Raleigh-Durham-Cary, NC",
+    "county": "Durham",
+    "state": "NC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Raleigh-Durham-Cary, NC",
+    "county": "Wake",
+    "state": "NC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Raleigh-Durham-Cary, NC",
+    "county": "Johnston",
+    "state": "NC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Raleigh-Durham-Cary, NC",
+    "county": "Chatham",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Raleigh-Durham-Cary, NC",
+    "county": "Orange",
+    "state": "NC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Raleigh-Durham-Cary, NC",
+    "county": "Franklin",
+    "state": "NC",
+    "productTypes": ["Lot Development"]
+  },
+  {
+    "msaName": "Greensboro-Winston-Salem-High Point, NC",
+    "county": "Forsyth",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Greensboro-Winston-Salem-High Point, NC",
+    "county": "Davie",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Greensboro-Winston-Salem-High Point, NC",
+    "county": "Davidson",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Greensboro-Winston-Salem-High Point, NC",
+    "county": "Guilford",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Greensboro-Winston-Salem-High Point, NC",
+    "county": "Alamance",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Greensboro-Winston-Salem-High Point, NC",
+    "county": "Randolph",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Wilmington, NC",
+    "county": "New Hanover",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Wilmington, NC",
+    "county": "Brunswick",
+    "state": "NC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Myrtle Beach-Conway-North Myrtle Beach, SC",
+    "county": "Horry",
+    "state": "SC",
+    "productTypes": ["BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Myrtle Beach-Conway-North Myrtle Beach, SC",
+    "county": "Georgetown",
+    "state": "SC",
+    "productTypes": ["Lot Development"]
+  },
+  {
+    "msaName": "Charleston-North Charleston, SC",
+    "county": "Charleston",
+    "state": "SC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charleston-North Charleston, SC",
+    "county": "Berkeley",
+    "state": "SC",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments", "Lot Development"]
+  },
+  {
+    "msaName": "Charleston-North Charleston, SC",
+    "county": "Dorchester",
+    "state": "SC",
+    "productTypes": ["Active Adult", "Lot Development"]
+  },
+  {
+    "msaName": "Nashville-Davidson-Murfreesboro-Franklin, TN",
+    "county": "Davidson",
+    "state": "TN",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Nashville-Davidson-Murfreesboro-Franklin, TN",
+    "county": "Wilson",
+    "state": "TN",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Nashville-Davidson-Murfreesboro-Franklin, TN",
+    "county": "Rutherford",
+    "state": "TN",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Nashville-Davidson-Murfreesboro-Franklin, TN",
+    "county": "Williamson",
+    "state": "TN",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Nashville-Davidson-Murfreesboro-Franklin, TN",
+    "county": "Sumner",
+    "state": "TN",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Chattanooga, TN-GA",
+    "county": "Hamilton",
+    "state": "TN",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Chattanooga, TN-GA",
+    "county": "Bradley",
+    "state": "TN",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Chattanooga, TN-GA",
+    "county": "Walker",
+    "state": "GA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Chattanooga, TN-GA",
+    "county": "Catoosa",
+    "state": "GA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Knoxville, TN",
+    "county": "Knox",
+    "state": "TN",
+    "productTypes": ["BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "Fulton",
+    "state": "GA",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "DeKalb",
+    "state": "GA",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "Clayton",
+    "state": "GA",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "Cobb",
+    "state": "GA",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "Gwinnett",
+    "state": "GA",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "Forsyth",
+    "state": "GA",
+    "productTypes": ["BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "Hall",
+    "state": "GA",
+    "productTypes": ["BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "Cherokee",
+    "state": "GA",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "Paulding",
+    "state": "GA",
+    "productTypes": ["BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "Coweta",
+    "state": "GA",
+    "productTypes": ["BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "Fayette",
+    "state": "GA",
+    "productTypes": ["BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Atlanta-Sandy Springs-Roswell, GA",
+    "county": "Henry",
+    "state": "GA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Athens-Clarke County, GA",
+    "county": "Clarke",
+    "state": "GA",
+    "productTypes": ["BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Savannah, GA",
+    "county": "Chatham",
+    "state": "GA",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Savannah, GA",
+    "county": "Effingham",
+    "state": "GA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Savannah, GA",
+    "county": "Bryan",
+    "state": "GA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Birmingham-Hoover, AL",
+    "county": "Jefferson",
+    "state": "AL",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Birmingham-Hoover, AL",
+    "county": "Shelby",
+    "state": "AL",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Birmingham-Hoover, AL",
+    "county": "St. Clair",
+    "state": "AL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Birmingham-Hoover, AL",
+    "county": "Blount",
+    "state": "AL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Huntsville, AL",
+    "county": "Madison",
+    "state": "AL",
+    "productTypes": ["Active Adult", "BTR", "Conventional Apartments"]
+  },
+  {
+    "msaName": "Huntsville, AL",
+    "county": "Limestone",
+    "state": "AL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Greenville-Anderson, SC",
+    "county": "Greenville",
+    "state": "SC",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Greenville-Anderson, SC",
+    "county": "Spartanburg",
+    "state": "SC",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Greenville-Anderson, SC",
+    "county": "Anderson",
+    "state": "SC",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Greenville-Anderson, SC",
+    "county": "Pickens",
+    "state": "SC",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Greenville-Anderson, SC",
+    "county": "Laurens",
+    "state": "SC",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "New York",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Kings",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Queens",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Bronx",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Richmond",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Nassau",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Suffolk",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Westchester",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Rockland",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Bergen",
+    "state": "NJ",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Hudson",
+    "state": "NJ",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Essex",
+    "state": "NJ",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New York-Newark-Jersey City, NY-NJ",
+    "county": "Union",
+    "state": "NJ",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Dallas-Fort Worth-Arlington, TX",
+    "county": "Dallas",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Dallas-Fort Worth-Arlington, TX",
+    "county": "Tarrant",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Dallas-Fort Worth-Arlington, TX",
+    "county": "Collin",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Dallas-Fort Worth-Arlington, TX",
+    "county": "Denton",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Dallas-Fort Worth-Arlington, TX",
+    "county": "Rockwall",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Dallas-Fort Worth-Arlington, TX",
+    "county": "Kaufman",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Los Angeles-Long Beach-Anaheim, CA",
+    "county": "Los Angeles",
+    "state": "CA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Los Angeles-Long Beach-Anaheim, CA",
+    "county": "Orange",
+    "state": "CA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Chicago-Naperville-Elgin, IL",
+    "county": "Cook",
+    "state": "IL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Chicago-Naperville-Elgin, IL",
+    "county": "DuPage",
+    "state": "IL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Chicago-Naperville-Elgin, IL",
+    "county": "Lake",
+    "state": "IL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Chicago-Naperville-Elgin, IL",
+    "county": "Will",
+    "state": "IL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Chicago-Naperville-Elgin, IL",
+    "county": "Kane",
+    "state": "IL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Houston-The Woodlands-Sugar Land, TX",
+    "county": "Harris",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Houston-The Woodlands-Sugar Land, TX",
+    "county": "Fort Bend",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Houston-The Woodlands-Sugar Land, TX",
+    "county": "Montgomery",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Houston-The Woodlands-Sugar Land, TX",
+    "county": "Brazoria",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Washington-Arlington-Alexandria, DC-VA-MD",
+    "county": "District of Columbia",
+    "state": "DC",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Washington-Arlington-Alexandria, DC-VA-MD",
+    "county": "Arlington",
+    "state": "VA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Washington-Arlington-Alexandria, DC-VA-MD",
+    "county": "Alexandria City",
+    "state": "VA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Washington-Arlington-Alexandria, DC-VA-MD",
+    "county": "Fairfax",
+    "state": "VA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Washington-Arlington-Alexandria, DC-VA-MD",
+    "county": "Montgomery",
+    "state": "MD",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Washington-Arlington-Alexandria, DC-VA-MD",
+    "county": "Prince George's",
+    "state": "MD",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Miami-Fort Lauderdale-West Palm Beach, FL",
+    "county": "Miami-Dade",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Miami-Fort Lauderdale-West Palm Beach, FL",
+    "county": "Broward",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Miami-Fort Lauderdale-West Palm Beach, FL",
+    "county": "Palm Beach",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Phoenix-Mesa-Scottsdale, AZ",
+    "county": "Maricopa",
+    "state": "AZ",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Phoenix-Mesa-Scottsdale, AZ",
+    "county": "Pinal",
+    "state": "AZ",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Seattle-Tacoma-Bellevue, WA",
+    "county": "King",
+    "state": "WA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Seattle-Tacoma-Bellevue, WA",
+    "county": "Snohomish",
+    "state": "WA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Seattle-Tacoma-Bellevue, WA",
+    "county": "Pierce",
+    "state": "WA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Denver-Aurora-Lakewood, CO",
+    "county": "Denver",
+    "state": "CO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Denver-Aurora-Lakewood, CO",
+    "county": "Arapahoe",
+    "state": "CO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Denver-Aurora-Lakewood, CO",
+    "county": "Jefferson",
+    "state": "CO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Denver-Aurora-Lakewood, CO",
+    "county": "Adams",
+    "state": "CO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Denver-Aurora-Lakewood, CO",
+    "county": "Douglas",
+    "state": "CO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "San Diego-Carlsbad, CA",
+    "county": "San Diego",
+    "state": "CA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Tampa-St. Petersburg-Clearwater, FL",
+    "county": "Hillsborough",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Tampa-St. Petersburg-Clearwater, FL",
+    "county": "Pinellas",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Tampa-St. Petersburg-Clearwater, FL",
+    "county": "Pasco",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Tampa-St. Petersburg-Clearwater, FL",
+    "county": "Hernando",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Orlando-Kissimmee-Sanford, FL",
+    "county": "Orange",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Orlando-Kissimmee-Sanford, FL",
+    "county": "Seminole",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Orlando-Kissimmee-Sanford, FL",
+    "county": "Osceola",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Orlando-Kissimmee-Sanford, FL",
+    "county": "Lake",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Austin-Round Rock, TX",
+    "county": "Travis",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Austin-Round Rock, TX",
+    "county": "Williamson",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Austin-Round Rock, TX",
+    "county": "Hays",
+    "state": "TX",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Richmond, VA",
+    "county": "Henrico",
+    "state": "VA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Richmond, VA",
+    "county": "Chesterfield",
+    "state": "VA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Richmond, VA",
+    "county": "Hanover",
+    "state": "VA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Richmond, VA",
+    "county": "Richmond City",
+    "state": "VA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Richmond, VA",
+    "county": "Goochland",
+    "state": "VA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Sacramento-Roseville-Arden-Arcade, CA",
+    "county": "Sacramento",
+    "state": "CA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Sacramento-Roseville-Arden-Arcade, CA",
+    "county": "Placer",
+    "state": "CA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Sacramento-Roseville-Arden-Arcade, CA",
+    "county": "El Dorado",
+    "state": "CA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Sacramento-Roseville-Arden-Arcade, CA",
+    "county": "Yolo",
+    "state": "CA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Columbus, OH",
+    "county": "Franklin",
+    "state": "OH",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Columbus, OH",
+    "county": "Delaware",
+    "state": "OH",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Columbus, OH",
+    "county": "Fairfield",
+    "state": "OH",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Columbus, OH",
+    "county": "Licking",
+    "state": "OH",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Columbus, OH",
+    "county": "Union",
+    "state": "OH",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Kansas City, MO-KS",
+    "county": "Jackson",
+    "state": "MO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Kansas City, MO-KS",
+    "county": "Clay",
+    "state": "MO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Kansas City, MO-KS",
+    "county": "Platte",
+    "state": "MO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Kansas City, MO-KS",
+    "county": "Cass",
+    "state": "MO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Kansas City, MO-KS",
+    "county": "Johnson",
+    "state": "KS",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Kansas City, MO-KS",
+    "county": "Wyandotte",
+    "state": "KS",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Kansas City, MO-KS",
+    "county": "Leavenworth",
+    "state": "KS",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Jacksonville, FL",
+    "county": "Duval",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Jacksonville, FL",
+    "county": "Clay",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Jacksonville, FL",
+    "county": "St. Johns",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Jacksonville, FL",
+    "county": "Nassau",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Jacksonville, FL",
+    "county": "Baker",
+    "state": "FL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Pittsburgh, PA",
+    "county": "Allegheny",
+    "state": "PA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Pittsburgh, PA",
+    "county": "Butler",
+    "state": "PA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Pittsburgh, PA",
+    "county": "Washington",
+    "state": "PA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Pittsburgh, PA",
+    "county": "Westmoreland",
+    "state": "PA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Pittsburgh, PA",
+    "county": "Beaver",
+    "state": "PA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Cincinnati, OH-KY-IN",
+    "county": "Hamilton",
+    "state": "OH",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Cincinnati, OH-KY-IN",
+    "county": "Butler",
+    "state": "OH",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Cincinnati, OH-KY-IN",
+    "county": "Warren",
+    "state": "OH",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Cincinnati, OH-KY-IN",
+    "county": "Clermont",
+    "state": "OH",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Cincinnati, OH-KY-IN",
+    "county": "Boone",
+    "state": "KY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Cincinnati, OH-KY-IN",
+    "county": "Kenton",
+    "state": "KY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Cincinnati, OH-KY-IN",
+    "county": "Campbell",
+    "state": "KY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "St. Louis, MO-IL",
+    "county": "St. Louis",
+    "state": "MO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "St. Louis, MO-IL",
+    "county": "St. Charles",
+    "state": "MO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "St. Louis, MO-IL",
+    "county": "Jefferson",
+    "state": "MO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "St. Louis, MO-IL",
+    "county": "Franklin",
+    "state": "MO",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "St. Louis, MO-IL",
+    "county": "St. Clair",
+    "state": "IL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "St. Louis, MO-IL",
+    "county": "Madison",
+    "state": "IL",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Oklahoma City, OK",
+    "county": "Oklahoma",
+    "state": "OK",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Oklahoma City, OK",
+    "county": "Cleveland",
+    "state": "OK",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Oklahoma City, OK",
+    "county": "Canadian",
+    "state": "OK",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Oklahoma City, OK",
+    "county": "Logan",
+    "state": "OK",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Oklahoma City, OK",
+    "county": "Grady",
+    "state": "OK",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Louisville, KY-IN",
+    "county": "Jefferson",
+    "state": "KY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Louisville, KY-IN",
+    "county": "Oldham",
+    "state": "KY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Louisville, KY-IN",
+    "county": "Bullitt",
+    "state": "KY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Louisville, KY-IN",
+    "county": "Shelby",
+    "state": "KY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Louisville, KY-IN",
+    "county": "Clark",
+    "state": "IN",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Louisville, KY-IN",
+    "county": "Floyd",
+    "state": "IN",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Providence-Warwick, RI-MA",
+    "county": "Providence",
+    "state": "RI",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Providence-Warwick, RI-MA",
+    "county": "Kent",
+    "state": "RI",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Providence-Warwick, RI-MA",
+    "county": "Washington",
+    "state": "RI",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Providence-Warwick, RI-MA",
+    "county": "Bristol",
+    "state": "RI",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Hartford-West Hartford-East Hartford, CT",
+    "county": "Hartford",
+    "state": "CT",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Hartford-West Hartford-East Hartford, CT",
+    "county": "Tolland",
+    "state": "CT",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Hartford-West Hartford-East Hartford, CT",
+    "county": "Middlesex",
+    "state": "CT",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Albuquerque, NM",
+    "county": "Bernalillo",
+    "state": "NM",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Albuquerque, NM",
+    "county": "Sandoval",
+    "state": "NM",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Albuquerque, NM",
+    "county": "Valencia",
+    "state": "NM",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Albuquerque, NM",
+    "county": "Torrance",
+    "state": "NM",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Boise City, ID",
+    "county": "Ada",
+    "state": "ID",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Boise City, ID",
+    "county": "Canyon",
+    "state": "ID",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Boise City, ID",
+    "county": "Boise",
+    "state": "ID",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Boise City, ID",
+    "county": "Gem",
+    "state": "ID",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Boise City, ID",
+    "county": "Owyhee",
+    "state": "ID",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Des Moines-West Des Moines, IA",
+    "county": "Polk",
+    "state": "IA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Des Moines-West Des Moines, IA",
+    "county": "Dallas",
+    "state": "IA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Des Moines-West Des Moines, IA",
+    "county": "Warren",
+    "state": "IA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Des Moines-West Des Moines, IA",
+    "county": "Madison",
+    "state": "IA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Omaha-Council Bluffs, NE-IA",
+    "county": "Douglas",
+    "state": "NE",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Omaha-Council Bluffs, NE-IA",
+    "county": "Sarpy",
+    "state": "NE",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Omaha-Council Bluffs, NE-IA",
+    "county": "Washington",
+    "state": "NE",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Omaha-Council Bluffs, NE-IA",
+    "county": "Cass",
+    "state": "NE",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Omaha-Council Bluffs, NE-IA",
+    "county": "Pottawattamie",
+    "state": "IA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Grand Rapids-Wyoming, MI",
+    "county": "Kent",
+    "state": "MI",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Grand Rapids-Wyoming, MI",
+    "county": "Ottawa",
+    "state": "MI",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Grand Rapids-Wyoming, MI",
+    "county": "Allegan",
+    "state": "MI",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New Orleans-Metairie, LA",
+    "county": "Orleans Parish",
+    "state": "LA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New Orleans-Metairie, LA",
+    "county": "Jefferson Parish",
+    "state": "LA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New Orleans-Metairie, LA",
+    "county": "St. Tammany Parish",
+    "state": "LA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New Orleans-Metairie, LA",
+    "county": "St. Bernard Parish",
+    "state": "LA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "New Orleans-Metairie, LA",
+    "county": "Plaquemines Parish",
+    "state": "LA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Buffalo-Cheektowaga-Niagara Falls, NY",
+    "county": "Erie",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Buffalo-Cheektowaga-Niagara Falls, NY",
+    "county": "Niagara",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Rochester, NY",
+    "county": "Monroe",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Rochester, NY",
+    "county": "Ontario",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Rochester, NY",
+    "county": "Wayne",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Rochester, NY",
+    "county": "Livingston",
+    "state": "NY",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Tucson, AZ",
+    "county": "Pima",
+    "state": "AZ",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Fresno, CA",
+    "county": "Fresno",
+    "state": "CA",
+    "productTypes": ["Active Adult"]
+  },
+  {
+    "msaName": "Fresno, CA",
+    "county": "Madera",
+    "state": "CA",
+    "productTypes": ["Active Adult"]
+  }
+]

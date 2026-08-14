@@ -1,0 +1,581 @@
+Template Type,Template ID,Template Name,Subject/Content Type,Full Content,Usage Type,Variables Used
+EMAIL,1,Deal Submission Confirmation,Deal Received - {{address}} | LandLinq #{{dealId}},"Dear {{brokerName}},
+
+Thank you for submitting your deal to LandLinq. We've successfully received your property submission:
+
+**Property Details:**
+Address: {{address}}
+Deal ID: {{dealId}}
+Submission Date: {{submissionDate}}
+Acreage: {{acreage}} acres
+Development Type: {{developmentType}}
+Asking Price: {{askingPrice}}
+
+Our analyst team will review your submission within 24-48 hours. You'll receive updates as we progress through our evaluation process.
+
+**What happens next:**
+1. Initial review and classification (24-48 hours)
+2. Detailed market analysis and due diligence
+3. Final decision and feedback
+
+You can track your deal status anytime at: {{trackingUrl}}
+
+Best regards,
+The LandLinq Team
+
+Questions? Reply to this email or call us at (888) 486-6346.",confirmation,"brokerName, address, dealId, submissionDate, acreage, developmentType, askingPrice, trackingUrl"
+EMAIL,2,Deal Approved - High Priority,Great News! {{address}} Approved | LandLinq #{{dealId}},"Dear {{brokerName}},
+
+Excellent news! Your property submission has been APPROVED and classified as HIGH PRIORITY.
+
+**Property:** {{address}}
+**Deal ID:** {{dealId}}
+**Classification:** High Priority (Green)
+**Estimated Timeline:** {{estimatedTimeline}}
+
+**Why we're excited about this deal:**
+{{approvalReasons}}
+
+**Next Steps:**
+1. Our acquisition team will contact you within 24 hours
+2. We'll schedule a property visit within {{visitTimeframe}}
+3. Initial offer expected within {{offerTimeframe}}
+
+**Your Analyst:** {{analystName}}
+**Direct Contact:** {{analystEmail}} | {{analystPhone}}
+
+We're moving quickly on this opportunity. Please ensure all property documents are readily available.
+
+Best regards,
+{{analystName}}
+Catalyst Capital Partners
+
+P.S. Thank you for bringing us quality opportunities like this!",approved,"brokerName, address, dealId, estimatedTimeline, approvalReasons, visitTimeframe, offerTimeframe, analystName, analystEmail, analystPhone"
+EMAIL,3,Deal Under Review - Potential Interest,{{address}} Under Review | LandLinq #{{dealId}},"Dear {{brokerName}},
+
+Thank you for your submission. We've completed our initial review of your property:
+
+**Property:** {{address}}
+**Deal ID:** {{dealId}}
+**Status:** Under Review (Potential Interest)
+**Classification:** Yellow - Requires Additional Analysis
+
+**Current Assessment:**
+{{reviewNotes}}
+
+**Additional Information Needed:**
+{{informationRequested}}
+
+**Timeline:**
+- Detailed analysis: {{analysisTimeframe}}
+- Decision expected: {{decisionTimeframe}}
+
+Our team is conducting deeper market research and feasibility analysis. We'll update you as soon as our evaluation is complete.
+
+**Your Analyst:** {{analystName}}
+**Questions?** {{analystEmail}} | {{analystPhone}}
+
+Thank you for your patience as we conduct our thorough review process.
+
+Best regards,
+{{analystName}}
+Catalyst Capital Partners",under_review,"brokerName, address, dealId, reviewNotes, informationRequested, analysisTimeframe, decisionTimeframe, analystName, analystEmail, analystPhone"
+EMAIL,4,Deal Declined with Feedback,Re: {{address}} - Decision Update | LandLinq #{{dealId}},"Dear {{brokerName}},
+
+Thank you for submitting your property for our consideration. After careful review, we've decided not to move forward with this opportunity at this time.
+
+**Property:** {{address}}
+**Deal ID:** {{dealId}}
+**Decision:** Not Proceeding
+
+**Feedback:**
+{{declineReasons}}
+
+**Market Insights:**
+{{marketFeedback}}
+
+While this particular property doesn't align with our current acquisition criteria, we value our relationship with you and encourage you to continue sending opportunities that match our investment parameters.
+
+**What we're actively seeking:**
+- {{targetCriteria}}
+- Markets: {{targetMarkets}}
+- Size: {{preferredSizeRange}}
+
+We appreciate your time and look forward to future opportunities that may be a better fit.
+
+Best regards,
+{{analystName}}
+Catalyst Capital Partners
+
+**New Opportunities:** Continue submitting at {{submissionUrl}}",rejected,"brokerName, address, dealId, declineReasons, marketFeedback, targetCriteria, targetMarkets, preferredSizeRange, analystName, submissionUrl"
+EMAIL,5,Follow-up After Initial Interest,Following Up: {{address}} | LandLinq #{{dealId}},"Dear {{brokerName}},
+
+I hope this email finds you well. I'm following up on the property submission we discussed:
+
+**Property:** {{address}}
+**Deal ID:** {{dealId}}
+**Last Contact:** {{lastContactDate}}
+
+**Current Status:**
+{{currentStatus}}
+
+**Outstanding Items:**
+{{outstandingItems}}
+
+**Next Steps:**
+{{nextSteps}}
+
+I wanted to ensure we maintain momentum on this opportunity. Please let me know if you have any updates or if there's additional information I can provide.
+
+**Best times to reach me:**
+- Phone: {{analystPhone}} ({{availability}})
+- Email: {{analystEmail}} (checked regularly)
+
+Looking forward to moving this forward together.
+
+Best regards,
+{{analystName}}
+Catalyst Capital Partners",follow_up,"brokerName, address, dealId, lastContactDate, currentStatus, outstandingItems, nextSteps, analystPhone, availability, analystEmail, analystName"
+EMAIL,6,Document Request,Documents Needed: {{address}} | LandLinq #{{dealId}},"Dear {{brokerName}},
+
+To continue our evaluation of your property submission, we need the following documents:
+
+**Property:** {{address}}
+**Deal ID:** {{dealId}}
+**Request Date:** {{requestDate}}
+
+**Required Documents:**
+{{documentList}}
+
+**Optional but Helpful:**
+{{optionalDocuments}}
+
+**Upload Instructions:**
+1. Use our secure portal: {{uploadUrl}}
+2. Reference Deal ID: {{dealId}}
+3. Email directly to: {{analystEmail}}
+
+**Timeline:**
+Please provide these documents within {{documentDeadline}} to maintain our review timeline.
+
+If you have any questions about specific documents or need assistance with uploads, please don't hesitate to contact me.
+
+Best regards,
+{{analystName}}
+Catalyst Capital Partners
+{{analystEmail}} | {{analystPhone}}",document_request,"brokerName, address, dealId, requestDate, documentList, optionalDocuments, uploadUrl, documentDeadline, analystName, analystEmail, analystPhone"
+EMAIL,7,Meeting Confirmation,Meeting Confirmed: {{address}} | {{meetingDate}},"Dear {{brokerName}},
+
+This confirms our upcoming meeting to discuss the property opportunity:
+
+**Meeting Details:**
+- **Date:** {{meetingDate}}
+- **Time:** {{meetingTime}}
+- **Location:** {{meetingLocation}}
+- **Property:** {{address}}
+- **Deal ID:** {{dealId}}
+
+**Attendees:**
+- {{attendeeList}}
+
+**Meeting Agenda:**
+1. Property overview and highlights
+2. Market analysis discussion
+3. Development potential review
+4. Next steps and timeline
+5. Q&A
+
+**Please Bring:**
+{{itemsToBring}}
+
+**Contact Information:**
+If you need to reschedule or have any questions:
+- {{analystName}}: {{analystPhone}}
+- Email: {{analystEmail}}
+
+Looking forward to our productive discussion.
+
+Best regards,
+{{analystName}}
+Catalyst Capital Partners",meeting_confirmation,"brokerName, meetingDate, meetingTime, meetingLocation, address, dealId, attendeeList, itemsToBring, analystName, analystPhone, analystEmail"
+EMAIL,8,Market Update Newsletter,Market Insights: {{marketName}} | {{month}} {{year}},"Dear {{brokerName}},
+
+Here's your monthly market update for opportunities in the {{marketName}} area:
+
+**Market Snapshot - {{month}} {{year}}:**
+- Active Deals: {{activeDeals}}
+- Average Days to Decision: {{avgDecisionDays}}
+- Market Temperature: {{marketTemperature}}
+
+**What We're Seeing:**
+{{marketTrends}}
+
+**Current Acquisition Focus:**
+{{currentFocus}}
+
+**Recently Closed:**
+{{recentClosings}}
+
+**Opportunities We're Seeking:**
+- Development Type: {{preferredTypes}}
+- Size Range: {{sizeRange}}
+- Target Markets: {{targetAreas}}
+- Price Range: {{priceRange}}
+
+**Submit Deals:** {{submissionUrl}}
+**Market Questions:** {{contactEmail}}
+
+Thank you for being a valued member of our broker network.
+
+Best regards,
+The LandLinq Team
+Catalyst Capital Partners",market_update,"brokerName, marketName, month, year, activeDeals, avgDecisionDays, marketTemperature, marketTrends, currentFocus, recentClosings, preferredTypes, sizeRange, targetAreas, priceRange, submissionUrl, contactEmail"
+EMAIL,9,Broker Welcome Package,Welcome to LandLinq! Your Complete Guide,"Dear {{brokerName}},
+
+Welcome to the LandLinq broker network! We're excited to work with you to identify exceptional land acquisition opportunities.
+
+**Your Account Details:**
+- Broker ID: {{brokerId}}
+- Portal Access: {{portalUrl}}
+- Submission Email: {{submissionEmail}}
+
+**Getting Started:**
+1. **Deal Submission:** {{submissionGuideUrl}}
+2. **Market Criteria:** {{criteriaUrl}}
+3. **Success Stories:** {{successStoriesUrl}}
+
+**What We Look For:**
+{{acquisitionCriteria}}
+
+**Our Process:**
+1. Submit → 2. Review (24-48 hrs) → 3. Decision → 4. Next Steps
+
+**Your Success Team:**
+- Primary Analyst: {{primaryAnalyst}}
+- Email: {{analystEmail}}
+- Phone: {{analystPhone}}
+- Backup Contact: {{backupContact}}
+
+**Resources:**
+- Submission Templates: {{templatesUrl}}
+- Market Reports: {{reportsUrl}}
+- FAQ: {{faqUrl}}
+
+**Performance Dashboard:**
+Track your submissions, approvals, and commissions at: {{dashboardUrl}}
+
+We're looking forward to a successful partnership!
+
+Best regards,
+The LandLinq Team
+Catalyst Capital Partners",welcome,"brokerName, brokerId, portalUrl, submissionEmail, submissionGuideUrl, criteriaUrl, successStoriesUrl, acquisitionCriteria, primaryAnalyst, analystEmail, analystPhone, backupContact, templatesUrl, reportsUrl, faqUrl, dashboardUrl"
+EMAIL,10,Commission Payment Notification,Commission Payment Processed - {{dealAddress}},"Dear {{brokerName}},
+
+Great news! Your commission payment has been processed for the following deal:
+
+**Transaction Details:**
+- Property: {{dealAddress}}
+- Deal ID: {{dealId}}
+- Closing Date: {{closingDate}}
+- Commission Amount: {{commissionAmount}}
+- Payment Date: {{paymentDate}}
+
+**Payment Method:** {{paymentMethod}}
+**Reference Number:** {{referenceNumber}}
+
+**Transaction Summary:**
+- Purchase Price: {{purchasePrice}}
+- Commission Rate: {{commissionRate}}
+- Gross Commission: {{grossCommission}}
+- Less Deductions: {{deductions}}
+- Net Payment: {{netPayment}}
+
+Your payment should appear in your account within {{processingDays}} business days.
+
+**Questions about this payment?**
+Contact our accounting team:
+- Email: {{accountingEmail}}
+- Phone: {{accountingPhone}}
+- Hours: {{accountingHours}}
+
+Thank you for bringing us this excellent opportunity!
+
+Best regards,
+{{analystName}}
+Catalyst Capital Partners
+
+**Track your earnings:** {{earningsPortalUrl}}",commission,"brokerName, dealAddress, dealId, closingDate, commissionAmount, paymentDate, paymentMethod, referenceNumber, purchasePrice, commissionRate, grossCommission, deductions, netPayment, processingDays, accountingEmail, accountingPhone, accountingHours, analystName, earningsPortalUrl"
+SMS,11,Quick Deal Confirmation,Deal Received,"Hi {{brokerName}}! Deal received for {{address}} (ID: {{dealId}}). Initial review within 24-48hrs. Track status: {{shortUrl}}. Questions? Reply HELP. - LandLinq Team",confirmation,"brokerName, address, dealId, shortUrl"
+SMS,12,Urgent High Priority Alert,High Priority Deal,"🎉 APPROVED! {{address}} is HIGH PRIORITY. {{analystName}} calling within 24hrs. Check email for details. Deal ID: {{dealId}}. - Catalyst Capital",approved,"address, analystName, dealId"
+SMS,13,Quick Status Update,Deal Status Update,"Update on {{address}} ({{dealId}}): {{statusUpdate}}. {{nextStep}}. Full details in email. Questions? Call {{analystPhone}}. - {{analystName}}",under_review,"address, dealId, statusUpdate, nextStep, analystPhone, analystName"
+SMS,14,Document Reminder,Documents Needed,"Reminder: Documents needed for {{address}} ({{dealId}}) by {{deadline}}. Upload: {{uploadUrl}} or reply with questions. - {{analystName}}",document_request,"address, dealId, deadline, uploadUrl, analystName"
+SMS,15,Meeting Reminder,Meeting Tomorrow,"Reminder: Meeting tomorrow {{time}} at {{location}} for {{address}}. Need to reschedule? Call {{phone}}. - {{analystName}}",meeting_reminder,"time, location, address, phone, analystName"
+SMS,16,Market Alert,Hot Market Update,"🔥 HOT MARKET: {{marketName}} - seeking {{propertyType}}, {{sizeRange}} acres. Fast decisions! Submit: {{submissionUrl}} - LandLinq",market_alert,"marketName, propertyType, sizeRange, submissionUrl"
+SMS,17,Payment Processed,Commission Paid,"💰 Commission processed! ${{amount}} for {{address}} ({{dealId}}). Payment arriving {{arrivalDate}}. Details in email. - Catalyst Capital",payment,"amount, address, dealId, arrivalDate"
+SMS,18,Follow-up Prompt,Quick Check-in,"Hi {{brokerName}}! Following up on {{address}} ({{dealId}}). Any updates? Call {{phone}} or reply here. - {{analystName}}",follow_up,"brokerName, address, dealId, phone, analystName"
+EMAIL,19,Quarterly Performance Review,Q{{quarter}} {{year}} Broker Performance Summary,"Dear {{brokerName}},
+
+Here's your quarterly performance summary for Q{{quarter}} {{year}}:
+
+**Your Performance Highlights:**
+- Deals Submitted: {{dealsSubmitted}}
+- Approval Rate: {{approvalRate}}%
+- Closed Transactions: {{closedDeals}}
+- Total Commissions: {{totalCommissions}}
+- Average Deal Size: {{avgDealSize}}
+
+**Top Performing Markets:**
+{{topMarkets}}
+
+**Deal Categories:**
+- High Priority (Green): {{greenDeals}}
+- Under Review (Yellow): {{yellowDeals}}  
+- Declined (Red): {{redDeals}}
+
+**Commission Breakdown:**
+{{commissionBreakdown}}
+
+**Compared to Network Average:**
+- Approval Rate: {{approvalComparison}}
+- Deal Quality Score: {{qualityScore}}/10
+- Response Time: {{responseTimeComparison}}
+
+**Areas of Excellence:**
+{{excellenceAreas}}
+
+**Growth Opportunities:**
+{{growthAreas}}
+
+**Q{{nextQuarter}} Goals:**
+{{nextQuarterGoals}}
+
+**Upcoming Market Focus:**
+{{upcomingFocus}}
+
+Thank you for your continued partnership. Let's make Q{{nextQuarter}} even more successful!
+
+Best regards,
+{{analystName}}
+Catalyst Capital Partners
+
+**Schedule Review Call:** {{calendarUrl}}",performance_review,"brokerName, quarter, year, dealsSubmitted, approvalRate, closedDeals, totalCommissions, avgDealSize, topMarkets, greenDeals, yellowDeals, redDeals, commissionBreakdown, approvalComparison, qualityScore, responseTimeComparison, excellenceAreas, growthAreas, nextQuarter, nextQuarterGoals, upcomingFocus, analystName, calendarUrl"
+EMAIL,20,Holiday/Season Greetings,Happy Holidays from Catalyst Capital Partners,"Dear {{brokerName}},
+
+As {{holiday}} approaches, we want to take a moment to thank you for your partnership and dedication throughout {{year}}.
+
+**This Year's Achievements Together:**
+- Deals Evaluated: {{totalDeals}}
+- Successful Acquisitions: {{successfulAcquisitions}}
+- Partners Like You: {{totalBrokers}}
+- Markets Served: {{marketsServed}}
+
+**Your Contribution:**
+You've been instrumental in {{personalContribution}}.
+
+**Looking Ahead to {{nextYear}}:**
+We're excited about expanded opportunities in:
+- {{newMarkets}}
+- {{newDevelopmentTypes}}
+- {{enhancedPrograms}}
+
+**Holiday Schedule:**
+Our offices will be {{holidaySchedule}}. For urgent matters, contact {{emergencyContact}}.
+
+**New Year Kick-off:**
+Save the date for our {{eventName}} on {{eventDate}}. Details coming soon!
+
+From all of us at Catalyst Capital Partners, we wish you and your family a wonderful {{holiday}} and a prosperous {{nextYear}}.
+
+Thank you for being an exceptional partner.
+
+Warm regards,
+The Catalyst Capital Partners Team
+
+P.S. Keep those great deals coming in {{nextYear}}!",holiday_greeting,"brokerName, holiday, year, totalDeals, successfulAcquisitions, totalBrokers, marketsServed, personalContribution, nextYear, newMarkets, newDevelopmentTypes, enhancedPrograms, holidaySchedule, emergencyContact, eventName, eventDate"
+EMAIL,21,Deal Expiration Warning,Action Needed: {{address}} Deal Expires Soon | {{dealId}},"Dear {{brokerName}},
+
+This is an important notice regarding your submitted deal:
+
+**Property:** {{address}}
+**Deal ID:** {{dealId}}
+**Status:** {{currentStatus}}
+**Expiration:** {{expirationDate}} ({{daysRemaining}} days remaining)
+
+**Required Action:**
+{{requiredAction}}
+
+**To Extend/Update:**
+1. {{step1}}
+2. {{step2}}
+3. {{step3}}
+
+**Contact Immediately:**
+If you need assistance or have questions, please contact:
+- {{analystName}}: {{analystPhone}}
+- Email: {{analystEmail}}
+- Response needed by: {{responseDeadline}}
+
+**Why This Matters:**
+{{importanceNote}}
+
+Don't let this opportunity expire! Please reach out today.
+
+Best regards,
+{{analystName}}
+Catalyst Capital Partners
+
+**Quick Response:** Reply to this email or call {{quickContactNumber}}",expiration_warning,"brokerName, address, dealId, currentStatus, expirationDate, daysRemaining, requiredAction, step1, step2, step3, analystName, analystPhone, analystEmail, responseDeadline, importanceNote, quickContactNumber"
+EMAIL,22,New Market Expansion Announcement,Exciting News: We're Expanding to {{newMarketName}}!,"Dear {{brokerName}},
+
+We have exciting news to share! Catalyst Capital Partners is expanding our acquisition focus to include {{newMarketName}}.
+
+**New Market Details:**
+- Market: {{newMarketName}}
+- Launch Date: {{launchDate}}
+- Focus Areas: {{focusAreas}}
+- Development Types: {{developmentTypes}}
+
+**What We're Seeking:**
+{{acquisitionCriteria}}
+
+**Investment Range:** {{investmentRange}}
+**Timeline:** {{acquisitionTimeline}}
+
+**Local Team:**
+- Market Manager: {{marketManager}}
+- Analyst: {{localAnalyst}}
+- Phone: {{localPhone}}
+- Email: {{localEmail}}
+
+**Broker Opportunities:**
+{{brokerOpportunities}}
+
+**Special Launch Incentives:**
+{{launchIncentives}}
+
+**Getting Started:**
+1. Review market criteria: {{criteriaUrl}}
+2. Submit first deal: {{submissionUrl}}
+3. Schedule market briefing: {{briefingUrl}}
+
+**Market Kick-off Event:**
+Join us for our {{eventName}} on {{eventDate}} at {{eventLocation}}.
+RSVP: {{rsvpUrl}}
+
+This expansion represents significant new opportunities for our broker partners. We're excited to explore {{newMarketName}} together!
+
+Questions about the new market? Contact {{marketManager}} at {{contactInfo}}.
+
+Best regards,
+The LandLinq Team
+Catalyst Capital Partners",market_expansion,"brokerName, newMarketName, launchDate, focusAreas, developmentTypes, acquisitionCriteria, investmentRange, acquisitionTimeline, marketManager, localAnalyst, localPhone, localEmail, brokerOpportunities, launchIncentives, criteriaUrl, submissionUrl, briefingUrl, eventName, eventDate, eventLocation, rsvpUrl, contactInfo"
+SMS,19,Deal Expiration Alert,Deal Expires Soon,"⚠️ URGENT: {{address}} ({{dealId}}) expires in {{daysLeft}} days! Action needed. Check email or call {{phone}}. - {{analystName}}",expiration_alert,"address, dealId, daysLeft, phone, analystName"
+SMS,20,New Market Alert,New Market Launch,"🎉 NEW MARKET! Now seeking deals in {{marketName}}. {{propertyTypes}}, {{sizeRange}}. Submit: {{url}} - LandLinq",market_expansion,"marketName, propertyTypes, sizeRange, url"
+SMS,21,Meeting Confirmed,Meeting Set,"✅ Confirmed: {{date}} {{time}} at {{location}} for {{address}}. See email for agenda. Need changes? Call {{phone}}. - {{analystName}}",meeting_confirmation,"date, time, location, address, phone, analystName"
+SMS,22,Seasonal Greeting,Holiday Wishes,"🎄 Happy {{holiday}}! Thanks for an amazing {{year}}. Looking forward to more success in {{nextYear}}! - Catalyst Capital Team",holiday,"holiday, year, nextYear"
+SMS,23,Emergency Contact,After Hours Contact,"This is LandLinq after-hours service. For true emergencies: {{emergencyPhone}}. All other matters will be handled next business day. Thanks!",emergency,"emergencyPhone"
+SMS,24,Account Update,Account Information,"Hi {{brokerName}}! Your LandLinq account has been updated. New login: {{portalUrl}}. Questions? Reply HELP or call {{supportPhone}}.",account_update,"brokerName, portalUrl, supportPhone"
+EMAIL,23,Deal Analysis Deep Dive,Detailed Analysis: {{address}} | LandLinq #{{dealId}},"Dear {{brokerName}},
+
+We've completed our comprehensive analysis of your submitted property. Here's our detailed assessment:
+
+**Property:** {{address}}
+**Deal ID:** {{dealId}}
+**Analysis Date:** {{analysisDate}}
+**Lead Analyst:** {{leadAnalyst}}
+
+**EXECUTIVE SUMMARY**
+{{executiveSummary}}
+
+**MARKET ANALYSIS**
+{{marketAnalysis}}
+
+**DEVELOPMENT POTENTIAL**
+{{developmentPotential}}
+
+**FINANCIAL PROJECTIONS**
+{{financialProjections}}
+
+**RISK ASSESSMENT**
+{{riskAssessment}}
+
+**COMPARABLE ANALYSIS**
+{{comparableAnalysis}}
+
+**INFRASTRUCTURE & UTILITIES**
+{{infrastructureAnalysis}}
+
+**ZONING & REGULATORY**
+{{zoningAnalysis}}
+
+**ENVIRONMENTAL CONSIDERATIONS**
+{{environmentalFactors}}
+
+**RECOMMENDATION**
+{{finalRecommendation}}
+
+**NEXT STEPS**
+{{nextSteps}}
+
+**TIMELINE**
+{{proposedTimeline}}
+
+This analysis reflects current market conditions as of {{analysisDate}}. Please feel free to discuss any aspects in detail.
+
+**Schedule Discussion:**
+{{calendarLink}} or call {{analystPhone}}
+
+Best regards,
+{{leadAnalyst}}
+Senior Land Acquisition Analyst
+Catalyst Capital Partners
+
+**Confidential Analysis - Not for Distribution**",detailed_analysis,"brokerName, address, dealId, analysisDate, leadAnalyst, executiveSummary, marketAnalysis, developmentPotential, financialProjections, riskAssessment, comparableAnalysis, infrastructureAnalysis, zoningAnalysis, environmentalFactors, finalRecommendation, nextSteps, proposedTimeline, calendarLink, analystPhone"
+EMAIL,24,Referral Thank You,Thank You for the Referral!,"Dear {{brokerName}},
+
+Thank you for referring {{referredBrokerName}} to the LandLinq network!
+
+**Referral Details:**
+- Referred Broker: {{referredBrokerName}}
+- Company: {{referredCompany}}
+- Referral Date: {{referralDate}}
+- Status: {{referralStatus}}
+
+**Your Referral Bonus:**
+{{referralBonus}}
+
+**Referred Broker's Progress:**
+{{referralProgress}}
+
+**Why Referrals Matter:**
+{{referralImportance}}
+
+**Referral Program Benefits:**
+- Cash bonus for successful referrals: {{bonusAmount}}
+- Expanded deal flow opportunities
+- Network growth rewards
+- Annual recognition program
+
+**Additional Referrals:**
+Know other quality brokers? The referral program continues!
+- Submit referrals: {{referralUrl}}
+- Track status: {{trackingUrl}}
+- Program details: {{programDetailsUrl}}
+
+**Program Rules:**
+{{programRules}}
+
+Thank you for helping us grow our network with quality partners like {{referredBrokerName}}.
+
+**Current Referral Status:**
+- This Year: {{yearlyReferrals}} referrals
+- Bonus Earned: {{bonusEarned}}
+- Network Rank: {{networkRank}}
+
+Best regards,
+{{partnershipManager}}
+Partnership Development
+Catalyst Capital Partners
+
+**Questions:** {{partnershipEmail}} | {{partnershipPhone}}",referral_thanks,"brokerName, referredBrokerName, referredCompany, referralDate, referralStatus, referralBonus, referralProgress, referralImportance, bonusAmount, referralUrl, trackingUrl, programDetailsUrl, programRules, yearlyReferrals, bonusEarned, networkRank, partnershipManager, partnershipEmail, partnershipPhone"
+SMS,25,Referral Bonus Alert,Referral Bonus,"💰 Referral bonus earned! {{referredName}} joined successfully. ${{bonusAmount}} being processed. Thanks for growing our network! - LandLinq",referral_bonus,"referredName, bonusAmount"

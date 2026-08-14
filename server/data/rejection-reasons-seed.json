@@ -1,0 +1,152 @@
+[
+  {
+    "category": "Size & Density",
+    "reason": "Property too small (under 4 acres)",
+    "isActive": true,
+    "sortOrder": 1
+  },
+  {
+    "category": "Size & Density",
+    "reason": "Insufficient density potential",
+    "isActive": true,
+    "sortOrder": 2
+  },
+  {
+    "category": "Size & Density",
+    "reason": "Unit count below threshold",
+    "isActive": true,
+    "sortOrder": 3
+  },
+  {
+    "category": "Location",
+    "reason": "Outside target MSAs",
+    "isActive": true,
+    "sortOrder": 4
+  },
+  {
+    "category": "Location",
+    "reason": "Market oversupply concerns",
+    "isActive": true,
+    "sortOrder": 5
+  },
+  {
+    "category": "Location",
+    "reason": "Weak demographic profile",
+    "isActive": true,
+    "sortOrder": 6
+  },
+  {
+    "category": "Location",
+    "reason": "Poor employment/income metrics",
+    "isActive": true,
+    "sortOrder": 7
+  },
+  {
+    "category": "Financial",
+    "reason": "Asking price too high for market",
+    "isActive": true,
+    "sortOrder": 8
+  },
+  {
+    "category": "Financial",
+    "reason": "Rent comps too low (below $1.75/sqft)",
+    "isActive": true,
+    "sortOrder": 9
+  },
+  {
+    "category": "Financial",
+    "reason": "No qualifying comparables found",
+    "isActive": true,
+    "sortOrder": 10
+  },
+  {
+    "category": "Financial",
+    "reason": "Projected returns below threshold",
+    "isActive": true,
+    "sortOrder": 11
+  },
+  {
+    "category": "Financial",
+    "reason": "Development costs prohibitive",
+    "isActive": true,
+    "sortOrder": 12
+  },
+  {
+    "category": "Site Conditions",
+    "reason": "Topography challenges",
+    "isActive": true,
+    "sortOrder": 13
+  },
+  {
+    "category": "Site Conditions",
+    "reason": "Environmental concerns",
+    "isActive": true,
+    "sortOrder": 14
+  },
+  {
+    "category": "Site Conditions",
+    "reason": "Wetlands or flood zone issues",
+    "isActive": true,
+    "sortOrder": 15
+  },
+  {
+    "category": "Site Conditions",
+    "reason": "Access/egress limitations",
+    "isActive": true,
+    "sortOrder": 16
+  },
+  {
+    "category": "Zoning & Entitlements",
+    "reason": "Zoning not suitable for intended use",
+    "isActive": true,
+    "sortOrder": 17
+  },
+  {
+    "category": "Zoning & Entitlements",
+    "reason": "Rezoning unlikely to be approved",
+    "isActive": true,
+    "sortOrder": 18
+  },
+  {
+    "category": "Zoning & Entitlements",
+    "reason": "Excessive entitlement risk",
+    "isActive": true,
+    "sortOrder": 19
+  },
+  {
+    "category": "Zoning & Entitlements",
+    "reason": "Restrictive density limitations",
+    "isActive": true,
+    "sortOrder": 20
+  },
+  {
+    "category": "Infrastructure",
+    "reason": "No public sewer available",
+    "isActive": true,
+    "sortOrder": 21
+  },
+  {
+    "category": "Infrastructure",
+    "reason": "Utilities extension too costly",
+    "isActive": true,
+    "sortOrder": 22
+  },
+  {
+    "category": "Infrastructure",
+    "reason": "Water capacity insufficient",
+    "isActive": true,
+    "sortOrder": 23
+  },
+  {
+    "category": "Infrastructure",
+    "reason": "Road/transportation infrastructure lacking",
+    "isActive": true,
+    "sortOrder": 24
+  },
+  {
+    "category": "Other",
+    "reason": "Does not align with current investment thesis",
+    "isActive": true,
+    "sortOrder": 25
+  }
+]

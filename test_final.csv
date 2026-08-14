@@ -1,0 +1,189 @@
+Template Type,Template ID,Template Name,Subject/Content Type,Full Content,Usage Type,Variables Used
+EMAIL,1,Deal Submission Confirmation,Deal Received - {{address}} | LandLinq #{{dealId}},"Dear {{brokerName}},
+
+Thank you for submitting your deal to LandLinq. We've successfully received your property submission:
+
+📍 **Property**: {{address}}
+🏢 **Development Type**: {{developmentType}}
+📏 **Size**: {{acres}} acres ({{lotCount}} lots)
+💰 **Asking Price**: ${{price}}
+📋 **Deal ID**: TL-{{dealId}}
+
+What happens next:
+✅ Initial review within 2 business hours
+✅ Detailed analysis within 24-48 hours
+✅ Direct contact from our acquisition team
+
+You can track your submission status at: [Portal Link]
+
+We appreciate your partnership and will be in touch soon!
+
+Best regards,
+{{analystName}}
+LandLinq Acquisitions Team
+Catalyst Capital Partners
+📧 {{analystEmail}} | 📱 Direct line available",confirmation,"brokerName, address, developmentType, acres, lotCount, price, dealId, analystName, analystEmail"
+EMAIL,2,High Priority - Pursuing Deal,🎯 HIGH PRIORITY: {{address}} - Moving to Due Diligence,"Dear {{brokerName}},
+
+🎉 **Excellent news!** Your property at {{address}} has been classified as HIGH PRIORITY and we're moving forward immediately.
+
+**Why we're excited:**
+✅ Perfect market fit for {{market}}
+✅ Ideal size at {{acres}} acres
+✅ Strong development potential
+✅ Meets all our acquisition criteria
+
+**Immediate next steps:**
+📅 **Site visit scheduled**: Within 3 business days
+📋 **Due diligence package**: Will be sent today
+💼 **Direct contact**: {{analystName}} will call you within 2 hours
+📊 **Preliminary offer**: Expected within 5-7 business days
+
+**What we need from you:**
+• Survey and title work (if available)
+• Environmental assessments
+• Zoning documentation
+• Utility availability confirmation
+
+This is exactly the type of deal we've been looking for. Let's move quickly!
+
+**Your dedicated team:**
+🏢 **Analyst**: {{analystName}} - {{analystEmail}}
+🏗️ **Developer**: {{developerName}} - {{developerEmail}}
+🤝 **Partner**: {{partnerName}} - {{partnerEmail}}
+
+Talk soon!
+
+{{analystName}}
+Senior Acquisitions Analyst
+LandLinq | Catalyst Capital Partners",approved,"brokerName, address, market, acres, analystName, analystEmail, developerName, developerEmail, partnerName, partnerEmail"
+EMAIL,3,Deal Under Review - Additional Analysis,Under Review: {{address}} - Additional Information Needed,"Dear {{brokerName}},
+
+Thank you for your submission of {{address}}. Our team has completed the initial review and we're moving to detailed analysis.
+
+**Current Status**: Under Review 🔍
+**Timeline**: Decision expected within 48-72 hours
+
+**What we're analyzing:**
+📊 Market comparables in {{market}}
+🏗️ Development feasibility for {{developmentType}}
+💰 Financial modeling at ${{pricePerAcre}}/acre
+📋 Zoning and permitting requirements
+🚧 Infrastructure and utility costs
+
+**To expedite our review, please provide (if available):**
+• Recent survey or plat
+• Preliminary title work
+• Zoning letters or documentation
+• Utility availability letters
+• Environmental Phase I (if completed)
+
+While we complete our analysis, here are some questions:
+1. Are you the listing agent or do you represent the seller directly?
+2. What's the seller's timeline for closing?
+3. Are there any known issues with the property?
+4. Have there been other offers or interest?
+
+We'll keep you updated throughout the process. Feel free to call with any questions.
+
+Best regards,
+{{analystName}}
+Acquisitions Team
+LandLinq | Catalyst Capital Partners
+{{analystEmail}}",under_review,"brokerName, address, market, developmentType, pricePerAcre, analystName, analystEmail"
+EMAIL,4,Deal Does Not Meet Criteria,Update on {{address}} - Not a Current Fit,"Dear {{brokerName}},
+
+Thank you for submitting {{address}} for our consideration. After thorough review, this property doesn't align with our current acquisition criteria.
+
+**Review Summary:**
+📍 **Property**: {{address}}
+📏 **Size**: {{acres}} acres
+💰 **Price**: ${{price}} (${{pricePerAcre}}/acre)
+🏢 **Type**: {{developmentType}}
+
+**Decision Factors:**
+{{rejectionReasons}}
+
+**This doesn't mean it's not a good deal** - it's simply not the right fit for our current portfolio and investment strategy.
+
+**We'd love to see more deals from you that fit these criteria:**
+✅ **Size**: 15+ acres (30+ preferred)
+✅ **Price**: Under ${{marketMaxPrice}}/acre in {{market}}
+✅ **Zoning**: Residential or planned development
+✅ **Location**: Growth corridors with infrastructure
+✅ **Type**: {{preferredTypes}}
+
+Please keep us in mind for future opportunities! We value our relationship and want to work together on the right deal.
+
+**Quick favor**: If you have other properties that might fit better, we'd love to see them. We're always looking for the next great opportunity.
+
+Thanks again for thinking of LandLinq.
+
+Best regards,
+{{analystName}}
+LandLinq Acquisitions
+Catalyst Capital Partners
+{{analystEmail}}
+
+P.S. - We maintain a database of deals that don't fit today but might tomorrow. We'll keep your information for future reference.",rejected,"brokerName, address, acres, price, pricePerAcre, developmentType, rejectionReasons, marketMaxPrice, market, preferredTypes, analystName, analystEmail"
+EMAIL,5,Letter of Intent Sent,📋 LOI Submitted - {{address}} | Next Steps,"Dear {{brokerName}},
+
+🎯 **We've submitted our Letter of Intent** for {{address}}!
+
+**LOI Summary:**
+💰 **Purchase Price**: ${{offerPrice}}
+📅 **Closing Timeline**: {{closingDays}} days
+🔍 **Due Diligence Period**: {{dueDiligenceDays}} days
+💵 **Earnest Money**: ${{earnestMoney}}
+📊 **Financing**: {{financingType}}
+
+**Key Terms:**
+✅ Subject to satisfactory due diligence
+✅ Clear title and survey
+✅ Environmental clearance
+✅ Zoning verification for intended use
+✅ Utility availability confirmation
+
+**What happens next:**
+1️⃣ **Seller review**: 2-3 business days typically
+2️⃣ **Negotiations**: We're flexible on terms
+3️⃣ **Contract execution**: Once LOI is accepted
+4️⃣ **Due diligence begins**: Immediate start upon signing
+
+**Your role moving forward:**
+Please coordinate with the seller for LOI response
+📋 Help facilitate due diligence access
+🤝 Keep communication flowing between all parties
+
+**Our commitment to you:**
+• Fast, professional closing process
+• Transparent communication throughout
+• Fair and competitive terms
+• Respect for all parties involved
+
+We're excited about this opportunity and look forward to working together!
+
+{{analystName}}
+Senior Acquisitions Analyst
+{{analystEmail}} | {{analystPhone}}
+LandLinq | Catalyst Capital Partners",approved,"brokerName, address, offerPrice, closingDays, dueDiligenceDays, earnestMoney, financingType, analystName, analystEmail, analystPhone"
+SMS,1,Submission Received,SMS Content,"✅ {{brokerName}}, we received your {{address}} submission! TL-{{dealId}}. Initial review starts now. Expect update within 24hrs. -LandLinq",under_review,"brokerName, address, dealId"
+SMS,2,High Priority - Pursuing,SMS Content,"🎯 URGENT {{brokerName}}! {{address}} is HIGH PRIORITY. {{analystName}} calling you within 2hrs. This is exactly what we want! -LandLinq",approved,"brokerName, address, analystName"
+SMS,3,Under Review Update,SMS Content,"🔍 {{brokerName}}, {{address}} under detailed review. Need 48-72hrs for decision. May need additional docs. Check email. -{{analystName}}",under_review,"brokerName, address, analystName"
+SMS,4,Deal Passed,SMS Content,"{{brokerName}}, {{address}} doesn't fit current criteria. Not the right deal for us right now. Email sent with details + future criteria. Thanks! -LandLinq",rejected,"brokerName, address"
+SMS,5,LOI Submitted,SMS Content,"📋 {{brokerName}}! LOI submitted for {{address}} at ${{offerPrice}}. Now we wait for seller response. I'll keep you posted! -{{analystName}}",approved,"brokerName, address, offerPrice, analystName"
+SMS,6,Contract Signed,SMS Content,"🎉 UNDER CONTRACT! {{address}} contract signed. ${{contractPrice}}. Due diligence starts now. Closing {{closingDate}}. -{{analystName}}",approved,"address, contractPrice, closingDate, analystName"
+SMS,7,Due Diligence Update,SMS Content,"📊 {{brokerName}}, {{address}} due diligence progressing well. No issues so far. On track for {{closingDate}} closing. -{{analystName}}",approved,"brokerName, address, closingDate, analystName"
+SMS,8,Closing Scheduled,SMS Content,"🏁 {{brokerName}}! {{address}} closing set: {{closingDate}} at {{closingTime}}. {{closingLocation}}. See you there! -{{analystName}}",approved,"brokerName, address, closingDate, closingTime, closingLocation, analystName"
+SMS,9,Deal Closed,SMS Content,"🎊 WE CLOSED! {{address}} done! ${{finalPrice}}. Commission processing. Lunch celebration this week? Thanks for great partnership! -{{analystName}}",approved,"address, finalPrice, analystName"
+SMS,10,Pipeline Check-in,SMS Content,"Hi {{brokerName}}! {{daysSince}} days since {{lastAddress}} closed. Got any more deals like that one? We're actively buying! -{{analystName}}",under_review,"brokerName, daysSince, lastAddress, analystName"
+SMS,11,Urgent Opportunity,SMS Content,"⚡ {{brokerName}} - URGENT! {{address}} perfect for us. Need details NOW. Can pay top dollar if it fits. Call me! -{{analystName}} {{phone}}",high_priority,"brokerName, address, analystName, phone"
+SMS,12,Site Visit Scheduled,SMS Content,"📅 {{brokerName}}, site visit scheduled for {{address}} on {{visitDate}} at {{visitTime}}. Can you meet us there? -{{analystName}}",approved,"brokerName, address, visitDate, visitTime, analystName"
+SMS,13,Quick Status Check,SMS Content,"Quick check {{brokerName}} - any update on {{address}}? Seller timeline? Other interest? We're ready to move fast. -{{analystName}}",under_review,"brokerName, address, analystName"
+SMS,14,Market Alert,SMS Content,"🏡 {{brokerName}}, seeing increased activity in {{market}}. Got anything coming in that area? We're very active there. -{{analystName}}",under_review,"brokerName, market, analystName"
+SMS,15,Check-in Text,SMS Content,"Hey {{brokerName}}! Hope you're crushing it. Coffee soon to discuss market trends? Always looking for next great deal! -{{analystName}}",under_review,"brokerName, analystName"
+SMS,16,Holiday Greeting,SMS Content,"Happy {{holiday}} {{brokerName}}! Thanks for being such a great partner this year. Looking forward to more deals in 2025! -LandLinq Team",under_review,"holiday, brokerName"
+SMS,17,Price Update Request,SMS Content,"{{brokerName}}, any flexibility on {{address}} price? We're at ${{ourPrice}} vs asking ${{askingPrice}}. Worth a conversation? -{{analystName}}",under_review,"brokerName, address, ourPrice, askingPrice, analystName"
+SMS,18,Document Request,SMS Content,"{{brokerName}}, need survey/plat for {{address}} to move forward. Can you help get that? Eager to proceed! -{{analystName}}",under_review,"brokerName, address, analystName"
+SMS,19,Competition Alert,SMS Content,"{{brokerName}}, heard there might be other offers on {{address}}. We can move FAST if needed. Let's chat! -{{analystName}} {{phone}}",high_priority,"brokerName, address, analystName, phone"
+SMS,20,Thank You,SMS Content,"{{brokerName}}, thanks again for {{address}}! Your professionalism made this smooth. Already looking forward to the next one! -{{analystName}}",approved,"brokerName, address, analystName"

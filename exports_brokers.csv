@@ -1,0 +1,18 @@
+id,first_name,last_name,email,phone,brokerage,company,markets_covered,state_region,years_experience,license_number,is_active,is_archived,sms_opt_in,preferred_contact,crm_tags,crm_notes,assigned_to,last_contacted_at,website_url,bio,created_at,updated_at
+93354f0a-a7c9-4296-8877-abd519cbe7a0,Apex,Tester,apextest_1783361046514@catalystcp.com,+15551234568,,,"[""Charlotte""]",,,,true,false,false,email,,,,,,,2026-07-06T18:04:06.570Z,2026-07-06T18:04:06.570Z
+31fdb0ce-6d5d-4409-923a-97cf35f055e1,Apex,Tester,apextest_1783361027143@example.com,+15551234567,,,"[""Charlotte""]",,,,true,false,false,email,,,,,,,2026-07-06T18:03:47.420Z,2026-07-06T18:03:47.420Z
+63d1d587-3666-4b0b-9e47-3d5ccda0d980,John,Bell,john@catalystcp.com,,,Catalyst Capital Partners,,,,,true,false,,email,,,,,,,2025-12-15T18:59:46.755Z,2025-12-15T18:59:46.755Z
+ce252ad1-fc9c-4ec9-b4dc-ad4def0e05fa,Brian,,ford@catalystcp.com,,,Catalyst Capital Partners,,,,,true,false,,email,,,,,,,2025-12-15T18:59:46.755Z,2025-12-15T18:59:46.755Z
+6df477aa-9915-4805-b32e-f9a666d6a944,Jim,Hillim,jim@catalystcp.com,,,Catalyst Capital Partners,,,,,true,false,,email,,,,,,,2025-12-15T18:59:46.755Z,2025-12-15T18:59:46.755Z
+37774fcc-ec4c-4bb1-9349-37d887c0d87d,Erich,Mahle,erich@catalystcp.com,,,Catalyst Capital Partners,,,,,true,false,,email,,,,,,,2025-12-15T18:59:46.755Z,2025-12-15T18:59:46.755Z
+5441e81e-2ceb-472a-8595-c7503bd51140,AJ,,aj@catalystcp.com,,,Catalyst Capital Partners,,,,,true,false,,email,,,,,,,2025-12-15T18:59:46.755Z,2025-12-15T18:59:46.755Z
+d233c94f-a483-4667-b913-82aefc8cd737,Nic,Monroe,nic@catalystcp.com,,,Catalyst Capital Partners,,,,,true,false,,email,,,,,,,2025-12-15T18:59:46.755Z,2025-12-15T18:59:46.755Z
+03f62478-e5b2-4435-a597-896e51ced7e6,Mike,Nichols,mike@catalystcp.com,,,Catalyst Capital Partners,,,,,true,false,,email,,,,,,,2025-12-15T18:59:46.755Z,2025-12-15T18:59:46.755Z
+a159bef9-56ff-418f-be60-4848604c993e,Mallie,,mallie@catalystcp.com,,,Catalyst Capital Partners,,,,,true,false,,email,,,,,,,2025-12-15T18:59:46.755Z,2025-12-15T18:59:46.755Z
+20fd9779-55f0-4114-9fd8-cbe26ae0ab88,Steve,,steve@catalystcp.com,,,Catalyst Capital Partners,,,,,true,false,,email,,,,,,,2025-12-15T18:59:46.755Z,2025-12-15T18:59:46.755Z
+6f8ef566-b9aa-4dcb-b3ac-01e397346a7b,Austin,,austin@catalystcp.com,,,Catalyst Capital Partners,,,,,true,false,,email,,,,,,,2025-12-15T18:59:46.755Z,2025-12-15T18:59:46.755Z
+b0d49c65-d12f-4932-bdd4-c33dd7acc2e1,Ted,Hill,ted@catalystcp.com,,,Catalyst Capital Partners,,,,,true,false,,email,,,,,,,2025-12-15T18:59:46.755Z,2025-12-15T18:59:46.755Z
+be640226-15a5-4fc5-b7b9-6e83cba05182,SMSTest,JA3vkb,smstestoomnxm@example.com,+1704682,,,"[""Atlanta"",""Nashville"",""Charlotte""]",,,,true,false,true,email,,,,,,,2025-11-19T15:30:22.630Z,2025-11-19T15:30:22.630Z
+a44b2724-78b0-48f6-b1d6-bd8eb3711ab6,TestBroker,Bkrl_uHAq,testbrokerl_uhaq@example.com,+170489,,,"[""Dallas"",""Austin"",""Houston""]",,,,true,false,,email,,,,,,,2025-11-19T15:25:13.242Z,2025-11-19T15:25:13.242Z
+bb586e43-1c65-461a-aa64-b0bc3d1ae768,Jacob,Berg,jackbergcjr@gmail.com,7034744399,,,,,,,true,false,true,email,,,,,,,2025-09-04T18:15:51.015Z,2025-09-04T18:15:51.015Z
+c3351faf-5dfb-4bd1-b374-ffa6533e90f9,Jack,Team,jack@catalystcp.com,,,,"[""Not specified""]",,,,true,false,,email,Developer Network,,,,,,2025-09-03T19:34:15.634Z,2026-04-10T15:43:55.748Z
