@@ -1,0 +1,155 @@
+Replit QA Prompt — LIHTC Scoring Accuracy Checklist
+Run through every item below and verify the current implementation matches. For each item that is wrong or missing, fix it. Do not change any other product types.
+
+SECTION 1 — NEIGHBORHOOD CHARACTER (max 10 pts)
+
+ Scoring is based on physical condition of structures within 0.5 miles — NOT poverty rate
+ Three options only: Well Maintained = 10 pts / Fair = 5 pts / Blighted = 0 pts
+ This field is manual analyst input only — no auto-assignment from any API
+ Census poverty rate may be displayed as a supporting reference label but must be clearly marked "for reference only — does not determine score"
+ Redevelopment sites auto-assign 10 pts regardless of condition — analyst can still override
+ No other values or intermediate scores are possible in this category
+
+
+SECTION 2 — PRIMARY AMENITIES (max 26 pts)
+
+ Grocery max = 12 pts
+ Shopping max = 7 pts
+ Pharmacy max = 7 pts
+ Total primary amenity cap = 26 pts
+ Standard market distance tiers: ≤2.0mi / ≤2.5mi / ≤3.0mi / ≤4.0mi
+ Small town distance tiers: ≤3.5mi / ≤4.0mi / ≤4.5mi / ≤5.5mi
+ Small town tiers apply to ALL primary amenities when municipality population < 10,000
+ Distances are driving miles via Google Maps Distance Matrix — not straight line
+ Only one establishment counts per amenity row (highest scoring one wins)
+ Grocery chains matched against QAP approved list only: Aldi, Bestway Grocery, Bi-Lo, Bo's Food Stores, Compare Foods, Earth Fare, Fairvalue, Family Foods, Food Lion, Food Matters Market, The Fresh Market, Galaxy Food Centers, Harris Teeter, Hopey & Company, IGA, Ingle's Market, Just $ave, Lidl, Lowes Foods, Piggly Wiggly, Publix, Red & White, Sav-Mor, Save-A-Lot, Sprouts, Super Target, Trader Joe's, Walmart Neighborhood Market, Walmart Supercenter, Weaver Street Market, Wegmans, Whole Foods
+ Shopping chains matched against QAP approved list only: Big Lots, Dollar General, DGX, DG Market, Dollar Tree, Family Dollar, Fred's Super Dollar, Maxway, Ollie's Bargain Outlet, Roses, Roses Express, Super Target, Target, Walmart, Walmart Supercenter
+ Pharmacy is NOT a named chain list — any establishment with a licensed pharmacist AND non-medical general merchandise qualifies. Query Google Places for "pharmacy" and flag for analyst verification. Explicitly exclude: hospital pharmacies, specialty pharmacies, compounding-only pharmacies
+ If no qualifying establishment found within max distance threshold, score = 0 and display "No qualifying [amenity] found within scoring range — verify manually"
+ Each matched establishment name and driving distance is logged visibly so analyst can verify
+
+
+SECTION 3 — SECONDARY AMENITIES (max 20 pts)
+
+ Six categories: Other Primary Amenity / Service / Healthcare / Public Facility / Public School / Other Retail
+ Total of all six categories is capped at 20 pts — not each category individually
+ Other Primary Amenity max = 5 pts, uses PRIMARY distance tiers (not secondary tiers)
+ Other Primary Amenity small town tiers: ≤3.5mi / ≤4.0mi / ≤4.5mi / ≤5.5mi
+ Other Primary Amenity standard tiers: ≤2.0mi / ≤2.5mi / ≤3.0mi / ≤4.0mi
+ Other Primary Amenity point scale: 5 / 4 / 3 / 2 pts at each tier
+ Other Primary Amenity must be a QAP-approved grocery, shopping, or pharmacy not already used as a primary amenity
+ Service, Healthcare, Public Facility, Public School, Other Retail each max = 3 pts
+ Secondary amenity standard tiers: ≤2.0mi = 3pts / ≤2.5mi = 2pts / ≤3.0mi = 1pt / >3.0mi = 0pts
+ Secondary amenity small town tiers: ≤3.5mi = 3pts / ≤4.0mi = 2pts / ≤4.5mi = 1pt / >4.5mi = 0pts
+ Secondary amenities do NOT earn points beyond 3.0 miles in standard market
+ Service qualifies as: restaurant, bank/credit union, or gas station with convenience store only — food trucks do not count
+ Healthcare qualifies as: hospital, urgent care, general/family practice, general dentist only — no orthodontists, no medical specialists, no clinics within pharmacies
+ Public Facility qualifies as: public park with playground equipment and/or walking/bike trails (listed on official map/website), OR library open 5+ days/week operated by local government, OR senior/recreation/community center with scheduled activities operated by local government
+ Public School qualifies as: non-alternative elementary, middle, or high school — charter and magnet public schools are eligible
+ Other Retail qualifies as: any QAP-approved grocery or shopping chain not already counted as primary or other primary amenity
+ Only one establishment counts per secondary category row
+
+
+SECTION 4 — TRANSIT (max 6 pts)
+
+ Distance is walking distance only — not driving distance
+ Small town expanded distance bands do NOT apply to transit — always use 0.25 mile walking threshold regardless of municipality size
+ Stop within 0.25 miles walking via continuous existing sidewalks with covered waiting area = 6 pts
+ Stop within 0.25 miles walking via continuous existing sidewalks without covered waiting area = 2 pts
+ No qualifying stop = 0 pts
+ System conservatively scores 2 pts when a stop is found (shelter cannot be auto-detected)
+ Analyst can manually upgrade to 6 pts via override if covered shelter is confirmed
+ Walking route must use existing continuous sidewalks excluding the proposed project site itself
+ Matched transit stop name and walking distance logged visibly for analyst verification
+
+
+SECTION 5 — SITE SUITABILITY (max 12 pts)
+
+ Four separate 3-point checks — each scores independently
+ Check 1 — No incompatible uses (3 pts): incompatible uses include airports, chemical/hazardous storage, industrial/agricultural with environmental concerns, junk/salvage yards, active landfills, excessive noise sources, wastewater treatment within half mile; adult entertainment, distribution facility, factory, jail/prison, large swamp within 500 feet; electrical substation, frequently used railroad tracks, roads ≥55mph posted speed (500ft for interstate), power transmission lines/towers within 250 feet of a proposed building
+ Check 2 — No physical challenges (3 pts): flood hazards, steep slopes, large boulders, ravines, year-round streams, wetlands, power transmission lines/towers. If FEMA flood zone detected → this check scores 0 pts (do NOT apply a separate −3 deduction)
+ Check 3 — Site visibility (3 pts): site is visible from normal travel patterns AND within 500 feet of an active structure used for residential, commercial, educational, or governmental purposes — excluding blighted structures and incompatible uses. Cannot be auto-detected — assume 3 pts and flag for analyst confirmation
+ Check 4 — Traffic safety (3 pts): traffic controls allow safe access — no blind curves, no crossing 3+ lanes of same-direction traffic when exiting. Cannot be auto-detected — assume 3 pts and flag for analyst confirmation
+ Checks 3 and 4 display a yellow flag: "Assumed 3 pts — analyst must confirm via site visit"
+ Agency discretion −3 point deduction is a separate manual analyst flag only — it is never auto-triggered
+
+
+SECTION 6 — OLMSTEAD (max 4 pts) — THIS SECTION MAY BE MISSING — ADD IF NOT PRESENT
+
+ Calculate: 1BR units ÷ total units
+ ≥ 7.5% = 1 pt
+ ≥ 10% = 2 pts
+ ≥ 15% = 3 pts
+ Project is in a DHHS priority county = +1 pt (auto-detect from static list)
+ DHHS priority counties: Alamance, Buncombe, Burke, Cabarrus, Cumberland, Durham, Forsyth, Gaston, Guilford, Henderson, Iredell, Mecklenburg, New Hanover, Orange, Pitt, Robeson, Wake, Wayne, Wilson
+ Points are additive — a project can earn both the 1BR percentage points and the county point
+ This category appears as its own line in the scoring breakdown table
+
+
+SECTION 7 — INCOME / RPP (max 2 pts)
+
+ County income tier auto-detected from address using QAP 2026 county list
+ High Income county: ≥25% of units at 30% AMI = 2pts / ≥15% = 1pt
+ Moderate Income county: ≥25% of units at 40% AMI = 2pts / ≥15% = 1pt
+ Low Income county: ≥25% of units at 50% AMI = 2pts / ≥15% = 1pt
+ Input required: number of units at each AMI band as % of total qualified low-income units
+ County income tier displayed visibly so analyst can verify
+
+
+SECTION 8 — NEGATIVE POINTS
+
+ Construction cost > $135,000/unit = −10 pts (analyst input required)
+ Agency discretion deduction = up to −3 pts (manual analyst flag only — never auto-triggered)
+ Section 1602 noncompliance = up to −40 pts — add a manual yes/no/unknown flag: "Is any Principal involved in a Section 1602 Exchange project with uncorrected material noncompliance?" Yes = red flag warning −40 pts / Unknown = yellow flag / No = no flag
+ FEMA flood zone detection removes 3 suitability points from Check 2 above — it does NOT add a separate negative line item
+
+
+SECTION 9 — SCORE TOTALS
+
+ Auto-scoreable subtotal displayed separately from manual review sections
+ Correct maximum point totals:
+
+Neighborhood Character:        10 pts
+Primary Amenities:             26 pts
+Secondary Amenities:           20 pts
+Transit:                        6 pts
+Site Suitability:              12 pts
+Olmstead:                       4 pts
+Income / RPP:                   2 pts
+─────────────────────────────────────
+Auto-scoreable maximum:        80 pts
+Design Standards:              30 pts  (manual — requires drawings)
+Applicant Bonus:                1 pt   (analyst-controlled)
+─────────────────────────────────────
+Total Maximum Possible:       111 pts
+
+ Competitive context note reads: "Competitive 4% bond applications in NC typically score 90–110+. Design standards (up to 30 pts) require architect drawings submitted at full application and cannot be estimated at this stage."
+ Site score subtotal (neighborhood + amenities + transit + suitability = max 68 pts) displayed separately with pass/fail flag: minimum 50 pts required to advance
+
+
+SECTION 10 — HARD THRESHOLD FLAGS (display above score table)
+
+ QD Principal Eligibility: yes/no input — "Does at least one Principal have a placed-in-service project between Jan 1 2017 and Jan 1 2025 that is either a NC 9% tax credit project or a tax-exempt bond project in any state?" — No = red HARD DISQUALIFIER badge
+ 1BR Unit Minimum: auto-calculate 1BR units ÷ total units — if < 10% = red FAIL badge "Bond projects require ≥10% 1BR units per QAP Section IV(F)(5)(a)"
+ Unit Count: if total units > 200 = yellow WARNING badge "Projects over 200 units require prior NCHFA approval per QAP Section IV(E)(3)"
+ All three threshold flags appear before the point score table and are visually distinct from scored items
+
+
+SECTION 11 — SMALL TOWN CLASSIFICATION
+
+ On address entry, calls Census Geocoding API to identify incorporated place GEOID
+ Then calls ACS 2023 5-Year API (variable B01003_001E, state=37) to retrieve population
+ Population < 10,000 → small town bands applied → display "Small town classification applied (population: X per ACS 2023 5-Year Estimates)"
+ Population ≥ 10,000 → standard bands → display "Standard distance bands applied (population: X)"
+ Unincorporated address → standard bands → display "Unincorporated address — standard bands applied. Verify manually if needed."
+ API error or no data returned → standard bands → display "Population data unavailable — standard bands applied. Verify manually."
+ Result cached in session memory by municipality name (lowercase trimmed)
+ Classification result and population displayed on scoring card
+
+
+SECTION 12 — OVERRIDE SYSTEM
+
+ Every scored line item has a manual override available via edit button
+ Overridden items display visibly as "manually overridden" with original auto-score shown for reference
+ Overrides persist through re-runs
+ Neighborhood character override available (since it is always manual this should be the default input method)

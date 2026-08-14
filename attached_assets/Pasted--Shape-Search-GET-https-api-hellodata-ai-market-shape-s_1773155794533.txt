@@ -1,0 +1,282 @@
+# Shape Search
+
+GET https://api.hellodata.ai/market/shape_search
+
+Search for markets by name, city, state, or tags. Returns names as well as a geojson object of the coordinates of the market.
+This endpoint is free to use and enabled on demand. Please contact us to activate.
+
+Reference: https://docs.hellodata.ai/api-reference/api-reference/market/shape-search
+
+## OpenAPI Specification
+
+```yaml
+openapi: 3.1.0
+info:
+  title: backend
+  version: 1.0.0
+paths:
+  /market/shape_search:
+    get:
+      operationId: shape-search
+      summary: Shape Search
+      description: >-
+        Search for markets by name, city, state, or tags. Returns names as well
+        as a geojson object of the coordinates of the market.
+
+        This endpoint is free to use and enabled on demand. Please contact us to
+        activate.
+      tags:
+        - subpackage_market
+      parameters:
+        - name: q
+          in: query
+          description: >-
+            The search query string. Can include a market name, city, state, or
+            tag.
+          required: true
+          schema:
+            type: string
+        - name: x-api-key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: >-
+            List of markets matching the specified search criteria. The list is
+            limited to 7 results.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MarketSearchResponse'
+        '400':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShapeSearchRequestBadRequestError'
+servers:
+  - url: https://api.hellodata.ai
+components:
+  schemas:
+    MarketSearchResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        city:
+          type:
+            - string
+            - 'null'
+        state:
+          type:
+            - string
+            - 'null'
+        coordinates:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: double
+        tags:
+          type: array
+          items:
+            type: string
+        lat:
+          type: number
+          format: double
+        lon:
+          type: number
+          format: double
+        area_km2:
+          type: number
+          format: double
+      required:
+        - name
+        - city
+        - state
+        - coordinates
+        - tags
+        - lat
+        - lon
+        - area_km2
+      title: MarketSearchResponse
+    ShapeSearchRequestBadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+      title: ShapeSearchRequestBadRequestError
+  securitySchemes:
+    api:
+      type: apiKey
+      in: header
+      name: x-api-key
+    auth0:
+      type: http
+      scheme: bearer
+
+```
+
+## SDK Code Examples
+
+```python
+import requests
+
+url = "https://api.hellodata.ai/market/shape_search"
+
+querystring = {"q":"farmers market seattle"}
+
+payload = {}
+headers = {
+    "x-api-key": "<apiKey>",
+    "Content-Type": "application/json"
+}
+
+response = requests.get(url, json=payload, headers=headers, params=querystring)
+
+print(response.json())
+```
+
+```javascript
+const url = 'https://api.hellodata.ai/market/shape_search?q=farmers+market+seattle';
+const options = {
+  method: 'GET',
+  headers: {'x-api-key': '<apiKey>', 'Content-Type': 'application/json'},
+  body: '{}'
+};
+
+try {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  console.log(data);
+} catch (error) {
+  console.error(error);
+}
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"strings"
+	"net/http"
+	"io"
+)
+
+func main() {
+
+	url := "https://api.hellodata.ai/market/shape_search?q=farmers+market+seattle"
+
+	payload := strings.NewReader("{}")
+
+	req, _ := http.NewRequest("GET", url, payload)
+
+	req.Header.Add("x-api-key", "<apiKey>")
+	req.Header.Add("Content-Type", "application/json")
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+
+	fmt.Println(res)
+	fmt.Println(string(body))
+
+}
+```
+
+```ruby
+require 'uri'
+require 'net/http'
+
+url = URI("https://api.hellodata.ai/market/shape_search?q=farmers+market+seattle")
+
+http = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+
+request = Net::HTTP::Get.new(url)
+request["x-api-key"] = '<apiKey>'
+request["Content-Type"] = 'application/json'
+request.body = "{}"
+
+response = http.request(request)
+puts response.read_body
+```
+
+```java
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+
+HttpResponse<String> response = Unirest.get("https://api.hellodata.ai/market/shape_search?q=farmers+market+seattle")
+  .header("x-api-key", "<apiKey>")
+  .header("Content-Type", "application/json")
+  .body("{}")
+  .asString();
+```
+
+```php
+<?php
+require_once('vendor/autoload.php');
+
+$client = new \GuzzleHttp\Client();
+
+$response = $client->request('GET', 'https://api.hellodata.ai/market/shape_search?q=farmers+market+seattle', [
+  'body' => '{}',
+  'headers' => [
+    'Content-Type' => 'application/json',
+    'x-api-key' => '<apiKey>',
+  ],
+]);
+
+echo $response->getBody();
+```
+
+```csharp
+using RestSharp;
+
+var client = new RestClient("https://api.hellodata.ai/market/shape_search?q=farmers+market+seattle");
+var request = new RestRequest(Method.GET);
+request.AddHeader("x-api-key", "<apiKey>");
+request.AddHeader("Content-Type", "application/json");
+request.AddParameter("application/json", "{}", ParameterType.RequestBody);
+IRestResponse response = client.Execute(request);
+```
+
+```swift
+import Foundation
+
+let headers = [
+  "x-api-key": "<apiKey>",
+  "Content-Type": "application/json"
+]
+let parameters = [] as [String : Any]
+
+let postData = JSONSerialization.data(withJSONObject: parameters, options: [])
+
+let request = NSMutableURLRequest(url: NSURL(string: "https://api.hellodata.ai/market/shape_search?q=farmers+market+seattle")! as URL,
+                                        cachePolicy: .useProtocolCachePolicy,
+                                    timeoutInterval: 10.0)
+request.httpMethod = "GET"
+request.allHTTPHeaderFields = headers
+request.httpBody = postData as Data
+
+let session = URLSession.shared
+let dataTask = session.dataTask(with: request as URLRequest, completionHandler: { (data, response, error) -> Void in
+  if (error != nil) {
+    print(error as Any)
+  } else {
+    let httpResponse = response as? HTTPURLResponse
+    print(httpResponse)
+  }
+})
+
+dataTask.resume()
+```

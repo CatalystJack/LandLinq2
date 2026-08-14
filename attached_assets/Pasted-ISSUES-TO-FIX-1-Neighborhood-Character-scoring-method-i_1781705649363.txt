@@ -1,0 +1,36 @@
+ISSUES TO FIX:
+1. Neighborhood Character scoring method is wrong
+The app uses census tract poverty rate as a proxy. The QAP does not use poverty rate. It uses a physical condition assessment of structures within a half-mile radius:
+
+Well maintained structures = 10 pts
+Visible signs of deterioration = 5 pts
+Blighted structures (abandoned, deteriorated beyond normal wear, public nuisance) = 0 pts
+
+This cannot be auto-scored from any API. The poverty rate is a reasonable flag to surface to the analyst but must not be used to auto-assign points. Fix: remove auto-scoring here entirely. Replace with a manual three-option selector (Well Maintained / Fair / Blighted) with the poverty rate shown as a supporting data point only, clearly labeled "Poverty rate shown for reference only — neighborhood score must reflect physical condition of structures within 0.5 miles."
+2. Other Primary Amenity distance thresholds are wrong
+The scoring card shows Other Primary Amenity uses "primary thresholds (STD)" — meaning 5/4/3/2 pts at ≤2.0/≤2.5/≤3.0/≤4.0 miles. This is correct for standard market. But for small town, it should use the small town primary bands (≤3.5/≤4.0/≤4.5/≤5.5), not the secondary small town bands. Verify this is implemented correctly in the code — the documentation is ambiguous on this point.
+3. Other Primary Amenity max is 5 pts, not matched to secondary cap
+Per the QAP, Other Primary Amenity earns 5/4/3/2 pts at the four distance tiers. The scoring card shows this correctly. Just confirm the 20-point secondary amenity cap is applied after summing all six categories including Other Primary Amenity — the cap logic needs to treat all six as a pool, not cap each individually.
+4. Pharmacy chain list is incomplete and includes non-QAP stores
+The current list says "CVS, Walgreens, Rite Aid, Walmart pharmacy." The QAP does not specify a named list for pharmacies the way it does for grocery and shopping. Instead it defines a pharmacy as any establishment that has a licensed pharmacist AND sells non-medical general merchandise — explicitly excluding hospital pharmacies, specialty pharmacies, and compounding-only pharmacies. Fix: remove the named chain approach for pharmacies. Instead query Google Places for "pharmacy" near the address and flag to the analyst to verify it meets the general merchandise requirement. CVS and Walgreens will almost always qualify; small independent pharmacies may not.
+5. Flood zone negative points need refinement
+The app deducts −3 for flood zone detection. The QAP awards 3 positive points for "no flood hazards, steep slopes, large boulders, ravines, year-round streams, wetlands." The negative point structure in the QAP is a separate −3 for overall site unsuitability at Agency discretion — it is not automatically triggered by flood zone presence. Fix: keep the FEMA flood zone detection but restructure it as: if flood zone detected → remove the 3 suitability points for that check (score 0 instead of 3) rather than applying a separate −3 deduction. The Agency discretion −3 should remain as a manual analyst flag only.
+6. Hard threshold flags are not mentioned anywhere
+The scoring summary needs three hard threshold checks that are eligibility gates, not point items:
+
+QD Principal eligibility (placed-in-service project 2017–2025): yes/no — red flag if no
+1BR units ≥ 10% of total units for bond projects: auto-calculate — red flag if below
+Total units ≤ 200 (or Agency pre-approval obtained): yellow warning if exceeded
+
+These should appear above the score table as pass/fail badges.
+7. Section 1602 penalty flag is missing
+The −40 point penalty for Principals with uncorrected Section 1602 noncompliance is not reflected anywhere. Add as a manual yes/no flag in the negative points section.
+8. Olmstead points are missing entirely
+The scoring breakdown shows no Olmstead category. Per QAP Section IV(F)(5):
+
+1BR units ≥ 7.5% of total = 1 pt
+1BR units ≥ 10% of total = 2 pts
+1BR units ≥ 15% of total = 3 pts
+DHHS priority county = +1 pt
+
+Maximum 4 pts. This needs to be added as its own scored category. It also means the total possible score ceiling stated in the documentation ("roughly 58 pts... realistic ceiling around 70+") is understated — correct maximum before design standards is closer to 76 pts auto-scoreable plus 4 pts Olmstead plus 30 pts design plus 1 pt applicant bonus.

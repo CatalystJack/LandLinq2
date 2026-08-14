@@ -1,0 +1,339 @@
+***
+
+title: Identify Comparables
+subtitle: Instant comparables for any subject property in the US
+----------------------------------------------------------------
+
+Given a subject property, you can query this endpoint to find comparable properties.
+We developed a proprietary similarity score to rank candidate properties based on their similarity to the subject property.
+This API endpoint is useful for real estate professionals looking to find comparable properties for valuation, analysis, or market research purposes.
+
+The score is based on the following features:
+
+* **Distance**: The distance between the subject property and the comparable property.
+* **Market Characteristics**: Similarity in demographics, transportation facilities, and other market characteristics.
+* **Number of Units**: The number of units in the building.
+* **Year Built**: The year the building was built. When not available online, we use Computer Vision models to detect the year built from the pictures.
+* **Number of Stories**: The number of stories in the building. When not availability online, we use Computer Vision models to detect the number of stories from the pictures.
+* **Quality**: The quality of the buildings, estimated from the pictures and the description.
+* **Building Amenities**: The amenities available in the building. We use Natural Language Processing to extract this information from the text present on property's websites.
+* **Unit Amenities**: The amenities available in the unit. We use Natural Language Processing to extract this information from the text present on property's websites.
+* **Unit Mix**: The mix of units in the building. We compare unit types pair-wise to calculate the similarity score.
+
+<Callout intent="success">
+  This endpoint is free! Refine your comparables as much as needed.
+</Callout>
+
+### Get Comparable Properties
+
+<CodeBlocks>
+  <CodeBlock title="Curl">
+    ```bash
+    curl --location 'https://api.hellodata.ai/property/comparables' \
+    --header 'x-api-key: token' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "subject": {
+        <PropertyDetails>
+      }
+    }'
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="Python">
+    ```python
+    import requests
+
+    url = "https://api.hellodata.ai/property/comparables"
+
+    payload = {
+      "subject": {
+        <PropertyDetails> # get the details of the subject property using the /property/{id} endpoint
+      }
+    }
+
+    headers = {
+        'x-api-key': "token",
+        'Content-Type': "application/json"
+    }
+
+    response = requests.request("POST", url, json=payload, headers=headers)
+
+    print(response.text)
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="JS">
+    ```javascript
+    const axios = require('axios')
+
+    const config = {
+        method: 'post',
+        url: 'https://api.hellodata.ai/property/comparables',
+        headers: { 
+            'x-api-key': 'token', 
+            'Content-Type': 'application/json'
+        },
+        data : {
+            "subject": {
+                <PropertyDetails> // feed the property details you retrieved from the /property/{id} endpoint
+            }
+        }
+    }
+
+    axios(config)
+        .then((response) => {
+            console.log(JSON.stringify(response.data))
+        })
+        .catch((error) => {
+            console.log(error)
+        })
+    ```
+  </CodeBlock>
+</CodeBlocks>
+
+This will return a list of properties that are similar to the subject property. The list is sorted by similarity score in descending order.
+
+Each property simplified payload gives you high-level information, such that you can decide which properties to explore further:
+
+```json Comparable Properties Response
+{
+    "comparables": [
+        {
+            "id": "15599d82-be17-5b45-8003-0738de431104",
+            "lat": 41.88761,
+            "lon": -87.63816,
+            "year_built": 2015,
+            "number_units": 529,
+            "similarity_score": {
+                "distance_meters": 573.3983428508922,
+                "distance_miles": 0.35629409748772306,
+                "distance": 0.6493687463773125,
+                "number_units": 0.9894393078525705,
+                "vintage": 1,
+                "number_stories": 0.8753162865669926,
+                "quality": 0.9399914771951164,
+                "building_amenities": 0.7386363636363635,
+                "unit_amenities": 0.26785714285714285,
+                "unit_mix": {
+                    "0": 0.758883952386279,
+                    "1": 0.641025641025641,
+                },
+                "overall": 0.6525070566031329
+            },
+            "street_address": "343 West Wolf Point Plaza",
+            "street_address_alias": [
+                "343 West Wolf Point Plaza"
+            ],
+            "city": "Chicago",
+            "state": "IL",
+            "zip_code": "60654",
+            "building_name": "Wolf Point West",
+            "building_name_alias": [
+                "Wolf Point West",
+                "343 West Wolf Point Plaza"
+            ]
+        }
+    ]
+}
+```
+
+### Add constraints to the comparables
+
+You might have specific requirements for the properties you are looking for. You can add constraints to the request to filter the results:
+
+* Set distance limits (`maxDistance`)
+* Filter by units (`minNumberUnits`, `maxNumberUnits`)
+* Filter by year built (`minYearBuilt`, `maxYearBuilt`)
+* Filter by number of stories (`minNumberStories`, `maxNumberStories`)
+
+<CodeBlocks>
+  <CodeBlock title="Curl">
+    ```bash
+    curl --location 'https://api.hellodata.ai/property/comparables?max_distance=0.5&min_number_units=300&max_number_units=600&min_year_built=2010&max_year_built=2020&min_number_stories=10&max_number_stories=50' \
+    --header 'x-api-key: token' \
+    --header 'Content-Type: application/json' \
+
+    --data '{
+      "subject": {
+        <PropertyDetails>
+      }
+    }'
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="Python">
+    ```python
+    import requests
+
+    url = "https://api.hellodata.ai/property/comparables"
+
+    query_parameters = {
+        "maxDistance": 0.5,
+        "minNumberUnits": 300,
+        "maxNumberUnits": 600,
+        "minYearBuilt": 2010,
+        "maxYearBuilt": 2020,
+        "minNumberStories": 10,
+        "maxNumberStories": 50
+    }
+
+    payload = {
+        "subject": {
+            <PropertyDetails> # get the details of the subject property using the /property/{id} endpoint
+        }
+    }
+
+    headers = {
+        'x-api-key': "token",
+        'Content-Type': "application/json"
+    }
+
+    response = requests.request(
+        "POST",
+        url,
+        json=payload,
+        headers=headers,
+        params=query_parameters
+    )
+
+    for comparable in response.json()['comparables']:
+        print(comparable.get('street_address'), comparable.get('similarity_score'))
+
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="JS">
+    ```javascript
+    const axios = require('axios')
+
+    const config = {
+        method: 'post',
+        url: 'https://api.hellodata.ai/property/comparables',
+        headers: { 
+            'x-api-key': 'token', 
+            'Content-Type': 'application/json'
+        },
+        data : {
+            "subject": {
+                <PropertyDetails> // feed the property details you retrieved from the /property/{id} endpoint
+            }
+        },
+        params: {
+            "maxDistance": 0.5,
+            "minNumberUnits": 300,
+            "maxNumberUnits": 600,
+            "minYearBuilt": 2010,
+            "maxYearBuilt": 2020,
+            "minNumberStories": 10,
+            "maxNumberStories": 50
+        }
+    }
+
+    axios(config)
+        .then((response) => {
+            response.data.comparables.forEach(comparable => {
+                console.log(comparable.street_address, comparable.similarity_score)
+            })
+        })
+        .catch((error) => {
+            console.log(error)
+        })
+    ```
+  </CodeBlock>
+</CodeBlocks>
+
+### Exclude and Include specific properties
+
+* If you have already seen some properties and want to exclude them from the results, you can add their `id` to the `excluded_ids` array in the request. They will not appear in the results.
+* You may also tell the API that you want some specific properties to be selected. In that case, you can add their `id` to the `selected_ids` array in the request. The API will return these properties first, and then if `topN` is high enough, it will also add best next comparables to the response.
+
+<CodeBlocks>
+  <CodeBlock title="Curl">
+    ```bash
+    curl --location 'https://api.hellodata.ai/property/comparables' \
+    --header 'x-api-key: token' \
+    --header 'Content-Type: application/json' \
+    --data '{
+      "subject": {
+        <PropertyDetails>
+      },
+      "excluded_ids": ["15599d82-be17-5b45-8003-0738de431104"],
+      "selected_ids": ["2b3b1b3b-1b3b-1b3b-1b3b-1b3b1b3b1b3b"]
+    }'
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="Python">
+    ```python
+    import requests
+
+    url = "https://api.hellodata.ai/property/comparables"
+
+    payload = {
+      "subject": {
+        <PropertyDetails> # get the details of the subject property using the /property/{id} endpoint
+      },
+      "excluded_ids": ["15599d82-be17-5b45-8003-0738de431104"], # this property will not appear in the results
+      "selected_ids": ["2b3b1b3b-1b3b-1b3b-1b3b-1b3b1b3b1b3b"] # this property will appear in the results
+    }
+
+    headers = {
+        'x-api-key': "token",
+        'Content-Type': "application/json"
+    }
+
+    response = requests.request("POST", url, json=payload, headers=headers)
+
+    print(response.text)
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="JS">
+    ```javascript
+    const axios = require('axios')
+
+    const config = {
+        method: 'post',
+        url: 'https://api.hellodata.ai/property/comparables',
+        headers: { 
+            'x-api-key': 'token', 
+            'Content-Type': 'application/json'
+        },
+        data : {
+            "subject": {
+                <PropertyDetails> // feed the property details you retrieved from the /property/{id} endpoint
+            },
+            "excluded_ids": ["15599d82-be17-5b45-8003-0738de431104"], // this property will not appear in the results
+            "selected_ids": ["2b3b1b3b-1b3b-1b3b-1b3b-1b3b1b3b1b3b"] // this property will be forced to appear in the results
+        }
+    }
+
+    axios(config)
+        .then((response) => {
+            console.log(JSON.stringify(response.data))
+        })
+        .catch((error) => {
+            console.log(error)
+        })
+    ```
+  </CodeBlock>
+</CodeBlocks>
+
+### Get the top N properties
+
+You can also specify the number of properties you want to get in the response by setting the `topN` parameter in the request.
+You can request up to 50 comps most similar properties at once.
+
+If you need more, you can make multiple requests with `topN=50` and `excluded_ids` set to the `id` of the properties you have already seen.
+We encourage you to query once with 50 properties and filter results in your application for speed and performance reasons.
+
+### Speed and performance
+
+This endpoint aggregates a lot of data to provide you with the most relevant properties.
+Some requests might take longer than others, depending on the number of properties in the area and the complexity of the properties.
+Feel free to make multiple requests in parallel, but be aware that you might hit the [rate limit](/docs/rate-limits), or slow down the response time if you make too many requests in a short period.
+
+### Full Documentation
+
+Find more details about the API response in our [API Reference](/api-reference/api-reference/property/comparables).

@@ -1,0 +1,133 @@
+***
+
+title: Respecting Rate Limits
+subtitle: Wait and retry using response headers
+-----------------------------------------------
+
+When you call the HelloData API, every response includes rate limit headers.
+To avoid hitting the limiter (or to recover quickly when you do), read the `RateLimit` header and wait the number of seconds specified by its `t` parameter before retrying.
+
+## Which header to use
+
+We use the IETF `RateLimit` header format.
+
+* **`RateLimit`**: includes remaining requests (`r`) and seconds until reset (`t`)
+* **`RateLimit-Policy`**: describes the policy (quota `q` and window `w`)
+
+Example `RateLimit` header:
+
+```text
+"default";r=0;t=12
+```
+
+In that example, you should wait **12 seconds** before retrying.
+
+## Python example
+
+This example retries a request when it receives a `429 Too Many Requests`, waiting `t` seconds from the `RateLimit` header before retrying.
+
+```python
+import time
+import re
+import requests
+
+
+def parse_ratelimit_t_seconds(rate_limit_header: str | None) -> int | None:
+    """
+    Parses the IETF RateLimit header and returns the `t` value (seconds until reset).
+    Example header: '"default";r=0;t=12'
+    """
+    if not rate_limit_header:
+        return None
+
+    # Match ;t=<int> anywhere in the header value
+    m = re.search(r"(?:^|;)t=(\d+)(?:;|$)", rate_limit_header)
+    if not m:
+        return None
+    return int(m.group(1))
+
+
+def get_with_rate_limit_handling(url: str, headers: dict[str, str], *, max_retries: int = 5):
+    for attempt in range(max_retries + 1):
+        resp = requests.get(url, headers=headers, timeout=30)
+
+        if resp.status_code != 429:
+            return resp
+
+        wait_s = parse_ratelimit_t_seconds(resp.headers.get("RateLimit"))
+        if wait_s is None:
+            # If the header is missing/unparseable, fall back to a small backoff.
+            wait_s = min(2 ** attempt, 30)
+
+        time.sleep(wait_s)
+
+    return resp  # last response (429)
+
+
+# Example usage:
+# API_KEY = "..."
+# r = get_with_rate_limit_handling(
+#     "https://api.hellodata.ai/v1/property/search",
+#     headers={"Authorization": f"Bearer {API_KEY}"},
+# )
+# r.raise_for_status()
+# data = r.json()
+```
+
+## TypeScript example
+
+This example does the same thing using `fetch` (Node 18+).
+
+```typescript
+function parseRateLimitTSeconds(rateLimitHeader: string | null): number | null {
+  if (!rateLimitHeader) return null;
+
+  // Example header: `"default";r=0;t=12`
+  const match = rateLimitHeader.match(/(?:^|;)t=(\d+)(?:;|$)/);
+  if (!match) return null;
+  return Number(match[1]);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function fetchWithRateLimitHandling(
+  url: string,
+  init: RequestInit,
+  { maxRetries = 5 }: { maxRetries?: number } = {}
+): Promise<Response> {
+  let lastResponse: Response | undefined;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, init);
+    lastResponse = res;
+
+    if (res.status !== 429) {
+      return res;
+    }
+
+    const tSeconds = parseRateLimitTSeconds(res.headers.get("RateLimit"));
+    const waitSeconds = tSeconds ?? Math.min(2 ** attempt, 30);
+
+    await sleep(waitSeconds * 1000);
+  }
+
+  return lastResponse!;
+}
+
+// Example usage:
+// const API_KEY = process.env.HELLODATA_API_KEY!;
+// const res = await fetchWithRateLimitHandling("https://api.hellodata.ai/v1/property/search", {
+//   method: "GET",
+//   headers: { Authorization: `Bearer ${API_KEY}` },
+// });
+// if (!res.ok) throw new Error(await res.text());
+// const json = await res.json();
+```
+
+## Notes and best practices
+
+* **Proactively slow down when `r` is low**: if you’re near `r=0`, add a small delay between requests.
+* **Prefer concurrency limits over retries**: cap parallel requests (e.g. with a semaphore / queue) so you don’t burst over the minute window.
+* **Always handle missing headers**: use a small exponential backoff fallback if `RateLimit` isn’t present for some reason.

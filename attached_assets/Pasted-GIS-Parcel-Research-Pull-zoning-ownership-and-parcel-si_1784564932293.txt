@@ -1,0 +1,17 @@
+GIS Parcel Research
+Pull zoning, ownership, and parcel size data straight from county GIS systems (Dirt.AI can automate this). Continuously scans for parcels matching your target size and zoning criteria, and flags assemblage potential when adjacent parcels could combine into a larger development site. Act when a parcel matches your profile in a growth corridor.
+
+City/County Zoning Agendas
+Monthly zoning agendas name the applicant, the project details, and often the developer behind a proposed rezoning or site plan. AI can read every municipality's agenda each month and extract that info automatically instead of you combing through PDFs by hand. Act as soon as a new filing shows up, since these are developers actively working a deal before it's public knowledge.
+
+Permits
+Permit status tells you developer intent and timing, especially when a project has been sitting inactive for a while. AI monitors permit portals and flags anything stalled past a set threshold (e.g. 90+ days) so you can reach out and ask what happened and what their plan is now. Also flag newly issued permits as a signal of fresh activity.
+
+Google Alerts / News
+Supplemental, not a primary engine. This confirms and adds context to what GIS/zoning/permit monitoring already flagged, catching market-moving announcements or distress signals that show up in local coverage. AI doesn't add much value here beyond what already exists; it's mostly manual review.
+
+Expired MLS Listings
+Owners whose deal didn't close are often still motivated but now overlooked. A weekly automated pull of expired listings in your target size and geography surfaces sellers with no active broker relationship. Act the moment a listing expires with no closing.
+
+Land Ownership Changes
+Tracks when a parcel transfers to a known development group, private equity entity, or repeat buyer, this ties directly back to your GIS work. AI flags a transfer when the new owner's address matches a known developer/PE entity, which tells you demand exists in that corridor even before anything is built. Also worth tracking parcels that get purchased and then sit undeveloped for a long stretch, since that owner may be a future seller.

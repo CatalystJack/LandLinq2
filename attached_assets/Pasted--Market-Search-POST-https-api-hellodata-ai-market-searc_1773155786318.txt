@@ -1,0 +1,1460 @@
+# Market Search
+
+POST https://api.hellodata.ai/market/search
+Content-Type: application/json
+
+Performs a property search using geometric shapes and advanced filtering criteria.
+This endpoint enables flexible market analysis by finding properties within custom-defined boundaries
+and applying multi-dimensional filters to refine results based on property characteristics.
+
+NOTE: This new endpoint needs to be activated for your account and is charged at a higher rate. Please contact us to activate.
+
+### Core Functionality
+
+The search combines geographic boundaries (defined by coordinate polygons) with property-specific filters
+such as construction year, building size, unit mix characteristics, and property type classifications.
+This allows for precise market analysis within irregular geographic areas like neighborhoods, custom
+market areas, or specific zones of interest.
+
+### Geographic Boundaries
+
+**Coordinate Format**: Geographic boundaries are defined using GeoJSON-style coordinate arrays.
+The format follows the pattern: `number[][][][]` where:
+- **Outer array**: Contains multiple polygons (for complex shapes with holes or multiple areas)
+- **Second level**: Contains individual polygons
+- **Third level**: Contains coordinate rings (first ring is exterior, subsequent rings are holes)
+- **Inner arrays**: Individual coordinate pairs as `[longitude, latitude]`
+
+**Example coordinate structures**:
+```javascript
+// Simple rectangular area in Manhattan
+[[[[-73.99, 40.75], [-73.98, 40.75], [-73.98, 40.76], [-73.99, 40.76], [-73.99, 40.75]]]]
+
+// Complex shape with a hole (e.g., excluding a park)
+[[[
+  [[-73.99, 40.75], [-73.97, 40.75], [-73.97, 40.77], [-73.99, 40.77], [-73.99, 40.75]], // Outer boundary
+  [[-73.985, 40.755], [-73.975, 40.755], [-73.975, 40.765], [-73.985, 40.765], [-73.985, 40.755]] // Hole
+]]]
+```
+
+### Filtering System
+
+**Range Filters**: Most numeric filters use a standardized range format with three properties:
+- `min`: Minimum value (inclusive). Use `null` to omit minimum constraint
+- `max`: Maximum value (inclusive). Use `null` to omit maximum constraint
+- `allow_null`: Whether to include properties with missing data for this field (default: `false`)
+
+**Property Type Filters**: Boolean filters for different property classifications:
+- `is_student`: Student housing complexes (detected via amenities, naming patterns, pricing)
+- `is_senior`: Senior living communities
+- `is_affordable`: Properties with affordable housing units (uses LIHTC database and other sources)
+
+**Unit Mix Filters**: Advanced filtering based on unit composition and pricing:
+- Filter by unit counts, square footage, rent levels, and rent per square foot
+- Available for overall property and by bedroom count (studio through 4-bedroom)
+- Uses historical market data to calculate averages
+
+### Performance & Limitations
+
+**Result Limits**: Each request is capped at **2,500 properties** to ensure optimal performance.
+If you hit this limit, consider:
+- Narrowing your geographic boundary
+- Adding more restrictive filters (year built, unit count, etc.)
+- Splitting large areas into multiple searches
+
+**Geographic Scope**: Searches are optimized for metropolitan areas. Very large rural areas
+may return fewer relevant results due to lower property density.
+
+**Data Freshness**: Property data is continuously updated, but some filters (especially unit mix)
+rely on historical market data that may have varying collection periods across markets.
+
+### Usage Recommendations
+
+**For Market Analysis**:
+- Use generous geographic boundaries initially, then refine with property filters
+- Combine year built and unit count filters to focus on comparable property classes
+- Leverage unit mix filters to find properties with similar tenant profiles
+
+**For Competitive Analysis**:
+- Start with broader search area around subject property
+- Use property type filters to exclude non-competing assets
+- Apply unit mix filters to match target demographics
+
+**For Site Selection**:
+- Define custom geographic boundaries around areas of interest
+- Use year built filters to identify redevelopment opportunities or new construction
+- Apply unit mix filters to understand existing supply characteristics
+
+Each request is limited to a maximum of 2,500 results. If you hit this limit, consider refining your filters
+to narrow the search and reduce the result count.
+
+Reference: https://docs.hellodata.ai/api-reference/api-reference/market/market-search
+
+## OpenAPI Specification
+
+```yaml
+openapi: 3.1.0
+info:
+  title: backend
+  version: 1.0.0
+paths:
+  /market/search:
+    post:
+      operationId: market-search
+      summary: Market Search
+      description: >-
+        Performs a property search using geometric shapes and advanced filtering
+        criteria.
+
+        This endpoint enables flexible market analysis by finding properties
+        within custom-defined boundaries
+
+        and applying multi-dimensional filters to refine results based on
+        property characteristics.
+
+
+        NOTE: This new endpoint needs to be activated for your account and is
+        charged at a higher rate. Please contact us to activate.
+
+
+        ### Core Functionality
+
+
+        The search combines geographic boundaries (defined by coordinate
+        polygons) with property-specific filters
+
+        such as construction year, building size, unit mix characteristics, and
+        property type classifications.
+
+        This allows for precise market analysis within irregular geographic
+        areas like neighborhoods, custom
+
+        market areas, or specific zones of interest.
+
+
+        ### Geographic Boundaries
+
+
+        **Coordinate Format**: Geographic boundaries are defined using
+        GeoJSON-style coordinate arrays.
+
+        The format follows the pattern: `number[][][][]` where:
+
+        - **Outer array**: Contains multiple polygons (for complex shapes with
+        holes or multiple areas)
+
+        - **Second level**: Contains individual polygons
+
+        - **Third level**: Contains coordinate rings (first ring is exterior,
+        subsequent rings are holes)
+
+        - **Inner arrays**: Individual coordinate pairs as `[longitude,
+        latitude]`
+
+
+        **Example coordinate structures**:
+
+        ```javascript
+
+        // Simple rectangular area in Manhattan
+
+        [[[[-73.99, 40.75], [-73.98, 40.75], [-73.98, 40.76], [-73.99, 40.76],
+        [-73.99, 40.75]]]]
+
+
+        // Complex shape with a hole (e.g., excluding a park)
+
+        [[[
+          [[-73.99, 40.75], [-73.97, 40.75], [-73.97, 40.77], [-73.99, 40.77], [-73.99, 40.75]], // Outer boundary
+          [[-73.985, 40.755], [-73.975, 40.755], [-73.975, 40.765], [-73.985, 40.765], [-73.985, 40.755]] // Hole
+        ]]]
+
+        ```
+
+
+        ### Filtering System
+
+
+        **Range Filters**: Most numeric filters use a standardized range format
+        with three properties:
+
+        - `min`: Minimum value (inclusive). Use `null` to omit minimum
+        constraint
+
+        - `max`: Maximum value (inclusive). Use `null` to omit maximum
+        constraint
+
+        - `allow_null`: Whether to include properties with missing data for this
+        field (default: `false`)
+
+
+        **Property Type Filters**: Boolean filters for different property
+        classifications:
+
+        - `is_student`: Student housing complexes (detected via amenities,
+        naming patterns, pricing)
+
+        - `is_senior`: Senior living communities
+
+        - `is_affordable`: Properties with affordable housing units (uses LIHTC
+        database and other sources)
+
+
+        **Unit Mix Filters**: Advanced filtering based on unit composition and
+        pricing:
+
+        - Filter by unit counts, square footage, rent levels, and rent per
+        square foot
+
+        - Available for overall property and by bedroom count (studio through
+        4-bedroom)
+
+        - Uses historical market data to calculate averages
+
+
+        ### Performance & Limitations
+
+
+        **Result Limits**: Each request is capped at **2,500 properties** to
+        ensure optimal performance.
+
+        If you hit this limit, consider:
+
+        - Narrowing your geographic boundary
+
+        - Adding more restrictive filters (year built, unit count, etc.)
+
+        - Splitting large areas into multiple searches
+
+
+        **Geographic Scope**: Searches are optimized for metropolitan areas.
+        Very large rural areas
+
+        may return fewer relevant results due to lower property density.
+
+
+        **Data Freshness**: Property data is continuously updated, but some
+        filters (especially unit mix)
+
+        rely on historical market data that may have varying collection periods
+        across markets.
+
+
+        ### Usage Recommendations
+
+
+        **For Market Analysis**:
+
+        - Use generous geographic boundaries initially, then refine with
+        property filters
+
+        - Combine year built and unit count filters to focus on comparable
+        property classes
+
+        - Leverage unit mix filters to find properties with similar tenant
+        profiles
+
+
+        **For Competitive Analysis**:
+
+        - Start with broader search area around subject property
+
+        - Use property type filters to exclude non-competing assets
+
+        - Apply unit mix filters to match target demographics
+
+
+        **For Site Selection**:
+
+        - Define custom geographic boundaries around areas of interest
+
+        - Use year built filters to identify redevelopment opportunities or new
+        construction
+
+        - Apply unit mix filters to understand existing supply characteristics
+
+
+        Each request is limited to a maximum of 2,500 results. If you hit this
+        limit, consider refining your filters
+
+        to narrow the search and reduce the result count.
+      tags:
+        - subpackage_market
+      parameters:
+        - name: x-api-key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: >-
+            List of properties matching the specified search criteria, limited
+            to 2,500 results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Market_MarketSearch_Response_200'
+      requestBody:
+        description: >-
+          Market filter criteria including geographic boundaries and property
+          filters
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimpleMarketFilters'
+servers:
+  - url: https://api.hellodata.ai
+components:
+  schemas:
+    Point:
+      type: array
+      items:
+        type: number
+        format: double
+      title: Point
+    Polygons:
+      type: array
+      items:
+        type: array
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Point'
+      title: Polygons
+    RangeFilter:
+      type: object
+      properties:
+        min:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            Minimum value for the range (inclusive). Properties with values
+            below this threshold
+
+            will be excluded from results. Set to `null` to omit the minimum
+            constraint.
+        max:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            Maximum value for the range (inclusive). Properties with values
+            above this threshold
+
+            will be excluded from results. Set to `null` to omit the maximum
+            constraint.
+        allow_null:
+          type:
+            - boolean
+            - 'null'
+          default: false
+          description: >-
+            Whether to include properties that have `null` (missing/unknown)
+            values for this field.
+
+
+            **Default behavior**: `false` - properties with missing data are
+            excluded
+
+            **When `true`**: properties with missing data are included in
+            results
+
+
+            **Use Cases**:
+
+            - `false`: Only include properties with known values (stricter
+            filtering)
+
+            - `true`: Include properties even if this data point is unknown
+            (broader results)
+      required:
+        - min
+        - max
+      description: >-
+        Standard range filter interface used throughout the market search
+        system.
+
+        Provides flexible numeric filtering with optional null value handling.
+
+        All numeric comparisons are inclusive (greater than or equal to min,
+        less than or equal to max).
+      title: RangeFilter
+    MixFilter:
+      type: object
+      properties:
+        number_units:
+          $ref: '#/components/schemas/RangeFilter'
+          description: >-
+            Filter by the count of units in this category that have appeared on
+            the market.
+
+            Useful for identifying properties with sufficient unit counts in
+            specific categories.
+
+
+            **Use Cases**:
+
+            - Ensure meaningful sample sizes: `{min: 5}` for at least 5 units of
+            this type
+
+            - Target properties focused on specific unit types: `{min: 50}` for
+            1BR-focused buildings
+
+            - Exclude token unit types: `{min: 10}` to filter out properties
+            with just a few units
+        sqft:
+          $ref: '#/components/schemas/RangeFilter'
+          description: >-
+            Filter by the average square footage of units in this category.
+
+            Based on historical listing data aggregated across all units in this
+            category.
+
+
+            **Use Cases**:
+
+            - Target luxury sizing: `{min: 1000}` for spacious units
+
+            - Exclude micro units: `{min: 500}` for studio apartments
+
+            - Focus on efficient layouts: `{max: 800}` for compact 1BR units
+        rent:
+          $ref: '#/components/schemas/RangeFilter'
+          description: >-
+            Filter by the average rent of units in this category.
+
+            Aggregated from historical market listing data, providing insight
+            into property positioning.
+
+
+            **Important**: Rent levels reflect historical averages, not current
+            asking rents.
+
+            Values may vary significantly by market and time period of data
+            collection.
+
+
+            **Use Cases**:
+
+            - Target luxury properties: `{min: 3000}` for high-end 2BR units
+
+            - Focus on affordable segment: `{max: 1500}` for budget-friendly
+            options
+
+            - Identify market-rate properties: `{min: 1200, max: 2500}` for
+            mid-market positioning
+        rent_per_sqft:
+          $ref: '#/components/schemas/RangeFilter'
+          description: >-
+            Filter by the average rent per square foot of units in this
+            category.
+
+            Calculated as average rent divided by average square footage for
+            this unit type.
+
+
+            **Key Metric**: Rent per square foot normalizes for unit size,
+            enabling direct
+
+            comparison of property positioning and market premium across
+            different unit sizes.
+
+
+            **Use Cases**:
+
+            - Identify luxury properties: `{min: 4.0}` for premium pricing
+
+            - Target value properties: `{max: 2.5}` for below-market pricing
+
+            - Focus on market rate: `{min: 2.5, max: 4.0}` for typical market
+            positioning
+        effective_rent:
+          $ref: '#/components/schemas/RangeFilter'
+          description: >-
+            Filter by the average effective rent of units in this category.
+
+            Effective rent accounts for concessions and specials, providing
+            insight into actual
+
+            net rent after discounts. Aggregated from historical market listing
+            data.
+
+
+            **Important**: Effective rent reflects the actual rent paid after
+            concessions,
+
+            which may differ significantly from asking rent in markets with high
+            concession activity.
+
+
+            **Use Cases**:
+
+            - Target properties with aggressive concessions: `{max: 2000}` for
+            heavily discounted units
+
+            - Identify properties maintaining premium effective rents: `{min:
+            3000}` for high-end positioning
+
+            - Compare asking vs effective rent gaps: Use in combination with
+            `rent` filter
+        effective_rent_per_sqft:
+          $ref: '#/components/schemas/RangeFilter'
+          description: >-
+            Filter by the average effective rent per square foot of units in
+            this category.
+
+            Calculated as average effective rent divided by average square
+            footage for this unit type.
+
+
+            **Key Metric**: Effective rent per square foot normalizes for unit
+            size and accounts
+
+            for concessions, enabling comparison of actual net pricing across
+            different unit sizes.
+
+
+            **Use Cases**:
+
+            - Identify properties with aggressive effective pricing: `{max:
+            2.5}` for value positioning
+
+            - Target premium effective pricing: `{min: 4.0}` for luxury
+            properties
+
+            - Compare asking vs effective pricing: Use in combination with
+            `rent_per_sqft` filter
+      description: >-
+        Filtering options for a specific unit category (e.g., studio, 1BR, 2BR,
+        etc.).
+
+        Enables detailed analysis of unit composition, sizing, and pricing
+        within properties.
+
+        All filters are based on historical market data aggregated at the
+        property level.
+
+        This is calculated over the entire history of the property.
+      title: MixFilter
+    UnitMixFilters:
+      type: object
+      properties:
+        overall:
+          $ref: '#/components/schemas/MixFilter'
+          description: >-
+            Filters applied to the entire property's unit portfolio, aggregating
+            across all unit types.
+
+            Useful for property-level analysis without concern for specific unit
+            type breakdowns.
+
+
+            **Metrics Include**:
+
+            - Total units ever marketed across all types
+
+            - Property-wide average square footage
+
+            - Property-wide average rent
+
+            - Property-wide average rent per square foot
+        studio:
+          $ref: '#/components/schemas/MixFilter'
+          description: >-
+            Filters specific to studio units (0 bedroom units).
+
+            Typically targets young professionals, students, or urban markets
+            with high land costs.
+
+
+            **Typical Characteristics**:
+
+            - Size range: 300-600 sq ft
+
+            - Often found in urban cores or near universities
+
+            - Higher rent per sq ft due to smaller absolute size
+        one_bedroom:
+          $ref: '#/components/schemas/MixFilter'
+          description: >-
+            Filters specific to one-bedroom units.
+
+            Popular among young professionals, couples, and single-person
+            households.
+
+
+            **Typical Characteristics**:
+
+            - Size range: 500-900 sq ft
+
+            - Often represents largest unit count in urban properties
+
+            - Balanced rent per sq ft relative to other unit types
+        two_bedroom:
+          $ref: '#/components/schemas/MixFilter'
+          description: >-
+            Filters specific to two-bedroom units.
+
+            Targets small families, roommates, and households needing additional
+            space.
+
+
+            **Typical Characteristics**:
+
+            - Size range: 800-1,400 sq ft
+
+            - Often commands premium for extra bedroom/bathroom
+
+            - Key unit type for family-oriented properties
+        three_bedroom:
+          $ref: '#/components/schemas/MixFilter'
+          description: >-
+            Filters specific to three-bedroom units.
+
+            Primarily targets families with children or multi-generational
+            households.
+
+
+            **Typical Characteristics**:
+
+            - Size range: 1,100-1,800 sq ft
+
+            - Often found in suburban or family-oriented communities
+
+            - May have lower rent per sq ft due to larger size
+        four_bedroom:
+          $ref: '#/components/schemas/MixFilter'
+          description: |-
+            Filters specific to four-bedroom units.
+            Targets large families or shared housing arrangements.
+
+            **Typical Characteristics**:
+            - Size range: 1,400+ sq ft
+            - Relatively uncommon in most markets
+            - Often found in suburban or luxury properties
+      description: >-
+        Comprehensive unit mix filtering system enabling detailed property
+        analysis by unit composition.
+
+        Each filter category represents a different unit type, allowing for
+        sophisticated market
+
+        segmentation based on unit mix characteristics and pricing.
+
+
+        **Data Foundation**: All metrics are derived from historical listing
+        data, providing insight
+
+        into actual market behavior rather than just current snapshot
+        availability.
+
+
+        **Analysis Capabilities**:
+
+        - Identify properties targeting specific demographics (families, young
+        professionals, etc.)
+
+        - Compare positioning across unit types within the same property
+
+        - Find properties with similar unit mix profiles for competitive
+        analysis
+
+        - Analyze rent premiums across different unit sizes
+      title: UnitMixFilters
+    SimpleMarketFiltersUnitTypesItems:
+      type: object
+      properties:
+        partial_bath:
+          type:
+            - number
+            - 'null'
+          format: double
+        bath:
+          type: number
+          format: double
+        bed:
+          type: number
+          format: double
+      required:
+        - partial_bath
+        - bath
+        - bed
+      title: SimpleMarketFiltersUnitTypesItems
+    UnitRentFilterType:
+      type: string
+      enum:
+        - asking_rent
+        - asking_rent_psf
+        - effective_rent
+        - effective_rent_psf
+      default: asking_rent
+      description: >-
+        Type of rent to filter on.
+
+        - `asking_rent`: The asking/list price for the unit
+        (units_history.price)
+
+        - `asking_rent_psf`: Asking rent per square foot (units_history.price /
+        units.sqft)
+
+        - `effective_rent`: Effective rent after concessions
+        (units_history.effective_price)
+
+        - `effective_rent_psf`: Effective rent per square foot
+        (units_history.effective_price / units.sqft)
+      title: UnitRentFilterType
+    UnitRentFilter:
+      type: object
+      properties:
+        min:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            Minimum value for the range (inclusive). Properties with values
+            below this threshold
+
+            will be excluded from results. Set to `null` to omit the minimum
+            constraint.
+        max:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            Maximum value for the range (inclusive). Properties with values
+            above this threshold
+
+            will be excluded from results. Set to `null` to omit the maximum
+            constraint.
+        allow_null:
+          type:
+            - boolean
+            - 'null'
+          default: false
+          description: >-
+            Whether to include properties that have `null` (missing/unknown)
+            values for this field.
+
+
+            **Default behavior**: `false` - properties with missing data are
+            excluded
+
+            **When `true`**: properties with missing data are included in
+            results
+
+
+            **Use Cases**:
+
+            - `false`: Only include properties with known values (stricter
+            filtering)
+
+            - `true`: Include properties even if this data point is unknown
+            (broader results)
+        type:
+          $ref: '#/components/schemas/UnitRentFilterType'
+          description: >-
+            Type of rent to filter on.
+
+            - `asking_rent`: The asking/list price for the unit
+            (units_history.price)
+
+            - `asking_rent_psf`: Asking rent per square foot
+            (units_history.price / units.sqft)
+
+            - `effective_rent`: Effective rent after concessions
+            (units_history.effective_price)
+
+            - `effective_rent_psf`: Effective rent per square foot
+            (units_history.effective_price / units.sqft)
+      required:
+        - min
+        - max
+      description: >-
+        Unit rent filter with support for different rent types.
+
+        Extends RangeFilter to include a type field that determines which rent
+        metric to filter on.
+      title: UnitRentFilter
+    SimpleMarketFilters:
+      type: object
+      properties:
+        coordinates:
+          $ref: '#/components/schemas/Polygons'
+          description: >-
+            **Required**. Geographic boundaries defining the search area using
+            GeoJSON-style coordinate arrays.
+
+            Supports complex polygons including shapes with holes and multiple
+            disconnected areas.
+
+
+            **Format**: `number[][][][]` where:
+
+            - **Level 1**: Array of polygons (enables multiple search areas or
+            complex shapes)
+
+            - **Level 2**: Array of coordinate rings within each polygon
+
+            - **Level 3**: Array of coordinate pairs forming each ring
+
+            - **Level 4**: Individual coordinates as `[longitude, latitude]`
+
+
+            **Important**: The first ring in each polygon defines the exterior
+            boundary.
+
+            Additional rings define holes within that boundary.
+
+
+            **Coordinate System**: Uses WGS84 (EPSG:4326) with longitude values
+            between -180 to 180
+
+            and latitude values between -90 to 90.
+        year_built:
+          $ref: '#/components/schemas/RangeFilter'
+          description: >-
+            Filter properties by their construction year. Useful for targeting
+            specific development eras,
+
+            new construction, or properties due for major renovations.
+
+
+            **Use Cases**:
+
+            - Target new construction: `{min: 2020, max: null}`
+
+            - Exclude very old properties: `{min: 1980, max: null}`
+
+            - Focus on specific era: `{min: 2000, max: 2010}`
+
+            - Include properties with unknown build dates: `{min: 1990, max:
+            null, allow_null: true}`
+        number_units:
+          $ref: '#/components/schemas/RangeFilter'
+          description: >-
+            Filter properties by total number of residential units. Essential
+            for ensuring
+
+            comparable property sizes and investment scales.
+
+
+            **Use Cases**:
+
+            - Large complexes only: `{min: 200, max: null}`
+
+            - Mid-size properties: `{min: 50, max: 200}`
+
+            - Small properties: `{min: null, max: 50}`
+
+            - Include properties with unknown unit counts: `{allow_null: true}`
+        number_stories:
+          $ref: '#/components/schemas/RangeFilter'
+          description: >-
+            Filter properties by building height (number of floors/stories).
+            Useful for
+
+            architectural compatibility, zoning analysis, or construction type
+            considerations.
+
+
+            **Use Cases**:
+
+            - High-rise only: `{min: 10, max: null}`
+
+            - Low-rise: `{min: null, max: 4}`
+
+            - Mid-rise: `{min: 5, max: 15}`
+
+            - Include unknown story counts: `{allow_null: true}`
+        is_student:
+          type: boolean
+          description: >-
+            Filter for student housing properties.
+
+
+            **Use Cases**:
+
+            - `true`: Only include confirmed student housing
+
+            - `false`: Exclude student housing from results
+
+            - `null`: Include all properties regardless of student housing
+            status
+        is_senior:
+          type: boolean
+          description: >-
+            Filter for senior living communities and age-restricted properties.
+            Detection includes:
+
+            - Age restrictions (55+, 62+, etc.) in property descriptions
+
+            - Senior-specific amenities (accessibility features, medical
+            facilities)
+
+
+            **Use Cases**:
+
+            - `true`: Only include senior living properties
+
+            - `false`: Exclude senior living from results
+
+            - `null`: Include all properties regardless of senior designation
+        is_build_to_rent:
+          type: boolean
+          description: |-
+            Filter for build-to-rent communities.
+
+            **Use Cases**:
+            - `true`: Only include build-to-rent properties
+            - `false`: Exclude build-to-rent from results
+            - `null`: Include all properties regardless of build-to-rent status
+        is_affordable:
+          type: boolean
+          description: >-
+            Filter for properties containing affordable or subsidized housing
+            units. Identification uses:
+
+            - LIHTC (Low-Income Housing Tax Credit) property database
+
+            - Rent-restricted unit indicators in listing data
+
+            - Property names and descriptions mentioning affordable housing
+
+
+            **Note**: Properties may have mixed-income units (both market-rate
+            and affordable).
+
+            This filter identifies properties with *any* affordable component.
+
+
+            **Use Cases**:
+
+            - `true`: Only include properties with affordable housing components
+
+            - `false`: Exclude properties with affordable housing
+
+            - `null`: Include all properties regardless of affordable housing
+            status
+        is_single_family:
+          type: boolean
+          description: >-
+            Filter for single-family residential properties. Includes detached
+            houses and
+
+            other standalone residential structures designed for one family.
+
+
+            **Use Cases**:
+
+            - `true`: Only include single-family properties
+
+            - `false`: Exclude single-family properties from results
+
+            - `null`: Include all properties regardless of single-family
+            designation
+        is_apartment:
+          type: boolean
+          description: >-
+            Filter for apartment properties. Includes traditional apartment
+            buildings,
+
+            apartment complexes, and multi-unit residential buildings with
+            rental units.
+
+
+            **Use Cases**:
+
+            - `true`: Only include apartment properties
+
+            - `false`: Exclude apartment properties from results
+
+            - `null`: Include all properties regardless of apartment designation
+        is_condo:
+          type: boolean
+          description: >-
+            Filter for condominium properties. Includes individually owned units
+            within
+
+            multi-unit buildings where owners hold title to their specific unit.
+
+
+            **Use Cases**:
+
+            - `true`: Only include condominium properties
+
+            - `false`: Exclude condominium properties from results
+
+            - `null`: Include all properties regardless of condominium
+            designation
+        unit_mix:
+          $ref: '#/components/schemas/UnitMixFilters'
+          description: >-
+            Advanced filters for unit composition and pricing characteristics.
+            Enables sophisticated
+
+            market analysis based on unit mix, sizes, and rent levels across
+            different unit types.
+
+
+            **Structure**: Contains filters for overall property and by bedroom
+            count (studio through 4BR).
+
+            Each category can filter by:
+
+            - `number_units`: Count of units in this category
+
+            - `sqft`: Average square footage for units in this category
+
+            - `rent`: Average rent for units in this category
+
+            - `rent_per_sqft`: Average rent per square foot for units in this
+            category
+
+
+            **Data Source**: Based on historical market listing data, providing
+            insight into
+
+            actual market positioning rather than just current availability.
+
+
+            **Use Cases**:
+
+            - Target luxury properties: `{overall: {rent_per_sqft: {min: 4.0}}}`
+
+            - Find family-oriented properties: `{three_bedroom: {number_units:
+            {min: 20}}}`
+
+            - Exclude micro-unit buildings: `{studio: {sqft: {min: 500}}}`
+        unit_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimpleMarketFiltersUnitTypesItems'
+          description: >-
+            Filter properties by their unit types. Useful for targeting
+            properties with specific unit types.
+
+
+            **Use Cases**:
+
+            - Target properties with studios: `[{bed: 0, bath: 1, partial_bath:
+            null}]`
+        included_amenities:
+          type: array
+          items:
+            type: string
+          description: >-
+            Filter properties by amenities that they have. Useful for targeting
+            properties with specific amenities.
+
+
+            **Use Cases**:
+
+            - Target properties with a city view: `['city view']`
+        excluded_amenities:
+          type: array
+          items:
+            type: string
+          description: >-
+            Filter properties by amenities that they have. Useful for targeting
+            properties with specific amenities.
+
+
+            **Use Cases**:
+
+            - Exclude properties without a walk-in closet: `['walk in closet']`
+        listing_status:
+          type: string
+          description: |-
+            Filter properties by their listing status.
+
+            **Use Cases**:
+            - Target properties with active listings: `'active'`
+            - Target properties with closed listings: `'closed'`
+            - Target both: 'all'
+        building_quality:
+          $ref: '#/components/schemas/RangeFilter'
+          description: |-
+            Filter properties based on their average quality from 0 to 1
+
+            **Use Cases**:
+            Target high or low quality buildings
+        review_score:
+          $ref: '#/components/schemas/RangeFilter'
+          description: |-
+            Filter properties based on their average review score from 0 to 1
+
+            **Use Cases**:
+            Target buildings with bad reviews
+        unit_sqft:
+          $ref: '#/components/schemas/RangeFilter'
+          description: >-
+            Filter properties by individual unit square footage. This filters at
+            the unit level,
+
+            ensuring only properties with units matching the specified sqft
+            range are included.
+
+
+            **Use Cases**:
+
+            - Target properties with specific unit sizes: `{min: 800, max:
+            1200}` for 800-1200 sqft units
+
+            - Exclude micro units: `{min: 500, max: null}` for units at least
+            500 sqft
+
+            - Focus on larger units: `{min: 1500, max: null}` for spacious units
+        unit_rent:
+          $ref: '#/components/schemas/UnitRentFilter'
+          description: >-
+            Filter properties by individual unit rent. This filters at the unit
+            level,
+
+            ensuring only properties with units matching the specified rent
+            range are included.
+
+            Based on historical listing prices from units_history.
+
+
+            **Rent Types**:
+
+            - `asking_rent`: The asking/list price for the unit
+
+            - `asking_rent_psf`: Asking rent per square foot
+
+            - `effective_rent`: Effective rent (after concessions)
+
+            - `effective_rent_psf`: Effective rent per square foot
+
+
+            **Use Cases**:
+
+            - Target properties with specific rent ranges: `{type:
+            'asking_rent', min: 1500, max: 2500}` for $1500-$2500 units
+
+            - Exclude luxury units: `{type: 'effective_rent', max: 3000}` for
+            units under $3000
+
+            - Focus on premium units: `{type: 'asking_rent_psf', min: 4.0}` for
+            high-end pricing
+      required:
+        - coordinates
+      description: >-
+        Interface representing the comprehensive filter criteria that can be
+        applied to a market search.
+
+        This includes geographic boundaries, property characteristics, and unit
+        mix specifications.
+
+        All filter parameters are optional except for coordinates, allowing for
+        flexible search refinement.
+      title: SimpleMarketFilters
+    UUID:
+      type: string
+      format: uuid
+      description: |-
+        Stringified UUIDv4.
+        See [RFC 4112](https://tools.ietf.org/html/rfc4122)
+      title: UUID
+    DateStr:
+      type: string
+      description: Date string in the format 'YYYY-MM-DD'
+      title: DateStr
+    PropertySearchResponse:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+          description: >-
+            The primary unique identifier of the property. It is a stringified
+            UUIDv5.
+
+            This value can occasionally change if multiple properties get merged
+            into one.
+        id_alias:
+          type: array
+          items:
+            $ref: '#/components/schemas/UUID'
+          description: >-
+            A list of alternate unique identifiers (alias IDs) for the property.
+
+            These IDs are typically derived from historical addresses and remain
+
+            valid even if the primary address changes over time. While old IDs
+
+            are automatically redirected to the current primary ID, exposing
+            alias
+
+            IDs helps with deduplication and data consistency.
+        lat:
+          type: number
+          format: double
+          description: The property's latitude
+        lon:
+          type: number
+          format: double
+          description: The property's longitude
+        building_name:
+          type:
+            - string
+            - 'null'
+          description: The property's name.
+        building_name_alias:
+          type: array
+          items:
+            type: string
+          description: |-
+            Other known names for the property. When searching for a property
+            by name, these aliases will also be matched.
+        street_address:
+          type: string
+          description: The property's street address part of the full address.
+        street_address_alias:
+          type: array
+          items:
+            type: string
+          description: >-
+            Other known street addresses for the property. When searching for a
+            property
+
+            by address, these aliases will also be matched.
+        city:
+          type: string
+          description: The property's city.
+        state:
+          type: string
+          description: The property's state. Formatted as a 2-char string.
+        zip_code:
+          type: string
+          description: >-
+            The property's zip code. Formatted as a 5-char string with leading
+            0.
+        number_units:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The property's advertised number_units
+        year_built:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The property's year_built. This can be in the future if the property
+            is under construction.
+        number_stories:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The property's number of stories.
+        created_on:
+          $ref: '#/components/schemas/DateStr'
+          description: The date when this record was last updated.
+      required:
+        - id
+        - building_name
+        - building_name_alias
+        - street_address
+        - street_address_alias
+        - city
+        - state
+        - zip_code
+      description: >-
+        The PropertySearchResponse object is returned by the search endpoints.
+
+        It is a very simple property object that can then be used to query the
+        /properties/:id endpoint
+      title: PropertySearchResponse
+    Market_MarketSearch_Response_200:
+      type: object
+      properties:
+        properties:
+          type: array
+          items:
+            $ref: '#/components/schemas/PropertySearchResponse'
+      required:
+        - properties
+      title: Market_MarketSearch_Response_200
+  securitySchemes:
+    api:
+      type: apiKey
+      in: header
+      name: x-api-key
+    auth0:
+      type: http
+      scheme: bearer
+
+```
+
+## SDK Code Examples
+
+```python
+import requests
+
+url = "https://api.hellodata.ai/market/search"
+
+payload = { "coordinates": [[[[1.1]]]] }
+headers = {
+    "x-api-key": "<apiKey>",
+    "Content-Type": "application/json"
+}
+
+response = requests.post(url, json=payload, headers=headers)
+
+print(response.json())
+```
+
+```javascript
+const url = 'https://api.hellodata.ai/market/search';
+const options = {
+  method: 'POST',
+  headers: {'x-api-key': '<apiKey>', 'Content-Type': 'application/json'},
+  body: '{"coordinates":[[[[1.1]]]]}'
+};
+
+try {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  console.log(data);
+} catch (error) {
+  console.error(error);
+}
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"strings"
+	"net/http"
+	"io"
+)
+
+func main() {
+
+	url := "https://api.hellodata.ai/market/search"
+
+	payload := strings.NewReader("{\n  \"coordinates\": [\n    [\n      [\n        [\n          1.1\n        ]\n      ]\n    ]\n  ]\n}")
+
+	req, _ := http.NewRequest("POST", url, payload)
+
+	req.Header.Add("x-api-key", "<apiKey>")
+	req.Header.Add("Content-Type", "application/json")
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+
+	fmt.Println(res)
+	fmt.Println(string(body))
+
+}
+```
+
+```ruby
+require 'uri'
+require 'net/http'
+
+url = URI("https://api.hellodata.ai/market/search")
+
+http = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+
+request = Net::HTTP::Post.new(url)
+request["x-api-key"] = '<apiKey>'
+request["Content-Type"] = 'application/json'
+request.body = "{\n  \"coordinates\": [\n    [\n      [\n        [\n          1.1\n        ]\n      ]\n    ]\n  ]\n}"
+
+response = http.request(request)
+puts response.read_body
+```
+
+```java
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+
+HttpResponse<String> response = Unirest.post("https://api.hellodata.ai/market/search")
+  .header("x-api-key", "<apiKey>")
+  .header("Content-Type", "application/json")
+  .body("{\n  \"coordinates\": [\n    [\n      [\n        [\n          1.1\n        ]\n      ]\n    ]\n  ]\n}")
+  .asString();
+```
+
+```php
+<?php
+require_once('vendor/autoload.php');
+
+$client = new \GuzzleHttp\Client();
+
+$response = $client->request('POST', 'https://api.hellodata.ai/market/search', [
+  'body' => '{
+  "coordinates": [
+    [
+      [
+        [
+          1.1
+        ]
+      ]
+    ]
+  ]
+}',
+  'headers' => [
+    'Content-Type' => 'application/json',
+    'x-api-key' => '<apiKey>',
+  ],
+]);
+
+echo $response->getBody();
+```
+
+```csharp
+using RestSharp;
+
+var client = new RestClient("https://api.hellodata.ai/market/search");
+var request = new RestRequest(Method.POST);
+request.AddHeader("x-api-key", "<apiKey>");
+request.AddHeader("Content-Type", "application/json");
+request.AddParameter("application/json", "{\n  \"coordinates\": [\n    [\n      [\n        [\n          1.1\n        ]\n      ]\n    ]\n  ]\n}", ParameterType.RequestBody);
+IRestResponse response = client.Execute(request);
+```
+
+```swift
+import Foundation
+
+let headers = [
+  "x-api-key": "<apiKey>",
+  "Content-Type": "application/json"
+]
+let parameters = ["coordinates": [[[[1.1]]]]] as [String : Any]
+
+let postData = JSONSerialization.data(withJSONObject: parameters, options: [])
+
+let request = NSMutableURLRequest(url: NSURL(string: "https://api.hellodata.ai/market/search")! as URL,
+                                        cachePolicy: .useProtocolCachePolicy,
+                                    timeoutInterval: 10.0)
+request.httpMethod = "POST"
+request.allHTTPHeaderFields = headers
+request.httpBody = postData as Data
+
+let session = URLSession.shared
+let dataTask = session.dataTask(with: request as URLRequest, completionHandler: { (data, response, error) -> Void in
+  if (error != nil) {
+    print(error as Any)
+  } else {
+    let httpResponse = response as? HTTPURLResponse
+    print(httpResponse)
+  }
+})
+
+dataTask.resume()
+```

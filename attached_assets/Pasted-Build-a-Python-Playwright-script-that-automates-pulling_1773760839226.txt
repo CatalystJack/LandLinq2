@@ -1,0 +1,45 @@
+Build a Python Playwright script that automates pulling 2024 tax bill data from Mecklenburg County's Polaris3G GIS portal and writes results into an Excel file.
+
+OVERVIEW:
+- Read parcel IDs from an Excel file (column P, rows 3–227)
+- For each parcel, navigate the Polaris3G portal to find the 2024 tax bill
+- Scrape 4 values from the tax bill and write them back to the Excel file
+- Validate that the total tax bill on the site matches the calculated total in column N
+
+EXCEL FILE STRUCTURE:
+- Column P = Parcel ID (8-digit string, e.g. "04711418")
+- Column J = Total Assessed Value (to be filled)
+- Column K = Total Millage Rate (to be filled — store as combined decimal, e.g. 0.7572)
+- Column L = Direct Assessments (to be filled — store as sum of all direct assessments)
+- Column M = Interest Due (to be filled)
+- Column N = Already has formula: =J*K/100+L+M (use this to validate vs GIS total)
+
+GIS PORTAL:
+- Base URL: https://polaris3g.mecklenburgcountync.gov/
+- Search bar accepts parcel ID directly
+- After searching, scroll down the left panel to "Tax Information" section
+- Click "Tax Bill Information"
+- Select the 2024 tax bill (it may be the second option if 2025 is listed above it)
+
+VALUES TO SCRAPE FROM TAX BILL PAGE:
+1. Assessed Value → Column J
+2. Total Millage Rate (combined rate) → Column K
+3. Direct Assessments (sum all line items) → Column L
+4. Interest Due → Column M
+5. Also capture the Total Tax Bill shown on the page for validation against Column N
+
+REQUIREMENTS:
+- Use Playwright (async) with headed browser so I can watch it run
+- Add a 1–2 second delay between parcels to avoid rate limiting
+- If a parcel search returns no results, log it and skip
+- If the 2024 tax bill is not found, log it and skip
+- Save progress to the Excel file every 10 parcels (in case of crash)
+- At the end, print a summary: total processed, total skipped, any mismatches between GIS total and Column N calculated total
+- Log all skipped/error parcels to a separate errors.csv file
+
+LIBRARIES NEEDED:
+- playwright
+- openpyxl
+- asyncio
+
+Provide the complete script, install instructions, and instructions for how to point it at my local Excel file.

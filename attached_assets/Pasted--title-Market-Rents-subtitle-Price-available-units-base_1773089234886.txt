@@ -1,0 +1,176 @@
+***
+
+title: Market Rents
+subtitle: Price available units based on what just closed among your competitors
+--------------------------------------------------------------------------------
+
+Given a property, the pricing API will return a list of recommended prices for available units in the building.
+We also offer different parameters to help you filter the results based on your requirements.
+
+## Methodology
+
+The pricing API uses a comps approach to recommend prices for available units in a building.
+We find comparable units that have closed recently (by default, this can be tweaked to include units that are currently available) and use them to recommend prices for the available units in the subject property.
+
+## Querying the API
+
+<CodeBlocks>
+  <CodeBlock title="Curl">
+    ```bash
+    curl -X POST https://api.hellodata.ai/property/pricing \
+         -H "x-api-key: <apiKey>" \
+         -H "Content-Type: application/json" \
+         -d '{
+          "subject": <PropertyPayload>,
+         }
+    '
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="Python">
+    ```python
+    import requests
+
+    url = "https://api.hellodata.ai/property/pricing"
+
+    payload = {
+      "subject": <PropertyPayload>,
+    }
+
+    headers = {
+      'x-api-key': '<your-api-key>',
+      'Content-Type': 'application/json'
+    }
+
+    response = requests.request("POST", url, headers=headers, data = payload)
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="JS">
+    ```javascript
+    const axios = require('axios')
+
+    const data = JSON.stringify({
+      "subject": <PropertyPayload>,
+    })
+
+    const headers = {
+      'x-api-key': '<your-api-key>',
+      'Content-Type': 'application/json'
+    }
+
+    const config = {
+      method: 'post',
+      url,
+      headers,
+      data : data
+    }
+
+    axios(config)
+      .then(function (response) {
+        console.log(JSON.stringify(response.data))
+      })
+      .catch(function (error) {
+        console.log(error)
+      })
+    ```
+  </CodeBlock>
+</CodeBlocks>
+
+### Config Parameters
+
+We give you the ability to refine property and units we base our recommendations on. Here are the parameters you can use:
+
+* `max_radius`: The maximum search radius (in miles) for comparable properties. This limits how far out from the subject property the search for comparables will go.
+* `listing_status`: Force the search to only consider units having a specific status (active, closed, or all). By default, all units are considered.
+* `from_date`: The start date for the period within which comparable units should be considered. This filters the data to include only those units occurring after this date.
+* `to_date`: The end date for the period within which comparable units should be considered. This filters the data to include only units occurring before this date.
+* `include_outliers`: Determines whether to include outlier data in the comparison. Outliers can significantly affect the average and median values of the comps.
+* `building_ids`: A list of building IDs that should be explicitly included in the comps analysis, regardless of other criteria.
+* `excluded_unit_ids`: A list of unit IDs to be excluded from the comps analysis. This can help remove known anomalies or non-comparable units from the dataset.
+* `exclude_subject`: Indicates whether the subject property itself should be excluded from the comps analysis. This is useful when the subject property's data might skew the comparison.
+
+You can pass a `settings` parameter next to the `subject` parameter in the request payload to include these parameters.
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+    ```python
+    import requests
+
+    url = "https://api.hellodata.ai/property/pricing"
+
+    headers = {
+      'x-api-key': '<your-api-key>',
+      'Content-Type': 'application/json'
+    }
+
+    payload = {
+      "subject": <PropertyPayload>,
+      "settings": {
+        "max_radius": 1, # 1 mile
+        "listing_status": "closed", # closed units only
+        "from_date": "2021-01-01", # closed between 2021-01-01 and 2021-12-31
+        "to_date": "2021-12-31", 
+        "include_outliers": false, # exclude outliers
+        "building_ids": [], # go with recommended buildings (comparables)
+        "excluded_unit_ids": ["3e628031-57b8-5394-821d-13779318fef4"], # But exclude this unit (a penthouse, for example)
+        "exclude_subject": true # exclude the subject property from the comps, so that we don't compare it to itself
+      }
+    }
+
+    response = requests.request("POST", url, headers=headers, data = payload)
+
+    print(response.json())
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="JS">
+    ```javascript
+    const axios = require('axios')
+
+    const data = {
+      "subject": <PropertyPayload>,
+      "settings": {
+        "max_radius": 1, // 1 mile
+        "listing_status": "closed", // closed units only
+        "from_date": "2021-01-01", // closed between 2021-01-01 and 2021-12-31
+        "to_date": "2021-12-31", 
+        "include_outliers": false, // exclude outliers
+        "building_ids": [], // go with recommended buildings (comparables)
+        "excluded_unit_ids": ["3e628031-57b8-5394-821d-13779318fef4"], // But exclude this unit (a penthouse, for example)
+        "exclude_subject": true // exclude the subject property from the comps, so that we don't compare it to itself
+      }
+    }
+
+    const headers = {
+      'x-api-key': '<your-api-key>',
+      'Content-Type': 'application/json'
+    }
+
+    const config = {
+      method: 'post',
+      url,
+      headers,
+      data
+    }
+
+    axios(config)
+      .then(function (response) {
+        console.log(JSON.stringify(response.data))
+      })
+      .catch(function (error) {
+        console.log(error)
+      })
+    ```
+  </CodeBlock>
+</CodeBlocks>
+
+### Speed and performance
+
+This endpoint aggregates a lot of data to provide you with the most accurate recommendations.
+Some requests might take longer than others, depending on the number of properties in the area and the complexity of the properties.
+Feel free to make multiple requests in parallel, but be aware that you might hit the [rate limit](/docs/rate-limits), or slow down the response time if you make too many requests in a short period.
+
+### Full Documentation
+
+Find more details about this endpoint in our [API Reference](/api-reference/api-reference/property/market-rents).

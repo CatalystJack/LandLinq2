@@ -1,0 +1,73 @@
+Build a web app that automates pulling 2024 property tax bill data from Mecklenburg County, NC for parcels listed in an uploaded Excel file.
+
+What it does:
+
+User uploads an Excel file (.xlsx) where parcel IDs are in column P (index 15), starting at row 3 (index 2)
+The app scrapes tax data for each parcel and fills in 5 columns:
+Column J (index 9): Assessed Value
+Column K (index 10): Millage Rate
+Column L (index 11): Direct Assessments
+Column M (index 12): Interest
+Column N (index 13): Total Tax Bill
+User can download the updated Excel file when done
+Tech stack: pnpm monorepo, React + Vite frontend, Express + TypeScript API backend, Playwright for browser automation
+
+Scraping logic (two sources):
+
+Assessed Value — call this API:
+GET https://polaris3g.mecklenburgcountync.gov/api/bolt?pid={parcelId}&page=1
+Parse response.market_value (numeric field).
+
+Millage Rate, Direct Assessments, Interest, Total Tax Bill — use Playwright (headless Chromium) to:
+
+Navigate to https://taxbill.co.mecklenburg.nc.us/publicwebaccess/BillSearchResults.aspx?ParcelNum={parcelId}
+Find the table row link whose text contains -2024-, click it to go to the BillDetails page
+On the details page, run a page.evaluate() using a DOM TreeWalker to extract all text nodes, then parse:
+Find the text node after "Total Assessed Value" → Assessed Value (use this if the Bolt API fails)
+Find all "Rate" rows: collect decimal numbers (e.g. 0.3581) and sum them → Millage Rate; collect flat dollar amounts (e.g. 52.95) and sum them → Direct Assessments
+Find the text node after "Interest:" → Interest
+Find the text node after "Total Billed:" → Total Tax Bill
+Chromium path resolution — since this runs on Replit/NixOS, playwright-core's default path won't work. Resolve it like this:
+
+function resolveChromiumPath(): string {
+  try {
+    const p = chromium.executablePath();
+    if (p && existsSync(p)) return p;
+  } catch {}
+  // Dynamically scan Nix store
+  const nixStore = "/nix/store";
+  const subPaths = [
+    "chrome-linux/chrome",
+    "chromium-1187/chrome-linux/chrome",
+    "chromium-1169/chrome-linux/chrome",
+    "chromium-1134/chrome-linux/chrome",
+    "chromium-1080/chrome-linux/chrome",
+    "chromium-1048/chrome-linux/chrome",
+  ];
+  const entries = readdirSync(nixStore).filter(
+    e => e.includes("playwright-chromium") || e.includes("playwright-browsers")
+  );
+  for (const entry of entries) {
+    for (const sub of subPaths) {
+      const full = `${nixStore}/${entry}/${sub}`;
+      if (existsSync(full)) return full;
+    }
+  }
+  throw new Error("Chromium not found");
+}
+Also run npx playwright install chromium once to download the headless shell as a final fallback.
+
+Job system: Run scraping as a background job so the UI can poll for progress. Use an in-memory job store with fields: status (pending/running/done/error/cancelled), total, completed, results[], xlsxBuffer. Process parcels with concurrency of 3 using a semaphore.
+
+Frontend features:
+
+File upload input (accepts .xlsx)
+Start button that POSTs the file to /api/scrape/start (multipart/form-data)
+Progress bar polling /api/scrape/status/:jobId every 2 seconds
+Results table showing all 5 data columns per parcel
+Cancel button mid-job
+"Export to Excel" button that downloads the filled-in xlsx from /api/scrape/download/:jobId
+"Export to PDF (Print)" button that calls window.print()
+Excel output: Use the xlsx (SheetJS) library. Read the uploaded file, preserve all existing data, write the 5 scraped values into the correct columns for each parcel row, output as a new .xlsx buffer for download.
+
+tsconfig for the API server must include "lib": ["ES2022", "DOM"] so Playwright browser-context callbacks typecheck correctly.

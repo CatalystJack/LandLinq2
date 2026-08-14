@@ -1,0 +1,81 @@
+Primary Endpoint
+GET /property/{id} - This is the main endpoint that returns comprehensive property data including all the fields you mentioned 
+1
+.
+
+Property Details Fields
+Basic Property Information
+Year Built: Available in the property response
+Units: Total unit count from the property data
+Type: Property type (multifamily)
+Distance: Calculated when using search endpoints with geographic parameters
+Stories: Available in building details (though may be null as shown in your example)
+Building Size: Available in property characteristics
+Rent & Financials Fields
+The following fields can be calculated from the /property/{id} response 
+2
+:
+
+Rent PSF: Calculate using weighted average: sum(all_effective_prices) / sum(all_sqfts)
+Average Rent/Unit: Average of effective_price or min_effective_price from building_availability
+Vacancy: Can be calculated from available vs total units in building_availability
+Leased: Derived from units not currently available in building_availability
+Unit Mix Data
+Unit mix information is extracted from the building_availability array, which contains:
+
+Bedroom counts (bed field) for each unit
+Unit types (studio, 1BR, 2BR, 3BR, 4BR)
+Square footage (sqft field)
+Rent data for each unit type
+Calculation Examples
+Average Rent Calculation
+def get_average_rent(property_data):
+    units = property_data.get("building_availability", [])
+    effective_prices = [
+        unit.get("effective_price") or unit.get("min_effective_price")
+        for unit in units
+        if unit.get("effective_price") or unit.get("min_effective_price")
+    ]
+    return sum(effective_prices) / len(effective_prices) if effective_prices else None
+
+Rent PSF Calculation
+def get_rent_psf(property_data):
+    units = property_data.get("building_availability", [])
+    total_price = 0
+    total_sqft = 0
+    
+    for unit in units:
+        price = unit.get("effective_price") or unit.get("min_effective_price")
+        sqft = unit.get("sqft") or unit.get("min_sqft")
+        
+        if price and sqft:
+            total_price += price
+            total_sqft += sqft
+    
+    return total_price / total_sqft if total_sqft > 0 else None
+
+Regional Reports with Unit Mix Filters
+For enhanced unit mix analysis, you can use regional report filters with unit mix capabilities 
+3
+:
+
+{
+  "filters": {
+    "unit_mix": {
+      "overall": {
+        "rent_per_sqft": {
+          "min": 2.5,
+          "max": 3.5
+        }
+      },
+      "studio": {
+        "number_units": {"min": 10},
+        "rent": {"max": 1500}
+      },
+      "one_bedroom": {
+        "number_units": {"min": 10},
+        "sqft": {"min": 600}
+      }
+    }
+  }
+}

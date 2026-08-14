@@ -1,0 +1,1992 @@
+# Get Property
+
+GET https://api.hellodata.ai/property/{id}
+
+Retrieve all the details of a property given its id.
+
+- **ID changes**: it is rare, but can happen, to see the id of a property change. We consider it unlikely for bigger properties since they tend to have a more established "identity" among our data pipelines. For example, if multiples properties are merged into one, or major data changes make us change the id. In this case, you might receive a 404 error. The property search endpoint is free, so always feel free to query it in case that happens.
+- **Payload usage**: this payload can be used to get the property details, the unit pricing, the expense benchmarks, and the rent comps. And you are free to cache it if you need to.
+- **Date filtering**: You can optionally filter units, history, availability periods, and concessions by providing `from` and/or `to` date parameters. Only data that overlaps with the specified date range will be included. You can provide either date, both, or neither. This is particularly useful when you only need current or recent data, as it can significantly speed up API calls and reduce response payload size compared to retrieving the full historical dataset.
+
+We make a few properties free to access to help with testing. These three properties are listed below but if you would like to use a different property to test with, we are happy to allow that for you.
+
+| ID                                   | Building Name        | Address                                       |
+|--------------------------------------|----------------------|-----------------------------------------------|
+| e8769b06-1334-5ab6-b9c6-6dfccbf9ea78 | Reserve at Glenview  | 195 Waukegan Road, Glenview, IL 60025         |
+| 20e4945a-ce78-5f2c-9053-6bdaca39044b | 7229-33 S Yates Blvd | 7229 South Yates Boulevard, Chicago, IL 60649 |
+| 0e628031-57b8-5394-821d-13779318fef4 | OneEleven            | 111 West Wacker Drive, Chicago, IL 60601      |
+
+Reference: https://docs.hellodata.ai/api-reference/api-reference/property/get-property
+
+## OpenAPI Specification
+
+```yaml
+openapi: 3.1.0
+info:
+  title: backend
+  version: 1.0.0
+paths:
+  /property/{id}:
+    get:
+      operationId: get-property
+      summary: Get Property
+      description: >-
+        Retrieve all the details of a property given its id.
+
+
+        - **ID changes**: it is rare, but can happen, to see the id of a
+        property change. We consider it unlikely for bigger properties since
+        they tend to have a more established "identity" among our data
+        pipelines. For example, if multiples properties are merged into one, or
+        major data changes make us change the id. In this case, you might
+        receive a 404 error. The property search endpoint is free, so always
+        feel free to query it in case that happens.
+
+        - **Payload usage**: this payload can be used to get the property
+        details, the unit pricing, the expense benchmarks, and the rent comps.
+        And you are free to cache it if you need to.
+
+        - **Date filtering**: You can optionally filter units, history,
+        availability periods, and concessions by providing `from` and/or `to`
+        date parameters. Only data that overlaps with the specified date range
+        will be included. You can provide either date, both, or neither. This is
+        particularly useful when you only need current or recent data, as it can
+        significantly speed up API calls and reduce response payload size
+        compared to retrieving the full historical dataset.
+
+
+        We make a few properties free to access to help with testing. These
+        three properties are listed below but if you would like to use a
+        different property to test with, we are happy to allow that for you.
+
+
+        | ID                                   | Building Name        |
+        Address                                       |
+
+        |--------------------------------------|----------------------|-----------------------------------------------|
+
+        | e8769b06-1334-5ab6-b9c6-6dfccbf9ea78 | Reserve at Glenview  | 195
+        Waukegan Road, Glenview, IL 60025         |
+
+        | 20e4945a-ce78-5f2c-9053-6bdaca39044b | 7229-33 S Yates Blvd | 7229
+        South Yates Boulevard, Chicago, IL 60649 |
+
+        | 0e628031-57b8-5394-821d-13779318fef4 | OneEleven            | 111 West
+        Wacker Drive, Chicago, IL 60601      |
+      tags:
+        - subpackage_property
+      parameters:
+        - name: id
+          in: path
+          description: The property id (UUIDv5 retrieved from the search endpoint).
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: from
+          in: query
+          description: >-
+            Optional. Filter results to include only data that overlaps with
+            dates on or after this date (ISO 8601 format, e.g., "2024-01-01").
+          required: false
+          schema:
+            type: string
+        - name: to
+          in: query
+          description: >-
+            Optional. Filter results to include only data that overlaps with
+            dates on or before this date (ISO 8601 format, e.g., "2024-12-31").
+          required: false
+          schema:
+            type: string
+        - name: use_all_in_rent
+          in: query
+          description: >-
+            Optional. Adjusts the 'min_price', 'price', 'max_price',
+            'min_effective_price', 'effective_price', 'max_effective_price',
+            'price_plans' to be All-in Rent or Total Monthly Leasing Price
+            (TMLP) by adding in fees.
+          required: false
+          schema:
+            type: boolean
+        - name: x-api-key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The property details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropertyDetailsResponse'
+        '404':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetPropertyRequestNotFoundError'
+servers:
+  - url: https://api.hellodata.ai
+components:
+  schemas:
+    UUID:
+      type: string
+      format: uuid
+      description: |-
+        Stringified UUIDv4.
+        See [RFC 4112](https://tools.ietf.org/html/rfc4122)
+      title: UUID
+    DateStr:
+      type: string
+      description: Date string in the format 'YYYY-MM-DD'
+      title: DateStr
+    UnitAmenityTag:
+      type: string
+      enum:
+        - ada_unit
+        - affordable.section_8
+        - affordable.lihtc
+        - balcony_patio
+        - balcony_patio.enclosed
+        - balcony_patio.large
+        - balcony_patio.private
+        - balcony_patio.small
+        - balcony_patio.storage
+        - corner_unit
+        - den
+        - dishwasher
+        - double_occupancy
+        - fireplace
+        - floor
+        - floor.penthouse
+        - garage
+        - garage.attached
+        - garage.detached
+        - garage.one_car
+        - garage.two_car
+        - kitchen_island
+        - kitchen_island.large
+        - renovated
+        - renovated.fully
+        - renovated.partially
+        - renovated.recently
+        - smarthome
+        - stainless_steel_appliances
+        - townhome
+        - urban_1br
+        - view
+        - view.city
+        - view.courtyard
+        - view.direction
+        - view.mountains
+        - view.pool
+        - view.water
+        - view.woods
+        - walk_in_closet
+        - walk_in_closet.large
+        - washer_dryer
+        - washer_dryer.full_size
+        - washer_dryer.stackable
+        - washer_dryer_connections
+      title: UnitAmenityTag
+    Price:
+      type: object
+      properties:
+        from_date:
+          $ref: '#/components/schemas/DateStr'
+          description: The start date for this price (inclusive).
+        to_date:
+          $ref: '#/components/schemas/DateStr'
+          description: The end date for this price (inclusive).
+        price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The market rent of the unit or the min_price when a unit is
+            marketing a price range. The min_price is typically the cheapest
+            lease term.
+
+
+            **Note:** This may be null when the property is advertising a price
+            range (see `min_price`/`max_price` in the `Price` interface). When
+            `price` is null, `min_price` and `max_price` represent the
+            communicated price range for floorplans or multiple units with
+            varying prices. When `price` and `effective_price` are available,
+            they represent the advertised price and effective price (price after
+            specials applied) for a specific unit.
+        effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The effective price of the unit, considering discounts or
+            promotions.
+        lease_term:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The lease term for the price and effective price
+        period_id:
+          type: number
+          format: double
+          description: >-
+            Links a price to the active market period of a unit. Use with
+            'availability_periods' key.
+        min_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The minimum market rent of the unit, if applicable. Often filled for
+            floorplans.
+
+            When `price` is null, this represents the lower bound of a
+            communicated price range.
+        max_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The maximum market rent of the unit, if applicable. Often filled for
+            floorplans.
+
+            When `price` is null, this represents the upper bound of a
+            communicated price range.
+        min_effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The minimum effective price of the unit, considering discounts or
+            promotions, if applicable. Filled if min_price exists.
+        max_effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The maximum effective price of the unit, considering discounts or
+            promotions, if applicable. Filled if max_price exists.
+        price_plans:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: double
+          description: >-
+            A sorted list of terms with the following: [duration_in_months,
+            price, effective_price]
+      required:
+        - from_date
+        - to_date
+        - price
+        - effective_price
+        - period_id
+        - min_price
+        - max_price
+        - min_effective_price
+        - max_effective_price
+      description: >-
+        Price object contains the pricing information for a unit in a given
+        slice of time.
+
+
+        **Price Range vs. Specific Price:**
+
+        - When `min_price`/`max_price` are available but `price` is null, they
+        represent communicated price ranges (e.g., floorplan advertising with
+        varying unit prices). This is common when properties advertise a range
+        like "$1,200-$1,800" rather than a specific unit price.
+
+        - When `price` and `effective_price` are available, they represent the
+        advertised price and effective price (price after specials applied) for
+        a specific unit.
+
+
+        In summary: price ranges (`min_price`/`max_price`) are used when
+        advertising multiple units with different prices, while specific prices
+        (`price`/`effective_price`) are used when advertising a single unit at a
+        fixed price.
+      title: Price
+    PricePlan:
+      type: object
+      properties:
+        monthly_rent:
+          type: number
+          format: double
+          description: >-
+            (Deprecated) The asking rent for the unit with the specified term
+            duration. Use price instead.
+        price:
+          type: number
+          format: double
+          description: The asking rent for the unit with the specified term duration.
+        effective_price:
+          type: number
+          format: double
+          description: The effective rent for the unit with the specified term duration.
+        duration_in_months:
+          type: number
+          format: double
+          description: Length of the lease agreement in months.
+        specials:
+          type:
+            - string
+            - 'null'
+          description: >-
+            Describes any promotional offers or discounts applicable to the
+            lease.
+      required:
+        - duration_in_months
+        - specials
+      description: Defines the latest lease terms available for this unit.
+      title: PricePlan
+    UnavailablePeriod:
+      type: object
+      properties:
+        from_date:
+          $ref: '#/components/schemas/DateStr'
+          description: >-
+            The start date when the unit was taken off the market and became
+            unavailable for display.
+        to_date:
+          $ref: '#/components/schemas/DateStr'
+          description: The end date when the unit became available for marketing again.
+      required:
+        - from_date
+        - to_date
+      description: >-
+        Represents a time period during which a unit was temporarily unavailable
+        for marketing,
+
+        despite being otherwise available. This can occur for various reasons,
+        such as maintenance,
+
+        pricing adjustments, or administrative updates.
+      title: UnavailablePeriod
+    AvailabilityPeriod:
+      type: object
+      properties:
+        period_id:
+          type: number
+          format: double
+          description: >-
+            Unique id for this units period. Can be used with the period_id in
+            'history' key.
+        enter_market:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: >-
+            The date the unit was first listed for rent. If null, the unit
+            existed on 06-17-2023, when we first started collecting data but we
+            cannot say for certain on what day it first appeared.
+        exit_market:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: >-
+            The last date the unit was listed for rent. If null, the unit is
+            still active.
+        days_on_market:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The number of days the unit has been on the market. exit_market -
+            enter_market
+        availability:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: Date when the unit will become or became available.
+        price_plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricePlan'
+          description: >-
+            (Deprecated) The list of latest lease terms for the unit/floorplan's
+            availability period. Use unit.history instead.
+        deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The security deposit of this unit during this period.
+        unavailable_periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnavailablePeriod'
+      required:
+        - period_id
+        - enter_market
+        - exit_market
+        - days_on_market
+        - availability
+      title: AvailabilityPeriod
+    Availability:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+          description: Unique identifier for this unit.
+        is_floorplan:
+          type: boolean
+          description: >-
+            Flag indicating if the listing is for a generic floorplan rather
+            than a specific unit.
+
+            This happens when the listing advertises a generic floorplan rather
+            than a specific unit.
+        bed:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Number of bedrooms in the unit.
+        bath:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Number of full bathrooms in the unit.
+        partial_bath:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Number of half bathrooms in the unit.
+        sqft:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The actual square footage of the unit.
+        floorplan_name:
+          type:
+            - string
+            - 'null'
+          description: >-
+            The name of the floorplan, if this entry represents a floorplan. Or
+            the unit's floorplan name.
+        unit_name:
+          type:
+            - string
+            - 'null'
+          description: The specific name or number of the unit, if applicable.
+        enter_market:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: >-
+            The date the unit was first listed for rent. If null, the unit
+            existed on 06-17-2023, when we first started collecting data, but we
+            cannot say for certain on what day it first appeared.
+        exit_market:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: >-
+            The last date the unit was listed for rent. If null, the unit is
+            still active.
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnitAmenityTag'
+          description: >-
+            An array of tags that were predicted using floorplan images,
+            floorplan names and unit amenities
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/Price'
+          description: The list of prices for the unit/floorplan over time.
+        availability_periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/AvailabilityPeriod'
+          description: >-
+            An array detailing the periods during which this unit was active.
+            For price changes within each period, refer to the 'history' key.
+        floor:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The floor number for the unit, derived from the patterns in the unit
+            names among the building.
+        availability:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: Date when the unit will become or became available.
+        min_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The lowest advertised rent for the unit or floorplan.
+        price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The asking rent for the unit or the lowest price in a range.
+            Represents the latest asking rent we have seen for the unit.
+
+            If you are looking for the asking rent over time, refer to the
+            'history' key.
+        max_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The highest advertised rent for the unit or floorplan.
+        min_effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The lowest effective rent after considering discounts or promotions.
+        effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The effective rent after considering discounts or promotions.
+            Represents the latest effective price we have seen for the unit.
+
+            If you are looking for the effective price over time, refer to the
+            'history' key.
+        max_effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The highest effective rent after considering discounts or
+            promotions.
+        days_on_market:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The number of days the unit has been on the market. exit_market -
+            enter_market
+        min_sqft:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The minimum square footage of the unit or floorplan.
+        max_sqft:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The maximum square footage of the unit or floorplan.
+        created_on:
+          $ref: '#/components/schemas/DateStr'
+          description: The date when this record was last updated.
+        lease_term:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The lease term for the price and effective price
+        price_plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricePlan'
+          description: The list of latest lease terms for the unit/floorplan
+        amenities:
+          type: array
+          items:
+            type: string
+          description: >-
+            An array of non-normalized amenities strings direct from property
+            websites
+        deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The latest security deposit for this unit.
+        school_term:
+          type:
+            - string
+            - 'null'
+          description: Indicates the academic term in which this unit is offered.
+      required:
+        - id
+        - is_floorplan
+        - bed
+        - bath
+        - partial_bath
+        - sqft
+        - floorplan_name
+        - unit_name
+        - enter_market
+        - exit_market
+        - tags
+        - history
+        - availability_periods
+        - floor
+        - availability
+        - min_price
+        - price
+        - max_price
+        - min_effective_price
+        - effective_price
+        - max_effective_price
+        - days_on_market
+        - min_sqft
+        - max_sqft
+        - created_on
+        - price_plans
+        - amenities
+      description: >-
+        Describes the status and details of a unit or floorplan's availability,
+
+        alongside various attributes like pricing and size. Contains historical
+        availabilty and pricing data.
+
+        In some rare cases, the availability object may represent a floorplan
+        rather than a specific unit, when the listing advertises a generic
+        floorplan.
+      title: Availability
+    BuildingQuality:
+      type: object
+      properties:
+        property_overall_quality:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The overall quality score of the property, reflecting an aggregate
+            assessment of the entire property.
+        avg_quality_score_bedroom:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for all bedrooms, assessing finishes,
+            condition, and amenities within these spaces.
+        avg_quality_score_kitchen:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the kitchen, evaluating the finishes,
+            appliances, and layout.
+        avg_quality_score_bathroom:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for all bathrooms, focusing on finishes,
+            fixtures, and condition.
+        avg_quality_score_dining_room:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the dining room, considering the
+            space, finishes, and lighting.
+        avg_quality_score_common_areas:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for common areas, including lobbies,
+            gardens, and other shared spaces.
+        avg_quality_score_fitness_center:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the fitness center, assessing
+            equipment quality, space, and maintenance.
+        avg_quality_score_laundry_room:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the laundry room, focusing on the
+            quality of machines and the maintenance of the space.
+        avg_quality_score_living_room:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the living room, evaluating the
+            comfort, finishes, and layout.
+        avg_quality_score_main_entrance:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the main entrance, considering its
+            appearance, security, and accessibility.
+        avg_quality_score_stairs_hallway:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for stairs and hallways, assessing the
+            condition, lighting, and safety features.
+        avg_quality_score_swimming_pool:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the swimming pool, if applicable,
+            focusing on maintenance, size, and amenities.
+        avg_quality_score_walk_in_closet:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for walk-in closets, evaluating the size,
+            organization options, and finishes.
+      required:
+        - property_overall_quality
+        - avg_quality_score_bedroom
+        - avg_quality_score_kitchen
+        - avg_quality_score_bathroom
+        - avg_quality_score_dining_room
+        - avg_quality_score_common_areas
+        - avg_quality_score_fitness_center
+        - avg_quality_score_laundry_room
+        - avg_quality_score_living_room
+        - avg_quality_score_main_entrance
+        - avg_quality_score_stairs_hallway
+        - avg_quality_score_swimming_pool
+        - avg_quality_score_walk_in_closet
+      description: >-
+        Defines the quality scores for various aspects of a property, including
+        both general areas and specific features.
+
+        Scores are based on the assessment of finishes, conditions, and
+        amenities, derived from interior and exterior photo evaluations.
+
+        Each score ranges from 0 to 1, where 0 indicates the lowest quality and
+        1 the highest.
+      title: BuildingQuality
+    Record_string.number_:
+      type: object
+      properties: {}
+      description: Construct a type with a set of properties K of type T
+      title: Record_string.number_
+    ReviewAnalysis:
+      type: object
+      properties:
+        avg_score:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The average score for the property over the past 24 months.
+        count_reviews:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The number of reviews used to calculate the average scores.
+        positive_counts:
+          $ref: '#/components/schemas/Record_string.number_'
+          description: The number of times it was mentioned in reviews as a pro.
+        negative_counts:
+          $ref: '#/components/schemas/Record_string.number_'
+          description: The number of times the category was mentioned in reviews as a con.
+      required:
+        - avg_score
+        - count_reviews
+        - positive_counts
+        - negative_counts
+      description: >-
+        The ReviewAnalysis object represents the average review scores for a
+        property over the trailing 24 months.
+
+        We also analyzed the reviews using Natural Language Processing to
+        determine the most common pros and cons mentioned in the reviews.
+      title: ReviewAnalysis
+    PropertyDetailsResponseDemographics:
+      type: object
+      properties: {}
+      description: |-
+        <Availability type="beta" /> Subject to change in near future.
+        The demographics for the property's location, if available.
+      title: PropertyDetailsResponseDemographics
+    PropertyDetailsResponseAmiLimits:
+      type: object
+      properties: {}
+      description: >-
+        AMI (Area Median Income) affordability limits by household size.
+
+        The AMI Limits can be either 30%, 50%, 60%, 80%, or 120%
+
+        Each of these percents has a price amount for 1 to 8 people denoted by
+        the p suffix
+
+        The 25 refers to the year 2025
+
+        Used to determine if a unit qualifies as affordable based on
+        rent-to-income ratio.
+      title: PropertyDetailsResponseAmiLimits
+    ConcessionsItem:
+      type: object
+      properties:
+        condition_lease_term_months:
+          type: array
+          items:
+            type: number
+            format: double
+          description: Lease term conditions in months.
+        condition_deadline:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: Deadline condition for the concession, formatted as a string.
+        condition_bedrooms:
+          type: array
+          items:
+            type: number
+            format: double
+          description: Bedroom conditions for the concession.
+        condition_unit_names:
+          type: array
+          items:
+            type: string
+          description: Unit name conditions for the concession.
+        condition_floorplans:
+          type: array
+          items:
+            type: string
+          description: Floorplan conditions for the concession.
+        free_weeks_count:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            Number of free weeks offered. Distinct from free_months_count
+            because 1 year is 52 weeks, so we use 1 month = 4.33 weeks for NER
+            computations.
+        free_months_count:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Number of free months offered.
+        free_months_until:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: >-
+            The deadline until which free months are offered, formatted as a
+            string.
+        one_time_dollars_off_amount:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: One-time dollar amount off the rent.
+        one_time_dollars_off_percentage:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: One-time percentage off the rent.
+        recurring_dollars_off_amount:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Recurring dollar amount off the rent.
+        recurring_dollars_off_percentage:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Recurring percentage off the rent.
+        waived_application_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the application fee is waived.
+        waived_security_deposit:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the security deposit is waived.
+        waived_administrative_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the administrative fee is waived.
+        waived_move_in_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the move-in fee is waived.
+        cheaper_security_deposit:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if a cheaper security deposit is available.
+        cheaper_administrative_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if a cheaper administrative fee is available.
+        cheaper_application_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if a cheaper application fee is available.
+        cheaper_move_in_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if a cheaper move-in fee is available.
+        cheaper_rent:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if cheaper rent is available.
+        condition_specific_unit:
+          type:
+            - boolean
+            - 'null'
+          description: >-
+            Indicates if the concession is specific to certain units but doesn't
+            say which.
+        special_included:
+          type:
+            - boolean
+            - 'null'
+          description: |-
+            Indicates if the concession was already included in asking price.
+            For example for: "1 month free. Special included in advertisement"
+      required:
+        - condition_lease_term_months
+        - condition_deadline
+        - condition_bedrooms
+        - condition_unit_names
+        - condition_floorplans
+        - free_weeks_count
+        - free_months_count
+        - free_months_until
+        - one_time_dollars_off_amount
+        - one_time_dollars_off_percentage
+        - recurring_dollars_off_amount
+        - recurring_dollars_off_percentage
+        - waived_application_fee
+        - waived_security_deposit
+        - waived_administrative_fee
+        - waived_move_in_fee
+        - cheaper_security_deposit
+        - cheaper_administrative_fee
+        - cheaper_application_fee
+        - cheaper_move_in_fee
+        - cheaper_rent
+        - condition_specific_unit
+        - special_included
+      description: >-
+        One concession can contain a lot of information. We break it out
+        depending on condition qualifiers.
+      title: ConcessionsItem
+    Concessions:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+          description: A unique identifer for this concession.
+        concessions:
+          type: string
+          description: The text of the special being offered.
+        from_date:
+          $ref: '#/components/schemas/DateStr'
+          description: The start date from which the special offer was being marketed.
+        to_date:
+          $ref: '#/components/schemas/DateStr'
+          description: The end date when the special was no longer being marketed.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConcessionsItem'
+      required:
+        - id
+        - concessions
+        - from_date
+        - to_date
+        - items
+      title: Concessions
+    PricingStrategy:
+      type: object
+      properties:
+        is_using_rev_management:
+          type:
+            - boolean
+            - 'null'
+          description: >-
+            Indicates whether revenue management tools are used to adjust
+            pricing dynamically.
+
+            Determined as a function of unit price volatility.
+        avg_duration:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The average duration in days between price changes for the property.
+        avg_price_change:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The average amount of price change when adjustments are made.
+        avg_time_on_market:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average time in days a unit remains on the market before being
+            rented.
+        day_of_week_distribution:
+          type:
+            - array
+            - 'null'
+          items:
+            type: number
+            format: double
+          description: >-
+            Distribution of price changes across days of the week, represented
+            as the total changes on each day.
+
+            The array is ordered Monday through Sunday (index 0 = Monday, index
+            1 = Tuesday, ..., index 6 = Sunday).
+        count_prices:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The total number of price changes observed for the property. This
+            equals the sum of all elements in `day_of_week_distribution`.
+      required:
+        - is_using_rev_management
+        - avg_duration
+        - avg_price_change
+        - avg_time_on_market
+        - day_of_week_distribution
+        - count_prices
+      description: >-
+        Describes the pricing strategy adopted by a property, detailing how
+        prices have historically
+
+        fluctuated based on market dynamics and property management decisions
+        over the past 6 months.
+
+        It encapsulates trends in price adjustments and time-related aspects of
+        property marketing.
+      title: PricingStrategy
+    BuildingAmenity:
+      type: string
+      enum:
+        - 24_hour_maintenance
+        - accepts_housing_voucher
+        - ada_compliant
+        - additional_storage_space_outside_unit
+        - art_studio
+        - attached_garage
+        - basketball_court
+        - bike_rack
+        - bilingual
+        - boat_dock
+        - bocceball_court
+        - business_center
+        - cabana
+        - carport
+        - cats_allowed
+        - club_house_party_room
+        - barbecue_grill
+        - community_chef_kitchen_space
+        - community_dog_park
+        - community_garden
+        - community_pet_washing_station
+        - community_room
+        - community_wifi
+        - computer_lab
+        - controlled_access
+        - corporate_suite
+        - courtyard
+        - daycare
+        - detached_garage
+        - disposal_chutes
+        - dogs_allowed
+        - doorman
+        - electric_car_charging_station
+        - elevator
+        - fire_pit
+        - fitness_center
+        - concierge
+        - foosball
+        - game_room
+        - gated_community_access
+        - golf_simulator
+        - green_community
+        - guest_parking
+        - guest_suite
+        - historic_building
+        - hot_tub
+        - housekeeping_available
+        - income_restricted
+        - internet_lounge
+        - landscaping
+        - laundry_service
+        - laundry_room
+        - library
+        - lobby
+        - lounge
+        - massage_room
+        - multimedia_center
+        - satisfaction_guaranteed
+        - on_site_car_wash
+        - on_site_maintenance
+        - on_site_management
+        - one_car_garage
+        - online_payment_portal
+        - organic_waste_composting
+        - package_lockers
+        - package_receiving
+        - parking_garage
+        - parking_included
+        - pet_daycare_service
+        - pets_allowed
+        - pickleball_court
+        - picnic_area
+        - playground
+        - pool_table
+        - putting_green
+        - racquetball_court
+        - recycling
+        - reserved_parking
+        - resident_events
+        - resident_referral_program
+        - resident_rewards_program
+        - rock_climbing_wall
+        - rooftop_space
+        - roommate_matching
+        - sauna
+        - secure_resident_parking
+        - secured_covered_bike_storage
+        - security_system
+        - shared_office_space
+        - short_term_lease_options
+        - shuffle_board
+        - non_smoking
+        - snow_removal
+        - soccer_field
+        - spa
+        - sport_court
+        - sunroom
+        - swimming_pool
+        - table_tennis
+        - tanning_beds
+        - tennis_court
+        - terrace
+        - two_car_garage
+        - valet_trash_service
+        - volleyball_court
+        - waterfront
+        - workshop
+        - yoga_studio
+        - zen_garden
+      description: A normalized building amenity
+      title: BuildingAmenity
+    UnitAmenity:
+      type: string
+      enum:
+        - air_conditioning
+        - all_appliances_included
+        - all_utilities_included
+        - attic
+        - backsplash
+        - basement
+        - bath_tub
+        - bay_window
+        - black_appliances
+        - breakfast_bar
+        - built_in_desk
+        - carpet
+        - ceiling_fan
+        - central_air_conditioning
+        - central_heat
+        - city_view
+        - concrete_floor
+        - courtyard_view
+        - crown_molding
+        - custom_cabinets
+        - deck
+        - den
+        - dining_room
+        - dishwasher
+        - double_sink_vanity
+        - eat_in_kitchen
+        - efficient_appliances
+        - electricity_included
+        - faux_wood_floor
+        - fireplace
+        - floor_to_ceiling_windows
+        - french_doors
+        - fully_upgraded
+        - furnished
+        - garbage_disposal
+        - granite_countertops
+        - hardwood_floor
+        - heat_included
+        - high_ceilings
+        - in_wall_usb_ports
+        - individual_locking_bedrooms
+        - internet_included
+        - kitchen_island
+        - large_bedrooms
+        - large_bathrooms
+        - large_closets
+        - large_windows
+        - linoleum_floor
+        - living_room
+        - loft
+        - marble_countertops
+        - microwave
+        - mountain_view
+        - mud_room
+        - nature_view
+        - open_floor_plan
+        - oven
+        - pantry
+        - patio_or_balcony
+        - porch
+        - private_bathroom
+        - private_entrance
+        - quartz_countertops
+        - ranch_style
+        - range
+        - recently_renovated
+        - refrigerator
+        - sewer_included
+        - skylight
+        - smart_doorbell
+        - smart_lighting
+        - smart_locks
+        - smart_thermostat
+        - stainless_steel_appliances
+        - stove
+        - tile_floor
+        - track_lighting
+        - trash_compactor
+        - trash_service_included
+        - vaulted_ceilings
+        - view
+        - vinyl_floor
+        - walk_in_closet
+        - walk_in_shower
+        - washer_dryer_hookups
+        - washer_dryer_in_unit
+        - water_included
+        - water_view
+        - white_appliances
+        - window_ac_unit
+        - window_covering
+        - yard
+      description: A normalized unit amenity
+      title: UnitAmenity
+    OccupancyOverTime:
+      type: object
+      properties:
+        as_of:
+          $ref: '#/components/schemas/DateStr'
+          description: The date that the occupancy was recorded
+        leased:
+          type: number
+          format: double
+          description: >-
+            Leased represents the percentage of vacant units to total units.
+
+            For stabilized assets, vacant units are defined as those available
+            for move-in within the next 7 days.
+        exposure:
+          type: number
+          format: double
+          description: >-
+            Exposure represents the percentage of units in a building currently
+            listed as available for move-in within the next 6 months.
+
+            This includes units that are either already vacant or not being
+            renewed, divided by the total number of units in the building.
+      required:
+        - as_of
+        - leased
+        - exposure
+      title: OccupancyOverTime
+    AdditionalFee:
+      type: object
+      properties:
+        label:
+          type: string
+          description: >-
+            A human-readable label describing the fee (e.g., "Service Charge",
+            "Processing Fee").
+        amount:
+          type: number
+          format: double
+          description: The monetary value of the fee.
+        frequency:
+          type: string
+          description: How often the fee is paid (once, month, year).
+      required:
+        - label
+        - amount
+        - frequency
+      description: >-
+        Represents an additional fee that does not fit into a predefined
+        category.
+      title: AdditionalFee
+    PropertyDetailsResponse:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+          description: >-
+            The unique identifier of the property. It is a stringified UUIDv5.
+
+            This value can occasionally change if multiple properties get merged
+            into one.
+        building_name:
+          type:
+            - string
+            - 'null'
+          description: The name of the building or property.
+        street_address:
+          type: string
+          description: The primary street address of the property.
+        city:
+          type: string
+          description: The city where the property is located.
+        state:
+          type: string
+          description: The state where the property is located.
+        zip_code:
+          type: string
+          description: The postal code for the property's location.
+        year_built:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Year the property was originally built.
+        number_units:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Total number of units in the property.
+        number_stories:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Number of stories or levels in the property.
+        lat:
+          type: number
+          format: double
+          description: Latitude coordinate of the property's location.
+        lon:
+          type: number
+          format: double
+          description: Longitude coordinate of the property's location.
+        created_on:
+          $ref: '#/components/schemas/DateStr'
+          description: Date when the property details were last updated or created.
+        building_availability:
+          type: array
+          items:
+            $ref: '#/components/schemas/Availability'
+          description: >-
+            The list of units and floorplans that have been listed for rent at
+            the property since the start of the data collection.
+        building_quality:
+          $ref: '#/components/schemas/BuildingQuality'
+          description: >-
+            The quality scores for various aspects of the property, including
+            both general areas and specific features.
+        review_analysis:
+          oneOf:
+            - $ref: '#/components/schemas/ReviewAnalysis'
+            - type: 'null'
+          description: Analysis of the property's public reviews over the past 24 months.
+        street_address_alias:
+          type: array
+          items:
+            type: string
+          description: Alternate or commonly used names or aliases for the street address.
+        msa:
+          type:
+            - string
+            - 'null'
+          description: >-
+            Metropolitan Statistical Area the property belongs to, if
+            applicable.
+        property_embedding:
+          type:
+            - array
+            - 'null'
+          items:
+            type: number
+            format: double
+          description: >-
+            An array representing the property embedding vector, used for
+            advanced analysis.
+
+            If you want to compare two properties, you can use the cosine
+            similarity between their property embeddings.
+
+            Note: this vector is subject to change a couple of times a year as
+            we improve our models.
+        market_embedding:
+          type:
+            - array
+            - 'null'
+          items:
+            type: number
+            format: double
+          description: >-
+            An array representing the market embedding vector, used for advanced
+            analysis.
+
+            If you want to compare two markets, you can use the cosine
+            similarity between their market embeddings.
+
+            Note: this vector is subject to change a couple of times a year as
+            we improve our models.
+        demographics:
+          $ref: '#/components/schemas/PropertyDetailsResponseDemographics'
+          description: |-
+            <Availability type="beta" /> Subject to change in near future.
+            The demographics for the property's location, if available.
+        census_tract_id:
+          type:
+            - string
+            - 'null'
+          description: The FIPS code of the property's location.
+        ami_limits:
+          $ref: '#/components/schemas/PropertyDetailsResponseAmiLimits'
+          description: >-
+            AMI (Area Median Income) affordability limits by household size.
+
+            The AMI Limits can be either 30%, 50%, 60%, 80%, or 120%
+
+            Each of these percents has a price amount for 1 to 8 people denoted
+            by the p suffix
+
+            The 25 refers to the year 2025
+
+            Used to determine if a unit qualifies as affordable based on
+            rent-to-income ratio.
+        building_name_alias:
+          type: array
+          items:
+            type: string
+          description: Alternative names or aliases for the building.
+        building_phone_number:
+          type:
+            - string
+            - 'null'
+          description: Contact phone number for the building management or leasing office.
+        building_website:
+          type:
+            - string
+            - 'null'
+          description: Website URL for the property or management company.
+        is_single_family:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the property is a single-family home.
+        is_condo:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the property consists of condominiums.
+        is_apartment:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the property is an apartment complex.
+        is_student:
+          type:
+            - boolean
+            - 'null'
+          description: >-
+            Indicates whether we have identified the property as a student
+            housing complex. Detected
+
+            based on the presence of certain amenities, unit naming conventions,
+            price points, and other factors.
+        is_senior:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the property is a senior living community.
+        is_build_to_rent:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the property is a build-to-rent community.
+        is_affordable:
+          type:
+            - boolean
+            - 'null'
+          description: >-
+            Indicates if the property contains affordable units. Uses the public
+            database of LIHTC properties and the floorplan names from the
+            property website + data from other public data sources.
+        number_units_prediction:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            A prediction of the number of units based on images, number of
+            floors, amenities, location, year built, and the number of units we
+            have seen so far.
+
+            NOTE: This is an approximation to understand the property's size
+            when the exact number of units is not available, do not use it as a
+            variable in your financial models.
+        year_built_prediction:
+          type:
+            - string
+            - 'null'
+          description: >-
+            Predicted or estimated construction period or era based on listing
+            images.
+        number_stories_prediction:
+          type:
+            - string
+            - 'null'
+          description: >-
+            Predicted or estimated range for the number of stories in the
+            building based on facade images.
+        management_company:
+          type:
+            - string
+            - 'null'
+          description: Name of the company managing the property.
+        concessions_history:
+          type: array
+          items:
+            $ref: '#/components/schemas/Concessions'
+          description: >-
+            Historical concession offers or promotions available at the
+            property, along
+
+            with extracted values from the text.
+        pricing_strategy:
+          $ref: '#/components/schemas/PricingStrategy'
+          description: Analysis of the property's pricing patterns and strategies.
+        cats_monthly_rent:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Monthly rent charge for having cats.
+        cats_one_time_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: One-time fee for having cats.
+        cats_deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Deposit required for having cats.
+        dogs_monthly_rent:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Monthly rent charge for having dogs.
+        dogs_one_time_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: One-time fee for having dogs.
+        dogs_deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Deposit required for having dogs.
+        admin_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Administrative fee charged by the property.
+        amenity_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Amenity fee charged by the property, if applicable.
+        application_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Application fee charged to apply for residency.
+        storage_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Fee for using storage facilities on the property.
+        parking_covered:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Monthly charge for covered parking, if available.
+        parking_garage:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Monthly charge for parking in a garage, if available.
+        parking_surface_lot:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Monthly charge for parking in a surface lot, if available.
+        min_deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Minimum security deposit required.
+        max_deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Maximum security deposit required (may vary by unit).
+        building_amenities:
+          type:
+            - array
+            - 'null'
+          items:
+            $ref: '#/components/schemas/BuildingAmenity'
+          description: List of amenities available in the building.
+        unit_amenities:
+          type:
+            - array
+            - 'null'
+          items:
+            $ref: '#/components/schemas/UnitAmenity'
+          description: List of amenities available in the units.
+        user_id:
+          type:
+            - string
+            - 'null'
+          description: >-
+            When it's a custom property, this field will be populated with the
+            user_id of the user who created the property.
+        street_view_url:
+          type:
+            - string
+            - 'null'
+          description: >-
+            A URL to a custom street view image provided for the property.
+
+            This field is only populated if the user has supplied their own
+            street view image,
+
+            overriding the default value.
+        is_lease_up:
+          type:
+            - boolean
+            - 'null'
+          description: >-
+            Lease-up mode indicates that the building was recently built, and it
+            is assumed that the developers
+
+            are only showing a small number of their available units because
+            they are still trying to fill their spaces.
+
+
+            The function checks several conditions to determine if the building
+            is in lease-up mode:
+
+            1. It verifies if the building was built recently (within the last
+            two years).
+
+            2. It checks if the building has more than 10 units.
+
+            3. It counts the number of available units and tracks the earliest
+            availability date.
+
+            4. It ensures that there have been at least 5 leases.
+
+            5. It checks if the earliest move-in date is within the last
+            18-months.
+
+            6. It calculates the percentage of units still being marketed and
+            ensures it is at least 15%.
+
+
+            If all these conditions are met, the building is considered to be in
+            lease-up mode.
+        occupancy_over_time:
+          type:
+            - array
+            - 'null'
+          items:
+            $ref: '#/components/schemas/OccupancyOverTime'
+        fees:
+          type:
+            - array
+            - 'null'
+          items:
+            $ref: '#/components/schemas/AdditionalFee'
+          description: All of the unstructured fees
+      required:
+        - id
+        - building_name
+        - street_address
+        - city
+        - state
+        - zip_code
+        - year_built
+        - number_units
+        - number_stories
+        - lat
+        - lon
+        - created_on
+        - building_availability
+        - building_quality
+        - street_address_alias
+        - msa
+        - market_embedding
+        - building_name_alias
+        - building_phone_number
+        - building_website
+        - is_single_family
+        - is_condo
+        - is_apartment
+        - year_built_prediction
+        - number_stories_prediction
+        - management_company
+        - pricing_strategy
+        - cats_monthly_rent
+        - cats_one_time_fee
+        - cats_deposit
+        - dogs_monthly_rent
+        - dogs_one_time_fee
+        - dogs_deposit
+        - admin_fee
+        - amenity_fee
+        - application_fee
+        - storage_fee
+        - parking_covered
+        - parking_garage
+        - parking_surface_lot
+        - min_deposit
+        - max_deposit
+        - building_amenities
+        - unit_amenities
+      description: >-
+        The PropertyDetailsResponse object represents all the data we have on
+        this specific property. It is returned by the /property/:id endpoint,
+        and used as the input for most endoints that require a property.
+      title: PropertyDetailsResponse
+    GetPropertyRequestNotFoundError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+      title: GetPropertyRequestNotFoundError
+  securitySchemes:
+    api:
+      type: apiKey
+      in: header
+      name: x-api-key
+    auth0:
+      type: http
+      scheme: bearer
+
+```
+
+## SDK Code Examples
+
+```python
+import requests
+
+url = "https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4"
+
+headers = {"x-api-key": "<apiKey>"}
+
+response = requests.get(url, headers=headers)
+
+print(response.json())
+```
+
+```javascript
+const url = 'https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4';
+const options = {method: 'GET', headers: {'x-api-key': '<apiKey>'}};
+
+try {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  console.log(data);
+} catch (error) {
+  console.error(error);
+}
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"io"
+)
+
+func main() {
+
+	url := "https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4"
+
+	req, _ := http.NewRequest("GET", url, nil)
+
+	req.Header.Add("x-api-key", "<apiKey>")
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+
+	fmt.Println(res)
+	fmt.Println(string(body))
+
+}
+```
+
+```ruby
+require 'uri'
+require 'net/http'
+
+url = URI("https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4")
+
+http = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+
+request = Net::HTTP::Get.new(url)
+request["x-api-key"] = '<apiKey>'
+
+response = http.request(request)
+puts response.read_body
+```
+
+```java
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+
+HttpResponse<String> response = Unirest.get("https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4")
+  .header("x-api-key", "<apiKey>")
+  .asString();
+```
+
+```php
+<?php
+require_once('vendor/autoload.php');
+
+$client = new \GuzzleHttp\Client();
+
+$response = $client->request('GET', 'https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4', [
+  'headers' => [
+    'x-api-key' => '<apiKey>',
+  ],
+]);
+
+echo $response->getBody();
+```
+
+```csharp
+using RestSharp;
+
+var client = new RestClient("https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4");
+var request = new RestRequest(Method.GET);
+request.AddHeader("x-api-key", "<apiKey>");
+IRestResponse response = client.Execute(request);
+```
+
+```swift
+import Foundation
+
+let headers = ["x-api-key": "<apiKey>"]
+
+let request = NSMutableURLRequest(url: NSURL(string: "https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4")! as URL,
+                                        cachePolicy: .useProtocolCachePolicy,
+                                    timeoutInterval: 10.0)
+request.httpMethod = "GET"
+request.allHTTPHeaderFields = headers
+
+let session = URLSession.shared
+let dataTask = session.dataTask(with: request as URLRequest, completionHandler: { (data, response, error) -> Void in
+  if (error != nil) {
+    print(error as Any)
+  } else {
+    let httpResponse = response as? HTTPURLResponse
+    print(httpResponse)
+  }
+})
+
+dataTask.resume()
+```

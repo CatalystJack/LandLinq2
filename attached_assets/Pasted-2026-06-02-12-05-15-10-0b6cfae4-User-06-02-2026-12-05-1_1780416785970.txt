@@ -1,0 +1,216 @@
+2026-06-02 12:05:15.10
+0b6cfae4
+User
+[06/02/2026, 12:05:15 PM] ℹ️ [INFO] Request started {
+2026-06-02 12:05:19.19
+0b6cfae4
+User
+}
+2026-06-02 12:05:19.19
+0b6cfae4
+User
+userId: undefined
+2026-06-02 12:05:19.19
+0b6cfae4
+User
+userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+2026-06-02 12:05:19.19
+0b6cfae4
+User
+requestId: 'mpwtwo2huufr91p6oup',
+2026-06-02 12:05:19.19
+0b6cfae4
+User
+method: 'GET',
+2026-06-02 12:05:19.19
+0b6cfae4
+User
+[06/02/2026, 12:05:19 PM] ℹ️ [INFO] Request started {
+2026-06-02 12:05:19.19
+0b6cfae4
+User
+endpoint: '/api/classification-progress',
+2026-06-02 12:05:19.19
+0b6cfae4
+User
+ipAddress: '35.191.80.209',
+2026-06-02 12:05:19.23
+0b6cfae4
+User
+}
+2026-06-02 12:05:19.23
+0b6cfae4
+User
+method: 'GET',
+2026-06-02 12:05:19.23
+0b6cfae4
+User
+userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+2026-06-02 12:05:19.23
+0b6cfae4
+User
+ipAddress: '35.191.80.209',
+2026-06-02 12:05:19.23
+0b6cfae4
+User
+userId: 'd71986da-e23f-4bcd-ba67-65e4eba45067'
+2026-06-02 12:05:19.23
+0b6cfae4
+User
+statusCode: 200,
+2026-06-02 12:05:19.23
+0b6cfae4
+User
+responseTime: 44,
+2026-06-02 12:05:19.23
+0b6cfae4
+User
+endpoint: '/api/classification-progress',
+2026-06-02 12:05:19.23
+0b6cfae4
+User
+requestId: 'mpwtwo2huufr91p6oup',
+2026-06-02 12:05:19.23
+0b6cfae4
+User
+[06/02/2026, 12:05:19 PM] ℹ️ [INFO] Request completed {
+2026-06-02 12:05:19.26
+0b6cfae4
+User
+4:05:19 PM [express] [12:05:19 PM] GET /api/classification-progress 304 in 69ms :: {"activeJobs":[]}
+2026-06-02 12:05:19.81
+0b6cfae4
+User
+[06/02/2026, 12:05:19 PM] ℹ️ [INFO] Request started {
+2026-06-02 12:05:23.99
+0b6cfae4
+User
+}
+2026-06-02 12:05:23.99
+0b6cfae4
+User
+[06/02/2026, 12:05:23 PM] ℹ️ [INFO] Request started {
+2026-06-02 12:05:23.99
+0b6cfae4
+User
+userId: undefined
+2026-06-02 12:05:23.99
+0b6cfae4
+User
+userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+2026-06-02 12:05:23.99
+0b6cfae4
+User
+ipAddress: '35.191.19.229',
+2026-06-02 12:05:23.99
+0b6cfae4
+User
+method: 'GET',
+2026-06-02 12:05:23.99
+0b6cfae4
+User
+requestId: 'mpwtwrrpz7qna1izk8c',
+2026-06-02 12:05:23.99
+0b6cfae4
+User
+endpoint: '/api/classification-progress',
+2026-06-02 12:05:24.03
+0b6cfae4
+User
+responseTime: 44,
+2026-06-02 12:05:24.03
+0b6cfae4
+User
+ipAddress: '35.191.19.229',
+2026-06-02 12:05:24.03
+0b6cfae4
+User
+userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+2026-06-02 12:05:24.03
+0b6cfae4
+User
+[06/02/2026, 12:05:24 PM] ℹ️ [INFO] Request completed {
+2026-06-02 12:05:24.03
+0b6cfae4
+User
+requestId: 'mpwtwrrpz7qna1izk8c',
+2026-06-02 12:05:24.03
+0b6cfae4
+User
+statusCode: 200,
+2026-06-02 12:05:24.03
+0b6cfae4
+User
+}
+2026-06-02 12:05:24.03
+0b6cfae4
+User
+method: 'GET',
+2026-06-02 12:05:24.03
+0b6cfae4
+User
+endpoint: '/api/classification-progress',
+2026-06-02 12:05:24.03
+0b6cfae4
+User
+userId: 'd71986da-e23f-4bcd-ba67-65e4eba45067'
+2026-06-02 12:05:24.05
+0b6cfae4
+User
+4:05:24 PM [express] [12:05:24 PM] GET /api/classification-progress 304 in 68ms :: {"activeJobs":[]}
+2026-06-02 12:05:24.07
+0b6cfae4
+User
+[06/02/2026, 12:05:24 PM] ℹ️ [INFO] Request started {
+2026-06-02 12:05:28.94
+0b6cfae4
+User
+userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+2026-06-02 12:05:28.94
+0b6cfae4
+User
+ipAddress: '35.191.68.171',
+2026-06-02 12:05:28.94
+0b6cfae4
+User
+userId: undefined
+2026-06-02 12:05:28.94
+0b6cfae4
+User
+[06/02/2026, 12:05:28 PM] ℹ️ [INFO] Request started {
+2026-06-02 12:05:28.94
+0b6cfae4
+User
+endpoint: '/api/classification-progress',
+2026-06-02 12:05:28.94
+0b6cfae4
+User
+requestId: 'mpwtwvlark3vx9fn0fh',
+2026-06-02 12:05:28.94
+0b6cfae4
+User
+method: 'GET',
+2026-06-02 12:05:28.98
+0b6cfae4
+User
+}
+2026-06-02 12:05:28.98
+0b6cfae4
+User
+userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+2026-06-02 12:05:28.98
+0b6cfae4
+User
+method: 'GET',
+2026-06-02 12:05:28.98
+0b6cfae4
+User
+[06/02/2026, 12:05:28 PM] ℹ️ [INFO] Request completed {
+2026-06-02 12:05:28.98
+0b6cfae4
+User
+responseTime: 44,
+2026-06-02 12:05:28.98
+0b6cfae4
+User
+userId: '92bb9472-598d-4423-92e7-d671ab001dcc'

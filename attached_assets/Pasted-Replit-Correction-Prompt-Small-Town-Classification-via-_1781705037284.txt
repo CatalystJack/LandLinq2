@@ -1,0 +1,62 @@
+Replit Correction Prompt — Small Town Classification via Census API
+Replace the static JSON file approach for small town classification in the affordable_lihtc scoring module with the following live API logic. No static municipality file is needed.
+
+Step 1 — Geocode the address to identify the municipality
+When a site address is submitted, call the US Census Bureau Geocoding API:
+GET https://geocoding.geo.census.gov/geocoder/geographies/address
+  ?street={street}
+  &city={city}
+  &state=NC
+  &benchmark=Public_AR_Current
+  &vintage=Current_Current
+  &layers=Incorporated+Places
+  &format=json
+Parse the response for the INCPLACE (incorporated place name) and GEOID fields from the Incorporated Places geography layer.
+
+If an incorporated place is returned, proceed to Step 2 using that place's GEOID
+If no incorporated place is returned (unincorporated address), skip Step 2, apply standard distance bands, and display: "Address appears to be unincorporated — standard amenity distance bands applied. Verify small town status manually if needed."
+
+
+Step 2 — Query ACS for incorporated place population
+Using the GEOID from Step 1, call the Census Bureau ACS 5-Year Estimates API:
+GET https://api.census.gov/data/2023/acs/acs5
+  ?get=NAME,B01003_001E
+  &for=place:{place_GEOID_last_5_digits}
+  &in=state:37
+
+B01003_001E is total population
+State code for North Carolina is 37
+The place GEOID from the geocoder will be a 7-digit code; use the last 5 digits as the place parameter
+
+Parse B01003_001E as an integer.
+
+Step 3 — Apply distance band logic
+If population < 10,000:
+  → Apply small town distance bands
+  → Display: "Small town classification applied 
+    (population: {X} per ACS 2023 5-Year Estimates)"
+
+If population ≥ 10,000:
+  → Apply standard distance bands
+  → Display: "Standard distance bands applied 
+    (population: {X} per ACS 2023 5-Year Estimates)"
+
+If ACS API returns no data or an error:
+  → Apply standard distance bands
+  → Display: "Population data unavailable — standard distance 
+    bands applied. Verify municipality status manually."
+
+Step 4 — Cache the result
+Cache the population lookup result in memory keyed by municipality name (lowercase, trimmed) to avoid redundant API calls within the same session. Cache format:
+javascript{
+  "gastonia": { population: 82000, smallTown: false },
+  "mount gilead": { population: 1400, smallTown: true }
+}
+Cache expires on page reload. No persistent storage needed.
+
+Important notes:
+
+Both the Census Geocoding API and ACS API are free and require no API key
+Do not use Google Maps or any other geocoding service for this step — the Census API is the authoritative source consistent with how NCHFA evaluates municipality size
+This logic runs only for affordable_lihtc deal type — do not apply to any other product type
+Display the municipality name, population, and band type applied in the scoring card so the analyst can verify

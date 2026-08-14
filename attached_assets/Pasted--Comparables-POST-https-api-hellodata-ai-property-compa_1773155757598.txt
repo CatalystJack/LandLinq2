@@ -1,0 +1,3208 @@
+# Comparables
+
+POST https://api.hellodata.ai/property/comparables
+Content-Type: application/json
+
+Find the best rent comps for a property given its details among close by properties.
+Score different facets of all candidates and return the best ones. In order to get the best results,
+we leverage market demographics, detected quality, amenities, similarity of unit mixes, and more.
+
+- **Data completion**: feel free to complete the record with extra data only you have access to or if you want to override the data we have. For example, what would be the rent of the property if it was in a better condition? You can increase the quality of the property and see how the comps change.
+- **Extra Filters**: you can set extra filters. For example, you can set a maximum distance between the subject and the rent comps, a minimum number of units, a maximum number of units, a minimum year built, and a maximum year built.
+- **Exclusions**: you can exclude properties from the results. For example, you can exclude properties that are not good comps or properties that have already been selected. We will make sure we don't return them in the results.
+- **Already Selected**: you can also pass the ids of the properties that you want to force into the results.
+
+### How to craft the payload:
+
+The endpoint accepts two types of payloads:
+
+**Option 1: Detailed Property (Recommended)**
+
+Use the result from `/property/{id}` endpoint as the `subject` field:
+
+```typescript
+{
+  subject: PropertyDetailsResponse, // from /property/{id}
+  excluded_ids?: string[],         // optional: exclude properties
+  selected_ids?: string[]          // optional: force include properties
+}
+```
+
+**Option 2: Simple Property**
+
+Use a simplified property object with basic information:
+
+```typescript
+{
+  simple_subject: {
+    lat: number,                    // required: latitude
+    lon: number,                    // required: longitude
+    is_single_family: boolean,      // required: property type
+    is_apartment: boolean,          // required: property type
+    is_condo: boolean,              // required: property type
+    number_units?: number,          // optional: total units
+    year_built?: number,            // optional: construction year
+    number_stories?: number,        // optional: building height
+    avg_quality_prediction?: number, // optional: quality score (0-1)
+    building_amenities?: string[],   // optional: building features
+    unit_amenities?: string[],       // optional: unit features
+    unit_mix?: Array<{              // optional: unit distribution
+      bed: number, bath: number, count: number, avg_sqft: number
+    }>
+  },
+  excluded_ids?: string[],          // optional: exclude properties
+  selected_ids?: string[]           // optional: force include properties
+}
+```
+
+**Recommendation**: Use Option 1 (detailed property) for best results. It provides comprehensive property information including market statistics, quality scores, unit details, and automatically detected values for missing fields.
+
+**When to use simple property**: Use Option 2 when you only have basic property information from your own systems and want to find similar properties based on fundamental characteristics like location, unit count, and amenities.
+
+### Computing Similarities:
+
+If you are interested in simply getting similarities between properties, you can use the `comparables` endpoint.
+Pass the ids of the comps you want similarities for into the `selected_ids` field.
+And set `topN` to the same number of properties you are passing.
+We will return the similarities between the subject and the selected properties.
+
+Reference: https://docs.hellodata.ai/api-reference/api-reference/property/comparables
+
+## OpenAPI Specification
+
+```yaml
+openapi: 3.1.0
+info:
+  title: backend
+  version: 1.0.0
+paths:
+  /property/comparables:
+    post:
+      operationId: comparables
+      summary: Comparables
+      description: >-
+        Find the best rent comps for a property given its details among close by
+        properties.
+
+        Score different facets of all candidates and return the best ones. In
+        order to get the best results,
+
+        we leverage market demographics, detected quality, amenities, similarity
+        of unit mixes, and more.
+
+
+        - **Data completion**: feel free to complete the record with extra data
+        only you have access to or if you want to override the data we have. For
+        example, what would be the rent of the property if it was in a better
+        condition? You can increase the quality of the property and see how the
+        comps change.
+
+        - **Extra Filters**: you can set extra filters. For example, you can set
+        a maximum distance between the subject and the rent comps, a minimum
+        number of units, a maximum number of units, a minimum year built, and a
+        maximum year built.
+
+        - **Exclusions**: you can exclude properties from the results. For
+        example, you can exclude properties that are not good comps or
+        properties that have already been selected. We will make sure we don't
+        return them in the results.
+
+        - **Already Selected**: you can also pass the ids of the properties that
+        you want to force into the results.
+
+
+        ### How to craft the payload:
+
+
+        The endpoint accepts two types of payloads:
+
+
+        **Option 1: Detailed Property (Recommended)**
+
+
+        Use the result from `/property/{id}` endpoint as the `subject` field:
+
+
+        ```typescript
+
+        {
+          subject: PropertyDetailsResponse, // from /property/{id}
+          excluded_ids?: string[],         // optional: exclude properties
+          selected_ids?: string[]          // optional: force include properties
+        }
+
+        ```
+
+
+        **Option 2: Simple Property**
+
+
+        Use a simplified property object with basic information:
+
+
+        ```typescript
+
+        {
+          simple_subject: {
+            lat: number,                    // required: latitude
+            lon: number,                    // required: longitude
+            is_single_family: boolean,      // required: property type
+            is_apartment: boolean,          // required: property type
+            is_condo: boolean,              // required: property type
+            number_units?: number,          // optional: total units
+            year_built?: number,            // optional: construction year
+            number_stories?: number,        // optional: building height
+            avg_quality_prediction?: number, // optional: quality score (0-1)
+            building_amenities?: string[],   // optional: building features
+            unit_amenities?: string[],       // optional: unit features
+            unit_mix?: Array<{              // optional: unit distribution
+              bed: number, bath: number, count: number, avg_sqft: number
+            }>
+          },
+          excluded_ids?: string[],          // optional: exclude properties
+          selected_ids?: string[]           // optional: force include properties
+        }
+
+        ```
+
+
+        **Recommendation**: Use Option 1 (detailed property) for best results.
+        It provides comprehensive property information including market
+        statistics, quality scores, unit details, and automatically detected
+        values for missing fields.
+
+
+        **When to use simple property**: Use Option 2 when you only have basic
+        property information from your own systems and want to find similar
+        properties based on fundamental characteristics like location, unit
+        count, and amenities.
+
+
+        ### Computing Similarities:
+
+
+        If you are interested in simply getting similarities between properties,
+        you can use the `comparables` endpoint.
+
+        Pass the ids of the comps you want similarities for into the
+        `selected_ids` field.
+
+        And set `topN` to the same number of properties you are passing.
+
+        We will return the similarities between the subject and the selected
+        properties.
+      tags:
+        - subpackage_property
+      parameters:
+        - name: topN
+          in: query
+          description: The number of rent comps to return.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: tier
+          in: query
+          description: >-
+            The tier of the property. Either 'valueAdd' or 'current'. When
+            'valueAdd', the results will assume a better condition of the
+            property.
+          required: false
+          schema:
+            $ref: '#/components/schemas/PropertyComparablesPostParametersTier'
+        - name: renovations
+          in: query
+          description: >-
+            The renovations to apply to the property. A value between 0.0 and
+            1.0 to add to the property quality. (e.g. 0.1 will transform a 0.4
+            quality property into a 0.5 quality property).
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: maxDistance
+          in: query
+          description: >-
+            The maximum distance in miles between the subject and the rent
+            comps.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: minDistance
+          in: query
+          description: >-
+            The minimum distance in miles between the subject and the rent
+            comps.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: minNumberUnits
+          in: query
+          description: >-
+            The minimum number of units of the rent comps. Does not filter
+            properties with no units.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: maxNumberUnits
+          in: query
+          description: >-
+            The maximum number of units of the rent comps. Does not filter
+            properties with no units.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: allowNullNumberUnits
+          in: query
+          description: >-
+            When a number of units range is specified, whether to allow
+            properties with no units to be included in the results. False by
+            default.
+          required: false
+          schema:
+            type: boolean
+        - name: minYearBuilt
+          in: query
+          description: >-
+            The minimum year built of the rent comps. Does not filter properties
+            with no year built.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: maxYearBuilt
+          in: query
+          description: >-
+            The maximum year built of the rent comps. Does not filter properties
+            with no year built.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: allowNullYearBuilt
+          in: query
+          description: >-
+            When a year built range is specified, whether to allow properties
+            with no year built to be included in the results. False by default.
+          required: false
+          schema:
+            type: boolean
+        - name: minNumberStories
+          in: query
+          description: >-
+            The minimum number of stories of the rent comps. Does not filter
+            properties with no stories.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: maxNumberStories
+          in: query
+          description: >-
+            The maximum number of stories of the rent comps. Does not filter
+            properties with no stories.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: allowNullNumberStories
+          in: query
+          description: >-
+            When a number of stories range is specified, whether to allow
+            properties with no stories to be included in the results. False by
+            default.
+          required: false
+          schema:
+            type: boolean
+        - name: useEmbedding
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: isAffordable
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: isBuildToRent
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: isSenior
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: isStudent
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: maxMilesToUniversity
+          in: query
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: maxMilesToHospital
+          in: query
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: x-api-key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The list of rent comps with high-level details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompsResponse'
+        '400':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComparablesRequestBadRequestError'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompsPayload'
+servers:
+  - url: https://api.hellodata.ai
+components:
+  schemas:
+    PropertyComparablesPostParametersTier:
+      type: string
+      enum:
+        - valueAdd
+        - current
+      title: PropertyComparablesPostParametersTier
+    UUID:
+      type: string
+      format: uuid
+      description: |-
+        Stringified UUIDv4.
+        See [RFC 4112](https://tools.ietf.org/html/rfc4122)
+      title: UUID
+    DateStr:
+      type: string
+      description: Date string in the format 'YYYY-MM-DD'
+      title: DateStr
+    UnitAmenityTag:
+      type: string
+      enum:
+        - ada_unit
+        - affordable.section_8
+        - affordable.lihtc
+        - balcony_patio
+        - balcony_patio.enclosed
+        - balcony_patio.large
+        - balcony_patio.private
+        - balcony_patio.small
+        - balcony_patio.storage
+        - corner_unit
+        - den
+        - dishwasher
+        - double_occupancy
+        - fireplace
+        - floor
+        - floor.penthouse
+        - garage
+        - garage.attached
+        - garage.detached
+        - garage.one_car
+        - garage.two_car
+        - kitchen_island
+        - kitchen_island.large
+        - renovated
+        - renovated.fully
+        - renovated.partially
+        - renovated.recently
+        - smarthome
+        - stainless_steel_appliances
+        - townhome
+        - urban_1br
+        - view
+        - view.city
+        - view.courtyard
+        - view.direction
+        - view.mountains
+        - view.pool
+        - view.water
+        - view.woods
+        - walk_in_closet
+        - walk_in_closet.large
+        - washer_dryer
+        - washer_dryer.full_size
+        - washer_dryer.stackable
+        - washer_dryer_connections
+      title: UnitAmenityTag
+    Price:
+      type: object
+      properties:
+        from_date:
+          $ref: '#/components/schemas/DateStr'
+          description: The start date for this price (inclusive).
+        to_date:
+          $ref: '#/components/schemas/DateStr'
+          description: The end date for this price (inclusive).
+        price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The market rent of the unit or the min_price when a unit is
+            marketing a price range. The min_price is typically the cheapest
+            lease term.
+
+
+            **Note:** This may be null when the property is advertising a price
+            range (see `min_price`/`max_price` in the `Price` interface). When
+            `price` is null, `min_price` and `max_price` represent the
+            communicated price range for floorplans or multiple units with
+            varying prices. When `price` and `effective_price` are available,
+            they represent the advertised price and effective price (price after
+            specials applied) for a specific unit.
+        effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The effective price of the unit, considering discounts or
+            promotions.
+        lease_term:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The lease term for the price and effective price
+        period_id:
+          type: number
+          format: double
+          description: >-
+            Links a price to the active market period of a unit. Use with
+            'availability_periods' key.
+        min_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The minimum market rent of the unit, if applicable. Often filled for
+            floorplans.
+
+            When `price` is null, this represents the lower bound of a
+            communicated price range.
+        max_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The maximum market rent of the unit, if applicable. Often filled for
+            floorplans.
+
+            When `price` is null, this represents the upper bound of a
+            communicated price range.
+        min_effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The minimum effective price of the unit, considering discounts or
+            promotions, if applicable. Filled if min_price exists.
+        max_effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The maximum effective price of the unit, considering discounts or
+            promotions, if applicable. Filled if max_price exists.
+        price_plans:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: double
+          description: >-
+            A sorted list of terms with the following: [duration_in_months,
+            price, effective_price]
+      required:
+        - from_date
+        - to_date
+        - price
+        - effective_price
+        - period_id
+        - min_price
+        - max_price
+        - min_effective_price
+        - max_effective_price
+      description: >-
+        Price object contains the pricing information for a unit in a given
+        slice of time.
+
+
+        **Price Range vs. Specific Price:**
+
+        - When `min_price`/`max_price` are available but `price` is null, they
+        represent communicated price ranges (e.g., floorplan advertising with
+        varying unit prices). This is common when properties advertise a range
+        like "$1,200-$1,800" rather than a specific unit price.
+
+        - When `price` and `effective_price` are available, they represent the
+        advertised price and effective price (price after specials applied) for
+        a specific unit.
+
+
+        In summary: price ranges (`min_price`/`max_price`) are used when
+        advertising multiple units with different prices, while specific prices
+        (`price`/`effective_price`) are used when advertising a single unit at a
+        fixed price.
+      title: Price
+    PricePlan:
+      type: object
+      properties:
+        monthly_rent:
+          type: number
+          format: double
+          description: >-
+            (Deprecated) The asking rent for the unit with the specified term
+            duration. Use price instead.
+        price:
+          type: number
+          format: double
+          description: The asking rent for the unit with the specified term duration.
+        effective_price:
+          type: number
+          format: double
+          description: The effective rent for the unit with the specified term duration.
+        duration_in_months:
+          type: number
+          format: double
+          description: Length of the lease agreement in months.
+        specials:
+          type:
+            - string
+            - 'null'
+          description: >-
+            Describes any promotional offers or discounts applicable to the
+            lease.
+      required:
+        - duration_in_months
+        - specials
+      description: Defines the latest lease terms available for this unit.
+      title: PricePlan
+    UnavailablePeriod:
+      type: object
+      properties:
+        from_date:
+          $ref: '#/components/schemas/DateStr'
+          description: >-
+            The start date when the unit was taken off the market and became
+            unavailable for display.
+        to_date:
+          $ref: '#/components/schemas/DateStr'
+          description: The end date when the unit became available for marketing again.
+      required:
+        - from_date
+        - to_date
+      description: >-
+        Represents a time period during which a unit was temporarily unavailable
+        for marketing,
+
+        despite being otherwise available. This can occur for various reasons,
+        such as maintenance,
+
+        pricing adjustments, or administrative updates.
+      title: UnavailablePeriod
+    AvailabilityPeriod:
+      type: object
+      properties:
+        period_id:
+          type: number
+          format: double
+          description: >-
+            Unique id for this units period. Can be used with the period_id in
+            'history' key.
+        enter_market:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: >-
+            The date the unit was first listed for rent. If null, the unit
+            existed on 06-17-2023, when we first started collecting data but we
+            cannot say for certain on what day it first appeared.
+        exit_market:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: >-
+            The last date the unit was listed for rent. If null, the unit is
+            still active.
+        days_on_market:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The number of days the unit has been on the market. exit_market -
+            enter_market
+        availability:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: Date when the unit will become or became available.
+        price_plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricePlan'
+          description: >-
+            (Deprecated) The list of latest lease terms for the unit/floorplan's
+            availability period. Use unit.history instead.
+        deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The security deposit of this unit during this period.
+        unavailable_periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnavailablePeriod'
+      required:
+        - period_id
+        - enter_market
+        - exit_market
+        - days_on_market
+        - availability
+      title: AvailabilityPeriod
+    Availability:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+          description: Unique identifier for this unit.
+        is_floorplan:
+          type: boolean
+          description: >-
+            Flag indicating if the listing is for a generic floorplan rather
+            than a specific unit.
+
+            This happens when the listing advertises a generic floorplan rather
+            than a specific unit.
+        bed:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Number of bedrooms in the unit.
+        bath:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Number of full bathrooms in the unit.
+        partial_bath:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Number of half bathrooms in the unit.
+        sqft:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The actual square footage of the unit.
+        floorplan_name:
+          type:
+            - string
+            - 'null'
+          description: >-
+            The name of the floorplan, if this entry represents a floorplan. Or
+            the unit's floorplan name.
+        unit_name:
+          type:
+            - string
+            - 'null'
+          description: The specific name or number of the unit, if applicable.
+        enter_market:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: >-
+            The date the unit was first listed for rent. If null, the unit
+            existed on 06-17-2023, when we first started collecting data, but we
+            cannot say for certain on what day it first appeared.
+        exit_market:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: >-
+            The last date the unit was listed for rent. If null, the unit is
+            still active.
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnitAmenityTag'
+          description: >-
+            An array of tags that were predicted using floorplan images,
+            floorplan names and unit amenities
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/Price'
+          description: The list of prices for the unit/floorplan over time.
+        availability_periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/AvailabilityPeriod'
+          description: >-
+            An array detailing the periods during which this unit was active.
+            For price changes within each period, refer to the 'history' key.
+        floor:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The floor number for the unit, derived from the patterns in the unit
+            names among the building.
+        availability:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: Date when the unit will become or became available.
+        min_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The lowest advertised rent for the unit or floorplan.
+        price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The asking rent for the unit or the lowest price in a range.
+            Represents the latest asking rent we have seen for the unit.
+
+            If you are looking for the asking rent over time, refer to the
+            'history' key.
+        max_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The highest advertised rent for the unit or floorplan.
+        min_effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The lowest effective rent after considering discounts or promotions.
+        effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The effective rent after considering discounts or promotions.
+            Represents the latest effective price we have seen for the unit.
+
+            If you are looking for the effective price over time, refer to the
+            'history' key.
+        max_effective_price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The highest effective rent after considering discounts or
+            promotions.
+        days_on_market:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The number of days the unit has been on the market. exit_market -
+            enter_market
+        min_sqft:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The minimum square footage of the unit or floorplan.
+        max_sqft:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The maximum square footage of the unit or floorplan.
+        created_on:
+          $ref: '#/components/schemas/DateStr'
+          description: The date when this record was last updated.
+        lease_term:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The lease term for the price and effective price
+        price_plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricePlan'
+          description: The list of latest lease terms for the unit/floorplan
+        amenities:
+          type: array
+          items:
+            type: string
+          description: >-
+            An array of non-normalized amenities strings direct from property
+            websites
+        deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The latest security deposit for this unit.
+        school_term:
+          type:
+            - string
+            - 'null'
+          description: Indicates the academic term in which this unit is offered.
+      required:
+        - id
+        - is_floorplan
+        - bed
+        - bath
+        - partial_bath
+        - sqft
+        - floorplan_name
+        - unit_name
+        - enter_market
+        - exit_market
+        - tags
+        - history
+        - availability_periods
+        - floor
+        - availability
+        - min_price
+        - price
+        - max_price
+        - min_effective_price
+        - effective_price
+        - max_effective_price
+        - days_on_market
+        - min_sqft
+        - max_sqft
+        - created_on
+        - price_plans
+        - amenities
+      description: >-
+        Describes the status and details of a unit or floorplan's availability,
+
+        alongside various attributes like pricing and size. Contains historical
+        availabilty and pricing data.
+
+        In some rare cases, the availability object may represent a floorplan
+        rather than a specific unit, when the listing advertises a generic
+        floorplan.
+      title: Availability
+    BuildingQuality:
+      type: object
+      properties:
+        property_overall_quality:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The overall quality score of the property, reflecting an aggregate
+            assessment of the entire property.
+        avg_quality_score_bedroom:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for all bedrooms, assessing finishes,
+            condition, and amenities within these spaces.
+        avg_quality_score_kitchen:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the kitchen, evaluating the finishes,
+            appliances, and layout.
+        avg_quality_score_bathroom:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for all bathrooms, focusing on finishes,
+            fixtures, and condition.
+        avg_quality_score_dining_room:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the dining room, considering the
+            space, finishes, and lighting.
+        avg_quality_score_common_areas:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for common areas, including lobbies,
+            gardens, and other shared spaces.
+        avg_quality_score_fitness_center:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the fitness center, assessing
+            equipment quality, space, and maintenance.
+        avg_quality_score_laundry_room:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the laundry room, focusing on the
+            quality of machines and the maintenance of the space.
+        avg_quality_score_living_room:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the living room, evaluating the
+            comfort, finishes, and layout.
+        avg_quality_score_main_entrance:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the main entrance, considering its
+            appearance, security, and accessibility.
+        avg_quality_score_stairs_hallway:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for stairs and hallways, assessing the
+            condition, lighting, and safety features.
+        avg_quality_score_swimming_pool:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for the swimming pool, if applicable,
+            focusing on maintenance, size, and amenities.
+        avg_quality_score_walk_in_closet:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality score for walk-in closets, evaluating the size,
+            organization options, and finishes.
+      required:
+        - property_overall_quality
+        - avg_quality_score_bedroom
+        - avg_quality_score_kitchen
+        - avg_quality_score_bathroom
+        - avg_quality_score_dining_room
+        - avg_quality_score_common_areas
+        - avg_quality_score_fitness_center
+        - avg_quality_score_laundry_room
+        - avg_quality_score_living_room
+        - avg_quality_score_main_entrance
+        - avg_quality_score_stairs_hallway
+        - avg_quality_score_swimming_pool
+        - avg_quality_score_walk_in_closet
+      description: >-
+        Defines the quality scores for various aspects of a property, including
+        both general areas and specific features.
+
+        Scores are based on the assessment of finishes, conditions, and
+        amenities, derived from interior and exterior photo evaluations.
+
+        Each score ranges from 0 to 1, where 0 indicates the lowest quality and
+        1 the highest.
+      title: BuildingQuality
+    Record_string.number_:
+      type: object
+      properties: {}
+      description: Construct a type with a set of properties K of type T
+      title: Record_string.number_
+    ReviewAnalysis:
+      type: object
+      properties:
+        avg_score:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The average score for the property over the past 24 months.
+        count_reviews:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The number of reviews used to calculate the average scores.
+        positive_counts:
+          $ref: '#/components/schemas/Record_string.number_'
+          description: The number of times it was mentioned in reviews as a pro.
+        negative_counts:
+          $ref: '#/components/schemas/Record_string.number_'
+          description: The number of times the category was mentioned in reviews as a con.
+      required:
+        - avg_score
+        - count_reviews
+        - positive_counts
+        - negative_counts
+      description: >-
+        The ReviewAnalysis object represents the average review scores for a
+        property over the trailing 24 months.
+
+        We also analyzed the reviews using Natural Language Processing to
+        determine the most common pros and cons mentioned in the reviews.
+      title: ReviewAnalysis
+    PropertyDetailsResponseDemographics:
+      type: object
+      properties: {}
+      description: |-
+        <Availability type="beta" /> Subject to change in near future.
+        The demographics for the property's location, if available.
+      title: PropertyDetailsResponseDemographics
+    PropertyDetailsResponseAmiLimits:
+      type: object
+      properties: {}
+      description: >-
+        AMI (Area Median Income) affordability limits by household size.
+
+        The AMI Limits can be either 30%, 50%, 60%, 80%, or 120%
+
+        Each of these percents has a price amount for 1 to 8 people denoted by
+        the p suffix
+
+        The 25 refers to the year 2025
+
+        Used to determine if a unit qualifies as affordable based on
+        rent-to-income ratio.
+      title: PropertyDetailsResponseAmiLimits
+    ConcessionsItem:
+      type: object
+      properties:
+        condition_lease_term_months:
+          type: array
+          items:
+            type: number
+            format: double
+          description: Lease term conditions in months.
+        condition_deadline:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: Deadline condition for the concession, formatted as a string.
+        condition_bedrooms:
+          type: array
+          items:
+            type: number
+            format: double
+          description: Bedroom conditions for the concession.
+        condition_unit_names:
+          type: array
+          items:
+            type: string
+          description: Unit name conditions for the concession.
+        condition_floorplans:
+          type: array
+          items:
+            type: string
+          description: Floorplan conditions for the concession.
+        free_weeks_count:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            Number of free weeks offered. Distinct from free_months_count
+            because 1 year is 52 weeks, so we use 1 month = 4.33 weeks for NER
+            computations.
+        free_months_count:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Number of free months offered.
+        free_months_until:
+          oneOf:
+            - $ref: '#/components/schemas/DateStr'
+            - type: 'null'
+          description: >-
+            The deadline until which free months are offered, formatted as a
+            string.
+        one_time_dollars_off_amount:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: One-time dollar amount off the rent.
+        one_time_dollars_off_percentage:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: One-time percentage off the rent.
+        recurring_dollars_off_amount:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Recurring dollar amount off the rent.
+        recurring_dollars_off_percentage:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Recurring percentage off the rent.
+        waived_application_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the application fee is waived.
+        waived_security_deposit:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the security deposit is waived.
+        waived_administrative_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the administrative fee is waived.
+        waived_move_in_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the move-in fee is waived.
+        cheaper_security_deposit:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if a cheaper security deposit is available.
+        cheaper_administrative_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if a cheaper administrative fee is available.
+        cheaper_application_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if a cheaper application fee is available.
+        cheaper_move_in_fee:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if a cheaper move-in fee is available.
+        cheaper_rent:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if cheaper rent is available.
+        condition_specific_unit:
+          type:
+            - boolean
+            - 'null'
+          description: >-
+            Indicates if the concession is specific to certain units but doesn't
+            say which.
+        special_included:
+          type:
+            - boolean
+            - 'null'
+          description: |-
+            Indicates if the concession was already included in asking price.
+            For example for: "1 month free. Special included in advertisement"
+      required:
+        - condition_lease_term_months
+        - condition_deadline
+        - condition_bedrooms
+        - condition_unit_names
+        - condition_floorplans
+        - free_weeks_count
+        - free_months_count
+        - free_months_until
+        - one_time_dollars_off_amount
+        - one_time_dollars_off_percentage
+        - recurring_dollars_off_amount
+        - recurring_dollars_off_percentage
+        - waived_application_fee
+        - waived_security_deposit
+        - waived_administrative_fee
+        - waived_move_in_fee
+        - cheaper_security_deposit
+        - cheaper_administrative_fee
+        - cheaper_application_fee
+        - cheaper_move_in_fee
+        - cheaper_rent
+        - condition_specific_unit
+        - special_included
+      description: >-
+        One concession can contain a lot of information. We break it out
+        depending on condition qualifiers.
+      title: ConcessionsItem
+    Concessions:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+          description: A unique identifer for this concession.
+        concessions:
+          type: string
+          description: The text of the special being offered.
+        from_date:
+          $ref: '#/components/schemas/DateStr'
+          description: The start date from which the special offer was being marketed.
+        to_date:
+          $ref: '#/components/schemas/DateStr'
+          description: The end date when the special was no longer being marketed.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConcessionsItem'
+      required:
+        - id
+        - concessions
+        - from_date
+        - to_date
+        - items
+      title: Concessions
+    PricingStrategy:
+      type: object
+      properties:
+        is_using_rev_management:
+          type:
+            - boolean
+            - 'null'
+          description: >-
+            Indicates whether revenue management tools are used to adjust
+            pricing dynamically.
+
+            Determined as a function of unit price volatility.
+        avg_duration:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The average duration in days between price changes for the property.
+        avg_price_change:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The average amount of price change when adjustments are made.
+        avg_time_on_market:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average time in days a unit remains on the market before being
+            rented.
+        day_of_week_distribution:
+          type:
+            - array
+            - 'null'
+          items:
+            type: number
+            format: double
+          description: >-
+            Distribution of price changes across days of the week, represented
+            as the total changes on each day.
+
+            The array is ordered Monday through Sunday (index 0 = Monday, index
+            1 = Tuesday, ..., index 6 = Sunday).
+        count_prices:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The total number of price changes observed for the property. This
+            equals the sum of all elements in `day_of_week_distribution`.
+      required:
+        - is_using_rev_management
+        - avg_duration
+        - avg_price_change
+        - avg_time_on_market
+        - day_of_week_distribution
+        - count_prices
+      description: >-
+        Describes the pricing strategy adopted by a property, detailing how
+        prices have historically
+
+        fluctuated based on market dynamics and property management decisions
+        over the past 6 months.
+
+        It encapsulates trends in price adjustments and time-related aspects of
+        property marketing.
+      title: PricingStrategy
+    BuildingAmenity:
+      type: string
+      enum:
+        - 24_hour_maintenance
+        - accepts_housing_voucher
+        - ada_compliant
+        - additional_storage_space_outside_unit
+        - art_studio
+        - attached_garage
+        - basketball_court
+        - bike_rack
+        - bilingual
+        - boat_dock
+        - bocceball_court
+        - business_center
+        - cabana
+        - carport
+        - cats_allowed
+        - club_house_party_room
+        - barbecue_grill
+        - community_chef_kitchen_space
+        - community_dog_park
+        - community_garden
+        - community_pet_washing_station
+        - community_room
+        - community_wifi
+        - computer_lab
+        - controlled_access
+        - corporate_suite
+        - courtyard
+        - daycare
+        - detached_garage
+        - disposal_chutes
+        - dogs_allowed
+        - doorman
+        - electric_car_charging_station
+        - elevator
+        - fire_pit
+        - fitness_center
+        - concierge
+        - foosball
+        - game_room
+        - gated_community_access
+        - golf_simulator
+        - green_community
+        - guest_parking
+        - guest_suite
+        - historic_building
+        - hot_tub
+        - housekeeping_available
+        - income_restricted
+        - internet_lounge
+        - landscaping
+        - laundry_service
+        - laundry_room
+        - library
+        - lobby
+        - lounge
+        - massage_room
+        - multimedia_center
+        - satisfaction_guaranteed
+        - on_site_car_wash
+        - on_site_maintenance
+        - on_site_management
+        - one_car_garage
+        - online_payment_portal
+        - organic_waste_composting
+        - package_lockers
+        - package_receiving
+        - parking_garage
+        - parking_included
+        - pet_daycare_service
+        - pets_allowed
+        - pickleball_court
+        - picnic_area
+        - playground
+        - pool_table
+        - putting_green
+        - racquetball_court
+        - recycling
+        - reserved_parking
+        - resident_events
+        - resident_referral_program
+        - resident_rewards_program
+        - rock_climbing_wall
+        - rooftop_space
+        - roommate_matching
+        - sauna
+        - secure_resident_parking
+        - secured_covered_bike_storage
+        - security_system
+        - shared_office_space
+        - short_term_lease_options
+        - shuffle_board
+        - non_smoking
+        - snow_removal
+        - soccer_field
+        - spa
+        - sport_court
+        - sunroom
+        - swimming_pool
+        - table_tennis
+        - tanning_beds
+        - tennis_court
+        - terrace
+        - two_car_garage
+        - valet_trash_service
+        - volleyball_court
+        - waterfront
+        - workshop
+        - yoga_studio
+        - zen_garden
+      description: A normalized building amenity
+      title: BuildingAmenity
+    UnitAmenity:
+      type: string
+      enum:
+        - air_conditioning
+        - all_appliances_included
+        - all_utilities_included
+        - attic
+        - backsplash
+        - basement
+        - bath_tub
+        - bay_window
+        - black_appliances
+        - breakfast_bar
+        - built_in_desk
+        - carpet
+        - ceiling_fan
+        - central_air_conditioning
+        - central_heat
+        - city_view
+        - concrete_floor
+        - courtyard_view
+        - crown_molding
+        - custom_cabinets
+        - deck
+        - den
+        - dining_room
+        - dishwasher
+        - double_sink_vanity
+        - eat_in_kitchen
+        - efficient_appliances
+        - electricity_included
+        - faux_wood_floor
+        - fireplace
+        - floor_to_ceiling_windows
+        - french_doors
+        - fully_upgraded
+        - furnished
+        - garbage_disposal
+        - granite_countertops
+        - hardwood_floor
+        - heat_included
+        - high_ceilings
+        - in_wall_usb_ports
+        - individual_locking_bedrooms
+        - internet_included
+        - kitchen_island
+        - large_bedrooms
+        - large_bathrooms
+        - large_closets
+        - large_windows
+        - linoleum_floor
+        - living_room
+        - loft
+        - marble_countertops
+        - microwave
+        - mountain_view
+        - mud_room
+        - nature_view
+        - open_floor_plan
+        - oven
+        - pantry
+        - patio_or_balcony
+        - porch
+        - private_bathroom
+        - private_entrance
+        - quartz_countertops
+        - ranch_style
+        - range
+        - recently_renovated
+        - refrigerator
+        - sewer_included
+        - skylight
+        - smart_doorbell
+        - smart_lighting
+        - smart_locks
+        - smart_thermostat
+        - stainless_steel_appliances
+        - stove
+        - tile_floor
+        - track_lighting
+        - trash_compactor
+        - trash_service_included
+        - vaulted_ceilings
+        - view
+        - vinyl_floor
+        - walk_in_closet
+        - walk_in_shower
+        - washer_dryer_hookups
+        - washer_dryer_in_unit
+        - water_included
+        - water_view
+        - white_appliances
+        - window_ac_unit
+        - window_covering
+        - yard
+      description: A normalized unit amenity
+      title: UnitAmenity
+    OccupancyOverTime:
+      type: object
+      properties:
+        as_of:
+          $ref: '#/components/schemas/DateStr'
+          description: The date that the occupancy was recorded
+        leased:
+          type: number
+          format: double
+          description: >-
+            Leased represents the percentage of vacant units to total units.
+
+            For stabilized assets, vacant units are defined as those available
+            for move-in within the next 7 days.
+        exposure:
+          type: number
+          format: double
+          description: >-
+            Exposure represents the percentage of units in a building currently
+            listed as available for move-in within the next 6 months.
+
+            This includes units that are either already vacant or not being
+            renewed, divided by the total number of units in the building.
+      required:
+        - as_of
+        - leased
+        - exposure
+      title: OccupancyOverTime
+    AdditionalFee:
+      type: object
+      properties:
+        label:
+          type: string
+          description: >-
+            A human-readable label describing the fee (e.g., "Service Charge",
+            "Processing Fee").
+        amount:
+          type: number
+          format: double
+          description: The monetary value of the fee.
+        frequency:
+          type: string
+          description: How often the fee is paid (once, month, year).
+      required:
+        - label
+        - amount
+        - frequency
+      description: >-
+        Represents an additional fee that does not fit into a predefined
+        category.
+      title: AdditionalFee
+    PropertyDetailsResponse:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+          description: >-
+            The unique identifier of the property. It is a stringified UUIDv5.
+
+            This value can occasionally change if multiple properties get merged
+            into one.
+        building_name:
+          type:
+            - string
+            - 'null'
+          description: The name of the building or property.
+        street_address:
+          type: string
+          description: The primary street address of the property.
+        city:
+          type: string
+          description: The city where the property is located.
+        state:
+          type: string
+          description: The state where the property is located.
+        zip_code:
+          type: string
+          description: The postal code for the property's location.
+        year_built:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Year the property was originally built.
+        number_units:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Total number of units in the property.
+        number_stories:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Number of stories or levels in the property.
+        lat:
+          type: number
+          format: double
+          description: Latitude coordinate of the property's location.
+        lon:
+          type: number
+          format: double
+          description: Longitude coordinate of the property's location.
+        created_on:
+          $ref: '#/components/schemas/DateStr'
+          description: Date when the property details were last updated or created.
+        building_availability:
+          type: array
+          items:
+            $ref: '#/components/schemas/Availability'
+          description: >-
+            The list of units and floorplans that have been listed for rent at
+            the property since the start of the data collection.
+        building_quality:
+          $ref: '#/components/schemas/BuildingQuality'
+          description: >-
+            The quality scores for various aspects of the property, including
+            both general areas and specific features.
+        review_analysis:
+          oneOf:
+            - $ref: '#/components/schemas/ReviewAnalysis'
+            - type: 'null'
+          description: Analysis of the property's public reviews over the past 24 months.
+        street_address_alias:
+          type: array
+          items:
+            type: string
+          description: Alternate or commonly used names or aliases for the street address.
+        msa:
+          type:
+            - string
+            - 'null'
+          description: >-
+            Metropolitan Statistical Area the property belongs to, if
+            applicable.
+        property_embedding:
+          type:
+            - array
+            - 'null'
+          items:
+            type: number
+            format: double
+          description: >-
+            An array representing the property embedding vector, used for
+            advanced analysis.
+
+            If you want to compare two properties, you can use the cosine
+            similarity between their property embeddings.
+
+            Note: this vector is subject to change a couple of times a year as
+            we improve our models.
+        market_embedding:
+          type:
+            - array
+            - 'null'
+          items:
+            type: number
+            format: double
+          description: >-
+            An array representing the market embedding vector, used for advanced
+            analysis.
+
+            If you want to compare two markets, you can use the cosine
+            similarity between their market embeddings.
+
+            Note: this vector is subject to change a couple of times a year as
+            we improve our models.
+        demographics:
+          $ref: '#/components/schemas/PropertyDetailsResponseDemographics'
+          description: |-
+            <Availability type="beta" /> Subject to change in near future.
+            The demographics for the property's location, if available.
+        census_tract_id:
+          type:
+            - string
+            - 'null'
+          description: The FIPS code of the property's location.
+        ami_limits:
+          $ref: '#/components/schemas/PropertyDetailsResponseAmiLimits'
+          description: >-
+            AMI (Area Median Income) affordability limits by household size.
+
+            The AMI Limits can be either 30%, 50%, 60%, 80%, or 120%
+
+            Each of these percents has a price amount for 1 to 8 people denoted
+            by the p suffix
+
+            The 25 refers to the year 2025
+
+            Used to determine if a unit qualifies as affordable based on
+            rent-to-income ratio.
+        building_name_alias:
+          type: array
+          items:
+            type: string
+          description: Alternative names or aliases for the building.
+        building_phone_number:
+          type:
+            - string
+            - 'null'
+          description: Contact phone number for the building management or leasing office.
+        building_website:
+          type:
+            - string
+            - 'null'
+          description: Website URL for the property or management company.
+        is_single_family:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the property is a single-family home.
+        is_condo:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the property consists of condominiums.
+        is_apartment:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the property is an apartment complex.
+        is_student:
+          type:
+            - boolean
+            - 'null'
+          description: >-
+            Indicates whether we have identified the property as a student
+            housing complex. Detected
+
+            based on the presence of certain amenities, unit naming conventions,
+            price points, and other factors.
+        is_senior:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the property is a senior living community.
+        is_build_to_rent:
+          type:
+            - boolean
+            - 'null'
+          description: Indicates if the property is a build-to-rent community.
+        is_affordable:
+          type:
+            - boolean
+            - 'null'
+          description: >-
+            Indicates if the property contains affordable units. Uses the public
+            database of LIHTC properties and the floorplan names from the
+            property website + data from other public data sources.
+        number_units_prediction:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            A prediction of the number of units based on images, number of
+            floors, amenities, location, year built, and the number of units we
+            have seen so far.
+
+            NOTE: This is an approximation to understand the property's size
+            when the exact number of units is not available, do not use it as a
+            variable in your financial models.
+        year_built_prediction:
+          type:
+            - string
+            - 'null'
+          description: >-
+            Predicted or estimated construction period or era based on listing
+            images.
+        number_stories_prediction:
+          type:
+            - string
+            - 'null'
+          description: >-
+            Predicted or estimated range for the number of stories in the
+            building based on facade images.
+        management_company:
+          type:
+            - string
+            - 'null'
+          description: Name of the company managing the property.
+        concessions_history:
+          type: array
+          items:
+            $ref: '#/components/schemas/Concessions'
+          description: >-
+            Historical concession offers or promotions available at the
+            property, along
+
+            with extracted values from the text.
+        pricing_strategy:
+          $ref: '#/components/schemas/PricingStrategy'
+          description: Analysis of the property's pricing patterns and strategies.
+        cats_monthly_rent:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Monthly rent charge for having cats.
+        cats_one_time_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: One-time fee for having cats.
+        cats_deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Deposit required for having cats.
+        dogs_monthly_rent:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Monthly rent charge for having dogs.
+        dogs_one_time_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: One-time fee for having dogs.
+        dogs_deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Deposit required for having dogs.
+        admin_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Administrative fee charged by the property.
+        amenity_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Amenity fee charged by the property, if applicable.
+        application_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Application fee charged to apply for residency.
+        storage_fee:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Fee for using storage facilities on the property.
+        parking_covered:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Monthly charge for covered parking, if available.
+        parking_garage:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Monthly charge for parking in a garage, if available.
+        parking_surface_lot:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Monthly charge for parking in a surface lot, if available.
+        min_deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Minimum security deposit required.
+        max_deposit:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: Maximum security deposit required (may vary by unit).
+        building_amenities:
+          type:
+            - array
+            - 'null'
+          items:
+            $ref: '#/components/schemas/BuildingAmenity'
+          description: List of amenities available in the building.
+        unit_amenities:
+          type:
+            - array
+            - 'null'
+          items:
+            $ref: '#/components/schemas/UnitAmenity'
+          description: List of amenities available in the units.
+        user_id:
+          type:
+            - string
+            - 'null'
+          description: >-
+            When it's a custom property, this field will be populated with the
+            user_id of the user who created the property.
+        street_view_url:
+          type:
+            - string
+            - 'null'
+          description: >-
+            A URL to a custom street view image provided for the property.
+
+            This field is only populated if the user has supplied their own
+            street view image,
+
+            overriding the default value.
+        is_lease_up:
+          type:
+            - boolean
+            - 'null'
+          description: >-
+            Lease-up mode indicates that the building was recently built, and it
+            is assumed that the developers
+
+            are only showing a small number of their available units because
+            they are still trying to fill their spaces.
+
+
+            The function checks several conditions to determine if the building
+            is in lease-up mode:
+
+            1. It verifies if the building was built recently (within the last
+            two years).
+
+            2. It checks if the building has more than 10 units.
+
+            3. It counts the number of available units and tracks the earliest
+            availability date.
+
+            4. It ensures that there have been at least 5 leases.
+
+            5. It checks if the earliest move-in date is within the last
+            18-months.
+
+            6. It calculates the percentage of units still being marketed and
+            ensures it is at least 15%.
+
+
+            If all these conditions are met, the building is considered to be in
+            lease-up mode.
+        occupancy_over_time:
+          type:
+            - array
+            - 'null'
+          items:
+            $ref: '#/components/schemas/OccupancyOverTime'
+        fees:
+          type:
+            - array
+            - 'null'
+          items:
+            $ref: '#/components/schemas/AdditionalFee'
+          description: All of the unstructured fees
+      required:
+        - id
+        - building_name
+        - street_address
+        - city
+        - state
+        - zip_code
+        - year_built
+        - number_units
+        - number_stories
+        - lat
+        - lon
+        - created_on
+        - building_availability
+        - building_quality
+        - street_address_alias
+        - msa
+        - market_embedding
+        - building_name_alias
+        - building_phone_number
+        - building_website
+        - is_single_family
+        - is_condo
+        - is_apartment
+        - year_built_prediction
+        - number_stories_prediction
+        - management_company
+        - pricing_strategy
+        - cats_monthly_rent
+        - cats_one_time_fee
+        - cats_deposit
+        - dogs_monthly_rent
+        - dogs_one_time_fee
+        - dogs_deposit
+        - admin_fee
+        - amenity_fee
+        - application_fee
+        - storage_fee
+        - parking_covered
+        - parking_garage
+        - parking_surface_lot
+        - min_deposit
+        - max_deposit
+        - building_amenities
+        - unit_amenities
+      description: >-
+        The PropertyDetailsResponse object represents all the data we have on
+        this specific property. It is returned by the /property/:id endpoint,
+        and used as the input for most endoints that require a property.
+      title: PropertyDetailsResponse
+    DetailedCompsPayload:
+      type: object
+      properties:
+        selected_ids:
+          type: array
+          items:
+            type: string
+          description: Force include some properties in the results
+        excluded_ids:
+          type: array
+          items:
+            type: string
+          description: >-
+            Exclude some properties from the results that are not suitable for
+            comparison.
+        subject:
+          $ref: '#/components/schemas/PropertyDetailsResponse'
+          description: >-
+            A detailed property object if you have queried the property details
+            from `/property/{id}`. We will use all the available information to
+            find the most similar properties, including market statistics,
+            detailed quality scores, unit details and detected values for
+            missing fields.
+      required:
+        - subject
+      title: DetailedCompsPayload
+    SimplePropertyUnitMixItems:
+      type: object
+      properties:
+        avg_sqft:
+          type: number
+          format: double
+        count:
+          type: number
+          format: double
+        bath:
+          type: number
+          format: double
+        bed:
+          type: number
+          format: double
+      required:
+        - avg_sqft
+        - count
+        - bath
+        - bed
+      title: SimplePropertyUnitMixItems
+    SimpleProperty:
+      type: object
+      properties:
+        lat:
+          type: number
+          format: double
+          description: latitude coordinate of the property's location.
+        lon:
+          type: number
+          format: double
+          description: longitude coordinate of the property's location.
+        is_single_family:
+          type: boolean
+          description: Whether the property is a single-family home.
+        is_apartment:
+          type: boolean
+          description: Whether the property is a multifamily home.
+        is_condo:
+          type: boolean
+          description: Whether the property consists of condominiums.
+        is_student:
+          type: boolean
+          description: Whether the property is a student housing complex.
+        is_senior:
+          type: boolean
+          description: Whether the property is a senior living community.
+        is_build_to_rent:
+          type: boolean
+          description: Whether the property is a build-to-rent community.
+        number_units:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The number of units in the property.
+        year_built:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The year the property was originally built.
+        number_stories:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The number of stories or levels in the property.
+        avg_quality_prediction:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality measured for the property using the condition
+            and finishes of the property detected from interior and exterior
+            photos.
+        building_amenities:
+          type: array
+          items:
+            type: string
+          description: The building amenities available at the property.
+        unit_amenities:
+          type: array
+          items:
+            type: string
+          description: The unit amenities available at the property.
+        unit_mix:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimplePropertyUnitMixItems'
+          description: The unit mix of the property.
+      required:
+        - lat
+        - lon
+        - is_single_family
+        - is_apartment
+        - is_condo
+      description: >-
+        The SimpleProperty object represents a simplified version of the
+        PropertyDetailsResponse object. Useful if you want to query comps with
+        your own property data.
+      title: SimpleProperty
+    SimpleCompsPayload:
+      type: object
+      properties:
+        selected_ids:
+          type: array
+          items:
+            type: string
+          description: Force include some properties in the results
+        excluded_ids:
+          type: array
+          items:
+            type: string
+          description: >-
+            Exclude some properties from the results that are not suitable for
+            comparison.
+        simple_subject:
+          $ref: '#/components/schemas/SimpleProperty'
+          description: >-
+            A simple property object that can come from your systems if you only
+            have the basic information about the property. We will use the basic
+            information to find the most similar properties.
+      required:
+        - simple_subject
+      title: SimpleCompsPayload
+    CompsPayload:
+      oneOf:
+        - $ref: '#/components/schemas/DetailedCompsPayload'
+        - $ref: '#/components/schemas/SimpleCompsPayload'
+      description: >-
+        Payload for getting similar comparables. You can either provide:
+
+
+        - [Recommended] A detailed property object if you have queried the
+        property details from `/property/{id}`. We will use all the available
+        information to find the most similar properties, including market
+        statistics, detailed quality scores, unit details and detected values
+        for missing fields.
+
+        - [Alternative] A simple property object that can come from your systems
+        if you only have the basic information about the property. We will use
+        the basic information to find the most similar properties.
+      title: CompsPayload
+    SimilaritiesUnitMix:
+      type: object
+      properties:
+        '0':
+          type: number
+          format: double
+        '1':
+          type: number
+          format: double
+        '2':
+          type: number
+          format: double
+        '3':
+          type: number
+          format: double
+      description: >-
+        The similarity score for unit mix of the property and the subject.
+
+        The more similar the unit characteristics are, like square footage, bed
+        and bath count,
+
+        the higher the score.
+      title: SimilaritiesUnitMix
+    Similarities:
+      type: object
+      properties:
+        overall:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The overall similarity score between the property and the subject.
+
+            You can confidently use this score to compare the similarity between
+            two properties.
+        distance:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The similarity score for the distance between the property and the
+            subject.
+
+            The closer the property is to the subject, the higher the score.
+        distance_miles:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            (Deprecated) The distance, in miles, between the property and the
+            subject.
+        number_units:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The similarity score for the number of units of the property and the
+            subject.
+
+            The closer the number of units, the higher the score. Note: the
+            lower the number
+
+            of units for the subject, the more sensitive the score is to the
+            number of units difference.
+        number_stories:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The similarity score for the number of stories of the property and
+            the subject.
+
+            Note: the taller the property is, the less sensitive the score is to
+            the number of stories difference.
+        quality:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The similarity score for quality of the property and the subject.
+
+            The closer the quality, the higher the score.
+
+            The quality is computed using the quality of the finishes, the
+            condition of the property,
+
+            and the quality of the amenities we have observed on interior and
+            exterior photos.
+        building_amenities:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The similarity score for building amenities of the property and the
+            subject.
+
+            The most amenities the property has in common with the subject, the
+            higher the score.
+        unit_amenities:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The similarity score for unit amenities of the property and the
+            subject.
+
+            The most amenities the property has in common with the subject, the
+            higher the score.
+        vintage:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The similarity score for the year built of the property and the
+            subject.
+
+            The closer the year built, the higher the score. Note: the more
+            recent
+
+            the subject is, the more sensitive the score is to the year built
+            difference.
+        market:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The similarity score for the market embedding of the property and
+            the subject.
+
+            The closer the embedding, the higher the score. It represents the
+            similarity
+
+            in demographics and market conditions between the two properties.
+        unit_mix:
+          oneOf:
+            - $ref: '#/components/schemas/SimilaritiesUnitMix'
+            - type: 'null'
+          description: >-
+            The similarity score for unit mix of the property and the subject.
+
+            The more similar the unit characteristics are, like square footage,
+            bed and bath count,
+
+            the higher the score.
+        subtype:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The similarity score for the property's asset class and the subject.
+
+            For now, this is a binary score, where 1 means the asset class is
+            the same and 0 means it is different.
+
+            Accounts for: senior_housing
+        distances_to_universities:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The similarity score for the distance to universities of the
+            property and the subject.
+
+            The most similar the distance to a university of a comparable is to
+            the subject, the higher the score.
+      required:
+        - overall
+        - distance
+        - number_units
+        - number_stories
+        - quality
+        - building_amenities
+        - unit_amenities
+        - vintage
+        - market
+        - unit_mix
+        - subtype
+      description: >-
+        The Similarities object is used to explain the similarity score between
+        two properties.
+
+        It contains an overall similarity score, as well as individual scores
+        for each of the
+
+        similarity features.
+      title: Similarities
+    PropertyComparableResponse:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+          description: >-
+            The primary unique identifier of the property. It is a stringified
+            UUIDv5.
+
+            This value can occasionally change if multiple properties get merged
+            into one.
+        id_alias:
+          type: array
+          items:
+            $ref: '#/components/schemas/UUID'
+          description: >-
+            A list of alternate unique identifiers (alias IDs) for the property.
+
+            These IDs are typically derived from historical addresses and remain
+
+            valid even if the primary address changes over time. While old IDs
+
+            are automatically redirected to the current primary ID, exposing
+            alias
+
+            IDs helps with deduplication and data consistency.
+        lat:
+          type: number
+          format: double
+          description: The property's latitude
+        lon:
+          type: number
+          format: double
+          description: The property's longitude
+        building_name:
+          type:
+            - string
+            - 'null'
+          description: The property's name.
+        building_name_alias:
+          type: array
+          items:
+            type: string
+          description: |-
+            Other known names for the property. When searching for a property
+            by name, these aliases will also be matched.
+        street_address:
+          type: string
+          description: The property's street address part of the full address.
+        street_address_alias:
+          type: array
+          items:
+            type: string
+          description: >-
+            Other known street addresses for the property. When searching for a
+            property
+
+            by address, these aliases will also be matched.
+        city:
+          type: string
+          description: The property's city.
+        state:
+          type: string
+          description: The property's state. Formatted as a 2-char string.
+        zip_code:
+          type: string
+          description: >-
+            The property's zip code. Formatted as a 5-char string with leading
+            0.
+        number_units:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The property's advertised number_units
+        year_built:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The property's year_built. This can be in the future if the property
+            is under construction.
+        number_stories:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The property's number of units
+        created_on:
+          $ref: '#/components/schemas/DateStr'
+          description: The date when this record was last updated.
+        avg_quality:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The average quality measured for the property using the condition
+            and finishes of the property detected from interior and exterior
+            photos.
+        distance_miles:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The distance, in miles, between the property and the subject.
+        distance_meters:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The distance, in meters, between the property and the subject.
+        similarity_score:
+          $ref: '#/components/schemas/Similarities'
+          description: >-
+            Breakdown of the quality score for various aspects of the property,
+            including both general areas and specific features.
+      required:
+        - id
+        - building_name
+        - building_name_alias
+        - street_address
+        - street_address_alias
+        - city
+        - state
+        - zip_code
+        - similarity_score
+      title: PropertyComparableResponse
+    CompetitionProfile:
+      type: object
+      properties:
+        radius_miles:
+          type: number
+          format: double
+          description: The radius, in miles, used to compute the competition profile.
+        high_similarity:
+          type: number
+          format: double
+          description: >-
+            The number of properties in the high similarity bucket. (similarity
+            in [0.8, 1])
+        medium_similarity:
+          type: number
+          format: double
+          description: >-
+            The number of properties in the medium similarity bucket.
+            (similarity in [0.6, 0.8[)
+        low_similarity:
+          type: number
+          format: double
+          description: >-
+            The number of properties in the low similarity bucket. (similarity
+            in [0, 0.6[)
+      required:
+        - radius_miles
+        - high_similarity
+        - medium_similarity
+        - low_similarity
+      description: >-
+        BETA: the object is currently in beta and may change without notice.
+
+        The CompetitionProfile object is used to explain the competition profile
+        of a property.
+
+        It describes how many properties are in the high, medium, and low
+        similarity buckets within a given radius (non overlapping,
+        non-cumulative).
+      title: CompetitionProfile
+    CompsResponse:
+      type: object
+      properties:
+        comparables:
+          type: array
+          items:
+            $ref: '#/components/schemas/PropertyComparableResponse'
+        competition_profile:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetitionProfile'
+      required:
+        - comparables
+      title: CompsResponse
+    ComparablesRequestBadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+      title: ComparablesRequestBadRequestError
+  securitySchemes:
+    api:
+      type: apiKey
+      in: header
+      name: x-api-key
+    auth0:
+      type: http
+      scheme: bearer
+
+```
+
+## SDK Code Examples
+
+```python
+import requests
+
+url = "https://api.hellodata.ai/property/comparables"
+
+payload = { "subject": {
+        "id": "52907745-7672-470e-a803-a2f8feb52944",
+        "building_name": "OneEleven",
+        "street_address": "111 West Wacker Drive",
+        "city": "Chicago",
+        "state": "IL",
+        "zip_code": "60601",
+        "year_built": 2014,
+        "number_units": 505,
+        "number_stories": 60,
+        "lat": 41.88651,
+        "lon": -87.63141,
+        "created_on": "2024-02-13",
+        "building_availability": [
+            {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "is_floorplan": True,
+                "bed": 2,
+                "bath": 2,
+                "partial_bath": 1,
+                "sqft": 850,
+                "floorplan_name": "2B2B",
+                "unit_name": "203",
+                "enter_market": "2023-12-01",
+                "exit_market": "2024-01-15",
+                "tags": ["ada_unit"],
+                "history": [
+                    {
+                        "from_date": "2024-01-01",
+                        "to_date": "2024-03-31",
+                        "price": 1500,
+                        "effective_price": 1450,
+                        "period_id": 0,
+                        "min_price": 1200,
+                        "max_price": 1800,
+                        "min_effective_price": 1150,
+                        "max_effective_price": 1750
+                    }
+                ],
+                "availability_periods": [
+                    {
+                        "period_id": 0,
+                        "enter_market": "2023-12-01",
+                        "exit_market": "2024-01-15",
+                        "days_on_market": 45,
+                        "availability": "2024-01-01"
+                    }
+                ],
+                "floor": 5,
+                "availability": "2024-01-01",
+                "min_price": 1200,
+                "price": 1500,
+                "max_price": 1800,
+                "min_effective_price": 1150,
+                "effective_price": 1450,
+                "max_effective_price": 1750,
+                "days_on_market": 45,
+                "min_sqft": 800,
+                "max_sqft": 900,
+                "created_on": "2023-11-01",
+                "price_plans": [
+                    {
+                        "duration_in_months": 12,
+                        "specials": "Special incentives available at OneEleven! Enjoy up to a half month free on select apartments."
+                    }
+                ],
+                "amenities": ["string"]
+            }
+        ],
+        "building_quality": {
+            "property_overall_quality": 0.85,
+            "avg_quality_score_bedroom": 0.82,
+            "avg_quality_score_kitchen": 0.87,
+            "avg_quality_score_bathroom": 0.81,
+            "avg_quality_score_dining_room": 0.8,
+            "avg_quality_score_common_areas": 0.83,
+            "avg_quality_score_fitness_center": 0.78,
+            "avg_quality_score_laundry_room": 0.75,
+            "avg_quality_score_living_room": 0.84,
+            "avg_quality_score_main_entrance": 0.86,
+            "avg_quality_score_stairs_hallway": 0.79,
+            "avg_quality_score_swimming_pool": 0.88,
+            "avg_quality_score_walk_in_closet": 0.8
+        },
+        "street_address_alias": ["111 West Wacker", "111 West Wacker Drive"],
+        "msa": "Chicago-Naperville-Elgin, IL-IN-WI",
+        "market_embedding": [1.1],
+        "building_name_alias": ["string"],
+        "building_phone_number": "7087250291",
+        "building_website": "https://www.oneelevenchicago.com/",
+        "is_single_family": False,
+        "is_condo": False,
+        "is_apartment": True,
+        "year_built_prediction": "2020+",
+        "number_stories_prediction": "11+",
+        "management_company": "The Bozzuto Group",
+        "pricing_strategy": {
+            "is_using_rev_management": True,
+            "avg_duration": 30,
+            "avg_price_change": 100,
+            "avg_time_on_market": 30,
+            "day_of_week_distribution": [1.1],
+            "count_prices": 1.1
+        },
+        "cats_monthly_rent": 50,
+        "cats_one_time_fee": 50,
+        "cats_deposit": 50,
+        "dogs_monthly_rent": 50,
+        "dogs_one_time_fee": 50,
+        "dogs_deposit": 50,
+        "admin_fee": 600,
+        "application_fee": 65,
+        "storage_fee": 50,
+        "parking_covered": 300,
+        "parking_garage": 319,
+        "parking_surface_lot": 100,
+        "min_deposit": 2248,
+        "max_deposit": 2248,
+        "building_amenities": ["24_hour_maintenance"],
+        "unit_amenities": ["air_conditioning"]
+    } }
+headers = {
+    "x-api-key": "<apiKey>",
+    "Content-Type": "application/json"
+}
+
+response = requests.post(url, json=payload, headers=headers)
+
+print(response.json())
+```
+
+```javascript
+const url = 'https://api.hellodata.ai/property/comparables';
+const options = {
+  method: 'POST',
+  headers: {'x-api-key': '<apiKey>', 'Content-Type': 'application/json'},
+  body: '{"subject":{"id":"52907745-7672-470e-a803-a2f8feb52944","building_name":"OneEleven","street_address":"111 West Wacker Drive","city":"Chicago","state":"IL","zip_code":"60601","year_built":2014,"number_units":505,"number_stories":60,"lat":41.88651,"lon":-87.63141,"created_on":"2024-02-13","building_availability":[{"id":"123e4567-e89b-12d3-a456-426614174000","is_floorplan":true,"bed":2,"bath":2,"partial_bath":1,"sqft":850,"floorplan_name":"2B2B","unit_name":"203","enter_market":"2023-12-01","exit_market":"2024-01-15","tags":["ada_unit"],"history":[{"from_date":"2024-01-01","to_date":"2024-03-31","price":1500,"effective_price":1450,"period_id":0,"min_price":1200,"max_price":1800,"min_effective_price":1150,"max_effective_price":1750}],"availability_periods":[{"period_id":0,"enter_market":"2023-12-01","exit_market":"2024-01-15","days_on_market":45,"availability":"2024-01-01"}],"floor":5,"availability":"2024-01-01","min_price":1200,"price":1500,"max_price":1800,"min_effective_price":1150,"effective_price":1450,"max_effective_price":1750,"days_on_market":45,"min_sqft":800,"max_sqft":900,"created_on":"2023-11-01","price_plans":[{"duration_in_months":12,"specials":"Special incentives available at OneEleven! Enjoy up to a half month free on select apartments."}],"amenities":["string"]}],"building_quality":{"property_overall_quality":0.85,"avg_quality_score_bedroom":0.82,"avg_quality_score_kitchen":0.87,"avg_quality_score_bathroom":0.81,"avg_quality_score_dining_room":0.8,"avg_quality_score_common_areas":0.83,"avg_quality_score_fitness_center":0.78,"avg_quality_score_laundry_room":0.75,"avg_quality_score_living_room":0.84,"avg_quality_score_main_entrance":0.86,"avg_quality_score_stairs_hallway":0.79,"avg_quality_score_swimming_pool":0.88,"avg_quality_score_walk_in_closet":0.8},"street_address_alias":["111 West Wacker","111 West Wacker Drive"],"msa":"Chicago-Naperville-Elgin, IL-IN-WI","market_embedding":[1.1],"building_name_alias":["string"],"building_phone_number":"7087250291","building_website":"https://www.oneelevenchicago.com/","is_single_family":false,"is_condo":false,"is_apartment":true,"year_built_prediction":"2020+","number_stories_prediction":"11+","management_company":"The Bozzuto Group","pricing_strategy":{"is_using_rev_management":true,"avg_duration":30,"avg_price_change":100,"avg_time_on_market":30,"day_of_week_distribution":[1.1],"count_prices":1.1},"cats_monthly_rent":50,"cats_one_time_fee":50,"cats_deposit":50,"dogs_monthly_rent":50,"dogs_one_time_fee":50,"dogs_deposit":50,"admin_fee":600,"application_fee":65,"storage_fee":50,"parking_covered":300,"parking_garage":319,"parking_surface_lot":100,"min_deposit":2248,"max_deposit":2248,"building_amenities":["24_hour_maintenance"],"unit_amenities":["air_conditioning"]}}'
+};
+
+try {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  console.log(data);
+} catch (error) {
+  console.error(error);
+}
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"strings"
+	"net/http"
+	"io"
+)
+
+func main() {
+
+	url := "https://api.hellodata.ai/property/comparables"
+
+	payload := strings.NewReader("{\n  \"subject\": {\n    \"id\": \"52907745-7672-470e-a803-a2f8feb52944\",\n    \"building_name\": \"OneEleven\",\n    \"street_address\": \"111 West Wacker Drive\",\n    \"city\": \"Chicago\",\n    \"state\": \"IL\",\n    \"zip_code\": \"60601\",\n    \"year_built\": 2014,\n    \"number_units\": 505,\n    \"number_stories\": 60,\n    \"lat\": 41.88651,\n    \"lon\": -87.63141,\n    \"created_on\": \"2024-02-13\",\n    \"building_availability\": [\n      {\n        \"id\": \"123e4567-e89b-12d3-a456-426614174000\",\n        \"is_floorplan\": true,\n        \"bed\": 2,\n        \"bath\": 2,\n        \"partial_bath\": 1,\n        \"sqft\": 850,\n        \"floorplan_name\": \"2B2B\",\n        \"unit_name\": \"203\",\n        \"enter_market\": \"2023-12-01\",\n        \"exit_market\": \"2024-01-15\",\n        \"tags\": [\n          \"ada_unit\"\n        ],\n        \"history\": [\n          {\n            \"from_date\": \"2024-01-01\",\n            \"to_date\": \"2024-03-31\",\n            \"price\": 1500,\n            \"effective_price\": 1450,\n            \"period_id\": 0,\n            \"min_price\": 1200,\n            \"max_price\": 1800,\n            \"min_effective_price\": 1150,\n            \"max_effective_price\": 1750\n          }\n        ],\n        \"availability_periods\": [\n          {\n            \"period_id\": 0,\n            \"enter_market\": \"2023-12-01\",\n            \"exit_market\": \"2024-01-15\",\n            \"days_on_market\": 45,\n            \"availability\": \"2024-01-01\"\n          }\n        ],\n        \"floor\": 5,\n        \"availability\": \"2024-01-01\",\n        \"min_price\": 1200,\n        \"price\": 1500,\n        \"max_price\": 1800,\n        \"min_effective_price\": 1150,\n        \"effective_price\": 1450,\n        \"max_effective_price\": 1750,\n        \"days_on_market\": 45,\n        \"min_sqft\": 800,\n        \"max_sqft\": 900,\n        \"created_on\": \"2023-11-01\",\n        \"price_plans\": [\n          {\n            \"duration_in_months\": 12,\n            \"specials\": \"Special incentives available at OneEleven! Enjoy up to a half month free on select apartments.\"\n          }\n        ],\n        \"amenities\": [\n          \"string\"\n        ]\n      }\n    ],\n    \"building_quality\": {\n      \"property_overall_quality\": 0.85,\n      \"avg_quality_score_bedroom\": 0.82,\n      \"avg_quality_score_kitchen\": 0.87,\n      \"avg_quality_score_bathroom\": 0.81,\n      \"avg_quality_score_dining_room\": 0.8,\n      \"avg_quality_score_common_areas\": 0.83,\n      \"avg_quality_score_fitness_center\": 0.78,\n      \"avg_quality_score_laundry_room\": 0.75,\n      \"avg_quality_score_living_room\": 0.84,\n      \"avg_quality_score_main_entrance\": 0.86,\n      \"avg_quality_score_stairs_hallway\": 0.79,\n      \"avg_quality_score_swimming_pool\": 0.88,\n      \"avg_quality_score_walk_in_closet\": 0.8\n    },\n    \"street_address_alias\": [\n      \"111 West Wacker\",\n      \"111 West Wacker Drive\"\n    ],\n    \"msa\": \"Chicago-Naperville-Elgin, IL-IN-WI\",\n    \"market_embedding\": [\n      1.1\n    ],\n    \"building_name_alias\": [\n      \"string\"\n    ],\n    \"building_phone_number\": \"7087250291\",\n    \"building_website\": \"https://www.oneelevenchicago.com/\",\n    \"is_single_family\": false,\n    \"is_condo\": false,\n    \"is_apartment\": true,\n    \"year_built_prediction\": \"2020+\",\n    \"number_stories_prediction\": \"11+\",\n    \"management_company\": \"The Bozzuto Group\",\n    \"pricing_strategy\": {\n      \"is_using_rev_management\": true,\n      \"avg_duration\": 30,\n      \"avg_price_change\": 100,\n      \"avg_time_on_market\": 30,\n      \"day_of_week_distribution\": [\n        1.1\n      ],\n      \"count_prices\": 1.1\n    },\n    \"cats_monthly_rent\": 50,\n    \"cats_one_time_fee\": 50,\n    \"cats_deposit\": 50,\n    \"dogs_monthly_rent\": 50,\n    \"dogs_one_time_fee\": 50,\n    \"dogs_deposit\": 50,\n    \"admin_fee\": 600,\n    \"application_fee\": 65,\n    \"storage_fee\": 50,\n    \"parking_covered\": 300,\n    \"parking_garage\": 319,\n    \"parking_surface_lot\": 100,\n    \"min_deposit\": 2248,\n    \"max_deposit\": 2248,\n    \"building_amenities\": [\n      \"24_hour_maintenance\"\n    ],\n    \"unit_amenities\": [\n      \"air_conditioning\"\n    ]\n  }\n}")
+
+	req, _ := http.NewRequest("POST", url, payload)
+
+	req.Header.Add("x-api-key", "<apiKey>")
+	req.Header.Add("Content-Type", "application/json")
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+
+	fmt.Println(res)
+	fmt.Println(string(body))
+
+}
+```
+
+```ruby
+require 'uri'
+require 'net/http'
+
+url = URI("https://api.hellodata.ai/property/comparables")
+
+http = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+
+request = Net::HTTP::Post.new(url)
+request["x-api-key"] = '<apiKey>'
+request["Content-Type"] = 'application/json'
+request.body = "{\n  \"subject\": {\n    \"id\": \"52907745-7672-470e-a803-a2f8feb52944\",\n    \"building_name\": \"OneEleven\",\n    \"street_address\": \"111 West Wacker Drive\",\n    \"city\": \"Chicago\",\n    \"state\": \"IL\",\n    \"zip_code\": \"60601\",\n    \"year_built\": 2014,\n    \"number_units\": 505,\n    \"number_stories\": 60,\n    \"lat\": 41.88651,\n    \"lon\": -87.63141,\n    \"created_on\": \"2024-02-13\",\n    \"building_availability\": [\n      {\n        \"id\": \"123e4567-e89b-12d3-a456-426614174000\",\n        \"is_floorplan\": true,\n        \"bed\": 2,\n        \"bath\": 2,\n        \"partial_bath\": 1,\n        \"sqft\": 850,\n        \"floorplan_name\": \"2B2B\",\n        \"unit_name\": \"203\",\n        \"enter_market\": \"2023-12-01\",\n        \"exit_market\": \"2024-01-15\",\n        \"tags\": [\n          \"ada_unit\"\n        ],\n        \"history\": [\n          {\n            \"from_date\": \"2024-01-01\",\n            \"to_date\": \"2024-03-31\",\n            \"price\": 1500,\n            \"effective_price\": 1450,\n            \"period_id\": 0,\n            \"min_price\": 1200,\n            \"max_price\": 1800,\n            \"min_effective_price\": 1150,\n            \"max_effective_price\": 1750\n          }\n        ],\n        \"availability_periods\": [\n          {\n            \"period_id\": 0,\n            \"enter_market\": \"2023-12-01\",\n            \"exit_market\": \"2024-01-15\",\n            \"days_on_market\": 45,\n            \"availability\": \"2024-01-01\"\n          }\n        ],\n        \"floor\": 5,\n        \"availability\": \"2024-01-01\",\n        \"min_price\": 1200,\n        \"price\": 1500,\n        \"max_price\": 1800,\n        \"min_effective_price\": 1150,\n        \"effective_price\": 1450,\n        \"max_effective_price\": 1750,\n        \"days_on_market\": 45,\n        \"min_sqft\": 800,\n        \"max_sqft\": 900,\n        \"created_on\": \"2023-11-01\",\n        \"price_plans\": [\n          {\n            \"duration_in_months\": 12,\n            \"specials\": \"Special incentives available at OneEleven! Enjoy up to a half month free on select apartments.\"\n          }\n        ],\n        \"amenities\": [\n          \"string\"\n        ]\n      }\n    ],\n    \"building_quality\": {\n      \"property_overall_quality\": 0.85,\n      \"avg_quality_score_bedroom\": 0.82,\n      \"avg_quality_score_kitchen\": 0.87,\n      \"avg_quality_score_bathroom\": 0.81,\n      \"avg_quality_score_dining_room\": 0.8,\n      \"avg_quality_score_common_areas\": 0.83,\n      \"avg_quality_score_fitness_center\": 0.78,\n      \"avg_quality_score_laundry_room\": 0.75,\n      \"avg_quality_score_living_room\": 0.84,\n      \"avg_quality_score_main_entrance\": 0.86,\n      \"avg_quality_score_stairs_hallway\": 0.79,\n      \"avg_quality_score_swimming_pool\": 0.88,\n      \"avg_quality_score_walk_in_closet\": 0.8\n    },\n    \"street_address_alias\": [\n      \"111 West Wacker\",\n      \"111 West Wacker Drive\"\n    ],\n    \"msa\": \"Chicago-Naperville-Elgin, IL-IN-WI\",\n    \"market_embedding\": [\n      1.1\n    ],\n    \"building_name_alias\": [\n      \"string\"\n    ],\n    \"building_phone_number\": \"7087250291\",\n    \"building_website\": \"https://www.oneelevenchicago.com/\",\n    \"is_single_family\": false,\n    \"is_condo\": false,\n    \"is_apartment\": true,\n    \"year_built_prediction\": \"2020+\",\n    \"number_stories_prediction\": \"11+\",\n    \"management_company\": \"The Bozzuto Group\",\n    \"pricing_strategy\": {\n      \"is_using_rev_management\": true,\n      \"avg_duration\": 30,\n      \"avg_price_change\": 100,\n      \"avg_time_on_market\": 30,\n      \"day_of_week_distribution\": [\n        1.1\n      ],\n      \"count_prices\": 1.1\n    },\n    \"cats_monthly_rent\": 50,\n    \"cats_one_time_fee\": 50,\n    \"cats_deposit\": 50,\n    \"dogs_monthly_rent\": 50,\n    \"dogs_one_time_fee\": 50,\n    \"dogs_deposit\": 50,\n    \"admin_fee\": 600,\n    \"application_fee\": 65,\n    \"storage_fee\": 50,\n    \"parking_covered\": 300,\n    \"parking_garage\": 319,\n    \"parking_surface_lot\": 100,\n    \"min_deposit\": 2248,\n    \"max_deposit\": 2248,\n    \"building_amenities\": [\n      \"24_hour_maintenance\"\n    ],\n    \"unit_amenities\": [\n      \"air_conditioning\"\n    ]\n  }\n}"
+
+response = http.request(request)
+puts response.read_body
+```
+
+```java
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+
+HttpResponse<String> response = Unirest.post("https://api.hellodata.ai/property/comparables")
+  .header("x-api-key", "<apiKey>")
+  .header("Content-Type", "application/json")
+  .body("{\n  \"subject\": {\n    \"id\": \"52907745-7672-470e-a803-a2f8feb52944\",\n    \"building_name\": \"OneEleven\",\n    \"street_address\": \"111 West Wacker Drive\",\n    \"city\": \"Chicago\",\n    \"state\": \"IL\",\n    \"zip_code\": \"60601\",\n    \"year_built\": 2014,\n    \"number_units\": 505,\n    \"number_stories\": 60,\n    \"lat\": 41.88651,\n    \"lon\": -87.63141,\n    \"created_on\": \"2024-02-13\",\n    \"building_availability\": [\n      {\n        \"id\": \"123e4567-e89b-12d3-a456-426614174000\",\n        \"is_floorplan\": true,\n        \"bed\": 2,\n        \"bath\": 2,\n        \"partial_bath\": 1,\n        \"sqft\": 850,\n        \"floorplan_name\": \"2B2B\",\n        \"unit_name\": \"203\",\n        \"enter_market\": \"2023-12-01\",\n        \"exit_market\": \"2024-01-15\",\n        \"tags\": [\n          \"ada_unit\"\n        ],\n        \"history\": [\n          {\n            \"from_date\": \"2024-01-01\",\n            \"to_date\": \"2024-03-31\",\n            \"price\": 1500,\n            \"effective_price\": 1450,\n            \"period_id\": 0,\n            \"min_price\": 1200,\n            \"max_price\": 1800,\n            \"min_effective_price\": 1150,\n            \"max_effective_price\": 1750\n          }\n        ],\n        \"availability_periods\": [\n          {\n            \"period_id\": 0,\n            \"enter_market\": \"2023-12-01\",\n            \"exit_market\": \"2024-01-15\",\n            \"days_on_market\": 45,\n            \"availability\": \"2024-01-01\"\n          }\n        ],\n        \"floor\": 5,\n        \"availability\": \"2024-01-01\",\n        \"min_price\": 1200,\n        \"price\": 1500,\n        \"max_price\": 1800,\n        \"min_effective_price\": 1150,\n        \"effective_price\": 1450,\n        \"max_effective_price\": 1750,\n        \"days_on_market\": 45,\n        \"min_sqft\": 800,\n        \"max_sqft\": 900,\n        \"created_on\": \"2023-11-01\",\n        \"price_plans\": [\n          {\n            \"duration_in_months\": 12,\n            \"specials\": \"Special incentives available at OneEleven! Enjoy up to a half month free on select apartments.\"\n          }\n        ],\n        \"amenities\": [\n          \"string\"\n        ]\n      }\n    ],\n    \"building_quality\": {\n      \"property_overall_quality\": 0.85,\n      \"avg_quality_score_bedroom\": 0.82,\n      \"avg_quality_score_kitchen\": 0.87,\n      \"avg_quality_score_bathroom\": 0.81,\n      \"avg_quality_score_dining_room\": 0.8,\n      \"avg_quality_score_common_areas\": 0.83,\n      \"avg_quality_score_fitness_center\": 0.78,\n      \"avg_quality_score_laundry_room\": 0.75,\n      \"avg_quality_score_living_room\": 0.84,\n      \"avg_quality_score_main_entrance\": 0.86,\n      \"avg_quality_score_stairs_hallway\": 0.79,\n      \"avg_quality_score_swimming_pool\": 0.88,\n      \"avg_quality_score_walk_in_closet\": 0.8\n    },\n    \"street_address_alias\": [\n      \"111 West Wacker\",\n      \"111 West Wacker Drive\"\n    ],\n    \"msa\": \"Chicago-Naperville-Elgin, IL-IN-WI\",\n    \"market_embedding\": [\n      1.1\n    ],\n    \"building_name_alias\": [\n      \"string\"\n    ],\n    \"building_phone_number\": \"7087250291\",\n    \"building_website\": \"https://www.oneelevenchicago.com/\",\n    \"is_single_family\": false,\n    \"is_condo\": false,\n    \"is_apartment\": true,\n    \"year_built_prediction\": \"2020+\",\n    \"number_stories_prediction\": \"11+\",\n    \"management_company\": \"The Bozzuto Group\",\n    \"pricing_strategy\": {\n      \"is_using_rev_management\": true,\n      \"avg_duration\": 30,\n      \"avg_price_change\": 100,\n      \"avg_time_on_market\": 30,\n      \"day_of_week_distribution\": [\n        1.1\n      ],\n      \"count_prices\": 1.1\n    },\n    \"cats_monthly_rent\": 50,\n    \"cats_one_time_fee\": 50,\n    \"cats_deposit\": 50,\n    \"dogs_monthly_rent\": 50,\n    \"dogs_one_time_fee\": 50,\n    \"dogs_deposit\": 50,\n    \"admin_fee\": 600,\n    \"application_fee\": 65,\n    \"storage_fee\": 50,\n    \"parking_covered\": 300,\n    \"parking_garage\": 319,\n    \"parking_surface_lot\": 100,\n    \"min_deposit\": 2248,\n    \"max_deposit\": 2248,\n    \"building_amenities\": [\n      \"24_hour_maintenance\"\n    ],\n    \"unit_amenities\": [\n      \"air_conditioning\"\n    ]\n  }\n}")
+  .asString();
+```
+
+```php
+<?php
+require_once('vendor/autoload.php');
+
+$client = new \GuzzleHttp\Client();
+
+$response = $client->request('POST', 'https://api.hellodata.ai/property/comparables', [
+  'body' => '{
+  "subject": {
+    "id": "52907745-7672-470e-a803-a2f8feb52944",
+    "building_name": "OneEleven",
+    "street_address": "111 West Wacker Drive",
+    "city": "Chicago",
+    "state": "IL",
+    "zip_code": "60601",
+    "year_built": 2014,
+    "number_units": 505,
+    "number_stories": 60,
+    "lat": 41.88651,
+    "lon": -87.63141,
+    "created_on": "2024-02-13",
+    "building_availability": [
+      {
+        "id": "123e4567-e89b-12d3-a456-426614174000",
+        "is_floorplan": true,
+        "bed": 2,
+        "bath": 2,
+        "partial_bath": 1,
+        "sqft": 850,
+        "floorplan_name": "2B2B",
+        "unit_name": "203",
+        "enter_market": "2023-12-01",
+        "exit_market": "2024-01-15",
+        "tags": [
+          "ada_unit"
+        ],
+        "history": [
+          {
+            "from_date": "2024-01-01",
+            "to_date": "2024-03-31",
+            "price": 1500,
+            "effective_price": 1450,
+            "period_id": 0,
+            "min_price": 1200,
+            "max_price": 1800,
+            "min_effective_price": 1150,
+            "max_effective_price": 1750
+          }
+        ],
+        "availability_periods": [
+          {
+            "period_id": 0,
+            "enter_market": "2023-12-01",
+            "exit_market": "2024-01-15",
+            "days_on_market": 45,
+            "availability": "2024-01-01"
+          }
+        ],
+        "floor": 5,
+        "availability": "2024-01-01",
+        "min_price": 1200,
+        "price": 1500,
+        "max_price": 1800,
+        "min_effective_price": 1150,
+        "effective_price": 1450,
+        "max_effective_price": 1750,
+        "days_on_market": 45,
+        "min_sqft": 800,
+        "max_sqft": 900,
+        "created_on": "2023-11-01",
+        "price_plans": [
+          {
+            "duration_in_months": 12,
+            "specials": "Special incentives available at OneEleven! Enjoy up to a half month free on select apartments."
+          }
+        ],
+        "amenities": [
+          "string"
+        ]
+      }
+    ],
+    "building_quality": {
+      "property_overall_quality": 0.85,
+      "avg_quality_score_bedroom": 0.82,
+      "avg_quality_score_kitchen": 0.87,
+      "avg_quality_score_bathroom": 0.81,
+      "avg_quality_score_dining_room": 0.8,
+      "avg_quality_score_common_areas": 0.83,
+      "avg_quality_score_fitness_center": 0.78,
+      "avg_quality_score_laundry_room": 0.75,
+      "avg_quality_score_living_room": 0.84,
+      "avg_quality_score_main_entrance": 0.86,
+      "avg_quality_score_stairs_hallway": 0.79,
+      "avg_quality_score_swimming_pool": 0.88,
+      "avg_quality_score_walk_in_closet": 0.8
+    },
+    "street_address_alias": [
+      "111 West Wacker",
+      "111 West Wacker Drive"
+    ],
+    "msa": "Chicago-Naperville-Elgin, IL-IN-WI",
+    "market_embedding": [
+      1.1
+    ],
+    "building_name_alias": [
+      "string"
+    ],
+    "building_phone_number": "7087250291",
+    "building_website": "https://www.oneelevenchicago.com/",
+    "is_single_family": false,
+    "is_condo": false,
+    "is_apartment": true,
+    "year_built_prediction": "2020+",
+    "number_stories_prediction": "11+",
+    "management_company": "The Bozzuto Group",
+    "pricing_strategy": {
+      "is_using_rev_management": true,
+      "avg_duration": 30,
+      "avg_price_change": 100,
+      "avg_time_on_market": 30,
+      "day_of_week_distribution": [
+        1.1
+      ],
+      "count_prices": 1.1
+    },
+    "cats_monthly_rent": 50,
+    "cats_one_time_fee": 50,
+    "cats_deposit": 50,
+    "dogs_monthly_rent": 50,
+    "dogs_one_time_fee": 50,
+    "dogs_deposit": 50,
+    "admin_fee": 600,
+    "application_fee": 65,
+    "storage_fee": 50,
+    "parking_covered": 300,
+    "parking_garage": 319,
+    "parking_surface_lot": 100,
+    "min_deposit": 2248,
+    "max_deposit": 2248,
+    "building_amenities": [
+      "24_hour_maintenance"
+    ],
+    "unit_amenities": [
+      "air_conditioning"
+    ]
+  }
+}',
+  'headers' => [
+    'Content-Type' => 'application/json',
+    'x-api-key' => '<apiKey>',
+  ],
+]);
+
+echo $response->getBody();
+```
+
+```csharp
+using RestSharp;
+
+var client = new RestClient("https://api.hellodata.ai/property/comparables");
+var request = new RestRequest(Method.POST);
+request.AddHeader("x-api-key", "<apiKey>");
+request.AddHeader("Content-Type", "application/json");
+request.AddParameter("application/json", "{\n  \"subject\": {\n    \"id\": \"52907745-7672-470e-a803-a2f8feb52944\",\n    \"building_name\": \"OneEleven\",\n    \"street_address\": \"111 West Wacker Drive\",\n    \"city\": \"Chicago\",\n    \"state\": \"IL\",\n    \"zip_code\": \"60601\",\n    \"year_built\": 2014,\n    \"number_units\": 505,\n    \"number_stories\": 60,\n    \"lat\": 41.88651,\n    \"lon\": -87.63141,\n    \"created_on\": \"2024-02-13\",\n    \"building_availability\": [\n      {\n        \"id\": \"123e4567-e89b-12d3-a456-426614174000\",\n        \"is_floorplan\": true,\n        \"bed\": 2,\n        \"bath\": 2,\n        \"partial_bath\": 1,\n        \"sqft\": 850,\n        \"floorplan_name\": \"2B2B\",\n        \"unit_name\": \"203\",\n        \"enter_market\": \"2023-12-01\",\n        \"exit_market\": \"2024-01-15\",\n        \"tags\": [\n          \"ada_unit\"\n        ],\n        \"history\": [\n          {\n            \"from_date\": \"2024-01-01\",\n            \"to_date\": \"2024-03-31\",\n            \"price\": 1500,\n            \"effective_price\": 1450,\n            \"period_id\": 0,\n            \"min_price\": 1200,\n            \"max_price\": 1800,\n            \"min_effective_price\": 1150,\n            \"max_effective_price\": 1750\n          }\n        ],\n        \"availability_periods\": [\n          {\n            \"period_id\": 0,\n            \"enter_market\": \"2023-12-01\",\n            \"exit_market\": \"2024-01-15\",\n            \"days_on_market\": 45,\n            \"availability\": \"2024-01-01\"\n          }\n        ],\n        \"floor\": 5,\n        \"availability\": \"2024-01-01\",\n        \"min_price\": 1200,\n        \"price\": 1500,\n        \"max_price\": 1800,\n        \"min_effective_price\": 1150,\n        \"effective_price\": 1450,\n        \"max_effective_price\": 1750,\n        \"days_on_market\": 45,\n        \"min_sqft\": 800,\n        \"max_sqft\": 900,\n        \"created_on\": \"2023-11-01\",\n        \"price_plans\": [\n          {\n            \"duration_in_months\": 12,\n            \"specials\": \"Special incentives available at OneEleven! Enjoy up to a half month free on select apartments.\"\n          }\n        ],\n        \"amenities\": [\n          \"string\"\n        ]\n      }\n    ],\n    \"building_quality\": {\n      \"property_overall_quality\": 0.85,\n      \"avg_quality_score_bedroom\": 0.82,\n      \"avg_quality_score_kitchen\": 0.87,\n      \"avg_quality_score_bathroom\": 0.81,\n      \"avg_quality_score_dining_room\": 0.8,\n      \"avg_quality_score_common_areas\": 0.83,\n      \"avg_quality_score_fitness_center\": 0.78,\n      \"avg_quality_score_laundry_room\": 0.75,\n      \"avg_quality_score_living_room\": 0.84,\n      \"avg_quality_score_main_entrance\": 0.86,\n      \"avg_quality_score_stairs_hallway\": 0.79,\n      \"avg_quality_score_swimming_pool\": 0.88,\n      \"avg_quality_score_walk_in_closet\": 0.8\n    },\n    \"street_address_alias\": [\n      \"111 West Wacker\",\n      \"111 West Wacker Drive\"\n    ],\n    \"msa\": \"Chicago-Naperville-Elgin, IL-IN-WI\",\n    \"market_embedding\": [\n      1.1\n    ],\n    \"building_name_alias\": [\n      \"string\"\n    ],\n    \"building_phone_number\": \"7087250291\",\n    \"building_website\": \"https://www.oneelevenchicago.com/\",\n    \"is_single_family\": false,\n    \"is_condo\": false,\n    \"is_apartment\": true,\n    \"year_built_prediction\": \"2020+\",\n    \"number_stories_prediction\": \"11+\",\n    \"management_company\": \"The Bozzuto Group\",\n    \"pricing_strategy\": {\n      \"is_using_rev_management\": true,\n      \"avg_duration\": 30,\n      \"avg_price_change\": 100,\n      \"avg_time_on_market\": 30,\n      \"day_of_week_distribution\": [\n        1.1\n      ],\n      \"count_prices\": 1.1\n    },\n    \"cats_monthly_rent\": 50,\n    \"cats_one_time_fee\": 50,\n    \"cats_deposit\": 50,\n    \"dogs_monthly_rent\": 50,\n    \"dogs_one_time_fee\": 50,\n    \"dogs_deposit\": 50,\n    \"admin_fee\": 600,\n    \"application_fee\": 65,\n    \"storage_fee\": 50,\n    \"parking_covered\": 300,\n    \"parking_garage\": 319,\n    \"parking_surface_lot\": 100,\n    \"min_deposit\": 2248,\n    \"max_deposit\": 2248,\n    \"building_amenities\": [\n      \"24_hour_maintenance\"\n    ],\n    \"unit_amenities\": [\n      \"air_conditioning\"\n    ]\n  }\n}", ParameterType.RequestBody);
+IRestResponse response = client.Execute(request);
+```
+
+```swift
+import Foundation
+
+let headers = [
+  "x-api-key": "<apiKey>",
+  "Content-Type": "application/json"
+]
+let parameters = ["subject": [
+    "id": "52907745-7672-470e-a803-a2f8feb52944",
+    "building_name": "OneEleven",
+    "street_address": "111 West Wacker Drive",
+    "city": "Chicago",
+    "state": "IL",
+    "zip_code": "60601",
+    "year_built": 2014,
+    "number_units": 505,
+    "number_stories": 60,
+    "lat": 41.88651,
+    "lon": -87.63141,
+    "created_on": "2024-02-13",
+    "building_availability": [
+      [
+        "id": "123e4567-e89b-12d3-a456-426614174000",
+        "is_floorplan": true,
+        "bed": 2,
+        "bath": 2,
+        "partial_bath": 1,
+        "sqft": 850,
+        "floorplan_name": "2B2B",
+        "unit_name": "203",
+        "enter_market": "2023-12-01",
+        "exit_market": "2024-01-15",
+        "tags": ["ada_unit"],
+        "history": [
+          [
+            "from_date": "2024-01-01",
+            "to_date": "2024-03-31",
+            "price": 1500,
+            "effective_price": 1450,
+            "period_id": 0,
+            "min_price": 1200,
+            "max_price": 1800,
+            "min_effective_price": 1150,
+            "max_effective_price": 1750
+          ]
+        ],
+        "availability_periods": [
+          [
+            "period_id": 0,
+            "enter_market": "2023-12-01",
+            "exit_market": "2024-01-15",
+            "days_on_market": 45,
+            "availability": "2024-01-01"
+          ]
+        ],
+        "floor": 5,
+        "availability": "2024-01-01",
+        "min_price": 1200,
+        "price": 1500,
+        "max_price": 1800,
+        "min_effective_price": 1150,
+        "effective_price": 1450,
+        "max_effective_price": 1750,
+        "days_on_market": 45,
+        "min_sqft": 800,
+        "max_sqft": 900,
+        "created_on": "2023-11-01",
+        "price_plans": [
+          [
+            "duration_in_months": 12,
+            "specials": "Special incentives available at OneEleven! Enjoy up to a half month free on select apartments."
+          ]
+        ],
+        "amenities": ["string"]
+      ]
+    ],
+    "building_quality": [
+      "property_overall_quality": 0.85,
+      "avg_quality_score_bedroom": 0.82,
+      "avg_quality_score_kitchen": 0.87,
+      "avg_quality_score_bathroom": 0.81,
+      "avg_quality_score_dining_room": 0.8,
+      "avg_quality_score_common_areas": 0.83,
+      "avg_quality_score_fitness_center": 0.78,
+      "avg_quality_score_laundry_room": 0.75,
+      "avg_quality_score_living_room": 0.84,
+      "avg_quality_score_main_entrance": 0.86,
+      "avg_quality_score_stairs_hallway": 0.79,
+      "avg_quality_score_swimming_pool": 0.88,
+      "avg_quality_score_walk_in_closet": 0.8
+    ],
+    "street_address_alias": ["111 West Wacker", "111 West Wacker Drive"],
+    "msa": "Chicago-Naperville-Elgin, IL-IN-WI",
+    "market_embedding": [1.1],
+    "building_name_alias": ["string"],
+    "building_phone_number": "7087250291",
+    "building_website": "https://www.oneelevenchicago.com/",
+    "is_single_family": false,
+    "is_condo": false,
+    "is_apartment": true,
+    "year_built_prediction": "2020+",
+    "number_stories_prediction": "11+",
+    "management_company": "The Bozzuto Group",
+    "pricing_strategy": [
+      "is_using_rev_management": true,
+      "avg_duration": 30,
+      "avg_price_change": 100,
+      "avg_time_on_market": 30,
+      "day_of_week_distribution": [1.1],
+      "count_prices": 1.1
+    ],
+    "cats_monthly_rent": 50,
+    "cats_one_time_fee": 50,
+    "cats_deposit": 50,
+    "dogs_monthly_rent": 50,
+    "dogs_one_time_fee": 50,
+    "dogs_deposit": 50,
+    "admin_fee": 600,
+    "application_fee": 65,
+    "storage_fee": 50,
+    "parking_covered": 300,
+    "parking_garage": 319,
+    "parking_surface_lot": 100,
+    "min_deposit": 2248,
+    "max_deposit": 2248,
+    "building_amenities": ["24_hour_maintenance"],
+    "unit_amenities": ["air_conditioning"]
+  ]] as [String : Any]
+
+let postData = JSONSerialization.data(withJSONObject: parameters, options: [])
+
+let request = NSMutableURLRequest(url: NSURL(string: "https://api.hellodata.ai/property/comparables")! as URL,
+                                        cachePolicy: .useProtocolCachePolicy,
+                                    timeoutInterval: 10.0)
+request.httpMethod = "POST"
+request.allHTTPHeaderFields = headers
+request.httpBody = postData as Data
+
+let session = URLSession.shared
+let dataTask = session.dataTask(with: request as URLRequest, completionHandler: { (data, response, error) -> Void in
+  if (error != nil) {
+    print(error as Any)
+  } else {
+    let httpResponse = response as? HTTPURLResponse
+    print(httpResponse)
+  }
+})
+
+dataTask.resume()
+```

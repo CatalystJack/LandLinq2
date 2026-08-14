@@ -1,0 +1,404 @@
+# Search
+
+GET https://api.hellodata.ai/property/search
+
+Search for a property by name, address, or other identifying text.
+
+This endpoint matches properties based on a query string. A well-formatted input—such as a full address—is more likely to return accurate results.
+We also include known aliases and alternate addresses when available.
+
+**Important**: This search endpoint only returns properties from HelloData's indexed database. Private properties created via POST /property (custom-created properties) are not indexed and will not appear in search results. The intended workflow is to use this search endpoint to find HelloData property IDs initially, then store those IDs for future direct access. If you create a property via POST /property, store the returned ID and use it directly—do not expect to find it via search.
+
+**Recommendation**: Use filters whenever possible to improve performance and result quality.
+
+Filtering options:
+- Use `lat` and `lon` together to sort results by proximity.
+- Use `max_distance` (in miles) with `lat` and `lon` to limit results to a given radius.
+- Use `state` (e.g. 'CA') or `zip_code` (5-digit or ZIP+4 formats) to restrict results by region.
+
+Reference: https://docs.hellodata.ai/api-reference/api-reference/property/search
+
+## OpenAPI Specification
+
+```yaml
+openapi: 3.1.0
+info:
+  title: backend
+  version: 1.0.0
+paths:
+  /property/search:
+    get:
+      operationId: search
+      summary: Search
+      description: >-
+        Search for a property by name, address, or other identifying text.
+
+
+        This endpoint matches properties based on a query string. A
+        well-formatted input—such as a full address—is more likely to return
+        accurate results.
+
+        We also include known aliases and alternate addresses when available.
+
+
+        **Important**: This search endpoint only returns properties from
+        HelloData's indexed database. Private properties created via POST
+        /property (custom-created properties) are not indexed and will not
+        appear in search results. The intended workflow is to use this search
+        endpoint to find HelloData property IDs initially, then store those IDs
+        for future direct access. If you create a property via POST /property,
+        store the returned ID and use it directly—do not expect to find it via
+        search.
+
+
+        **Recommendation**: Use filters whenever possible to improve performance
+        and result quality.
+
+
+        Filtering options:
+
+        - Use `lat` and `lon` together to sort results by proximity.
+
+        - Use `max_distance` (in miles) with `lat` and `lon` to limit results to
+        a given radius.
+
+        - Use `state` (e.g. 'CA') or `zip_code` (5-digit or ZIP+4 formats) to
+        restrict results by region.
+      tags:
+        - subpackage_property
+      parameters:
+        - name: q
+          in: query
+          description: >-
+            The search query string. Can include a property name, address, id,
+            or partial text.
+          required: true
+          schema:
+            type: string
+        - name: lat
+          in: query
+          description: Latitude for proximity-based sorting. Must be used with `lon`.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: lon
+          in: query
+          description: Longitude for proximity-based sorting. Must be used with `lat`.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: state
+          in: query
+          description: Optional. State abbreviation to filter results (e.g. 'NY').
+          required: false
+          schema:
+            type: string
+        - name: zip_code
+          in: query
+          description: >-
+            Optional. Zip code to filter results. Accepts 5-digit or ZIP+4
+            formats; missing leading zeros are automatically handled.
+          required: false
+          schema:
+            type: string
+        - name: max_distance
+          in: query
+          description: >-
+            Optional. Maximum distance in miles for nearby results. Requires
+            both `lat` and `lon`.
+          required: false
+          schema:
+            type: number
+            format: double
+        - name: x-api-key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A simplified list of matched properties.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PropertySearchResponse'
+        '400':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchRequestBadRequestError'
+servers:
+  - url: https://api.hellodata.ai
+components:
+  schemas:
+    UUID:
+      type: string
+      format: uuid
+      description: |-
+        Stringified UUIDv4.
+        See [RFC 4112](https://tools.ietf.org/html/rfc4122)
+      title: UUID
+    DateStr:
+      type: string
+      description: Date string in the format 'YYYY-MM-DD'
+      title: DateStr
+    PropertySearchResponse:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+          description: >-
+            The primary unique identifier of the property. It is a stringified
+            UUIDv5.
+
+            This value can occasionally change if multiple properties get merged
+            into one.
+        id_alias:
+          type: array
+          items:
+            $ref: '#/components/schemas/UUID'
+          description: >-
+            A list of alternate unique identifiers (alias IDs) for the property.
+
+            These IDs are typically derived from historical addresses and remain
+
+            valid even if the primary address changes over time. While old IDs
+
+            are automatically redirected to the current primary ID, exposing
+            alias
+
+            IDs helps with deduplication and data consistency.
+        lat:
+          type: number
+          format: double
+          description: The property's latitude
+        lon:
+          type: number
+          format: double
+          description: The property's longitude
+        building_name:
+          type:
+            - string
+            - 'null'
+          description: The property's name.
+        building_name_alias:
+          type: array
+          items:
+            type: string
+          description: |-
+            Other known names for the property. When searching for a property
+            by name, these aliases will also be matched.
+        street_address:
+          type: string
+          description: The property's street address part of the full address.
+        street_address_alias:
+          type: array
+          items:
+            type: string
+          description: >-
+            Other known street addresses for the property. When searching for a
+            property
+
+            by address, these aliases will also be matched.
+        city:
+          type: string
+          description: The property's city.
+        state:
+          type: string
+          description: The property's state. Formatted as a 2-char string.
+        zip_code:
+          type: string
+          description: >-
+            The property's zip code. Formatted as a 5-char string with leading
+            0.
+        number_units:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The property's advertised number_units
+        year_built:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: >-
+            The property's year_built. This can be in the future if the property
+            is under construction.
+        number_stories:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The property's number of stories.
+        created_on:
+          $ref: '#/components/schemas/DateStr'
+          description: The date when this record was last updated.
+      required:
+        - id
+        - building_name
+        - building_name_alias
+        - street_address
+        - street_address_alias
+        - city
+        - state
+        - zip_code
+      description: >-
+        The PropertySearchResponse object is returned by the search endpoints.
+
+        It is a very simple property object that can then be used to query the
+        /properties/:id endpoint
+      title: PropertySearchResponse
+    SearchRequestBadRequestError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+      title: SearchRequestBadRequestError
+  securitySchemes:
+    api:
+      type: apiKey
+      in: header
+      name: x-api-key
+    auth0:
+      type: http
+      scheme: bearer
+
+```
+
+## SDK Code Examples
+
+```python
+import requests
+
+url = "https://api.hellodata.ai/property/search"
+
+querystring = {"q":"q"}
+
+headers = {"x-api-key": "<apiKey>"}
+
+response = requests.get(url, headers=headers, params=querystring)
+
+print(response.json())
+```
+
+```javascript
+const url = 'https://api.hellodata.ai/property/search?q=q';
+const options = {method: 'GET', headers: {'x-api-key': '<apiKey>'}};
+
+try {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  console.log(data);
+} catch (error) {
+  console.error(error);
+}
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"io"
+)
+
+func main() {
+
+	url := "https://api.hellodata.ai/property/search?q=q"
+
+	req, _ := http.NewRequest("GET", url, nil)
+
+	req.Header.Add("x-api-key", "<apiKey>")
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+
+	fmt.Println(res)
+	fmt.Println(string(body))
+
+}
+```
+
+```ruby
+require 'uri'
+require 'net/http'
+
+url = URI("https://api.hellodata.ai/property/search?q=q")
+
+http = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+
+request = Net::HTTP::Get.new(url)
+request["x-api-key"] = '<apiKey>'
+
+response = http.request(request)
+puts response.read_body
+```
+
+```java
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+
+HttpResponse<String> response = Unirest.get("https://api.hellodata.ai/property/search?q=q")
+  .header("x-api-key", "<apiKey>")
+  .asString();
+```
+
+```php
+<?php
+require_once('vendor/autoload.php');
+
+$client = new \GuzzleHttp\Client();
+
+$response = $client->request('GET', 'https://api.hellodata.ai/property/search?q=q', [
+  'headers' => [
+    'x-api-key' => '<apiKey>',
+  ],
+]);
+
+echo $response->getBody();
+```
+
+```csharp
+using RestSharp;
+
+var client = new RestClient("https://api.hellodata.ai/property/search?q=q");
+var request = new RestRequest(Method.GET);
+request.AddHeader("x-api-key", "<apiKey>");
+IRestResponse response = client.Execute(request);
+```
+
+```swift
+import Foundation
+
+let headers = ["x-api-key": "<apiKey>"]
+
+let request = NSMutableURLRequest(url: NSURL(string: "https://api.hellodata.ai/property/search?q=q")! as URL,
+                                        cachePolicy: .useProtocolCachePolicy,
+                                    timeoutInterval: 10.0)
+request.httpMethod = "GET"
+request.allHTTPHeaderFields = headers
+
+let session = URLSession.shared
+let dataTask = session.dataTask(with: request as URLRequest, completionHandler: { (data, response, error) -> Void in
+  if (error != nil) {
+    print(error as Any)
+  } else {
+    let httpResponse = response as? HTTPURLResponse
+    print(httpResponse)
+  }
+})
+
+dataTask.resume()
+```

@@ -1,0 +1,160 @@
+2026-06-02 12:05:49.37
+0b6cfae4
+User
+}
+2026-06-02 12:05:49.37
+0b6cfae4
+User
+endpoint: '/api/classification-progress',
+2026-06-02 12:05:49.37
+0b6cfae4
+User
+method: 'GET',
+2026-06-02 12:05:49.37
+0b6cfae4
+User
+requestId: 'mpwtxbcqyqs94akywq',
+2026-06-02 12:05:49.37
+0b6cfae4
+User
+userId: undefined
+2026-06-02 12:05:49.37
+0b6cfae4
+User
+userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+2026-06-02 12:05:49.37
+0b6cfae4
+User
+ipAddress: '35.191.16.165',
+2026-06-02 12:05:49.41
+0b6cfae4
+User
+responseTime: 45,
+2026-06-02 12:05:49.41
+0b6cfae4
+User
+statusCode: 200,
+2026-06-02 12:05:49.41
+0b6cfae4
+User
+[06/02/2026, 12:05:49 PM] ℹ️ [INFO] Request completed {
+2026-06-02 12:05:49.41
+0b6cfae4
+User
+endpoint: '/api/classification-progress',
+2026-06-02 12:05:49.41
+0b6cfae4
+User
+requestId: 'mpwtxbcqyqs94akywq',
+2026-06-02 12:05:49.41
+0b6cfae4
+User
+userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+2026-06-02 12:05:49.41
+0b6cfae4
+User
+method: 'GET',
+2026-06-02 12:05:49.44
+0b6cfae4
+User
+4:05:49 PM [express] [12:05:49 PM] GET /api/classification-progress 304 in 69ms :: {"activeJobs":[]}
+2026-06-02 12:05:49.56
+0b6cfae4
+User
+endpoint: '/api/classification-progress',
+2026-06-02 12:05:49.56
+0b6cfae4
+User
+userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+2026-06-02 12:05:49.56
+0b6cfae4
+User
+requestId: 'mpwtxbi327vwhvvcv6s',
+2026-06-02 12:05:49.56
+0b6cfae4
+User
+[06/02/2026, 12:05:49 PM] ℹ️ [INFO] Request started {
+2026-06-02 12:05:53.92
+0b6cfae4
+User
+📍 [QUICK-DEAL-ENRICHMENT] Location: Atlanta, GA 30324
+2026-06-02 12:05:53.92
+0b6cfae4
+User
+📍 [QUICK-DEAL-ENRICHMENT] Deal #318: 1989 Cheshire Bridge Road
+2026-06-02 12:05:53.92
+0b6cfae4
+User
+🔍 [GEOCODE] Full address: "1989 Cheshire Bridge Road, Atlanta, GA"
+2026-06-02 12:05:53.92
+0b6cfae4
+User
+🌍 [OPENCAGE] Geocoding: 1989 Cheshire Bridge Road, Atlanta, GA
+2026-06-02 12:05:53.94
+0b6cfae4
+User
+ipAddress: '35.191.16.163',
+2026-06-02 12:05:53.94
+0b6cfae4
+User
+method: 'GET',
+2026-06-02 12:05:53.94
+0b6cfae4
+User
+userId: undefined
+2026-06-02 12:05:53.94
+0b6cfae4
+User
+}
+2026-06-02 12:05:53.94
+0b6cfae4
+User
+requestId: 'mpwtxevwead2exbzxea',
+2026-06-02 12:05:53.94
+0b6cfae4
+User
+userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+2026-06-02 12:05:53.94
+0b6cfae4
+User
+[06/02/2026, 12:05:53 PM] ℹ️ [INFO] Request started {
+2026-06-02 12:05:53.94
+0b6cfae4
+User
+endpoint: '/api/classification-progress',
+2026-06-02 12:05:53.99
+0b6cfae4
+User
+requestId: 'mpwtxevwead2exbzxea',
+2026-06-02 12:05:53.99
+0b6cfae4
+User
+statusCode: 200,
+2026-06-02 12:05:53.99
+0b6cfae4
+User
+ipAddress: '35.191.16.163',
+2026-06-02 12:05:53.99
+0b6cfae4
+User
+userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+2026-06-02 12:05:53.99
+0b6cfae4
+User
+method: 'GET',
+2026-06-02 12:05:53.99
+0b6cfae4
+User
+endpoint: '/api/classification-progress',
+2026-06-02 12:05:53.99
+0b6cfae4
+User
+[06/02/2026, 12:05:53 PM] ℹ️ [INFO] Request completed {
+2026-06-02 12:05:53.99
+0b6cfae4
+User
+responseTime: 42,
+2026-06-02 12:05:59.08
+0b6cfae4
+User
+requestId: 'mpwtxiungk4d65p1hkk',

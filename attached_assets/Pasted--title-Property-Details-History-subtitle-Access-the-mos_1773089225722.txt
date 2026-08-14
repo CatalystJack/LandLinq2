@@ -1,0 +1,145 @@
+***
+
+title: Property Details & History
+subtitle: 'Access the most comprehensive property data, and our AI-powered insights'
+------------------------------------------------------------------------------------
+
+Get everything we know about a property by its `id`. We keep things simple, so you can focus on building your application.
+Once you have the `id` of the property you are interested in, you can use the `property/{id}` endpoint to get all the details you need.
+
+<Info>
+  The only required parameter for this endpoint is the `id` of the property.
+  You can find it by searching for the property using the [search endpoint](/docs/property-search).
+</Info>
+
+The returned payload includes, among other things:
+
+* **Property Location**: Address, City, State, Zip Code, Latitude, Longitude, MSA.
+* **Property Details**: Number of units, year built, management company, etc.
+* **Property Amenities**: This is a list of all the amenities that are present in the property. We use a Natural Language Processing algorithm to extract this information from the text present on property's websites.
+* **Unit Amenities**: This is a list of all the amenities that are present in the unit. We use a Natural Language Processing algorithm to extract this information from the text present on property's websites.
+* **Concession History**: This is a list of all the specials that is being or have been offered by the property. It includes the text, the date range, the conditions, and the discounts. We use a Natural Language Processing algorithm to extract this information from the text present on property's websites.
+* **Pricing Strategy**: This is an analysis of the pricing strategy of the property. It includes the average duration of a lease, the average price change, the average time on the market, the day of the week distribution, and the count of prices.
+* **Building Quality**: This is a score that we have calculated based on the pictures and the description of the property. It is a score between 0 and 1. Broken down by room.
+* **Unit Availabilities**: This is a list of all the availabilities that we have see in the property. It includes the floorplan, the unit name, the floor, the availability, the price, the square footage, the days on the market, and the history of the availability.
+* **Reviews**: A summary of reviews we've collected from various sources, analysed and aggregated for you by our NLP algorithms.
+
+If you can find it on our platform, you can get it through the API.
+
+<CodeBlocks>
+  <CodeBlock title="Curl">
+    ```bash
+    curl --location 'https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4' \
+    --header 'x-api-key: token'
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="Python">
+    ```python
+    import requests
+
+    url = "https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4"
+
+    headers = {
+        'x-api': "token"
+    }
+
+    response = requests.request("GET", url, headers=headers)
+
+    print(response.json())
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="JS">
+    ```javascript
+    const axios = require('axios');
+
+    const config = {
+        method: 'get',
+        url: 'https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4',
+        headers: { 
+            'x-api-key': 'token'
+        },
+    };
+
+    axios(config)
+        .then(function (response) {
+            console.log(JSON.stringify(response.data));
+        })
+        .catch(function (error) {
+            console.log(error);
+        });
+    ```
+  </CodeBlock>
+</CodeBlocks>
+
+<Tip>
+  By default, you'll get the full history of the property, including all the changes in prices, availabilities, and specials since the first day we saw it on the market. However, you can use optional `from` and `to` date parameters to filter the data and speed up API calls by requesting only current or recent data.
+  Check our API reference for more details on the reponse payload: [property/\{id}](/api-reference/api-reference/property/get-property#response).
+</Tip>
+
+### Raw Data VS Processed Data
+
+We've seen many users apply our data in diverse ways, each with their own unique objectives.
+That's why we provide raw data, giving you the freedom to process and aggregate it as you see fit.
+Instead of pre-calculating metrics like average prices for properties or unit types, we let you decide how to best utilize the data for your specific needs.
+
+You can explore our [platform](https://app.hellodata.ai) to see how we handle data for our use cases, but we encourage you to leverage the raw data to build your own models and strategies that align with your goals.
+
+### Filtering by Date Range
+
+You can optionally filter units, history, availability periods, and concessions by providing `from` and/or `to` date parameters. This is particularly useful when you only need current or recent data, which can significantly speed up API calls and reduce response payload size.
+
+**What Gets Filtered:**
+
+* **Units**: Filtered based on `enter_market` and `exit_market` dates
+* **History**: Filtered based on `from_date` and `to_date` of each history entry
+* **Availability Periods**: Filtered based on `enter_market` and `exit_market` dates
+* **Concessions**: Filtered based on `from_date` and `to_date` of each concession
+
+**Usage:**
+You can provide either date, both dates, or neither. When dates are provided, only data that overlaps with the specified date range will be included in the response.
+
+<CodeBlocks>
+  <CodeBlock title="Get Only Current Data (Last 30 Days)">
+    ```bash
+    # Get data from the last 30 days (adjust date as needed)
+    curl --location 'https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4?from=2024-12-01' \
+    --header 'x-api-key: token'
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="Get Data for Specific Date Range">
+    ```bash
+    # Get data for a specific time period
+    curl --location 'https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4?from=2024-01-01&to=2024-12-31' \
+    --header 'x-api-key: token'
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="Get All Historical Data (Default)">
+    ```bash
+    # No date parameters - returns all available history
+    curl --location 'https://api.hellodata.ai/property/0e628031-57b8-5394-821d-13779318fef4' \
+    --header 'x-api-key: token'
+    ```
+  </CodeBlock>
+</CodeBlocks>
+
+<Info>
+  Date parameters use ISO 8601 format (e.g., "2024-01-01"). Use date filtering to speed up API calls when you only need current or recent data, rather than the full historical dataset.
+</Info>
+
+### Caching
+
+To reduce API costs, cache results from the Get Property endpoint for a few hours or days.
+Data generally doesn't change throughout the day.
+
+### Data Freshness
+
+We aggregate property data for any given day the following day.
+If you call this endpoint daily, we recommend you to call after 9 AM Eastern Time to ensure you get the previous day's data.
+
+### Full Documentation
+
+Find more details about this endpoint our [API Reference](/api-reference/api-reference/property/get-property).

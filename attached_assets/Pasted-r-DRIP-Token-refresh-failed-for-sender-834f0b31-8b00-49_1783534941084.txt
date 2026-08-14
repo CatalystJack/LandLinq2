@@ -1,0 +1,152 @@
+r
+❌ [DRIP] Token refresh failed for sender 834f0b31-8b00-491d-a7bd-5027810ad12d: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: d3f05bb9-f81e-43c3-ba23-e29ccc5a9500 Correlation ID: 67812ae8-087e-4ff8-ba1e-1a7027d97000 Timestamp: 2026-07-08 18:21:47Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:47Z","trace_id":"d3f05bb9-f81e-43c3-ba23-e29ccc5a9500","correlation_id":"67812ae8-087e-4ff8-ba1e-1a7027d97000","suberror":"consent_required"}
+
+2026-07-08 14:21:47.72
+87f17b1e
+User
+❌ [DRIP] [Jack Berg] Microsoft send failed for andrea.williams@exprealty.com: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: d3f05bb9-f81e-43c3-ba23-e29ccc5a9500 Correlation ID: 67812ae8-087e-4ff8-ba1e-1a7027d97000 Timestamp: 2026-07-08 18:21:47Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:47Z","trace_id":"d3f05bb9-f81e-43c3-ba23-e29ccc5a9500","correlation_id":"67812ae8-087e-4ff8-ba1e-1a7027d97000","suberror":"consent_required"}
+
+2026-07-08 14:21:47.79
+87f17b1e
+User
+📎 [STORAGE] Extracted path from URL: .private/campaign-attachments/1777561769156-Catalyst_Corporate_Profile_2026.pdf.pdf
+
+2026-07-08 14:21:49.23
+87f17b1e
+User
+at Timeout._onTimeout (node:internal/abort_controller:129:9)
+
+2026-07-08 14:21:49.23
+87f17b1e
+User
+at process.processTimers (node:internal/timers:519:7)
+
+2026-07-08 14:21:49.23
+87f17b1e
+User
+at new DOMException (node:internal/per_context/domexception:53:5)
+
+2026-07-08 14:21:49.23
+87f17b1e
+User
+at listOnTimeout (node:internal/timers:581:17)
+
+2026-07-08 14:21:49.23
+87f17b1e
+User
+EPA TRI API error: DOMException [TimeoutError]: The operation was aborted due to timeout
+
+2026-07-08 14:21:49.76
+87f17b1e
+User
+❌ [DRIP] Token refresh failed for sender 834f0b31-8b00-491d-a7bd-5027810ad12d: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: de5579ad-67f6-4b68-8495-fe4785783101 Correlation ID: d4b10651-b17f-4eb6-8631-aa18629e078e Timestamp: 2026-07-08 18:21:49Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:49Z","trace_id":"de5579ad-67f6-4b68-8495-fe4785783101","correlation_id":"d4b10651-b17f-4eb6-8631-aa18629e078e","suberror":"consent_required"}
+
+2026-07-08 14:21:49.76
+87f17b1e
+User
+❌ [DRIP] [Jack Berg] Microsoft send failed for irenesawyer@kw.com: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: de5579ad-67f6-4b68-8495-fe4785783101 Correlation ID: d4b10651-b17f-4eb6-8631-aa18629e078e Timestamp: 2026-07-08 18:21:49Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:49Z","trace_id":"de5579ad-67f6-4b68-8495-fe4785783101","correlation_id":"d4b10651-b17f-4eb6-8631-aa18629e078e","suberror":"consent_required"}
+
+2026-07-08 14:21:50.04
+87f17b1e
+User
+📎 [STORAGE] Extracted path from URL: .private/campaign-attachments/1777561769156-Catalyst_Corporate_Profile_2026.pdf.pdf
+
+2026-07-08 14:21:51.99
+87f17b1e
+User
+❌ [DRIP] Token refresh failed for sender 834f0b31-8b00-491d-a7bd-5027810ad12d: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: 2d6ade22-07c9-4fed-a716-3152594b5b01 Correlation ID: 2dce8b59-c18c-4865-9dd2-578e7bbbf4c7 Timestamp: 2026-07-08 18:21:51Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:51Z","trace_id":"2d6ade22-07c9-4fed-a716-3152594b5b01","correlation_id":"2dce8b59-c18c-4865-9dd2-578e7bbbf4c7","suberror":"consent_required"}
+
+2026-07-08 14:21:51.99
+87f17b1e
+User
+❌ [DRIP] [Jack Berg] Microsoft send failed for wrunge@collettre.com: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: 2d6ade22-07c9-4fed-a716-3152594b5b01 Correlation ID: 2dce8b59-c18c-4865-9dd2-578e7bbbf4c7 Timestamp: 2026-07-08 18:21:51Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:51Z","trace_id":"2d6ade22-07c9-4fed-a716-3152594b5b01","correlation_id":"2dce8b59-c18c-4865-9dd2-578e7bbbf4c7","suberror":"consent_required"}
+
+2026-07-08 14:21:52.47
+87f17b1e
+User
+❌ [DRIP] Token refresh failed for sender 834f0b31-8b00-491d-a7bd-5027810ad12d: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: 13267171-8566-4cc4-9738-9ffb1a96e400 Correlation ID: 3b487ff5-610c-4e33-85da-dac7856f3641 Timestamp: 2026-07-08 18:21:52Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:52Z","trace_id":"13267171-8566-4cc4-9738-9ffb1a96e400","correlation_id":"3b487ff5-610c-4e33-85da-dac7856f3641","suberror":"consent_required"}
+
+2026-07-08 14:21:52.47
+87f17b1e
+User
+❌ [DRIP] [Jack Berg] Microsoft send failed for 7045039608: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: 13267171-8566-4cc4-9738-9ffb1a96e400 Correlation ID: 3b487ff5-610c-4e33-85da-dac7856f3641 Timestamp: 2026-07-08 18:21:52Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:52Z","trace_id":"13267171-8566-4cc4-9738-9ffb1a96e400","correlation_id":"3b487ff5-610c-4e33-85da-dac7856f3641","suberror":"consent_required"}
+
+2026-07-08 14:21:52.68
+87f17b1e
+User
+❌ [DRIP] [Jack Berg] Microsoft send failed for 7045215240: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: d790cd2e-11a8-4700-b960-daf85e5ee500 Correlation ID: edb6e0fc-8cd7-40fe-96d4-556c6b9763d7 Timestamp: 2026-07-08 18:21:52Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:52Z","trace_id":"d790cd2e-11a8-4700-b960-daf85e5ee500","correlation_id":"edb6e0fc-8cd7-40fe-96d4-556c6b9763d7","suberror":"consent_required"}
+
+2026-07-08 14:21:52.68
+87f17b1e
+User
+❌ [DRIP] Token refresh failed for sender 834f0b31-8b00-491d-a7bd-5027810ad12d: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: d790cd2e-11a8-4700-b960-daf85e5ee500 Correlation ID: edb6e0fc-8cd7-40fe-96d4-556c6b9763d7 Timestamp: 2026-07-08 18:21:52Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:52Z","trace_id":"d790cd2e-11a8-4700-b960-daf85e5ee500","correlation_id":"edb6e0fc-8cd7-40fe-96d4-556c6b9763d7","suberror":"consent_required"}
+
+2026-07-08 14:21:52.75
+87f17b1e
+User
+📎 [STORAGE] Extracted path from URL: .private/campaign-attachments/1777561769156-Catalyst_Corporate_Profile_2026.pdf.pdf
+
+2026-07-08 14:21:53.97
+87f17b1e
+User
+❌ [DRIP] Token refresh failed for sender 834f0b31-8b00-491d-a7bd-5027810ad12d: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: 2971b672-2122-4248-93f8-a815fe9d6000 Correlation ID: 1efee68a-7e8b-4051-83ca-fc2dc4c3f850 Timestamp: 2026-07-08 18:21:53Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:53Z","trace_id":"2971b672-2122-4248-93f8-a815fe9d6000","correlation_id":"1efee68a-7e8b-4051-83ca-fc2dc4c3f850","suberror":"consent_required"}
+
+2026-07-08 14:21:53.97
+87f17b1e
+User
+❌ [DRIP] [Jack Berg] Microsoft send failed for kinley@mtnmodernnc.com: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: 2971b672-2122-4248-93f8-a815fe9d6000 Correlation ID: 1efee68a-7e8b-4051-83ca-fc2dc4c3f850 Timestamp: 2026-07-08 18:21:53Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:53Z","trace_id":"2971b672-2122-4248-93f8-a815fe9d6000","correlation_id":"1efee68a-7e8b-4051-83ca-fc2dc4c3f850","suberror":"consent_required"}
+
+2026-07-08 14:21:53.99
+87f17b1e
+User
+📎 [STORAGE] Extracted path from URL: .private/campaign-attachments/1777561769156-Catalyst_Corporate_Profile_2026.pdf.pdf
+
+2026-07-08 14:21:54.72
+87f17b1e
+User
+💓 [JOB-PROCESSOR] Heartbeat - Processor running at 2026-07-08T18:21:54.726Z
+
+2026-07-08 14:21:55.51
+87f17b1e
+User
+❌ [DRIP] Token refresh failed for sender 834f0b31-8b00-491d-a7bd-5027810ad12d: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: d3f05bb9-f81e-43c3-ba23-e29c3f5d9500 Correlation ID: 4bfa0338-d4ca-46e5-8d75-ce7434fab51a Timestamp: 2026-07-08 18:21:55Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:55Z","trace_id":"d3f05bb9-f81e-43c3-ba23-e29c3f5d9500","correlation_id":"4bfa0338-d4ca-46e5-8d75-ce7434fab51a","suberror":"consent_required"}
+
+2026-07-08 14:21:55.51
+87f17b1e
+User
+❌ [DRIP] [Jack Berg] Microsoft send failed for pwilliams@c-sprop.com: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: d3f05bb9-f81e-43c3-ba23-e29c3f5d9500 Correlation ID: 4bfa0338-d4ca-46e5-8d75-ce7434fab51a Timestamp: 2026-07-08 18:21:55Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:55Z","trace_id":"d3f05bb9-f81e-43c3-ba23-e29c3f5d9500","correlation_id":"4bfa0338-d4ca-46e5-8d75-ce7434fab51a","suberror":"consent_required"}
+
+2026-07-08 14:21:55.86
+87f17b1e
+User
+❌ [DRIP] Token refresh failed for sender 834f0b31-8b00-491d-a7bd-5027810ad12d: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: 2971b672-2122-4248-93f8-a815ac9e6000 Correlation ID: 6c78a2f2-3a5a-4a6d-9e57-411289d2e7af Timestamp: 2026-07-08 18:21:55Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:55Z","trace_id":"2971b672-2122-4248-93f8-a815ac9e6000","correlation_id":"6c78a2f2-3a5a-4a6d-9e57-411289d2e7af","suberror":"consent_required"}
+
+2026-07-08 14:21:55.86
+87f17b1e
+User
+❌ [DRIP] [Jack Berg] Microsoft send failed for 9802982823: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: 2971b672-2122-4248-93f8-a815ac9e6000 Correlation ID: 6c78a2f2-3a5a-4a6d-9e57-411289d2e7af Timestamp: 2026-07-08 18:21:55Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:55Z","trace_id":"2971b672-2122-4248-93f8-a815ac9e6000","correlation_id":"6c78a2f2-3a5a-4a6d-9e57-411289d2e7af","suberror":"consent_required"}
+
+2026-07-08 14:21:56.10
+87f17b1e
+User
+❌ [DRIP] Token refresh failed for sender 834f0b31-8b00-491d-a7bd-5027810ad12d: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: a1335462-a0fe-4134-9d34-88fddb0b5e00 Correlation ID: 2d365546-643c-4448-bb70-0f23532e59fd Timestamp: 2026-07-08 18:21:56Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:56Z","trace_id":"a1335462-a0fe-4134-9d34-88fddb0b5e00","correlation_id":"2d365546-643c-4448-bb70-0f23532e59fd","suberror":"consent_required"}
+
+2026-07-08 14:21:56.10
+87f17b1e
+User
+❌ [DRIP] [Jack Berg] Microsoft send failed for jdkern@kw.com: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: a1335462-a0fe-4134-9d34-88fddb0b5e00 Correlation ID: 2d365546-643c-4448-bb70-0f23532e59fd Timestamp: 2026-07-08 18:21:56Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:56Z","trace_id":"a1335462-a0fe-4134-9d34-88fddb0b5e00","correlation_id":"2d365546-643c-4448-bb70-0f23532e59fd","suberror":"consent_required"}
+
+2026-07-08 14:21:56.29
+87f17b1e
+User
+❌ [DRIP] Token refresh failed for sender 834f0b31-8b00-491d-a7bd-5027810ad12d: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: d3f05bb9-f81e-43c3-ba23-e29c8e5d9500 Correlation ID: d8477085-707a-4791-aa65-4c6190fa1fb4 Timestamp: 2026-07-08 18:21:56Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:56Z","trace_id":"d3f05bb9-f81e-43c3-ba23-e29c8e5d9500","correlation_id":"d8477085-707a-4791-aa65-4c6190fa1fb4","suberror":"consent_required"}
+
+2026-07-08 14:21:56.29
+87f17b1e
+User
+❌ [DRIP] [Jack Berg] Microsoft send failed for russadams@kw.com: Microsoft token refresh failed (400): {"error":"invalid_grant","error_description":"AADSTS65001: The user or administrator has not consented to use the application with ID 'e4eca81e-73ef-4888-b789-b7341ea6b817' named 'LandLinq Outreach'. Send an interactive authorization request for this user and resource. Trace ID: d3f05bb9-f81e-43c3-ba23-e29c8e5d9500 Correlation ID: d8477085-707a-4791-aa65-4c6190fa1fb4 Timestamp: 2026-07-08 18:21:56Z","error_codes":[65001],"timestamp":"2026-07-08 18:21:56Z","trace_id":"d3f05bb9-f81e-43c3-ba23-e29c8e5d9500","correlation_id":"d8477085-707a-4791-aa65-4c6190fa1fb4","suberror":"consent_required"}
+
+2026-07-08 14:21:56.48
+87f17b1e
+User
+❌ [DRIP] Token refresh failed for sender 834f0b31-8b00-491d

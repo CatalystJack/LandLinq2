@@ -1,0 +1,81 @@
+***
+
+title: "HelloData's API Documentation \U0001F44B"
+subtitle: Make real-time data your competitive advantage!
+---------------------------------------------------------
+
+With HelloData's API, you can access daily updates on millions of multifamily properties, including rent & availability, concessions, fees, amenities, property manager reviews and more.
+
+Our API is used by many of the largest owners, managers and PropTech companies across the U.S. to understand their markets and build data-driven products.
+
+<Frame caption="Simply look for a property using the search endpoint" background="subtle">
+  <img src="file:88b0ad5d-ba0e-43c3-8c7c-f01662627aaa" alt="Code looking for a property" />
+</Frame>
+
+## API Endpoint Flow
+
+Here's how our endpoints work together to provide comprehensive property analysis:
+
+```mermaid
+flowchart TD
+    A["/property/search<br /><small>FREE - Text search</small>"] 
+    B["/market/search<br /><small>Geographic filtering</small>"]
+    C["/property/{id}<br /><small>Complete property data</small>"]
+    D["/property/comparables<br /><small>Find similar properties</small>"]
+    E["/property/pricing<br /><small>Rent recommendations</small>"]
+    F["/property/expense_benchmarks<br /><small>Operating cost estimates</small>"]
+    
+    A["/property/search<br /><small>Search for a single property given a property name</small>"] -->|"Property IDs"| C
+    B["/market/search<br /><small>Search for many properties within a geography, with optional filters</small>"] -->|"Property IDs"| C
+    C -->|"PropertyDetailsResponse"| D
+    C -->|"PropertyDetailsResponse"| E
+    C -->|"PropertyDetailsResponse"| F
+    
+    style A fill:#e1f5fe
+    style B fill:#fff3e0
+    style C fill:#fff3e0
+    style D fill:#e8f5e8
+    style E fill:#e8f5e8
+    style F fill:#e8f5e8
+```
+
+## Use Cases
+
+We are customers of our own API, so we use it to power all our analyses and services.
+Don't hesitate to visit our [platform](https://app.hellodata.ai?utm_source=hellodata\&utm_medium=api-docs) to see how we use our data to provide market insights, comparables, pricing recommendations, and more.
+But you can also build much more by using our API along with your own data and services. Here are some ideas:
+
+* **PowerBI Dashboards**: Pull in daily updates on every institutional multifamily property in the country, including unit-level historical rent and concessions data.
+* **Deal Sourcing**: Identify value-add investment opportunities at scale, or use our data in aggregate to identify properties with specific attributes (e.g. swimming pools, golf simulators, etc.) for business development.
+* **Excel Models**: Bring detailed market data directly into your Excel models to analyze deals faster.
+* **Track Your Competition**: Understand your competitor's pricing strategy, check how often they change their prices, on which days, and by how much. Detect if they use dynamic pricing or revenue management.
+* **Market Analysis**: Track new units hitting the market, analyze trends in rent and leasing velocity, and understand the distributions of pricing and concessions in granular detail.
+* **Chatbots**: Power your chatbot with real-time data to answer questions about properties and pricing.
+
+And all of that is doable with only a handful of endpoints and a simple API. Let's get started!
+
+## Authentication / API Key
+
+<Note>
+  All you need is an API key, contact us to get started.
+</Note>
+
+## Frequently Visited Resources
+
+<Cards>
+  <Card title="API Reference" icon="fa-solid fa-code" href="/api-reference" />
+
+  <Card title="Try an example" icon="fa-regular fa-search" href="/docs/property-search" />
+
+  <Card title="Our Data" icon="fa-solid fa-info" href="https://www.hellodata.ai/our-data" />
+</Cards>
+
+<Cards>
+  <Card title="Website" icon="fa-solid fa-globe" href="https://www.hellodata.ai" />
+
+  <Card title="Schedule a Demo" icon="fa-solid fa-calendar" href="https://www.hellodata.ai/multifamily-market-analysis-demo" />
+</Cards>
+
+## Need Help?
+
+If you need help, don't hesitate to contact us using our chat or by email at [support@hellodata.ai](mailto:support@hellodata.ai).

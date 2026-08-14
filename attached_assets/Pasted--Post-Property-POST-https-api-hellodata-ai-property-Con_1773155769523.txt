@@ -1,0 +1,679 @@
+# Post Property
+
+POST https://api.hellodata.ai/property
+Content-Type: application/json
+
+Insert a new property in the database. For example a new development.
+
+Reference: https://docs.hellodata.ai/api-reference/api-reference/property/post-property
+
+## OpenAPI Specification
+
+```yaml
+openapi: 3.1.0
+info:
+  title: backend
+  version: 1.0.0
+paths:
+  /property:
+    post:
+      operationId: post-property
+      summary: Post Property
+      description: Insert a new property in the database. For example a new development.
+      tags:
+        - subpackage_property
+      parameters:
+        - name: x-api-key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The property details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property_PostProperty_Response_200'
+        '403':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostPropertyRequestForbiddenError'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                property:
+                  $ref: '#/components/schemas/PropertyReportPropertyInsert'
+              required:
+                - property
+servers:
+  - url: https://api.hellodata.ai
+components:
+  schemas:
+    BuildingAmenity:
+      type: string
+      enum:
+        - 24_hour_maintenance
+        - accepts_housing_voucher
+        - ada_compliant
+        - additional_storage_space_outside_unit
+        - art_studio
+        - attached_garage
+        - basketball_court
+        - bike_rack
+        - bilingual
+        - boat_dock
+        - bocceball_court
+        - business_center
+        - cabana
+        - carport
+        - cats_allowed
+        - club_house_party_room
+        - barbecue_grill
+        - community_chef_kitchen_space
+        - community_dog_park
+        - community_garden
+        - community_pet_washing_station
+        - community_room
+        - community_wifi
+        - computer_lab
+        - controlled_access
+        - corporate_suite
+        - courtyard
+        - daycare
+        - detached_garage
+        - disposal_chutes
+        - dogs_allowed
+        - doorman
+        - electric_car_charging_station
+        - elevator
+        - fire_pit
+        - fitness_center
+        - concierge
+        - foosball
+        - game_room
+        - gated_community_access
+        - golf_simulator
+        - green_community
+        - guest_parking
+        - guest_suite
+        - historic_building
+        - hot_tub
+        - housekeeping_available
+        - income_restricted
+        - internet_lounge
+        - landscaping
+        - laundry_service
+        - laundry_room
+        - library
+        - lobby
+        - lounge
+        - massage_room
+        - multimedia_center
+        - satisfaction_guaranteed
+        - on_site_car_wash
+        - on_site_maintenance
+        - on_site_management
+        - one_car_garage
+        - online_payment_portal
+        - organic_waste_composting
+        - package_lockers
+        - package_receiving
+        - parking_garage
+        - parking_included
+        - pet_daycare_service
+        - pets_allowed
+        - pickleball_court
+        - picnic_area
+        - playground
+        - pool_table
+        - putting_green
+        - racquetball_court
+        - recycling
+        - reserved_parking
+        - resident_events
+        - resident_referral_program
+        - resident_rewards_program
+        - rock_climbing_wall
+        - rooftop_space
+        - roommate_matching
+        - sauna
+        - secure_resident_parking
+        - secured_covered_bike_storage
+        - security_system
+        - shared_office_space
+        - short_term_lease_options
+        - shuffle_board
+        - non_smoking
+        - snow_removal
+        - soccer_field
+        - spa
+        - sport_court
+        - sunroom
+        - swimming_pool
+        - table_tennis
+        - tanning_beds
+        - tennis_court
+        - terrace
+        - two_car_garage
+        - valet_trash_service
+        - volleyball_court
+        - waterfront
+        - workshop
+        - yoga_studio
+        - zen_garden
+      description: A normalized building amenity
+      title: BuildingAmenity
+    UnitAmenity:
+      type: string
+      enum:
+        - air_conditioning
+        - all_appliances_included
+        - all_utilities_included
+        - attic
+        - backsplash
+        - basement
+        - bath_tub
+        - bay_window
+        - black_appliances
+        - breakfast_bar
+        - built_in_desk
+        - carpet
+        - ceiling_fan
+        - central_air_conditioning
+        - central_heat
+        - city_view
+        - concrete_floor
+        - courtyard_view
+        - crown_molding
+        - custom_cabinets
+        - deck
+        - den
+        - dining_room
+        - dishwasher
+        - double_sink_vanity
+        - eat_in_kitchen
+        - efficient_appliances
+        - electricity_included
+        - faux_wood_floor
+        - fireplace
+        - floor_to_ceiling_windows
+        - french_doors
+        - fully_upgraded
+        - furnished
+        - garbage_disposal
+        - granite_countertops
+        - hardwood_floor
+        - heat_included
+        - high_ceilings
+        - in_wall_usb_ports
+        - individual_locking_bedrooms
+        - internet_included
+        - kitchen_island
+        - large_bedrooms
+        - large_bathrooms
+        - large_closets
+        - large_windows
+        - linoleum_floor
+        - living_room
+        - loft
+        - marble_countertops
+        - microwave
+        - mountain_view
+        - mud_room
+        - nature_view
+        - open_floor_plan
+        - oven
+        - pantry
+        - patio_or_balcony
+        - porch
+        - private_bathroom
+        - private_entrance
+        - quartz_countertops
+        - ranch_style
+        - range
+        - recently_renovated
+        - refrigerator
+        - sewer_included
+        - skylight
+        - smart_doorbell
+        - smart_lighting
+        - smart_locks
+        - smart_thermostat
+        - stainless_steel_appliances
+        - stove
+        - tile_floor
+        - track_lighting
+        - trash_compactor
+        - trash_service_included
+        - vaulted_ceilings
+        - view
+        - vinyl_floor
+        - walk_in_closet
+        - walk_in_shower
+        - washer_dryer_hookups
+        - washer_dryer_in_unit
+        - water_included
+        - water_view
+        - white_appliances
+        - window_ac_unit
+        - window_covering
+        - yard
+      description: A normalized unit amenity
+      title: UnitAmenity
+    PropertyReportUnitInsert:
+      type: object
+      properties:
+        bed:
+          type: number
+          format: double
+          description: The number of bedrooms in the unit
+        bath:
+          type: number
+          format: double
+          description: The number of bathrooms in the unit
+        name:
+          type: string
+          description: The name of the unit
+        sqft:
+          type: number
+          format: double
+          description: The square footage of the unit
+        price:
+          type:
+            - number
+            - 'null'
+          format: double
+          description: The effective rent for the unit
+      required:
+        - bed
+        - bath
+        - name
+        - sqft
+        - price
+      description: >-
+        PropertyReportUnitInsert object is a very simplified version of a Unit
+        object
+
+        used when creating a new property. It is used to validate the request
+        body of a POST
+      title: PropertyReportUnitInsert
+    PropertyReportPropertyInsert:
+      type: object
+      properties:
+        street_address:
+          type: string
+          description: The new property's street address
+        city:
+          type: string
+          description: The new property's city
+        state:
+          type: string
+          description: The new property's state. Must be a 2 character string
+        zip_code:
+          type: string
+          description: >-
+            The zip code of the property. Must be a 5 digit string (no leading
+            0s)
+        lat:
+          type: number
+          format: double
+          description: The new property's latitude
+        lon:
+          type: number
+          format: double
+          description: The new property's longitude
+        building_name:
+          type:
+            - string
+            - 'null'
+          description: The new property's name
+        is_single_family:
+          type: boolean
+          description: >-
+            Whether the property is a single family home. Set either is_condo,
+            is_apartment, or is_single_family to true
+        is_condo:
+          type: boolean
+          description: >-
+            Whether the property is a condo. Set either is_condo, is_apartment,
+            or is_single_family to true
+        is_apartment:
+          type: boolean
+          description: >-
+            Whether the property is an apartment. Set either is_condo,
+            is_apartment, or is_single_family to true
+        number_units:
+          type: number
+          format: double
+          description: The number of units in the property
+        year_built:
+          type: number
+          format: double
+          description: The year the property was built
+        number_stories:
+          type: number
+          format: double
+          description: The number of stories in the property
+        building_amenities:
+          type: array
+          items:
+            $ref: '#/components/schemas/BuildingAmenity'
+          description: |-
+            The building's amenities.
+            If the property has no amenities, set to an empty array.
+            Must be a list of strings from the BuildingAmenity enum
+        unit_amenities:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnitAmenity'
+          description: |-
+            The units amenities.
+            If the property has no amenities, set to an empty array.
+            Must be a list of strings from the UnitAmenity enum
+        avg_quality:
+          type: number
+          format: double
+          description: >-
+            The average quality of the property and units, from 0.0 (extremely
+            poor condition) to 1.0 (very luxurious)
+        units:
+          type: array
+          items:
+            $ref: '#/components/schemas/PropertyReportUnitInsert'
+          description: The list of units in the property
+      required:
+        - street_address
+        - city
+        - state
+        - zip_code
+        - lat
+        - lon
+        - building_name
+        - is_single_family
+        - is_condo
+        - is_apartment
+        - number_units
+        - year_built
+        - number_stories
+        - building_amenities
+        - unit_amenities
+        - avg_quality
+        - units
+      description: >-
+        PropertyReportPropertyInsert object is a very simplified version of the
+        PropertyReportPropertyAttributes object
+
+        used when creating a new Property object. It is used to validate the
+        request body of a POST
+      title: PropertyReportPropertyInsert
+    Property_PostProperty_Response_200:
+      type: object
+      properties:
+        id:
+          type: string
+      required:
+        - id
+      title: Property_PostProperty_Response_200
+    PostPropertyRequestForbiddenError:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+      title: PostPropertyRequestForbiddenError
+  securitySchemes:
+    api:
+      type: apiKey
+      in: header
+      name: x-api-key
+    auth0:
+      type: http
+      scheme: bearer
+
+```
+
+## SDK Code Examples
+
+```python
+import requests
+
+url = "https://api.hellodata.ai/property"
+
+payload = { "property": {
+        "street_address": "123 Main St",
+        "city": "New York",
+        "state": "NY",
+        "zip_code": "01234",
+        "lat": 40.7128,
+        "lon": -74.006,
+        "building_name": "The Best Building",
+        "is_single_family": False,
+        "is_condo": False,
+        "is_apartment": True,
+        "number_units": 100,
+        "year_built": 2020,
+        "number_stories": 10,
+        "building_amenities": ["24_hour_maintenance"],
+        "unit_amenities": ["air_conditioning"],
+        "avg_quality": 0.8,
+        "units": [
+            {
+                "bed": 2,
+                "bath": 1,
+                "name": "1A",
+                "sqft": 1000,
+                "price": 1000
+            }
+        ]
+    } }
+headers = {
+    "x-api-key": "<apiKey>",
+    "Content-Type": "application/json"
+}
+
+response = requests.post(url, json=payload, headers=headers)
+
+print(response.json())
+```
+
+```javascript
+const url = 'https://api.hellodata.ai/property';
+const options = {
+  method: 'POST',
+  headers: {'x-api-key': '<apiKey>', 'Content-Type': 'application/json'},
+  body: '{"property":{"street_address":"123 Main St","city":"New York","state":"NY","zip_code":"01234","lat":40.7128,"lon":-74.006,"building_name":"The Best Building","is_single_family":false,"is_condo":false,"is_apartment":true,"number_units":100,"year_built":2020,"number_stories":10,"building_amenities":["24_hour_maintenance"],"unit_amenities":["air_conditioning"],"avg_quality":0.8,"units":[{"bed":2,"bath":1,"name":"1A","sqft":1000,"price":1000}]}}'
+};
+
+try {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  console.log(data);
+} catch (error) {
+  console.error(error);
+}
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"strings"
+	"net/http"
+	"io"
+)
+
+func main() {
+
+	url := "https://api.hellodata.ai/property"
+
+	payload := strings.NewReader("{\n  \"property\": {\n    \"street_address\": \"123 Main St\",\n    \"city\": \"New York\",\n    \"state\": \"NY\",\n    \"zip_code\": \"01234\",\n    \"lat\": 40.7128,\n    \"lon\": -74.006,\n    \"building_name\": \"The Best Building\",\n    \"is_single_family\": false,\n    \"is_condo\": false,\n    \"is_apartment\": true,\n    \"number_units\": 100,\n    \"year_built\": 2020,\n    \"number_stories\": 10,\n    \"building_amenities\": [\n      \"24_hour_maintenance\"\n    ],\n    \"unit_amenities\": [\n      \"air_conditioning\"\n    ],\n    \"avg_quality\": 0.8,\n    \"units\": [\n      {\n        \"bed\": 2,\n        \"bath\": 1,\n        \"name\": \"1A\",\n        \"sqft\": 1000,\n        \"price\": 1000\n      }\n    ]\n  }\n}")
+
+	req, _ := http.NewRequest("POST", url, payload)
+
+	req.Header.Add("x-api-key", "<apiKey>")
+	req.Header.Add("Content-Type", "application/json")
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+
+	fmt.Println(res)
+	fmt.Println(string(body))
+
+}
+```
+
+```ruby
+require 'uri'
+require 'net/http'
+
+url = URI("https://api.hellodata.ai/property")
+
+http = Net::HTTP.new(url.host, url.port)
+http.use_ssl = true
+
+request = Net::HTTP::Post.new(url)
+request["x-api-key"] = '<apiKey>'
+request["Content-Type"] = 'application/json'
+request.body = "{\n  \"property\": {\n    \"street_address\": \"123 Main St\",\n    \"city\": \"New York\",\n    \"state\": \"NY\",\n    \"zip_code\": \"01234\",\n    \"lat\": 40.7128,\n    \"lon\": -74.006,\n    \"building_name\": \"The Best Building\",\n    \"is_single_family\": false,\n    \"is_condo\": false,\n    \"is_apartment\": true,\n    \"number_units\": 100,\n    \"year_built\": 2020,\n    \"number_stories\": 10,\n    \"building_amenities\": [\n      \"24_hour_maintenance\"\n    ],\n    \"unit_amenities\": [\n      \"air_conditioning\"\n    ],\n    \"avg_quality\": 0.8,\n    \"units\": [\n      {\n        \"bed\": 2,\n        \"bath\": 1,\n        \"name\": \"1A\",\n        \"sqft\": 1000,\n        \"price\": 1000\n      }\n    ]\n  }\n}"
+
+response = http.request(request)
+puts response.read_body
+```
+
+```java
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+
+HttpResponse<String> response = Unirest.post("https://api.hellodata.ai/property")
+  .header("x-api-key", "<apiKey>")
+  .header("Content-Type", "application/json")
+  .body("{\n  \"property\": {\n    \"street_address\": \"123 Main St\",\n    \"city\": \"New York\",\n    \"state\": \"NY\",\n    \"zip_code\": \"01234\",\n    \"lat\": 40.7128,\n    \"lon\": -74.006,\n    \"building_name\": \"The Best Building\",\n    \"is_single_family\": false,\n    \"is_condo\": false,\n    \"is_apartment\": true,\n    \"number_units\": 100,\n    \"year_built\": 2020,\n    \"number_stories\": 10,\n    \"building_amenities\": [\n      \"24_hour_maintenance\"\n    ],\n    \"unit_amenities\": [\n      \"air_conditioning\"\n    ],\n    \"avg_quality\": 0.8,\n    \"units\": [\n      {\n        \"bed\": 2,\n        \"bath\": 1,\n        \"name\": \"1A\",\n        \"sqft\": 1000,\n        \"price\": 1000\n      }\n    ]\n  }\n}")
+  .asString();
+```
+
+```php
+<?php
+require_once('vendor/autoload.php');
+
+$client = new \GuzzleHttp\Client();
+
+$response = $client->request('POST', 'https://api.hellodata.ai/property', [
+  'body' => '{
+  "property": {
+    "street_address": "123 Main St",
+    "city": "New York",
+    "state": "NY",
+    "zip_code": "01234",
+    "lat": 40.7128,
+    "lon": -74.006,
+    "building_name": "The Best Building",
+    "is_single_family": false,
+    "is_condo": false,
+    "is_apartment": true,
+    "number_units": 100,
+    "year_built": 2020,
+    "number_stories": 10,
+    "building_amenities": [
+      "24_hour_maintenance"
+    ],
+    "unit_amenities": [
+      "air_conditioning"
+    ],
+    "avg_quality": 0.8,
+    "units": [
+      {
+        "bed": 2,
+        "bath": 1,
+        "name": "1A",
+        "sqft": 1000,
+        "price": 1000
+      }
+    ]
+  }
+}',
+  'headers' => [
+    'Content-Type' => 'application/json',
+    'x-api-key' => '<apiKey>',
+  ],
+]);
+
+echo $response->getBody();
+```
+
+```csharp
+using RestSharp;
+
+var client = new RestClient("https://api.hellodata.ai/property");
+var request = new RestRequest(Method.POST);
+request.AddHeader("x-api-key", "<apiKey>");
+request.AddHeader("Content-Type", "application/json");
+request.AddParameter("application/json", "{\n  \"property\": {\n    \"street_address\": \"123 Main St\",\n    \"city\": \"New York\",\n    \"state\": \"NY\",\n    \"zip_code\": \"01234\",\n    \"lat\": 40.7128,\n    \"lon\": -74.006,\n    \"building_name\": \"The Best Building\",\n    \"is_single_family\": false,\n    \"is_condo\": false,\n    \"is_apartment\": true,\n    \"number_units\": 100,\n    \"year_built\": 2020,\n    \"number_stories\": 10,\n    \"building_amenities\": [\n      \"24_hour_maintenance\"\n    ],\n    \"unit_amenities\": [\n      \"air_conditioning\"\n    ],\n    \"avg_quality\": 0.8,\n    \"units\": [\n      {\n        \"bed\": 2,\n        \"bath\": 1,\n        \"name\": \"1A\",\n        \"sqft\": 1000,\n        \"price\": 1000\n      }\n    ]\n  }\n}", ParameterType.RequestBody);
+IRestResponse response = client.Execute(request);
+```
+
+```swift
+import Foundation
+
+let headers = [
+  "x-api-key": "<apiKey>",
+  "Content-Type": "application/json"
+]
+let parameters = ["property": [
+    "street_address": "123 Main St",
+    "city": "New York",
+    "state": "NY",
+    "zip_code": "01234",
+    "lat": 40.7128,
+    "lon": -74.006,
+    "building_name": "The Best Building",
+    "is_single_family": false,
+    "is_condo": false,
+    "is_apartment": true,
+    "number_units": 100,
+    "year_built": 2020,
+    "number_stories": 10,
+    "building_amenities": ["24_hour_maintenance"],
+    "unit_amenities": ["air_conditioning"],
+    "avg_quality": 0.8,
+    "units": [
+      [
+        "bed": 2,
+        "bath": 1,
+        "name": "1A",
+        "sqft": 1000,
+        "price": 1000
+      ]
+    ]
+  ]] as [String : Any]
+
+let postData = JSONSerialization.data(withJSONObject: parameters, options: [])
+
+let request = NSMutableURLRequest(url: NSURL(string: "https://api.hellodata.ai/property")! as URL,
+                                        cachePolicy: .useProtocolCachePolicy,
+                                    timeoutInterval: 10.0)
+request.httpMethod = "POST"
+request.allHTTPHeaderFields = headers
+request.httpBody = postData as Data
+
+let session = URLSession.shared
+let dataTask = session.dataTask(with: request as URLRequest, completionHandler: { (data, response, error) -> Void in
+  if (error != nil) {
+    print(error as Any)
+  } else {
+    let httpResponse = response as? HTTPURLResponse
+    print(httpResponse)
+  }
+})
+
+dataTask.resume()
+```

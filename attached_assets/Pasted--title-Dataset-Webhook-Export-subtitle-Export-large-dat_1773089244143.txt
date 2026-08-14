@@ -1,0 +1,339 @@
+***
+
+title: Dataset Webhook Export
+subtitle: Export large datasets asynchronously with webhook notifications
+-------------------------------------------------------------------------
+
+<Warning>
+  This feature requires an active **Query Builder** subscription. Contact our sales team if you need access to this product.
+</Warning>
+
+xport datasets asynchronously and receive the results via webhook when processing is complete. The dataset export endpoint (`/dataset/export`, [dataset-export-async](/api-reference/api-reference/dataset/dataset-export-async) in the API Reference) uses the **same query engine and data model as Query Builder**—it returns the same data with the **same limitations** (e.g. no unit-level data; week is the finest time granularity). This is ideal for large datasets that would timeout with synchronous requests, or when you want to process data in the background without maintaining an active connection.
+
+<Info>
+  The webhook export is perfect for:
+
+  * Large datasets with thousands of rows
+  * Scheduled or automated data exports
+  * Background processing workflows
+  * Integration with data pipelines
+</Info>
+
+## How It Works
+
+1. **Submit Export Request**: Send your dataset query along with a webhook URL
+2. **Receive Confirmation**: Get immediate 201 response with export queued
+3. **Processing**: Your export is processed asynchronously in the background
+4. **Webhook Notification**: Your endpoint receives the results when complete
+
+## Request Format
+
+The request requires:
+
+* **dataset**: Your query configuration (columns, filters, limits)
+* **webhookURL**: HTTPS endpoint where results will be sent
+* **name**: Descriptive name for your export
+* **format**: Either 'csv' or 'jsonl'
+
+## Webhook Response
+
+When your export completes, you'll receive a POST request with this payload:
+
+```json
+{
+  "queryUUID": "123e4567-e89b-12d3-a456-426614174000",
+  "name": "Seattle Rental Data",
+  "format": "csv", 
+  "payload": { /* your original dataset query */ },
+  "gcsBlob": {
+    "url": "https://storage.googleapis.com/...",
+    "expires": "2024-02-15T10:30:00Z",
+    "timeTakenMs": 45000,
+    "numberRows": 12847
+  },
+  "requestedOn": "2024-01-15T10:00:00Z",
+  "completedOn": "2024-01-15T10:00:45Z"
+}
+```
+
+<CodeBlocks>
+  <CodeBlock title="Curl">
+    ```bash
+         curl --location 'https://api.hellodata.ai/dataset/export' \
+    --header 'Content-Type: application/json' \
+    --header 'x-api-key: your-api-key' \
+    --data '{
+        "dataset": {
+            "scopes": [
+                {"column": "street_address"},
+                {"column": "asking_rent", "aggregate": "Avg"}
+            ],
+            "filters": [
+                {"column": "msa", "filter": {"equals": "Seattle, WA"}},
+                {"column": "bed", "filter": {"in": [1, 2, 3]}}
+            ],
+            "limit": 10000
+        },
+        "webhookURL": "https://yourapp.com/webhook/dataset-export",
+        "name": "Seattle Rental Data Export",
+        "format": "csv"
+    }'
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="Python">
+    ```python
+    import requests
+    import json
+
+    url = "https://api.hellodata.ai/dataset/export"
+
+    payload = {
+        "dataset": {
+            "scopes": [
+                {"column": "street_address"},
+                {"column": "asking_rent", "aggregate": "Avg"}
+            ],
+            "filters": [
+                {"column": "msa", "filter": {"equals": "Seattle, WA"}},
+                {"column": "bed", "filter": {"in": [1, 2, 3]}}
+            ],
+            "limit": 10000
+        },
+        "webhookURL": "https://yourapp.com/webhook/dataset-export",
+        "name": "Seattle Rental Data Export", 
+        "format": "csv"
+    }
+
+    headers = {
+        'Content-Type': 'application/json',
+        'x-api-key': 'your-api-key'
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    print(f"Export queued: {response.status_code}")
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="JavaScript">
+    ```javascript
+    const axios = require('axios');
+
+    const config = {
+        method: 'post',
+        url: 'https://api.hellodata.ai/dataset/export',
+        headers: { 
+            'Content-Type': 'application/json',
+            'x-api-key': 'your-api-key'
+        },
+        data: {
+            dataset: {
+                scopes: [
+                    {column: 'street_address'},
+                    {column: 'asking_rent', aggregate: 'Avg'}
+                ],
+                filters: [
+                    {column: 'msa', filter: {equals: 'Seattle, WA'}},
+                    {column: 'bed', filter: {in: [1, 2, 3]}}
+                ],
+                limit: 10000
+            },
+            webhookURL: 'https://yourapp.com/webhook/dataset-export',
+            name: 'Seattle Rental Data Export',
+            format: 'csv'
+        }
+    };
+
+    axios(config)
+        .then(function (response) {
+            console.log('Export queued:', response.status);
+        })
+        .catch(function (error) {
+            console.log(error);
+        });
+    ```
+  </CodeBlock>
+</CodeBlocks>
+
+## Implementing Your Webhook Handler
+
+Your webhook endpoint should handle the incoming POST request and verify the HMAC signature for security. The signature is included in the `SHA256-HMAC-Signature` header. You'll use the body of the request and your API key to create a SHA256 HMAC signature. This signature can be compared to the one in the header in order to verify that the request has come from us.
+
+<CodeBlocks>
+  <CodeBlock title="Node.js/Express">
+    ```javascript
+    const express = require("express");
+    const crypto = require("crypto");
+    const app = express();
+
+    app.use(express.json());
+
+    app.post("/webhook/dataset-export", (req, res) => {
+      // Get the HMAC signature from the header
+      const signature = req.get("SHA256-HMAC-Signature");
+      if (!signature) {
+        return res.status(401).send("Invalid signature");
+      }
+
+      // Verify webhook authenticity
+      const hmac = crypto.createHmac("sha256", "your-api-key");
+      hmac.update(JSON.stringify(req.body));
+      const expectedSignature = hmac.digest("hex");
+
+      if (
+        !crypto.timingSafeEqual(
+          Buffer.from(expectedSignature, "hex"),
+          Buffer.from(signature, "hex"),
+        )
+      ) {
+        return res.status(401).send("Invalid signature");
+      }
+
+      const { queryUUID, gcsBlob } = req.body;
+
+      // Download and process your data
+      // processExportedData(gcsBlob.url);
+
+      console.log(`Export ${queryUUID} completed:`);
+      console.log(`- Download URL: ${gcsBlob.url}`);
+      console.log(`- Rows: ${gcsBlob.numberRows}`);
+      console.log(`- Processing time: ${gcsBlob.timeTakenMs}ms`);
+
+      res.status(200).send("OK");
+    });
+
+    app.listen(3000, () => { console.log("Server listening on port 3000"); });
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="Python/Flask">
+    ```python
+    from flask import Flask, request, jsonify
+    import hmac
+    import hashlib
+    import json
+
+    app = Flask(__name__)
+
+    @app.route('/webhook/dataset-export', methods=['POST'])
+    def handle_dataset_export():
+        # Get the signature from the header
+        signature = request.headers.get('SHA256-HMAC-Signature')
+        
+        # Verify HMAC signature
+        expected_signature = hmac.new(
+            b'your-api-key',
+            request.data,
+            hashlib.sha256
+        ).hexdigest()
+        
+        if not hmac.compare_digest(expected_signature, signature):
+            return 'Invalid signature', 401
+
+        # Valid signature; process the exported data
+        data = request.get_json()
+
+        # Process your exported data
+        # process_exported_data(data['gcsBlob']['url'])
+
+        print(f"Export {data['queryUUID']} completed:")
+        print(f"- Download URL: {data['gcsBlob']['url']}")
+        print(f"- Rows: {data['gcsBlob']['numberRows']}")
+        
+        return 'OK', 200
+    ```
+  </CodeBlock>
+</CodeBlocks>
+
+## Security & Verification
+
+Always verify the HMAC signature to ensure the webhook request is legitimate:
+
+1. **Compute HMAC**: Use your API key and the payload
+2. **Compare Signatures**: Match against the `SHA256-HMAC-Signature` header
+3. **Reject Invalid Requests**: Return 401 for signature mismatches
+
+## Important Notes
+
+<Warning>
+  **Download URLs expire in 30 days** - make sure to download your files promptly after receiving the webhook notification.
+</Warning>
+
+* **Processing Time**: Large exports may take several minutes to complete
+* **File Format**: Files are compressed with gzip for efficient transfer
+* **Webhook Requirements**: Your endpoint must be HTTPS and publicly accessible
+* **Response Expected**: Your webhook should respond with 2xx status to confirm receipt
+* **Tracking**: Use the `queryUUID` to match requests with responses
+
+## API vs Query Builder: when to use which
+
+**Power BI and similar tools:** Use **Query Builder / dataset export** when you need data for a **large number of properties** (e.g. entire markets or regions). Use the **API** when you're tracking a **specific, bounded list** of properties (portfolio, deal list, comps).
+
+| Scenario                                                               | Prefer                                 | Why                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Portfolio or deal list (dozens to low hundreds of properties)          | **API**                                | Property search, [details](/docs/property-details), [comparables](/docs/comparables), and [pricing](/docs/price-recommendations) endpoints are built for this. Unit-level data is available via the API. |
+| Market-wide or regional dashboards (thousands of properties)           | **Query Builder** / **Dataset Export** | Bulk exports scale to large row counts; avoids per-property API calls and timeouts.                                                                                                                      |
+| Unit-level history, daily time granularity                             | **API**                                | Export and Query Builder do not support unit-level data or finer-than-week time breakdowns.                                                                                                              |
+| Aggregated market data (e.g. avg rent by MSA, zip, bed/bath over time) | **Query Builder** / **Dataset Export** | Designed for aggregated, filterable datasets.                                                                                                                                                            |
+
+**Pricing:** The API is [per-request](/docs/pricing); Query Builder and dataset export require a **Query Builder subscription** (contact [sales](https://www.hellodata.ai/multifamily-market-analysis-demo) for details).
+
+## Data granularity and limitations
+
+The dataset export endpoint returns the **same data as Query Builder**, with the **same restrictions**:
+
+* **No unit-level data.** You cannot export individual unit rows (e.g. per-unit rent history). Data is at property, unit-type (bed/bath, floorplan), or aggregated level. Unit-level detail is available via the [API](/docs/property-details) (property details and history).
+* **Time dimension: week at finest.** For time breakdowns, **week** is the highest granularity (`as_of_week`). Month and quarter are also supported. Finer-than-week (e.g. day-level) breakdowns are not available in Query Builder or dataset export.
+
+| Dimension            | API                        | Query Builder / Dataset Export     |
+| -------------------- | -------------------------- | ---------------------------------- |
+| **Unit-level data**  | Yes                        | No                                 |
+| **Time granularity** | Day-level where applicable | Week (finest), then month, quarter |
+
+## Error Handling
+
+| Status Code | Description                                                   |
+| ----------- | ------------------------------------------------------------- |
+| **400**     | Invalid webhook URL (must be HTTPS, no localhost/private IPs) |
+| **403**     | Invalid API key or insufficient permissions                   |
+| **201**     | Export successfully queued                                    |
+
+If the export fails during processing, your webhook will not be called. Monitor your webhook endpoint for delivery failures.
+
+## Use Cases
+
+**Data Pipeline Integration**
+
+```javascript
+// Automatically trigger analysis when new data arrives
+app.post('/webhook/dataset-export', (req, res) => {
+    const { gcsBlob, name } = req.body;
+    
+    // Download the data
+    const csvData = await downloadFile(gcsBlob.url);
+    
+    // Trigger your data pipeline
+    await triggerDataPipeline(csvData, name);
+    
+    res.status(200).send('OK');
+});
+```
+
+**Scheduled Reports**
+
+```python
+# Process weekly market reports
+@app.route('/webhook/dataset-export', methods=['POST'])
+def process_weekly_report():
+    data = request.get_json()
+    
+    if 'weekly' in data['name'].lower():
+        # Send to reporting system
+        send_to_reporting_dashboard(data['gcsBlob']['url'])
+    
+    return 'OK', 200
+```
+
+## Full Documentation
+
+Find complete technical details in our [API Reference](/api-reference/api-reference/dataset/dataset-export-async).

@@ -1,0 +1,62 @@
+# Property ID Changes and Redirects
+
+HelloData maintains a consistent property identifier (`id`) for each building to allow users to retrieve full property details and history. However, in rare but important edge cases, these IDs can change.
+
+<Callout intent="info">
+  The `/property/search` endpoint is always free—feel free to use it when something looks off.
+</Callout>
+
+## When Do Property IDs Change?
+
+We may update the property ID you receive in the following scenarios:
+
+### 1. Property Merges
+
+When two properties (say A and B) are merged into one new property C:
+
+* Both A and B will redirect to C.
+* Your old `id` will still work and return property C.
+
+### 2. Property Splits
+
+When a property is split into multiple distinct properties:
+
+* The old ID (e.g. A) will redirect to one of the resulting new properties (e.g. B or C).
+* We recommend re-checking the `address` or `building_name` if you're unsure.
+
+### 3. Major Address or Identity Changes
+
+If a property's ZIP code, city, or address is significantly updated:
+
+* We may assign a new ID to the updated property.
+* The old ID will redirect to the new one.
+
+<Callout intent="warning">
+  If your request to `/property/{id}` returns a 404, it may be due to one of these transitions. Use `/property/search` to find the updated ID.
+</Callout>
+
+***
+
+## Tips for Developers
+
+* **Use Search as Backup**: If an ID returns unexpected results, confirm via the `/property/search` endpoint using name or address.
+* **Alias Matching**: The `building_name_alias` and `street_address_alias` fields can help confirm that you’re looking at the right property.
+* **Cache Sensibly**: Property IDs are generally stable, but if you rely on them long term, consider periodic revalidation.
+
+***
+
+## Example
+
+You originally fetched:
+
+```http
+GET /property/11111-11111-11111-11111
+{
+  "id": "22222-22222-22222-22222",
+  "building_name": "Main Street Apartments",
+  "building_name_alias": ["Main Apartments"],
+  "street_address": "1234 New Ave"
+}
+```
+
+This is expected behavior—you're still seeing the correct property under the latest data we have. We redirect to the new ID to ensure you always get the most up-to-date information.

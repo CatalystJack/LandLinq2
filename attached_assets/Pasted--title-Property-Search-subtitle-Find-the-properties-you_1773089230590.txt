@@ -1,0 +1,226 @@
+***
+
+title: Property Search
+subtitle: Find the properties you want to know everything about
+---------------------------------------------------------------
+
+The first step before retrieving property detailes, identifying comps, recommending rents or any other analysis is to find the property you are interested in.
+This endpoint allows you to search for properties by address, city, state, zip code, or property name. It works with typos and fuzzy matching, so you can be sure to find the property you are looking for.
+
+<Callout intent="success">
+  This endpoint is free! Refine your search as much as needed.
+</Callout>
+
+<Callout intent="warning">
+  **Private properties are not indexed**: This search endpoint only returns properties from HelloData's indexed database. Properties created via POST /property (custom-created/private properties) are not included in the search index and will not appear in search results.
+
+  **Intended workflow**: Use this search endpoint to find HelloData property IDs initially, then store those IDs for future direct access. If you create a property via POST /property, store the returned ID and use it directly—do not expect to find it via search.
+</Callout>
+
+### Basic search
+
+You can search by address, city, state, zip code, property name, or a combination of these.
+
+<CodeBlocks>
+  <CodeBlock title="Python">
+    ```python
+    import requests
+
+    url = "https://api.hellodata.ai/property/search"
+
+    querystring = {"q": "111 W Wacker Chicago"}
+
+    headers = {
+        'x-api-key': "your-api-key"
+    }
+
+    response = requests.request("GET", url, headers=headers, params=querystring)
+
+    print(response.json()) # list of potential matches    
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="Curl">
+    ```bash
+    curl --location 'https://api.hellodata.ai/property/search?q=111%20w%20wacker' \
+    --header 'x-api-key: your-api-key'
+    ```
+  </CodeBlock>
+
+  <CodeBlock title="JS">
+    ```javascript
+    const axios = require('axios')
+
+    const config = {
+        method: 'get',
+        url: 'https://api.hellodata.ai/property',
+        headers: { 
+            'x-api-key': 'your-api-key'
+        },
+        params: { 
+            'q': '111 W Wacker Chicago'
+        }
+    }
+
+    axios(config)
+        .then((response) => {
+            response.data.forEach(property => {
+                console.log(property)
+            })
+        })
+        .catch((error) => {
+            console.log(error)
+        })
+    ```
+  </CodeBlock>
+</CodeBlocks>
+
+<Info>
+  Make sure query parameters are URL encoded. For example, a space should be encoded as `%20`.
+</Info>
+
+This returns a simple list of properties that match your search. You can then use the `id` to get more details on a specific property.
+
+```json Returned list of matches
+[
+    {
+        "id": "0e628031-57b8-5394-821d-13779318fef4",
+        "lat": 41.88651,
+        "lon": -87.63141,
+        "building_name": "OneEleven",
+        "building_name_alias": [
+            "OneEleven"
+        ],
+        "street_address": "111 West Wacker Drive",
+        "street_address_alias": [
+            "111 West Wacker Drive",
+            "111 West Wacker"
+        ],
+        "city": "Chicago",
+        "state": "IL",
+        "zip_code": "60601",
+        "year_built": 2014,
+        "number_units": 505,
+    }
+]
+```
+
+### Adding constraints
+
+For automated searches, constrain results by zip code, state, or distance from a specific location.
+
+<Tabs>
+  <Tab title="Filter by Zip Code">
+    Here is how to search for properties in a specific zip code:
+
+    <CodeBlocks>
+      <CodeBlock title="Python">
+        ```python
+        import requests
+
+        url = "https://api.hellodata.ai/property/search"
+
+        querystring = {"q":"111 W Wacker Chicago", "zip_code": "60601"}
+
+        headers = {
+            'x-api-key': "your-api-key"
+        }
+
+        response = requests.request("GET", url, headers=headers, params=querystring)
+
+        print(response.json()) # list of potential matches within the zip code
+        ```
+      </CodeBlock>
+
+      <CodeBlock title="Curl">
+        ```bash
+        curl --location 'https://api.hellodata.ai/property/search?zip_code=60601&q=111%20w%20wacker' \
+        --header 'x-api-key: token'
+        ```
+      </CodeBlock>
+    </CodeBlocks>
+  </Tab>
+
+  <Tab title="Filter by State">
+    Here is how to search for properties in a specific state:
+
+    <CodeBlocks>
+      <CodeBlock title="Python">
+        ```python
+        import requests
+
+        url = "https://api.hellodata.ai/property/search"
+
+        querystring = {"q":"111 W Wacker Chicago", "state": "IL"}
+
+        headers = {
+            'x-api-key': "your-api-key"
+        }
+
+        response = requests.request("GET", url, headers=headers, params=querystring)
+
+        print(response.json()) # list of potential matches within the state
+        ```
+      </CodeBlock>
+
+      <CodeBlock title="Curl">
+        ```bash
+        curl --location 'https://api.hellodata.ai/property/search?state=IL&q=111%20w%20wacker' \
+        --header 'x-api-key: token'
+        ```
+      </CodeBlock>
+    </CodeBlocks>
+  </Tab>
+
+  <Tab title="Filter by Lat/Lon">
+    Here is how to search for properties within a specific distance from a location:
+
+    <CodeBlocks>
+      <CodeBlock title="Python">
+        ```python
+        import requests
+
+        url = "https://api.hellodata.ai/property/search"
+
+        querystring = {"lat":41.88651, "lon":-87.63141, "max_distance": 0.1} # 0.1 miles
+
+        headers = {
+            'x-api-key': "your-api-key"
+        }
+
+        response = requests.request("GET", url, headers=headers, params=querystring)
+
+        print(response.json()) # list of potential matches within 0.1 miles
+        ```
+      </CodeBlock>
+
+      <CodeBlock title="Curl">
+        ```bash
+        curl --location 'https://api.hellodata.ai/property/search?lat=41.88651&lon=-87.63141&max_distance=0.1' \
+        --header 'x-api-key: token'
+        ```
+      </CodeBlock>
+    </CodeBlocks>
+
+    <Info>
+      This methodology is useful for finding a specific property or a set of properties within a certain distance from a location. This is not suitable
+      for finding all properties within a certain distance from a location.
+    </Info>
+  </Tab>
+</Tabs>
+
+### Fuzzy matching
+
+The search endpoint supports fuzzy matching, so you can search for properties even with a typo or two, or partial information.
+
+### Speed and performance
+
+The search endpoint is optimized for speed and performance, so you can expect fast responses even when performing multiple searches in a short period of time.
+
+### Caching
+
+It is perfectly fine to cache the results of the search endpoint, as the data does not change frequently. This can help improve the performance of your application and reduce the load on the API.
+
+### Full Documentation
+
+Find more details about this endpoint our [API Reference](/api-reference/api-reference/property/search).

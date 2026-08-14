@@ -1,0 +1,56 @@
+Workflow overview
+Type: Contact-based
+Trigger:
+
+When Contact Tags is updated to include Jack LandLinq Broker
+Actions (recommended full flow):
+
+(Optional, but recommended) Set an “Assignment” field on the contact
+
+Example property name (custom): LandLinq Assigned Broker
+Value: the internal name/ID of the team member or routing logic you want LandLinq to understand.
+Purpose: This makes it clear in HubSpot who owns the broker relationship and gives LandLinq a clear assignment input.
+Send a webhook to LandLinq (https://landlinq.ai/api/webhooks/hubspot)
+
+Method: POST
+Content-Type: application/json
+Payload (recommended fields):
+{
+  "email": "{{ contact.email }}",
+  "firstName": "{{ contact.firstname }}",
+  "lastName": "{{ contact.lastname }}",
+  "contactId": "{{ contact.hs_object_id }}",
+  "contactTags": "{{ contact.radio_select }}",
+  "assignmentField": "{{ contact.<your_assignment_field> }}",
+  "source": "hubspot",
+  "event": "BROKER_TAGGED"
+}
+You’ll adapt {{ contact.<...> }} with HubSpot’s UI token picker.
+(Optional) Internal notification to your team
+
+Send an internal email or create a task:
+“New LandLinq Broker tagged: {{ contact.fullname }} ({{ contact.email }}) has been sent to LandLinq.”
+What I need from you to finalize this design precisely
+Two details so I can make this fully specific to your portal:
+
+Assignment Field in HubSpot
+
+Do you already have a custom field that indicates the assigned team member for this broker integration?
+If yes: what is its label (as seen in the Contact property list), e.g., “LandLinq Assigned Broker” or “Broker Owner”?
+If no: do you plan to:
+A) Let LandLinq decide assignment itself purely based on the tag, or
+B) Create a new custom property in HubSpot for assignment (e.g., a dropdown of team members)?
+Do you want the internal notification (step 3)?
+
+If yes, pick one:
+Internal email notification to specific users/team
+Create a task assigned to someone
+Both
+Once you answer:
+
+The Assignment Field label (or confirm that LandLinq will handle assignment with no extra field)
+Whether you want an internal notification, and which type
+I’ll give you:
+
+The exact field list and values to send in the webhook
+The exact steps to configure each action in the workflow editor (in simple, click-by-click language) tailored to your chosen assignment + notification setup.
