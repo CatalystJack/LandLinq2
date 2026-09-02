@@ -155,6 +155,36 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
     return landlinqNav;
   }, [landlinqNav, publicNav, isAuthenticated]);
 
+  const navigationSections = useMemo(() => {
+    if (!isAuthenticated || landlinqNav.length === 0) return [];
+
+    const sections: { name: string; items: any[] }[] = [];
+    let currentSection: { name: string; items: any[] } | null = null;
+
+    landlinqNav.forEach((item: any) => {
+      if (item.section) {
+        currentSection = {
+          name: item.section === "Platform" && isApexUser ? "Apex Platform" : item.section,
+          items: [],
+        };
+        sections.push(currentSection);
+        return;
+      }
+
+      if (!currentSection) {
+        currentSection = {
+          name: isApexUser ? "Apex Platform" : "LandLinq",
+          items: [],
+        };
+        sections.push(currentSection);
+      }
+
+      currentSection.items.push(item);
+    });
+
+    return sections.filter((section) => section.items.length > 0);
+  }, [landlinqNav, isAuthenticated, isApexUser]);
+
   return (
     <nav className="relative border-b border-slate-800 sticky top-0 z-50 shadow-lg" style={{ backgroundColor: '#081729' }}>
       <div className="relative max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
@@ -253,31 +283,44 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
               );
             })}
             
-            {/* Authenticated navigation - dropdown menus */}
-            {isAuthenticated && landlinqNav.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-1 py-2 px-3 text-sm font-medium text-white hover:text-[#4A90E2] transition-colors rounded-md focus:outline-none">
-                    {isApexUser ? "Apex Platform" : "LandLinq"}
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56 bg-white border-slate-200 shadow-lg max-h-80 overflow-y-auto">
-                  {landlinqNav.map((item: any) => (
-                    item.section ? (
-                      <DropdownMenuLabel key={item.section} className="pt-3 pb-1 text-[11px] uppercase tracking-wider text-slate-400">
-                        {item.section}
-                      </DropdownMenuLabel>
-                    ) : (
-                      <DropdownMenuItem key={item.name} asChild className="focus:bg-blue-100 hover:bg-blue-100 cursor-pointer">
-                        <Link href={item.href} className="w-full text-slate-800 hover:text-blue-600">
-                          {item.name}
-                        </Link>
-                      </DropdownMenuItem>
-                    )
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+            {/* Authenticated navigation - one dropdown tab per section */}
+            {isAuthenticated && navigationSections.length > 0 && (
+              <div className="flex items-center gap-0.5 lg:gap-1">
+                {navigationSections.map((section) => {
+                  const hasActiveItem = section.items.some((item) => location === item.href);
+
+                  return (
+                    <DropdownMenu key={section.name}>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className={`flex items-center gap-1 py-2 px-2 lg:px-3 text-xs lg:text-sm font-medium transition-colors rounded-md focus:outline-none ${
+                            hasActiveItem
+                              ? "text-cyan-300 bg-white/10"
+                              : "text-white hover:text-cyan-300 hover:bg-white/5"
+                          }`}
+                          data-testid={`nav-section-${section.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                        >
+                          {section.name}
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56 bg-white border-slate-200 shadow-lg">
+                        {section.items.map((item: any) => (
+                          <DropdownMenuItem
+                            key={item.name}
+                            asChild
+                            className="focus:bg-blue-100 hover:bg-blue-100 cursor-pointer"
+                          >
+                            <Link href={item.href} className="w-full text-slate-800 hover:text-blue-600">
+                              {item.name}
+                            </Link>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  );
+                })}
+              </div>
             )}
             
             {isAuthenticated ? (
