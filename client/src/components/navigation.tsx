@@ -70,39 +70,20 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
                 { name: "Data Warehouse", href: "/data-hub", description: "Market intelligence, deal data, and broker analytics" },
                 { name: "Analytics", href: "/analytics", description: "Performance metrics & charts" },
                 { section: "Deal Operations" },
-                { name: "Email Intake", href: "/email-intake", description: "Review AI-parsed deal emails before approval" },
-                { name: "AI Training", href: "/ai-training", description: "Train AI on pipeline review sessions" },
-                { name: "Developers", href: "/partner-developers", description: "Registered developer buy boxes & deal routing" },
-                { name: "Partner Brokers", href: "/partner-brokers-admin", description: "Broker portal accounts & market access" },
                 { name: "People", href: "/user-management", description: "Manage users and brokers" },
                 { section: "CRM & Outreach" },
                 { name: "CRM", href: "/crm", description: "Contact management & campaign outreach" },
-                { name: "Messaging", href: "/messaging", description: "Two-way SMS conversations" },
-                { name: "Outreach", href: "/outreach-management", description: "Email & SMS campaign templates" },
                 { name: "Outreach Analytics", href: "/outreach-analytics", description: "Emails sent, open rates & sender health" },
                 { name: "Outreach Setup", href: "/outreach-onboarding", description: "Configure senders & campaigns" },
-                { section: "Monitoring & Tools" },
-                { name: "LIHTC Scoring", href: "/affordable-housing", description: "NC affordable housing pre-scorer" },
-                { name: "LoopNet Review", href: "/listing-review", description: "Review for-sale listings in your markets" },
-                { name: "API Monitoring", href: "/api-monitoring", description: "Track API health & costs" },
               ]
             : [
                 { name: "Deal Dashboard", href: "/dashboard", description: "Review and manage incoming deals" },
-                { name: "Email Intake", href: "/email-intake", description: "Review AI-parsed deal emails before approval" },
-                { name: "AI Training", href: "/ai-training", description: "Train AI on pipeline review sessions" },
                 { name: "CRM", href: "/crm", description: "Contact management & campaign outreach" },
-                { name: "Developers", href: "/partner-developers", description: "Registered developer buy boxes & deal routing" },
-                { name: "Partner Brokers", href: "/partner-brokers-admin", description: "Broker portal accounts & market access" },
-                { name: "Messaging", href: "/messaging", description: "Two-way SMS conversations" },
                 { name: "People", href: "/user-management", description: "Manage users and brokers" },
-                { name: "Outreach", href: "/outreach-management", description: "Email & SMS campaign templates" },
                 { name: "Outreach Analytics", href: "/outreach-analytics", description: "Emails sent, open rates & sender health" },
                 { name: "Outreach Setup", href: "/outreach-onboarding", description: "Configure senders & campaigns" },
-                { name: "LIHTC Scoring", href: "/affordable-housing", description: "NC affordable housing pre-scorer" },
                 { name: "Data Hub", href: "/data-hub", description: "Market intelligence, deal data, and broker analytics" },
-                { name: "LoopNet Review", href: "/listing-review", description: "Review for-sale listings in your markets" },
                 { name: "Analytics", href: "/analytics", description: "Performance metrics & charts" },
-                { name: "API Monitoring", href: "/api-monitoring", description: "Track API health & costs" },
               ]
           )
         );
@@ -113,16 +94,12 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
       case UserRole.PARTNER:
         landlinq.push(
           { name: "Deal Dashboard", href: "/dashboard", description: "Deal queue and pending reviews" },
-          { name: "Messaging", href: "/messaging", description: "Two-way SMS conversations" },
           { name: "Data Hub", href: "/data-hub", description: "Market intelligence & insights" },
-          { name: "LoopNet Review", href: "/listing-review", description: "Review for-sale listings in your markets" },
           { name: "Analytics", href: "/analytics", description: "Performance metrics" },
-          { name: "LIHTC Scoring", href: "/affordable-housing", description: "NC affordable housing pre-scorer" }
         );
         // Show outreach features for specific users
         if (userEmail === 'jack@catalystcp.com') {
           landlinq.push(
-            { name: "Outreach", href: "/outreach-management", description: "Email & SMS campaign templates" },
             { name: "Outreach Analytics", href: "/outreach-analytics", description: "Emails sent, open rates & sender health" }
           );
         }
