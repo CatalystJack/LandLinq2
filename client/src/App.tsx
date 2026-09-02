@@ -78,6 +78,7 @@ const OutreachAnalytics = lazy(() => import("@/pages/outreach-analytics"));
 const MarketIntelligence = lazy(() => import("@/pages/market-intelligence"));
 const ApiKeysAdmin = lazy(() => import("@/pages/api-keys-admin"));
 const AdminInvestmentCompanies = lazy(() => import("@/pages/admin-investment-companies"));
+const MasterPipeline = lazy(() => import("@/pages/master-pipeline"));
 const DeveloperDashboard = lazy(() => import("@/pages/developer-dashboard"));
 const DeveloperCrm = lazy(() => import("@/pages/developer-crm"));
 const DeveloperOutreach = lazy(() => import("@/pages/developer-outreach"));
@@ -131,12 +132,13 @@ function Router() {
     isAuthenticated &&
     user &&
     authenticatedEmail.endsWith("@apexresi.com") &&
-    window.location.pathname === "/admin/investment-companies"
+    ["/admin/investment-companies", "/admin/master-pipeline"].includes(window.location.pathname)
   ) {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <Switch>
           <Route path="/admin/investment-companies" component={AdminInvestmentCompanies} />
+          <Route path="/admin/master-pipeline" component={MasterPipeline} />
         </Switch>
       </Suspense>
     );

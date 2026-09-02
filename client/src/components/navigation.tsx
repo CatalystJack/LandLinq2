@@ -101,6 +101,11 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
             href: "/admin/investment-companies",
             description: "Create company portals, criteria, and initial logins",
           });
+          landlinq.push({
+            name: "Master Pipeline",
+            href: "/admin/master-pipeline",
+            description: "View deal activity across every Investment Company",
+          });
         }
         break;
         

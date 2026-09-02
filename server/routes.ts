@@ -22,6 +22,8 @@ import {
   insertReviewEscalationSchema,
   users,
   brokers,
+  developerProfiles,
+  partnerDeveloperSends,
   communications,
   apiCallLogs,
   conversations,
@@ -11474,6 +11476,164 @@ RULES:
     }
     next();
   }
+
+  app.get("/api/admin/master-pipeline", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const profileId = String(req.query.profileId || "").trim();
+      const state = String(req.query.state || "").trim();
+      const county = String(req.query.county || "").trim();
+      const search = String(req.query.search || "").trim();
+      const classification = String(req.query.classification || "").trim().toLowerCase();
+      const conditions: any[] = [];
+
+      if (profileId && profileId !== "all") {
+        conditions.push(eq(partnerDeveloperSends.developerProfileId, profileId));
+      }
+      if (state && state !== "all") {
+        conditions.push(sql`LOWER(COALESCE(${deals.state}, '')) = LOWER(${state})`);
+      }
+      if (county && county !== "all") {
+        conditions.push(sql`LOWER(COALESCE(${deals.county}, '')) = LOWER(${county})`);
+      }
+      if (search) {
+        const term = `%${search}%`;
+        conditions.push(sql`(
+          ${deals.address} ILIKE ${term}
+          OR COALESCE(${deals.propertyName}, '') ILIKE ${term}
+          OR COALESCE(${deals.city}, '') ILIKE ${term}
+        )`);
+      }
+      if (classification === "pursuing") {
+        conditions.push(eq(partnerDeveloperSends.greenFlaggedByDeveloper, true));
+      } else if (classification === "review") {
+        conditions.push(eq(partnerDeveloperSends.classification, "review"));
+      } else if (classification === "passed") {
+        conditions.push(sql`(
+          ${partnerDeveloperSends.id} IS NOT NULL
+          AND COALESCE(${partnerDeveloperSends.greenFlaggedByDeveloper}, false) = false
+          AND COALESCE(${partnerDeveloperSends.classification}, '') <> 'review'
+        )`);
+      }
+
+      const [rows, profiles] = await Promise.all([
+        db
+          .select({
+            dealId: deals.id,
+            dealNumber: deals.dealNumber,
+            propertyName: deals.propertyName,
+            address: deals.address,
+            city: deals.city,
+            county: deals.county,
+            state: deals.state,
+            askingPrice: deals.askingPrice,
+            sizeAcres: deals.sizeAcres,
+            unitCount: deals.unitCount,
+            maxUnitsByZoning: deals.maxUnitsByZoning,
+            dealType: deals.dealType,
+            productTypes: deals.productTypes,
+            dealStatus: deals.status,
+            dealClassification: deals.classification,
+            dealCreatedAt: deals.createdAt,
+            dealUpdatedAt: deals.updatedAt,
+            sendId: partnerDeveloperSends.id,
+            sendStatus: partnerDeveloperSends.status,
+            sendClassification: partnerDeveloperSends.classification,
+            sentAt: partnerDeveloperSends.sentAt,
+            matchedAt: partnerDeveloperSends.matchedAt,
+            greenFlaggedByDeveloper: partnerDeveloperSends.greenFlaggedByDeveloper,
+            greenFlaggedAt: partnerDeveloperSends.greenFlaggedAt,
+            profileId: developerProfiles.id,
+            profileCompanyName: developerProfiles.companyName,
+            profileSlug: developerProfiles.slug,
+            profileIsActive: developerProfiles.isActive,
+          })
+          .from(deals)
+          .leftJoin(partnerDeveloperSends, eq(partnerDeveloperSends.dealId, deals.id))
+          .leftJoin(developerProfiles, eq(developerProfiles.id, partnerDeveloperSends.developerProfileId))
+          .where(conditions.length ? and(...conditions) : undefined)
+          .orderBy(desc(deals.createdAt), desc(partnerDeveloperSends.sentAt)),
+        db
+          .select({
+            id: developerProfiles.id,
+            companyName: developerProfiles.companyName,
+            slug: developerProfiles.slug,
+            isActive: developerProfiles.isActive,
+          })
+          .from(developerProfiles)
+          .orderBy(developerProfiles.companyName),
+      ]);
+
+      const masterPipeline = rows.map((row) => {
+        const hasSend = Boolean(row.sendId);
+        const pipelineStatus = !hasSend
+          ? "not_sent"
+          : row.greenFlaggedByDeveloper
+            ? "pursuing"
+            : row.sendClassification === "review"
+              ? "review"
+              : "passed";
+
+        return {
+          id: row.sendId || row.dealId,
+          pipelineStatus,
+          classification: row.sendClassification || null,
+          dealClassification: row.dealClassification || null,
+          sent: hasSend,
+          deal: {
+            id: row.dealId,
+            dealNumber: row.dealNumber,
+            propertyName: row.propertyName,
+            address: row.address,
+            city: row.city,
+            county: row.county,
+            state: row.state,
+            askingPrice: row.askingPrice,
+            sizeAcres: row.sizeAcres,
+            unitCount: row.unitCount,
+            maxUnitsByZoning: row.maxUnitsByZoning,
+            dealType: row.dealType,
+            productTypes: row.productTypes,
+            status: row.dealStatus,
+            classification: row.dealClassification,
+            createdAt: row.dealCreatedAt,
+            updatedAt: row.dealUpdatedAt,
+          },
+          send: hasSend
+            ? {
+                id: row.sendId,
+                status: row.sendStatus,
+                classification: row.sendClassification,
+                sentAt: row.sentAt,
+                matchedAt: row.matchedAt,
+                greenFlaggedByDeveloper: row.greenFlaggedByDeveloper,
+                greenFlaggedAt: row.greenFlaggedAt,
+              }
+            : null,
+          profile: row.profileId
+            ? {
+                id: row.profileId,
+                companyName: row.profileCompanyName,
+                slug: row.profileSlug,
+                isActive: row.profileIsActive,
+              }
+            : null,
+        };
+      });
+
+      return res.json({
+        deals: masterPipeline,
+        total: masterPipeline.length,
+        profiles,
+        filters: {
+          states: Array.from(new Set(rows.map((row) => row.state).filter(Boolean))).sort(),
+          counties: Array.from(new Set(rows.map((row) => row.county).filter(Boolean))).sort(),
+        },
+      });
+    } catch (error: any) {
+      console.error("[admin master pipeline GET] Error:", error);
+      return res.status(500).json({ error: "Failed to load the master pipeline" });
+    }
+  });
 
   function parseInvestmentCompanyPayload(body: any, partial = false) {
     const payload: Record<string, any> = {};
