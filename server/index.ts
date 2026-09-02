@@ -61,7 +61,17 @@ app.use(compression({
 // Security Headers Middleware
 app.use((req, res, next) => {
   // Force HTTPS in production
-  if (process.env.NODE_ENV === 'production' && req.header('x-forwarded-proto') !== 'https') {
+  // Replit's VM readiness probe calls the container directly over HTTP using a
+  // loopback Host header. Redirecting that probe to HTTPS makes it attempt TLS
+  // against this plain HTTP server and prevents an otherwise healthy build from
+  // being promoted.
+  const requestHost = (req.header('host') || '').toLowerCase();
+  const isInternalProbe = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?$/.test(requestHost);
+  if (
+    process.env.NODE_ENV === 'production' &&
+    !isInternalProbe &&
+    req.header('x-forwarded-proto') !== 'https'
+  ) {
     return res.redirect(`https://${req.header('host')}${req.url}`);
   }
 

@@ -12,3 +12,4 @@
 - [Developer import address dedup](developer-import-address-dedup.md) — reuse global address matches, but only mutate canonical deal fields when the importing profile already owns that deal relationship.
 - [Broker contact tenant identity](broker-contact-tenant-identity.md) — developer contacts dedupe within their owner profile; legacy email/phone lookups must only resolve shared NULL-owner brokers.
 - [Developer analytics tenant scope](developer-analytics-tenant-scope.md) — deal status is send-profile-specific; outreach totals must be jointly scoped through both an owned sender and campaign.
+- [VM HTTPS readiness probes](vm-https-readiness-probes.md) — production HTTPS redirects must exempt loopback hosts or Replit VM promotion follows TLS to the app's plain HTTP port and times out.
