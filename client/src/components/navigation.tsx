@@ -11,8 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const catalystLogo = "/assets/catalyst-logo.png?v=3";
-const landlinqLogo = "/assets/landlinq-email-logo.png";
+const landlinqWhiteLogo = "/assets/landlinq-white-logo.png";
 
 interface NavigationProps {
   onOpenSlideForm?: () => void;
@@ -191,25 +190,18 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
             <Link href="/" className="flex items-center gap-1.5">
               {isAuthenticated ? (
                 <img
-                  src={catalystLogo}
+                  src={landlinqWhiteLogo}
                   alt="LandLinq"
-                  className="h-8 sm:h-9 lg:h-10 w-auto"
-                  data-testid="logo-catalyst"
+                  className="h-9 sm:h-10 lg:h-12 w-auto max-w-[190px] object-contain"
+                  data-testid="logo-landlinq"
                 />
               ) : (
-                <>
-                  {/* Clip to icon-only portion of the logo PNG */}
-                  <div className="overflow-hidden flex-shrink-0" style={{ width: 36, height: 26 }}>
-                    <img
-                      src={landlinqLogo}
-                      alt=""
-                      style={{ height: 26, width: 'auto', maxWidth: 'none' }}
-                    />
-                  </div>
-                  <span className="text-white font-bold text-base tracking-tight leading-none select-none">
-                    LandLinq
-                  </span>
-                </>
+                <img
+                  src={landlinqWhiteLogo}
+                  alt="LandLinq"
+                  className="h-9 sm:h-10 lg:h-12 w-auto max-w-[190px] object-contain"
+                  data-testid="logo-landlinq"
+                />
               )}
             </Link>
           </div>
