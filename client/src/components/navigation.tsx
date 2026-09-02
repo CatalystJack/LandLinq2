@@ -78,7 +78,7 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
         );
         // LandLinq = Internal Platform Features
         landlinq.push(
-          { name: "Deal Dashboard", href: "/dashboard", description: "Review and manage incoming deals" },
+          { name: userEmail.toLowerCase().endsWith('@apexresi.com') ? "Platform Overview" : "Deal Dashboard", href: "/dashboard", description: userEmail.toLowerCase().endsWith('@apexresi.com') ? "Parent view across all Investment Companies and developers" : "Review and manage incoming deals" },
           { name: "Email Intake", href: "/email-intake", description: "Review AI-parsed deal emails before approval" },
           { name: "AI Training", href: "/ai-training", description: "Train AI on pipeline review sessions" },
           { name: "CRM", href: "/crm", description: "Contact management & campaign outreach" },
@@ -90,7 +90,7 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
           { name: "Outreach Analytics", href: "/outreach-analytics", description: "Emails sent, open rates & sender health" },
           { name: "Outreach Setup", href: "/outreach-onboarding", description: "Configure senders & campaigns" },
           { name: "LIHTC Scoring", href: "/affordable-housing", description: "NC affordable housing pre-scorer" },
-          { name: "Data Hub", href: "/data-hub", description: "Market intelligence & insights" },
+          { name: userEmail.toLowerCase().endsWith('@apexresi.com') ? "Data Warehouse" : "Data Hub", href: "/data-hub", description: "Market intelligence, deal data, and broker analytics" },
           { name: "LoopNet Review", href: "/listing-review", description: "Review for-sale listings in your markets" },
           { name: "Analytics", href: "/analytics", description: "Performance metrics & charts" },
           { name: "API Monitoring", href: "/api-monitoring", description: "Track API health & costs" }

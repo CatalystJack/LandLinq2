@@ -235,7 +235,10 @@ function Router() {
           <Route path="/api-keys" component={ApiKeysAdmin} />
           <Route path="/underwriting" component={Underwriting} />
           <Route path="/email-intake" component={EmailIntakePage} />
-          <Route path="/dashboard" component={AnalystDashboard} />
+          <Route path="/dashboard" component={() => {
+            const userEmail = String((user as any)?.claims?.email || (user as any)?.email || '').toLowerCase();
+            return userEmail.endsWith('@apexresi.com') ? <ExecutiveDashboard /> : <AnalystDashboard />;
+          }} />
           <Route path="/dashboard-v2" component={AnalystDashboardV2} />
           <Route path="/" component={PortalChooser} />
           {/* Catch all other routes - redirect to main dashboard */}

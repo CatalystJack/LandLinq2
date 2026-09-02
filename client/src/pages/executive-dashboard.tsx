@@ -36,6 +36,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import Navigation from "@/components/navigation";
 
 interface ExecutiveStats {
   deals: {
@@ -431,15 +432,28 @@ export default function ExecutiveDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      <Navigation />
       <div className="p-6 max-w-[1800px] mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-[#081729]" data-testid="text-dashboard-title">
-              Executive Dashboard
+               {isPlatformAdmin ? "Apex Platform Dashboard" : "Executive Dashboard"}
             </h1>
-            <p className="text-gray-500 mt-1">Real-time insights into LandLinq performance</p>
+            <p className="text-gray-500 mt-1">
+              {isPlatformAdmin
+                ? "A parent view of every Investment Company, developer, deal, and platform activity"
+                : "Real-time insights into LandLinq performance"}
+            </p>
           </div>
           <div className="flex items-center gap-4">
+            {isPlatformAdmin && (
+              <Link href="/admin/investment-companies">
+                <Button variant="outline" className="gap-2" data-testid="button-manage-development-partners">
+                  <Building2 size={16} />
+                  Manage Partners
+                </Button>
+              </Link>
+            )}
             <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
               <SheetTrigger asChild>
                 <Button 
@@ -576,16 +590,16 @@ export default function ExecutiveDashboard() {
               <RefreshCw size={16} />
               Refresh
             </Button>
-            <Link href="/analyst-dashboard">
+             <Link href={isPlatformAdmin ? "/admin/master-pipeline" : "/analyst-dashboard"}>
               <Button className="bg-[#081729] hover:bg-[#0a2540]" data-testid="button-go-to-deals">
                 <FileText size={16} className="mr-2" />
-                Deal Dashboard
+                 {isPlatformAdmin ? "All Deal Pipeline" : "Deal Dashboard"}
               </Button>
             </Link>
           </div>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
+         <Tabs defaultValue={isPlatformAdmin ? "system-wide" : "overview"} className="space-y-6">
           <TabsList className={`grid w-full max-w-md ${isPlatformAdmin ? "grid-cols-2" : "grid-cols-1"}`}>
             <TabsTrigger value="overview">LandLinq Overview</TabsTrigger>
             {isPlatformAdmin && <TabsTrigger value="system-wide">System-Wide</TabsTrigger>}
