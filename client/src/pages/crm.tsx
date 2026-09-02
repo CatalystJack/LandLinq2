@@ -14,7 +14,7 @@ import {
   Search, Users, Tag, Mail, Phone, MapPin, Building2, MessageSquare,
   Calendar, ChevronRight, ChevronLeft, X, Plus, Send, FileText, TrendingUp,
   CheckCircle, XCircle, Clock, AlertCircle, MoreHorizontal, RefreshCw,
-  MessageCircle, Filter, Inbox, Upload, UserCheck, Megaphone, Trash2, GitMerge, Settings2, Loader2, AlertTriangle
+  MessageCircle, Filter, Inbox, Upload, UserCheck, Megaphone, Trash2, GitMerge, Settings2, Loader2, AlertTriangle, Pencil
 } from "lucide-react";
 
 interface Contact {
@@ -159,6 +159,7 @@ export default function CRMPage() {
   const [assignedToFilter, setAssignedToFilter] = useState("all");
   const [multiCampaignTagFilter, setMultiCampaignTagFilter] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [detailTab, setDetailTab] = useState<"overview" | "activity">("overview");
   const [editFields, setEditFields] = useState({ firstName: "", lastName: "", email: "", phone: "", brokerage: "" });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showEnrollModal, setShowEnrollModal] = useState(false);
@@ -588,9 +589,9 @@ export default function CRMPage() {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Navigation />
-      <div className="flex flex-1 overflow-hidden min-h-0">
+      <div className="flex flex-1 overflow-hidden min-h-0 bg-[#f3f2ef]">
       {/* LEFT: Contacts List */}
-      <div className={`flex flex-col ${selectedContact ? 'w-[58%]' : 'w-full'} transition-all duration-200 border-r border-gray-200 bg-white`}>
+      <div className={`flex flex-col ${selectedContact ? 'hidden' : 'w-full'} transition-all duration-200 border-r border-gray-200 bg-white`}>
 
         {/* Header */}
         <div className="shrink-0 border-b border-gray-100 px-5 py-4 bg-white">
@@ -1075,95 +1076,556 @@ export default function CRMPage() {
       </div>
 
       {/* RIGHT: Contact Detail Panel */}
-      {selectedContact && (
-        <div className="w-[42%] flex flex-col bg-white border-l border-gray-200 overflow-hidden">
-          {/* Panel Header */}
-          <div className="shrink-0 border-b border-gray-100 px-5 py-4 flex items-start justify-between">
-            <div className="flex-1 min-w-0 pr-2 space-y-1">
-              <div className="flex gap-1">
-                <input
-                  value={editFields.firstName}
-                  placeholder="First name"
-                  className="font-semibold text-gray-800 text-sm bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-400 focus:outline-none w-[45%] min-w-0"
-                  onChange={e => setEditFields(f => ({ ...f, firstName: e.target.value }))}
-                  onBlur={e => {
-                    const val = e.target.value.trim();
-                    if (val !== (selectedContact.firstName || "")) {
-                      updateContactMutation.mutate({ id: selectedContact.id, data: { firstName: val } });
-                      setSelectedContact({ ...selectedContact, firstName: val });
-                    }
-                  }}
-                />
-                <input
-                  value={editFields.lastName}
-                  placeholder="Last name"
-                  className="font-semibold text-gray-800 text-sm bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-400 focus:outline-none flex-1 min-w-0"
-                  onChange={e => setEditFields(f => ({ ...f, lastName: e.target.value }))}
-                  onBlur={e => {
-                    const val = e.target.value.trim();
-                    if (val !== (selectedContact.lastName || "")) {
-                      updateContactMutation.mutate({ id: selectedContact.id, data: { lastName: val } });
-                      setSelectedContact({ ...selectedContact, lastName: val });
-                    }
-                  }}
-                />
-              </div>
-              <input
-                value={editFields.brokerage}
-                placeholder="Brokerage"
-                className="text-xs text-gray-500 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-400 focus:outline-none w-full"
-                onChange={e => setEditFields(f => ({ ...f, brokerage: e.target.value }))}
-                onBlur={e => {
-                  const val = e.target.value.trim();
-                  if (val !== (selectedContact.brokerage || "")) {
-                    updateContactMutation.mutate({ id: selectedContact.id, data: { brokerage: val } });
-                    setSelectedContact({ ...selectedContact, brokerage: val });
-                  }
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              {/* Prev / Next navigation */}
-              {(() => {
-                const idx = contacts.findIndex(c => c.id === selectedContact.id);
-                const hasPrev = idx > 0;
-                const hasNext = idx >= 0 && idx < contacts.length - 1;
-                return (
-                  <>
-                    <button
-                      onClick={() => hasPrev && setSelectedContact(contacts[idx - 1])}
-                      disabled={!hasPrev}
-                      title="Previous contact"
-                      className="text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed p-1 rounded hover:bg-gray-100 transition-colors"
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    <span className="text-[10px] text-gray-300 select-none">{idx >= 0 ? `${idx + 1}/${contacts.length}` : ""}</span>
-                    <button
-                      onClick={() => hasNext && setSelectedContact(contacts[idx + 1])}
-                      disabled={!hasNext}
-                      title="Next contact"
-                      className="text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed p-1 rounded hover:bg-gray-100 transition-colors"
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </>
-                );
-              })()}
+      {selectedContact && (<>
+        <div className="w-full flex flex-col bg-[#f3f2ef] overflow-hidden">
+          {/* Contact record header */}
+          <div className="shrink-0 bg-[#0a3769] text-white px-5 sm:px-8 pt-3 pb-5">
+            <div className="flex items-center justify-between mb-3">
               <button
-                onClick={() => setConfirmDeleteId(selectedContact.id)}
-                className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"
-                title="Delete contact"
+                onClick={() => setSelectedContact(null)}
+                className="inline-flex items-center gap-1.5 text-xs text-blue-100 hover:text-white transition-colors"
               >
-                <Trash2 size={14} />
+                <ChevronLeft size={14} /> Back to contacts
               </button>
-              <button onClick={() => setSelectedContact(null)} className="text-gray-400 hover:text-gray-600 p-1">
-                <X size={16} />
-              </button>
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const idx = contacts.findIndex(c => c.id === selectedContact.id);
+                  const hasPrev = idx > 0;
+                  const hasNext = idx >= 0 && idx < contacts.length - 1;
+                  return (
+                    <>
+                      <button
+                        onClick={() => hasPrev && setSelectedContact(contacts[idx - 1])}
+                        disabled={!hasPrev}
+                        title="Previous contact"
+                        className="p-1.5 rounded text-blue-100 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronLeft size={15} />
+                      </button>
+                      <span className="text-[10px] text-blue-100/70 select-none">{idx >= 0 ? `${idx + 1} of ${contacts.length}` : ""}</span>
+                      <button
+                        onClick={() => hasNext && setSelectedContact(contacts[idx + 1])}
+                        disabled={!hasNext}
+                        title="Next contact"
+                        className="p-1.5 rounded text-blue-100 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronRight size={15} />
+                      </button>
+                      <button
+                        onClick={() => setSelectedContact(null)}
+                        title="Close contact"
+                        className="ml-1 p-1.5 rounded text-blue-100 hover:bg-white/10 hover:text-white transition-colors"
+                      >
+                        <X size={15} />
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-12 h-12 rounded-full bg-[#1176c9] border-2 border-blue-200/50 flex items-center justify-center text-sm font-semibold shrink-0">
+                  {(selectedContact.firstName?.[0] || "").toUpperCase()}{(selectedContact.lastName?.[0] || "").toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input
+                      id="crm-contact-first-name"
+                      value={editFields.firstName}
+                      placeholder="First name"
+                      className="font-semibold text-xl bg-transparent border-b border-transparent hover:border-blue-200 focus:border-white focus:outline-none min-w-0 w-[45%] text-white placeholder:text-blue-200"
+                      onChange={e => setEditFields(f => ({ ...f, firstName: e.target.value }))}
+                      onBlur={e => {
+                        const val = e.target.value.trim();
+                        if (val !== (selectedContact.firstName || "")) {
+                          updateContactMutation.mutate({ id: selectedContact.id, data: { firstName: val } });
+                          setSelectedContact({ ...selectedContact, firstName: val });
+                        }
+                      }}
+                    />
+                    <input
+                      value={editFields.lastName}
+                      placeholder="Last name"
+                      className="font-semibold text-xl bg-transparent border-b border-transparent hover:border-blue-200 focus:border-white focus:outline-none min-w-0 flex-1 text-white placeholder:text-blue-200"
+                      onChange={e => setEditFields(f => ({ ...f, lastName: e.target.value }))}
+                      onBlur={e => {
+                        const val = e.target.value.trim();
+                        if (val !== (selectedContact.lastName || "")) {
+                          updateContactMutation.mutate({ id: selectedContact.id, data: { lastName: val } });
+                          setSelectedContact({ ...selectedContact, lastName: val });
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-blue-100">
+                    <input
+                      value={editFields.brokerage}
+                      placeholder="Company / brokerage"
+                      className="bg-transparent border-b border-transparent hover:border-blue-200 focus:border-white focus:outline-none min-w-0 max-w-[280px] text-blue-100 placeholder:text-blue-200"
+                      onChange={e => setEditFields(f => ({ ...f, brokerage: e.target.value }))}
+                      onBlur={e => {
+                        const val = e.target.value.trim();
+                        if (val !== (selectedContact.brokerage || "")) {
+                          updateContactMutation.mutate({ id: selectedContact.id, data: { brokerage: val } });
+                          setSelectedContact({ ...selectedContact, brokerage: val });
+                        }
+                      }}
+                    />
+                    <span className="text-blue-200/70">•</span>
+                    <span>{selectedContact.assignedTo || "Unassigned"}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {(selectedContact.crmTags || []).slice(0, 3).map(tag => (
+                      <span key={tag} className="rounded bg-white/15 border border-white/20 px-2 py-0.5 text-[10px] text-blue-50">{tag}</span>
+                    ))}
+                    {!selectedContact.isActive && <span className="rounded bg-white/10 border border-white/20 px-2 py-0.5 text-[10px] text-blue-100">Inactive</span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {selectedContact.email && (
+                  <a
+                    href={`mailto:${selectedContact.email}`}
+                    className="inline-flex items-center gap-1.5 rounded border border-blue-200/40 bg-white/5 px-3 py-2 text-xs font-medium text-white hover:bg-white/15 transition-colors"
+                  >
+                    <Mail size={13} /> Email
+                  </a>
+                )}
+                {selectedContact.phone && (
+                  <a
+                    href={`tel:${selectedContact.phone}`}
+                    className="inline-flex items-center gap-1.5 rounded border border-blue-200/40 bg-white/5 px-3 py-2 text-xs font-medium text-white hover:bg-white/15 transition-colors"
+                  >
+                    <Phone size={13} /> Call
+                  </a>
+                )}
+                <button
+                  onClick={() => document.getElementById("crm-contact-first-name")?.focus()}
+                  className="inline-flex items-center gap-1.5 rounded border border-blue-200/40 bg-white/5 px-3 py-2 text-xs font-medium text-white hover:bg-white/15 transition-colors"
+                >
+                  <Pencil size={13} /> Edit
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteId(selectedContact.id)}
+                  title="Delete contact"
+                  className="p-2 rounded border border-red-200/30 bg-white/5 text-red-200 hover:bg-red-500/30 hover:text-white transition-colors"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 pt-4 border-t border-blue-200/20">
+              <div>
+                <p className="text-[9px] uppercase tracking-wider text-blue-200/70 font-semibold">Phone</p>
+                <p className="mt-1 text-xs font-medium text-white">{selectedContact.phone || "—"}</p>
+              </div>
+              <div>
+                <p className="text-[9px] uppercase tracking-wider text-blue-200/70 font-semibold">Email</p>
+                <p className="mt-1 text-xs font-medium text-white truncate">{selectedContact.email || "—"}</p>
+              </div>
+              <div>
+                <p className="text-[9px] uppercase tracking-wider text-blue-200/70 font-semibold">Company</p>
+                <p className="mt-1 text-xs font-medium text-white truncate">{selectedContact.brokerage || "—"}</p>
+              </div>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row">
+            <aside className="w-full lg:w-[30%] lg:min-w-[260px] lg:max-w-[360px] shrink-0 overflow-visible lg:overflow-y-auto bg-white border-b lg:border-b-0 lg:border-r border-gray-200 px-5 py-5">
+              {/* Contact Details */}
+              <div className="border border-gray-200 rounded-sm bg-white">
+                <div className="flex items-center justify-between px-3 py-3 border-b border-gray-200">
+                  <p className="text-xs font-semibold text-gray-700">Contact Details</p>
+                  <button
+                    onClick={() => document.getElementById("crm-contact-first-name")?.focus()}
+                    className="text-[11px] font-medium text-[#1683c5] hover:text-[#0a3769]"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <div className="px-3 divide-y divide-gray-100">
+                  <div className="py-3">
+                    <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Name</p>
+                    <p className="mt-1 text-xs font-medium text-gray-800">{selectedContact.firstName} {selectedContact.lastName}</p>
+                  </div>
+                  <div className="py-3">
+                    <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Email</p>
+                    <input
+                      value={editFields.email}
+                      placeholder="Email address"
+                      type="email"
+                      className="mt-1 w-full bg-transparent border-b border-gray-200 focus:border-[#1683c5] focus:outline-none text-xs text-[#1683c5] pb-1"
+                      onChange={e => setEditFields(f => ({ ...f, email: e.target.value }))}
+                      onBlur={e => {
+                        const val = e.target.value.trim();
+                        if (val !== (selectedContact.email || "")) {
+                          updateContactMutation.mutate({ id: selectedContact.id, data: { email: val } });
+                          setSelectedContact({ ...selectedContact, email: val });
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="py-3">
+                    <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Phone</p>
+                    <input
+                      value={editFields.phone}
+                      placeholder="Phone number"
+                      type="tel"
+                      className="mt-1 w-full bg-transparent border-b border-gray-200 focus:border-[#1683c5] focus:outline-none text-xs text-[#1683c5] pb-1"
+                      onChange={e => setEditFields(f => ({ ...f, phone: e.target.value }))}
+                      onBlur={e => {
+                        const val = e.target.value.trim();
+                        if (val !== (selectedContact.phone || "")) {
+                          updateContactMutation.mutate({ id: selectedContact.id, data: { phone: val } });
+                          setSelectedContact({ ...selectedContact, phone: val });
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="py-3">
+                    <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Account / Company</p>
+                    <p className="mt-1 text-xs text-gray-700">{selectedContact.brokerage || "—"}</p>
+                  </div>
+                  <div className="py-3">
+                    <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Assigned to</p>
+                    <Input
+                      placeholder="Assign to team member..."
+                      defaultValue={selectedContact.assignedTo || ""}
+                      className="mt-1 h-7 text-xs px-0 border-0 border-b border-gray-200 rounded-none focus-visible:ring-0 focus-visible:border-[#1683c5]"
+                      onBlur={e => {
+                        if (e.target.value !== (selectedContact.assignedTo || "")) {
+                          updateContactMutation.mutate({ id: selectedContact.id, data: { assignedTo: e.target.value } });
+                          setSelectedContact({ ...selectedContact, assignedTo: e.target.value || undefined });
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="py-3">
+                    <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Contact type</p>
+                    <span className="inline-flex mt-1 rounded bg-gray-100 px-2 py-1 text-[10px] font-medium text-gray-600">
+                      {(selectedContact.crmTags || [])[0] || "Broker contact"}
+                    </span>
+                  </div>
+                  <div className="py-3">
+                    <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Lead source</p>
+                    <p className="mt-1 text-xs text-gray-500">—</p>
+                  </div>
+                  <div className="py-3">
+                    <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Last contacted</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {selectedContact.lastContactedAt ? new Date(selectedContact.lastContactedAt).toLocaleDateString() : "—"}
+                    </p>
+                  </div>
+                  <div className="py-3">
+                    <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Created date</p>
+                    <p className="mt-1 text-xs text-gray-700">
+                      {selectedContact.createdAt ? new Date(selectedContact.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact metadata rail */}
+              <div className="mt-4 border border-gray-200 rounded-sm bg-white p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-700">Contact preferences</p>
+                  <MessageCircle size={14} className={selectedContact.smsOptIn ? "text-green-500" : "text-gray-300"} />
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">SMS status</span>
+                  <span className={selectedContact.smsOptIn ? "text-green-600 font-medium" : "text-gray-400"}>
+                    {selectedContact.smsOptIn ? "Opted in" : "Opted out"}
+                  </span>
+                </div>
+                {(selectedContact.marketsCovered || []).length > 0 && (
+                  <div className="text-xs">
+                    <p className="text-gray-400 mb-1">Markets covered</p>
+                    <p className="text-gray-700">{(selectedContact.marketsCovered || []).join(", ")}</p>
+                  </div>
+                )}
+              </div>
+            </aside>
+
+            <main className="flex-1 min-w-0 overflow-visible lg:overflow-y-auto bg-[#f3f2ef]">
+              <div className="sticky top-0 z-10 flex items-center gap-6 h-12 px-5 sm:px-7 bg-white border-b border-gray-200">
+                <button
+                  onClick={() => setDetailTab("overview")}
+                  className={`h-full border-b-2 text-xs font-medium transition-colors ${detailTab === "overview" ? "border-[#1683c5] text-[#1683c5]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+                >
+                  Overview
+                </button>
+                <button
+                  onClick={() => setDetailTab("activity")}
+                  className={`h-full border-b-2 text-xs font-medium transition-colors ${detailTab === "activity" ? "border-[#1683c5] text-[#1683c5]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+                >
+                  Activity
+                </button>
+              </div>
+
+              <div className="p-5 sm:p-7">
+                {detailTab === "overview" ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="bg-white border border-gray-200 rounded-sm p-3">
+                        <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Created</p>
+                        <p className="mt-1 text-xs font-semibold text-gray-800">
+                          {selectedContact.createdAt ? new Date(selectedContact.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                        </p>
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-sm p-3">
+                        <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Type</p>
+                        <p className="mt-1 text-xs font-semibold text-gray-800">{(selectedContact.crmTags || [])[0] || "Broker contact"}</p>
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-sm p-3">
+                        <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Deals</p>
+                        <p className="mt-1 text-xs font-semibold text-gray-800">{selectedContact.dealCount || 0}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                        <UserCheck size={13} className="text-gray-500" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">Contact created</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          Added via manual entry · {selectedContact.createdAt ? new Date(selectedContact.createdAt).toLocaleDateString() : "date unavailable"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tags */}
+                    <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-gray-700">Tags</p>
+                        <span className="text-[10px] text-gray-400">{(selectedContact.crmTags || []).length} applied</span>
+                      </div>
+                      {(selectedContact.crmTags || []).length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {(selectedContact.crmTags || []).map(tag => {
+                            const isOutreach = (outreachTagsQuery.data || []).some(ot => ot.tag === tag);
+                            return (
+                              <span key={tag} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border ${isOutreach ? "bg-violet-50 text-violet-700 border-violet-200" : tagColor(tag)}`}>
+                                {isOutreach && <Megaphone size={9} />}
+                                {tag}
+                                <button onClick={() => removeTagFromContact(selectedContact, tag)} className="hover:opacity-70 ml-0.5">
+                                  <X size={10} />
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <Input
+                          placeholder="Add tag..."
+                          value={newTagInput}
+                          onChange={e => setNewTagInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter" && newTagInput.trim()) {
+                              addTagToContact(selectedContact, newTagInput.trim().toLowerCase().replace(/\s+/g, "-"));
+                              setNewTagInput("");
+                            }
+                          }}
+                          className="h-7 text-[11px] max-w-[180px]"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2"
+                          disabled={!newTagInput.trim()}
+                          onClick={() => {
+                            if (newTagInput.trim()) {
+                              addTagToContact(selectedContact, newTagInput.trim().toLowerCase().replace(/\s+/g, "-"));
+                              setNewTagInput("");
+                            }
+                          }}
+                        >
+                          <Plus size={11} />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {(outreachTagsQuery.data || []).length > 0 && (
+                      <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 space-y-3">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-700">Outreach campaigns</p>
+                          <p className="text-[11px] text-gray-400 mt-0.5">Select a campaign to tag and enroll this contact.</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(outreachTagsQuery.data || []).map(ot => {
+                            const applied = (selectedContact.crmTags || []).includes(ot.tag);
+                            const activeEnrollment = (activityQuery.data?.enrollments || []).find(
+                              (e: any) => e.template_id === ot.id && ["pending", "in_progress"].includes(e.status)
+                            );
+                            return applied ? (
+                              <span key={ot.id} className="inline-flex items-center overflow-hidden rounded-full border border-violet-600 bg-violet-600 text-[11px] font-medium text-white">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1">
+                                  <Megaphone size={9} />{ot.name}
+                                  {activeEnrollment && <span className="rounded-full bg-green-500 px-1 text-[9px]">Active</span>}
+                                </span>
+                                <button
+                                  onClick={() => removeTagFromContact(selectedContact, ot.tag)}
+                                  title={`Remove "${ot.name}" tag`}
+                                  className="self-stretch px-2 hover:bg-violet-800"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                key={ot.id}
+                                onClick={() => {
+                                  addTagToContact(selectedContact, ot.tag);
+                                  enrollMutation.mutate({ id: selectedContact.id, templateId: ot.id, senderId: ot.senderId });
+                                }}
+                                className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+                              >
+                                <Megaphone size={9} />{ot.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notes */}
+                    <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 space-y-2">
+                      <p className="text-xs font-semibold text-gray-700">Notes</p>
+                      <Textarea
+                        key={selectedContact.id}
+                        placeholder="Add internal notes about this contact..."
+                        defaultValue={selectedContact.crmNotes || ""}
+                        rows={3}
+                        className="text-xs resize-none"
+                        onBlur={e => {
+                          if (e.target.value !== (selectedContact.crmNotes || "")) {
+                            updateContactMutation.mutate({ id: selectedContact.id, data: { crmNotes: e.target.value } });
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {/* Campaign Enrollments */}
+                    <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-gray-700">Campaign enrollments</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[11px] px-2"
+                          onClick={() => { setEnrollTargetId(selectedContact.id); setShowEnrollModal(true); }}
+                        >
+                          <Plus size={11} className="mr-1" />Enroll
+                        </Button>
+                      </div>
+                      {activityQuery.isLoading ? (
+                        <div className="h-8 bg-gray-100 rounded animate-pulse" />
+                      ) : activityQuery.isError ? (
+                        <p className="text-xs text-red-400 italic">Could not load enrollments</p>
+                      ) : (activityQuery.data?.enrollments || []).length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">Not enrolled in any campaigns</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {(activityQuery.data?.enrollments || []).map((e: any) => (
+                            <div key={e.id} className="flex items-center justify-between bg-gray-50 rounded px-3 py-2 border border-gray-100">
+                              <div>
+                                <p className="text-xs font-medium text-gray-700">{e.template_name || "Campaign"}</p>
+                                <p className="text-[10px] text-gray-400">
+                                  Step {(e.current_step_index || 0) + 1} · {e.status}
+                                  {e.next_send_at && ` · Next: ${new Date(e.next_send_at).toLocaleDateString()}`}
+                                </p>
+                              </div>
+                              {(e.status === "pending" || e.status === "in_progress") && (
+                                <button onClick={() => cancelEnrollmentMutation.mutate(e.id)} className="text-red-400 hover:text-red-600 text-[10px]">Cancel</button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Deals */}
+                    <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 space-y-3">
+                      <p className="text-xs font-semibold text-gray-700">Deals ({activityQuery.data?.deals?.length || 0})</p>
+                      {activityQuery.isLoading ? (
+                        <div className="h-8 bg-gray-100 rounded animate-pulse" />
+                      ) : activityQuery.isError ? (
+                        <p className="text-xs text-red-400 italic">Could not load deals</p>
+                      ) : (activityQuery.data?.deals || []).length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">No deals submitted</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {(activityQuery.data?.deals || []).map((deal: any) => (
+                            <div key={deal.id} className="flex items-center justify-between bg-gray-50 rounded px-3 py-2 border border-gray-100">
+                              <div>
+                                <p className="text-xs font-medium text-gray-700">#{deal.dealNumber} — {deal.address}, {deal.city}, {deal.state}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  {classificationBadge(deal.classification)}
+                                  <span className="text-[10px] text-gray-400">{deal.createdAt ? new Date(deal.createdAt).toLocaleDateString() : ""}</span>
+                                </div>
+                              </div>
+                              <a href={`/analyst-dashboard?deal=${deal.id}`} target="_blank" className="text-blue-400 hover:text-blue-600"><ChevronRight size={14} /></a>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="bg-white border border-gray-200 rounded-sm p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700">Activity timeline</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Recent emails and SMS activity for this contact</p>
+                      </div>
+                      <span className="text-[10px] text-gray-400">{(activityQuery.data?.communications || []).length} records</span>
+                    </div>
+                    {activityQuery.isLoading ? (
+                      <div className="h-20 bg-gray-100 rounded animate-pulse" />
+                    ) : activityQuery.isError ? (
+                      <p className="text-xs text-red-400 italic">Could not load communications</p>
+                    ) : (activityQuery.data?.communications || []).length === 0 ? (
+                      <div className="py-12 text-center">
+                        <MessageSquare size={24} className="mx-auto mb-2 text-gray-300" />
+                        <p className="text-xs text-gray-400">No communications recorded</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-0 divide-y divide-gray-100">
+                        {(activityQuery.data?.communications || []).map((c: any) => (
+                          <div key={c.id} className="flex gap-3 py-3 first:pt-0 last:pb-0 text-xs text-gray-600">
+                            <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                              {c.type === "email" ? (
+                                <Mail size={12} className={c.direction === "outbound" ? "text-blue-500" : "text-gray-400"} />
+                              ) : (
+                                <MessageSquare size={12} className={c.direction === "outbound" ? "text-green-500" : "text-gray-400"} />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium truncate">{c.subject || (c.type === "sms" ? "SMS" : "Email")}</span>
+                                <span className="text-[10px] text-gray-400 shrink-0">{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ""}</span>
+                              </div>
+                              <p className="text-[10px] text-gray-400 mt-0.5">{c.direction === "outbound" ? "Sent" : "Received"} · {c.type === "sms" ? "SMS" : "Email"}</p>
+                              {c.body && typeof c.body === "string" && <p className="text-[11px] text-gray-500 mt-1">{c.body.substring(0, 180)}</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </main>
+          </div>
+        </div>
+          {false && (
+          <div>
+            {/* Legacy contact detail layout retained temporarily during the visual migration. */}
             {/* Contact Info */}
             <div className="space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Contact Info</p>
@@ -1516,8 +1978,8 @@ export default function CRMPage() {
               )}
             </div>
           </div>
-        </div>
-      )}
+          )}
+      </>)}
 
       </div> {/* end inner flex row */}
 

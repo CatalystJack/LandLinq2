@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { useState, useMemo, memo } from "react";
 import { AuthModal } from "@/components/auth-modal";
+import { preloadRoute } from "@/lib/route-preload";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -297,9 +298,12 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
                         data-nav-item={item.href}
                         className={`whitespace-nowrap rounded-md px-1.5 py-2 text-xs font-medium transition-colors lg:px-2 lg:text-sm ${
                           isActive
-                            ? "bg-white/10 text-cyan-300"
-                            : "text-white hover:bg-white/5 hover:text-cyan-300"
+                            ? "text-cyan-300"
+                            : "text-white hover:text-cyan-300"
                         }`}
+                        onMouseEnter={() => preloadRoute(item.href)}
+                        onFocus={() => preloadRoute(item.href)}
+                        onTouchStart={() => preloadRoute(item.href)}
                         data-testid={`nav-link-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
                         title={item.description}
                       >
@@ -322,9 +326,11 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
                         <button
                           className={`flex items-center gap-1 py-2 px-2 lg:px-3 text-xs lg:text-sm font-medium transition-colors rounded-md focus:outline-none ${
                             hasActiveItem
-                              ? "text-cyan-300 bg-white/10"
-                              : "text-white hover:text-cyan-300 hover:bg-white/5"
+                              ? "text-cyan-300"
+                              : "text-white hover:text-cyan-300"
                           }`}
+                          onMouseEnter={() => section.items.forEach((item) => preloadRoute(item.href))}
+                          onFocus={() => section.items.forEach((item) => preloadRoute(item.href))}
                           data-testid={`nav-section-${section.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
                         >
                           {section.name}
@@ -338,7 +344,13 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
                             asChild
                             className="focus:bg-blue-100 hover:bg-blue-100 cursor-pointer"
                           >
-                            <Link href={item.href} className="w-full text-slate-800 hover:text-blue-600">
+                            <Link
+                              href={item.href}
+                              className="w-full text-slate-800 hover:text-blue-600"
+                              onMouseEnter={() => preloadRoute(item.href)}
+                              onFocus={() => preloadRoute(item.href)}
+                              onTouchStart={() => preloadRoute(item.href)}
+                            >
                               {item.name}
                             </Link>
                           </DropdownMenuItem>
@@ -379,7 +391,15 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              onClick={() => {
+                const nextOpen = !isMobileMenuOpen;
+                if (nextOpen) {
+                  navigation.forEach((item: any) => {
+                    if (item.href) preloadRoute(item.href);
+                  });
+                }
+                setIsMobileMenuOpen(nextOpen);
+              }}
               data-testid="button-mobile-menu"
             >
               {isMobileMenuOpen ? (
@@ -465,6 +485,9 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
                         ? "text-white"
                         : "text-slate-300 hover:text-white"
                     }`}
+                      onMouseEnter={() => preloadRoute(item.href)}
+                      onFocus={() => preloadRoute(item.href)}
+                      onTouchStart={() => preloadRoute(item.href)}
                     onClick={() => setIsMobileMenuOpen(false)}
                     data-testid={`mobile-nav-link-${item.name.toLowerCase().replace(/ /g, "-")}`}
                   >

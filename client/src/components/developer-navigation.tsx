@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { preloadRoute } from "@/lib/route-preload";
 
 const tabs = [
   { label: "Deal Dashboard", href: "/developer/dashboard" },
@@ -48,9 +49,11 @@ export default function DeveloperNavigation() {
                 className="shrink-0 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:px-4"
                 style={{
                   color: isActive ? primaryColor : "#64748b",
-                  backgroundColor: isActive ? `${secondaryColor}18` : "transparent",
                   borderBottom: isActive ? `2px solid ${secondaryColor}` : "2px solid transparent",
                 }}
+                onMouseEnter={() => preloadRoute(tab.href)}
+                onFocus={() => preloadRoute(tab.href)}
+                onTouchStart={() => preloadRoute(tab.href)}
               >
                 {tab.label}
               </Link>
