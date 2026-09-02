@@ -201,6 +201,16 @@ app.get("/ping", (req, res) => {
   res.status(200).send("pong");
 });
 
+// Replit VM promotion probes GET / immediately after the port opens. Route
+// registration and static asset setup are intentionally deferred below, so
+// provide a temporary 200 response until the real frontend handler is ready.
+app.get("/", (req, res, next) => {
+  if (!heavyInitComplete) {
+    return res.status(200).type("text/plain").send("LandLinq is starting");
+  }
+  next();
+});
+
 app.get("/ready", (req, res) => {
   // INSTANT response for deployment - check env vars only (synchronous)
   const hasRequiredEnvVars = !!(process.env.DATABASE_URL && process.env.SESSION_SECRET);
