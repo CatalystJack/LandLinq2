@@ -42,6 +42,84 @@ interface ActivityData {
   enrollments: any[];
 }
 
+interface ContactsResponse {
+  contacts: Contact[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+}
+
+function asStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string")
+      .map(item => item.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value !== "string" || !value.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return asStringArray(parsed);
+  } catch {
+    // Legacy rows may store comma- or semicolon-delimited text instead of JSON.
+  }
+
+  return value.split(/[;,]/).map(item => item.trim()).filter(Boolean);
+}
+
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+async function fetchJson(url: string): Promise<unknown> {
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) {
+    const message = await response.text().catch(() => response.statusText);
+    throw new Error(`${response.status}: ${message}`);
+  }
+  return response.json();
+}
+
+function normalizeContactsResponse(value: unknown): ContactsResponse {
+  const payload = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const rawContacts = asArray<Record<string, unknown>>(payload.contacts);
+  const rawPagination = payload.pagination && typeof payload.pagination === "object"
+    ? payload.pagination as Record<string, unknown>
+    : undefined;
+
+  const numberOr = (input: unknown, fallback: number) => {
+    const parsed = Number(input);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  return {
+    contacts: rawContacts.map(contact => ({
+      ...contact,
+      id: String(contact.id || ""),
+      firstName: String(contact.firstName || ""),
+      lastName: String(contact.lastName || ""),
+      crmTags: asStringArray(contact.crmTags),
+      marketsCovered: asStringArray(contact.marketsCovered),
+      dealCount: numberOr(contact.dealCount, 0),
+    } as Contact)),
+    pagination: rawPagination ? {
+      page: numberOr(rawPagination.page, 1),
+      limit: numberOr(rawPagination.limit, rawContacts.length),
+      total: numberOr(rawPagination.total, rawContacts.length),
+      totalPages: numberOr(rawPagination.totalPages, 1),
+      hasNextPage: rawPagination.hasNextPage === true,
+      hasPrevPage: rawPagination.hasPrevPage === true,
+    } : undefined,
+  };
+}
+
 const TAG_COLORS: Record<string, string> = {
   "hot-lead": "bg-red-100 text-red-700 border-red-200",
   "warm": "bg-orange-100 text-orange-700 border-orange-200",
@@ -53,8 +131,9 @@ const TAG_COLORS: Record<string, string> = {
   "do-not-contact": "bg-red-200 text-red-800 border-red-300",
 };
 
-function tagColor(tag: string) {
-  return TAG_COLORS[tag.toLowerCase()] || "bg-indigo-50 text-indigo-700 border-indigo-200";
+function tagColor(tag: unknown) {
+  const normalizedTag = String(tag || "").toLowerCase();
+  return TAG_COLORS[normalizedTag] || "bg-indigo-50 text-indigo-700 border-indigo-200";
 }
 
 function classificationBadge(c: string) {
@@ -123,7 +202,7 @@ export default function CRMPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [tagDropdownOpen]);
 
-  const contactsQuery = useQuery<{ contacts: Contact[]; pagination: any }>({
+  const contactsQuery = useQuery<ContactsResponse>({
     queryKey: ["/api/crm/contacts", page, limit, search, tagFilter, marketFilter, smsFilter, stateFilter, msaFilter, countyFilter, assignedToFilter, multiCampaignTagFilter],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), limit: limit === "all" ? "9999" : String(limit) });
@@ -136,7 +215,7 @@ export default function CRMPage() {
       if (countyFilter && countyFilter !== "all") params.set("county", countyFilter);
       if (assignedToFilter && assignedToFilter !== "all") params.set("assignedTo", assignedToFilter);
       if (multiCampaignTagFilter) params.set("multiCampaignTag", "true");
-      return fetch(`/api/crm/contacts?${params}`).then(r => r.json());
+      return fetchJson(`/api/crm/contacts?${params}`).then(normalizeContactsResponse);
     },
   });
 
@@ -146,12 +225,41 @@ export default function CRMPage() {
     countiesByMsa: Record<string, string[]>;
     counties: string[];
     assignedTos: string[];
-  }>({ queryKey: ["/api/crm/geo-options"] });
+  }>({
+    queryKey: ["/api/crm/geo-options"],
+    queryFn: async () => {
+      const value = await fetchJson("/api/crm/geo-options");
+      const payload = value && typeof value === "object" ? value as Record<string, unknown> : {};
+      const rawMsas = payload.msasByState && typeof payload.msasByState === "object"
+        ? payload.msasByState as Record<string, unknown>
+        : {};
+      const rawCounties = payload.countiesByMsa && typeof payload.countiesByMsa === "object"
+        ? payload.countiesByMsa as Record<string, unknown>
+        : {};
+      return {
+        states: asStringArray(payload.states),
+        msasByState: Object.fromEntries(Object.entries(rawMsas).map(([key, item]) => [key, asStringArray(item)])),
+        countiesByMsa: Object.fromEntries(Object.entries(rawCounties).map(([key, item]) => [key, asStringArray(item)])),
+        counties: asStringArray(payload.counties),
+        assignedTos: asStringArray(payload.assignedTos),
+      };
+    },
+  });
 
-  const tagsQuery = useQuery<string[]>({ queryKey: ["/api/crm/tags"] });
+  const tagsQuery = useQuery<string[]>({
+    queryKey: ["/api/crm/tags"],
+    queryFn: () => fetchJson("/api/crm/tags").then(asStringArray),
+  });
 
   const outreachTagsQuery = useQuery<{ id: string; name: string; tag: string; senderId: string | null; senderName: string | null }[]>({
     queryKey: ["/api/crm/outreach-tags"],
+    queryFn: () => fetchJson("/api/crm/outreach-tags").then(value => asArray<any>(value).map(item => ({
+      id: String(item?.id || ""),
+      name: String(item?.name || ""),
+      tag: String(item?.tag || ""),
+      senderId: item?.senderId ? String(item.senderId) : null,
+      senderName: item?.senderName ? String(item.senderName) : null,
+    })).filter(item => item.id && item.tag)),
   });
 
   const activityQuery = useQuery<ActivityData>({
@@ -167,7 +275,10 @@ export default function CRMPage() {
     enabled: !!selectedContact,
   });
 
-  const campaignsQuery = useQuery<any[]>({ queryKey: ["/api/crm/campaigns"] });
+  const campaignsQuery = useQuery<any[]>({
+    queryKey: ["/api/crm/campaigns"],
+    queryFn: () => fetchJson("/api/crm/campaigns").then(asArray),
+  });
 
   const updateContactMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
@@ -442,7 +553,7 @@ export default function CRMPage() {
     URL.revokeObjectURL(url);
   };
 
-  const contacts = contactsQuery.data?.contacts || [];
+  const contacts = asArray<Contact>(contactsQuery.data?.contacts);
   const pagination = contactsQuery.data?.pagination;
 
   const allSelected = contacts.length > 0 && contacts.every(c => selectedIds.has(c.id));
@@ -777,6 +888,15 @@ export default function CRMPage() {
             </Select>
           </div>
         </div>
+
+        {contactsQuery.isError && (
+          <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-center justify-between gap-3">
+            <span>Contacts could not be loaded. The rest of the CRM is still available.</span>
+            <Button size="sm" variant="outline" onClick={() => contactsQuery.refetch()}>
+              <RefreshCw size={12} className="mr-1" /> Try again
+            </Button>
+          </div>
+        )}
 
         {/* Table */}
         <div className="flex-1 overflow-auto">

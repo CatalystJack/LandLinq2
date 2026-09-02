@@ -6,6 +6,7 @@ const tabs = [
   { label: "CRM", href: "/developer/crm" },
   { label: "Outreach", href: "/developer/outreach" },
   { label: "Analytics", href: "/developer/analytics" },
+  { label: "User Management", href: "/developer/user-management" },
   { label: "Settings", href: "/developer/settings" },
 ];
 

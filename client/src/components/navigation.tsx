@@ -8,7 +8,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -283,8 +282,36 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
               );
             })}
             
-            {/* Authenticated navigation - one dropdown tab per section */}
-            {isAuthenticated && navigationSections.length > 0 && (
+            {/* Authenticated non-Apex navigation - direct tabs across the header */}
+            {isAuthenticated && !isApexUser && landlinqNav.length > 0 && (
+              <div className="flex max-w-[calc(100vw-250px)] items-center gap-0.5 overflow-x-auto lg:gap-1">
+                {landlinqNav
+                  .filter((item: any) => !item.section)
+                  .map((item: any) => {
+                    const isActive = location === item.href;
+
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        data-nav-item={item.href}
+                        className={`whitespace-nowrap rounded-md px-1.5 py-2 text-xs font-medium transition-colors lg:px-2 lg:text-sm ${
+                          isActive
+                            ? "bg-white/10 text-cyan-300"
+                            : "text-white hover:bg-white/5 hover:text-cyan-300"
+                        }`}
+                        data-testid={`nav-link-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                        title={item.description}
+                      >
+                        {item.name}
+                      </Link>
+                    );
+                  })}
+              </div>
+            )}
+
+            {/* Authenticated Apex navigation - one dropdown tab per section */}
+            {isAuthenticated && isApexUser && navigationSections.length > 0 && (
               <div className="flex items-center gap-0.5 lg:gap-1">
                 {navigationSections.map((section) => {
                   const hasActiveItem = section.items.some((item) => location === item.href);

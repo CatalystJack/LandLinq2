@@ -83,6 +83,7 @@ const DeveloperDashboard = lazy(() => import("@/pages/developer-dashboard"));
 const DeveloperCrm = lazy(() => import("@/pages/developer-crm"));
 const DeveloperOutreach = lazy(() => import("@/pages/developer-outreach"));
 const DeveloperAnalytics = lazy(() => import("@/pages/developer-analytics"));
+const DeveloperUserManagement = lazy(() => import("@/pages/developer-user-management"));
 const DeveloperCriteriaSettings = lazy(() => import("@/pages/developer-criteria-settings"));
 const DeveloperLogin = lazy(() => import("@/pages/developer-login"));
 
@@ -170,6 +171,7 @@ function Router() {
           <Route path="/developer/crm" component={DeveloperCrm} />
           <Route path="/developer/outreach" component={DeveloperOutreach} />
           <Route path="/developer/analytics" component={DeveloperAnalytics} />
+          <Route path="/developer/user-management" component={DeveloperUserManagement} />
           <Route path="/developer/settings" component={DeveloperCriteriaSettings} />
           <Route>
             {() => {

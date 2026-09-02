@@ -2604,6 +2604,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     '/developer/crm',
     '/developer/outreach',
     '/developer/analytics',
+    '/developer/user-management',
     '/developer/settings',
   ]);
   app.use(async (req: any, res: any, next: any) => {
