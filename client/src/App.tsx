@@ -64,7 +64,6 @@ const AcquisitionCriteriaPage = lazy(() => import("@/pages/acquisition-criteria"
 const DatabaseManagement = lazy(() => import("@/pages/database-management"));
 const LandLinqDiscovery = lazy(() => import("@/pages/landlinq-discovery"));
 const ListingReview = lazy(() => import("@/pages/listing-review"));
-const AIInsights = lazy(() => import("@/pages/ai-insights"));
 const AITraining = lazy(() => import("@/pages/ai-training"));
 const ViewDeals = lazy(() => import("@/pages/view-deals"));
 const Reports = lazy(() => import("@/pages/reports"));
@@ -195,7 +194,6 @@ function Router() {
           <Route path="/analytics" component={AnalyticsPage} />
           <Route path="/api-monitoring" component={ApiMonitoring} />
           <Route path="/messaging" component={MessagingPage} />
-          <Route path="/ai-insights" component={AIInsights} />
           <Route path="/ai-training" component={AITraining} />
           <Route path="/email-preview" component={EmailPreview} />
           <Route path="/email-builder" component={TemplateEditor} />

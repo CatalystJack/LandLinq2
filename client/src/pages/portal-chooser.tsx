@@ -17,8 +17,8 @@ export default function PortalChooser() {
       <div className="mx-auto flex min-h-[calc(100vh-6rem)] max-w-4xl items-center justify-center">
         <Card className="w-full overflow-hidden border-slate-200/80 shadow-xl">
           <CardHeader className="space-y-4 border-b bg-white/80 px-6 py-8 text-center sm:px-10">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-catalyst-gold/15 text-catalyst-gold">
-              <Building2 className="h-7 w-7" aria-hidden="true" />
+            <div className="mx-auto flex h-14 w-24 items-center justify-center rounded-2xl bg-slate-50 p-2">
+              <img src="/assets/landlinq-color-icon.png" alt="LandLinq" className="h-full w-full object-contain" />
             </div>
             <div className="space-y-2">
               <CardTitle className="text-2xl text-catalyst-gray-900 sm:text-3xl">

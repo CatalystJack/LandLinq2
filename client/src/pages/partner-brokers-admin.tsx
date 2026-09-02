@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Users, Plus, Pencil, Trash2, X, Search,
   CheckCircle, Clock, XCircle, Mail, Phone,
-  Building2, ShieldCheck, ShieldOff, TrendingUp, ExternalLink
+  Building2, ShieldCheck, ShieldOff, TrendingUp
 } from "lucide-react";
 
 type BrokerAccount = {
@@ -341,9 +341,6 @@ function DealApprovalsTab() {
     const brokerName = [deal.broker_first_name, deal.broker_last_name].filter(Boolean).join(" ");
     const company = deal.broker_brokerage || deal.broker_company || null;
 
-    // Always use the analyst dashboard to generate the exact same jsPDF investment memo
-    const memoUrl = `/analyst-dashboard?memo=${deal.id}`;
-
     return (
       <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
         <td className="px-4 py-3">
@@ -388,15 +385,6 @@ function DealApprovalsTab() {
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
-            <a
-              href={memoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open investment memo in analyst dashboard"
-              className="inline-flex items-center gap-1 text-xs text-blue-600 border border-blue-200 px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
-            >
-              <ExternalLink className="w-3 h-3" /> Memo
-            </a>
             <button
               disabled={isPending}
               onClick={() => {

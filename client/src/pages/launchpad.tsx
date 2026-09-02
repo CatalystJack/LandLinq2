@@ -12,14 +12,10 @@ import {
   Settings,
   BarChart3, 
   Building2, 
-  Calendar,
-  Globe,
   ExternalLink,
   Database,
   MonitorCheck,
   RefreshCw,
-  FileText,
-  TrendingUp,
   Calculator,
   BookUser,
   Rss,
@@ -27,12 +23,6 @@ import {
   Inbox,
   Brain
 } from "lucide-react";
-import { 
-  SiClickup, 
-  SiHubspot, 
-  SiGooglenews
-} from "react-icons/si";
-import { FaShareAlt, FaChartLine, FaCalendarAlt, FaEnvelope } from "react-icons/fa";
 
 interface LaunchpadTile {
   name: string;
@@ -223,183 +213,6 @@ export default function Launchpad() {
       href: "/market-intelligence",
       color: "bg-blue-700",
       category: 'internal'
-    }
-  ];
-
-  const externalTools: LaunchpadTile[] = [
-    {
-      name: "Catalyst Website",
-      description: "catalystcp.com",
-      icon: Globe,
-      href: "https://www.catalystcp.com",
-      color: "bg-[#1a365d]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "SharePoint",
-      description: "Team files & documents",
-      icon: FaShareAlt,
-      href: "https://catalystcp.sharepoint.com",
-      color: "bg-[#038387]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "ClickUp",
-      description: "Project management",
-      icon: SiClickup,
-      href: "https://app.clickup.com",
-      color: "bg-gradient-to-br from-[#7B68EE] to-[#49CCF9]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "HubSpot",
-      description: "CRM & contacts",
-      icon: SiHubspot,
-      href: "https://app.hubspot.com",
-      color: "bg-[#FF7A59]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "Northspyre",
-      description: "Development project management",
-      icon: Building2,
-      href: "https://app.northspyre.com",
-      color: "bg-[#0052CC]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "Outlook Calendar",
-      description: "Schedule & meetings",
-      icon: FaCalendarAlt,
-      href: "https://outlook.office.com/calendar",
-      color: "bg-[#0078D4]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "Outlook Mail",
-      description: "Email inbox",
-      icon: FaEnvelope,
-      href: "https://outlook.office.com/mail",
-      color: "bg-[#0078D4]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "CoStar",
-      description: "Commercial real estate data",
-      icon: Building2,
-      href: "https://www.costar.com",
-      color: "bg-[#003865]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "ESRI / ArcGIS",
-      description: "Mapping & GIS analytics",
-      icon: Globe,
-      href: "https://www.arcgis.com",
-      color: "bg-[#007AC2]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "Google News",
-      description: "Latest headlines",
-      icon: SiGooglenews,
-      href: "https://news.google.com",
-      color: "bg-[#4285F4]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "Bloomberg Markets",
-      description: "Financial news & data",
-      icon: FaChartLine,
-      href: "https://www.bloomberg.com/markets",
-      color: "bg-[#2800D7]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "Corporate Profile",
-      description: "Company deck & overview",
-      icon: FileText,
-      href: "/catalyst-corporate-profile.pdf",
-      color: "bg-[#1a365d]",
-      external: true,
-      category: 'external'
-    },
-    {
-      name: "Finance Request Form",
-      description: "Submit finance requests",
-      icon: FileText,
-      href: "https://forms.clickup.com/9017649246/f/8cqwu2y-797/MRS7DUIQV0T7D9G7T4",
-      color: "bg-gradient-to-br from-[#7B68EE] to-[#49CCF9]",
-      external: true,
-      category: 'external'
-    }
-  ];
-
-  const underwritingTools: LaunchpadTile[] = [
-    {
-      name: "Deal Underwriter",
-      description: "Automated yield-on-cost calculator",
-      icon: Calculator,
-      href: "/underwriting",
-      color: "bg-blue-700",
-      external: false,
-      category: 'underwriting'
-    },
-    {
-      name: "Underwriting Assumptions",
-      description: "SharePoint underwriting files",
-      icon: Calculator,
-      href: "https://catalystcp.sharepoint.com/:w:/s/CCPTeam/IQCdBHghMZEbR4pmJeML_zLXAbFwqt8uK_-OfnigqOHA4TU?e=cGsTrZ",
-      color: "bg-emerald-700",
-      external: true,
-      category: 'underwriting'
-    },
-    {
-      name: "Apartment Templates",
-      description: "SharePoint apartment templates",
-      icon: Building2,
-      href: "https://catalystcp.sharepoint.com/:f:/s/CCPTeam/IgClXJzlgxBeS78o7lFEbAcSAWEhPBTFiEzAPwvbT-YlNd4?e=4dji1t",
-      color: "bg-emerald-700",
-      external: true,
-      category: 'underwriting'
-    },
-    {
-      name: "BTR Templates",
-      description: "Build-to-rent underwriting templates",
-      icon: FileText,
-      href: "https://catalystcp.sharepoint.com/:f:/s/CCPTeam/IgBiZZYJjd1qTa4CpRF0m1E4AToPYOD09LSgbKxoj33SB-8?e=ec1xEs",
-      color: "bg-emerald-700",
-      external: true,
-      category: 'underwriting'
-    },
-    {
-      name: "Underwriting SOP",
-      description: "Standard operating procedures",
-      icon: FileText,
-      href: "https://catalystcp.sharepoint.com/:w:/s/CCPTeam/IQA_3Jmd9qj5T7QwWVlNzAedAUe_PDCjvBINGfcKx83TMv0?e=5UEcx0",
-      color: "bg-emerald-700",
-      external: true,
-      category: 'underwriting'
-    },
-    {
-      name: "Property Insurance",
-      description: "SharePoint insurance files",
-      icon: FileText,
-      href: "https://catalystcp.sharepoint.com/:x:/s/CCPTeam/IQDS1y1-2fopR7ftFya5kJEHAaon7pTn-Xk1Cr5MJBgIsag?e=bsPfYX",
-      color: "bg-emerald-700",
-      external: true,
-      category: 'underwriting'
     }
   ];
 
@@ -603,32 +416,6 @@ export default function Launchpad() {
               </>
             )}
           </div>
-        </div>
-
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Underwriting Tools</h2>
-          </div>
-          <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-              {underwritingTools.map((tile) => (
-                <ListItem key={tile.name} tile={tile} />
-              ))}
-            </div>
-          </Card>
-        </div>
-
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Catalyst Tools</h2>
-          </div>
-          <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-              {externalTools.map((tile) => (
-                <ListItem key={tile.name} tile={tile} />
-              ))}
-            </div>
-          </Card>
         </div>
 
         <div className="mb-8">

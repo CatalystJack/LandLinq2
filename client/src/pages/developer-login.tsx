@@ -160,7 +160,7 @@ export default function DeveloperLogin() {
                 {branding.logoUrl ? (
                   <img src={branding.logoUrl} alt={`${branding.companyName} logo`} className="h-full w-full object-contain p-2" />
                 ) : (
-                  <Building2 className="h-9 w-9" style={{ color: primaryColor }} />
+                  <img src="/assets/landlinq-white-icon.png" alt="LandLinq" className="h-full w-full object-contain p-3" />
                 )}
               </div>
               <h1 className="text-2xl font-bold text-slate-900">{branding.companyName}</h1>

@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { LogIn } from "lucide-react";
 
-const landLinqLogo = "/assets/landlinq-email-logo.png";
+const landLinqLogo = "/assets/landlinq-white-logo.png";
 
 export default function Footer() {
   return (
@@ -64,16 +64,13 @@ export default function Footer() {
 
           <div className="text-center md:text-left">
             <div className="mb-8 flex justify-center md:justify-start">
-              <Link href="/" className="flex items-center gap-1.5">
-                <div className="overflow-hidden flex-shrink-0" style={{ width: 20, height: 16 }}>
-                  <img
-                    src={landLinqLogo}
-                    alt=""
-                    style={{ height: 16, width: 'auto', maxWidth: 'none' }}
-                    data-testid="footer-logo-landlinq"
-                  />
-                </div>
-                <span className="text-white font-bold text-sm tracking-tight leading-none cursor-pointer">LandLinq</span>
+              <Link href="/" className="inline-flex items-center">
+                <img
+                  src={landLinqLogo}
+                  alt="LandLinq"
+                  className="h-10 w-auto max-w-[190px] object-contain"
+                  data-testid="footer-logo-landlinq"
+                />
               </Link>
             </div>
             <p className="text-catalyst-gray-400 mb-6 leading-relaxed font-light">

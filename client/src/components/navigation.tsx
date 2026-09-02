@@ -1,7 +1,7 @@
 import { useAuth, UserRole } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
-import { Menu, X, ChevronDown, Sparkles } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 import { useState, useMemo, memo } from "react";
 import { AuthModal } from "@/components/auth-modal";
 import {
@@ -80,7 +80,6 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
         landlinq.push(
           { name: "Deal Dashboard", href: "/dashboard", description: "Review and manage incoming deals" },
           { name: "Email Intake", href: "/email-intake", description: "Review AI-parsed deal emails before approval" },
-          { name: "AI Insights", href: "/ai-insights", description: "Chat with AI about your deals and data" },
           { name: "AI Training", href: "/ai-training", description: "Train AI on pipeline review sessions" },
           { name: "CRM", href: "/crm", description: "Contact management & campaign outreach" },
           { name: "Developers", href: "/partner-developers", description: "Registered developer buy boxes & deal routing" },
@@ -330,20 +329,6 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-            
-            {/* AI Insights Button */}
-            {isAuthenticated && (
-              <Link href="/ai-insights">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center gap-1.5 text-white hover:text-blue-300 hover:bg-white/10"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  <span className="hidden lg:inline">AI</span>
-                </Button>
-              </Link>
             )}
             
             {isAuthenticated ? (
