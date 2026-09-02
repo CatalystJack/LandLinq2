@@ -301,11 +301,6 @@ setTimeout(() => {
     routesLoaded = true;
     log("✅ Routes registered successfully!");
 
-    // Production data is isolated from development data. Provision the first
-    // Apex administrator from a secret only when that exact account is absent.
-    const { ensureInitialApexAdmin } = await import('./apexAdminBootstrap');
-    await ensureInitialApexAdmin();
-
     // Add error handler after routes
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;

@@ -39,6 +39,12 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+function safeStringEqual(left: string, right: string) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
 export function setupAuth(app: Express) {
   const PostgresSessionStore = connectPg(session);
   const sessionStore = new PostgresSessionStore({ 
@@ -143,7 +149,28 @@ export function setupAuth(app: Express) {
         // This allows Catalyst team members to use either team password OR individual password
         
         // Regular authentication flow (works for non-Catalyst emails AND Catalyst emails with individual passwords)
-        const user = await storage.getUserByEmail(normalizedEmail);
+        let user = await storage.getUserByEmail(normalizedEmail);
+
+        // Development and production data are isolated. Allow the exact initial
+        // Apex administrator to securely provision its missing production row
+        // by presenting the bootstrap password stored in Replit Secrets.
+        const bootstrapPassword = process.env.APEX_ADMIN_BOOTSTRAP_PASSWORD;
+        if (
+          !user &&
+          normalizedEmail === "jack@apexresi.com" &&
+          bootstrapPassword &&
+          safeStringEqual(password, bootstrapPassword)
+        ) {
+          user = await storage.createUser({
+            email: normalizedEmail,
+            password: await hashPassword(password),
+            firstName: "Jack",
+            lastName: "Apex",
+            role: "SUPER_ADMIN",
+            mustResetPassword: false,
+          });
+          console.log(`✅ [AUTH] Initial Apex admin account provisioned`);
+        }
         
         if (!user) {
           console.log(`❌ [AUTH] User not found: ${normalizedEmail}`);

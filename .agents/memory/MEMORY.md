@@ -13,4 +13,4 @@
 - [Broker contact tenant identity](broker-contact-tenant-identity.md) — developer contacts dedupe within their owner profile; legacy email/phone lookups must only resolve shared NULL-owner brokers.
 - [Developer analytics tenant scope](developer-analytics-tenant-scope.md) — deal status is send-profile-specific; outreach totals must be jointly scoped through both an owned sender and campaign.
 - [VM HTTPS readiness probes](vm-https-readiness-probes.md) — production HTTPS redirects must exempt loopback hosts or Replit VM promotion follows TLS to the app's plain HTTP port and times out.
-- [Production admin provisioning](production-admin-provisioning.md) — development user records do not backfill an existing production DB; first Apex admin is bootstrapped from a secret on production startup.
+- [Production admin provisioning](production-admin-provisioning.md) — development users do not backfill production; provision the first Apex admin during its authenticated login, never blocking startup.
