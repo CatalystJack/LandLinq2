@@ -1,0 +1,38 @@
+Create a dedicated navigation shell for users with role = 'DEVELOPER', separate from 
+the existing internal app navigation (used by ADMIN/analyst/broker roles).
+
+1. New component: client/src/components/developer-navigation.tsx
+   A top nav bar with exactly five tabs, using the logged-in user's own developerProfile 
+   branding (logoUrl, primaryColor, secondaryColor):
+     - "Deal Dashboard" → /developer/dashboard
+     - "CRM" → /developer/crm
+     - "Outreach" → /developer/outreach
+     - "Analytics" → /developer/analytics
+     - "Settings" → /developer/settings
+   No other links, no admin menu, no launchpad link, nothing else in this nav.
+
+2. In client/src/App.tsx, add these five routes, each rendering developer-navigation.tsx 
+   plus its respective page component:
+     /developer/dashboard  → developer-dashboard.tsx
+     /developer/crm        → developer-crm.tsx
+     /developer/outreach   → developer-outreach.tsx
+     /developer/analytics  → developer-analytics.tsx
+     /developer/settings   → developer-criteria-settings.tsx
+   These page components will be built out in later tasks — for now, stub each as a 
+   simple placeholder page just enough to route to without erroring, if it doesn't 
+   already exist.
+
+3. Add a server-side and client-side guard: if req.user.role === 'DEVELOPER', they 
+   should ONLY ever be able to reach these five /developer/* routes. Any attempt to 
+   navigate to any other route in the app (e.g. /launchpad, /underwriting, 
+   /admin-dashboard, /market-intelligence, /executive) should redirect them back to 
+   /developer/dashboard. This should be an ALLOWLIST check (only these 5 routes are 
+   permitted for this role), not a blocklist of everything else — safer against 
+   anything added to the app later.
+
+4. On successful login, if the logged-in user's role is 'DEVELOPER', redirect them 
+   straight to /developer/dashboard instead of whatever the default post-login redirect 
+   is today.
+
+Do not modify navigation or routing for any other role (ADMIN, BROKER, analyst roles) 
+— this only adds a new, separate, locked-down navigation path for the DEVELOPER role.

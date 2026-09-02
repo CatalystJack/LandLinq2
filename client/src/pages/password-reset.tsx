@@ -92,7 +92,12 @@ export default function PasswordReset() {
           title: "Success!",
           description: "Your password has been reset successfully.",
         });
-        setLocation("/login");
+        const developerSlug = new URLSearchParams(window.location.search).get("developerSlug");
+        if (developerSlug) {
+          window.location.href = `/developer/${encodeURIComponent(developerSlug)}/login`;
+        } else {
+          setLocation("/login");
+        }
       } else {
         setError(data.message || "Failed to reset password");
       }

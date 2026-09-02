@@ -18,31 +18,25 @@ import { ClassificationProgress } from "@/components/ClassificationProgress";
 // ============================================
 
 // Core public pages - loaded immediately (small bundle)
-import Landing from "@/pages/landing";
 import AuthPage from "@/pages/auth";
 import NotFound from "@/pages/not-found";
 import ErrorPage from "@/pages/error-page";
+import PortalChooser from "@/pages/portal-chooser";
+import Landing from "@/pages/landing";
 
 // Lazy load ALL other pages to reduce initial bundle size
 const Home = lazy(() => import("@/pages/home"));
-const About = lazy(() => import("@/pages/about"));
-const Process = lazy(() => import("@/pages/process"));
-const SubmitDeal = lazy(() => import("@/pages/submit-deal"));
-const Dashboard = lazy(() => import("@/pages/dashboard"));
 const MySubmissions = lazy(() => import("@/pages/my-submissions"));
-const SimpleLogin = lazy(() => import("@/pages/simple-login"));
 const Privacy = lazy(() => import("@/pages/privacy"));
 const Terms = lazy(() => import("@/pages/terms"));
 const DealDetails = lazy(() => import("@/pages/deal-details"));
 const UnsubscribePage = lazy(() => import("@/pages/unsubscribe"));
-const CriteriaPage = lazy(() => import("@/pages/criteria"));
 const SMSOptIn = lazy(() => import("@/pages/sms-opt-in"));
 
 // Heavy analyst/admin pages - always lazy loaded
 const AnalystDashboard = lazy(() => import("@/pages/analyst-dashboard"));
 const AnalystDashboardV2 = lazy(() => import("@/pages/analyst-dashboard-v2"));
 const AdminDashboard = lazy(() => import("@/pages/admin-dashboard"));
-const ThemePreview = lazy(() => import("@/pages/theme-preview"));
 const SendGridDebugger = lazy(() => import("@/pages/sendgrid-debugger"));
 const UserManagement = lazy(() => import("@/pages/user-management"));
 const OutreachManagement = lazy(() => import("@/pages/outreach-management"));
@@ -50,10 +44,7 @@ const OutreachOnboarding = lazy(() => import("@/pages/outreach-onboarding"));
 const DataQualityDashboard = lazy(() => import("@/pages/data-quality-dashboard"));
 const BrokerManagement = lazy(() => import("@/pages/broker-management"));
 const CRMPage = lazy(() => import("@/pages/crm"));
-const DeveloperNetworkPage = lazy(() => import("@/pages/developer-network"));
 const PartnerDevelopersAdmin = lazy(() => import("@/pages/partner-developers-admin"));
-const BrokerPortal = lazy(() => import("@/pages/broker-portal"));
-const BrokerNetworkPage = lazy(() => import("@/pages/broker-network"));
 const PartnerBrokersAdmin = lazy(() => import("@/pages/partner-brokers-admin"));
 const ApiMonitoring = lazy(() => import("@/pages/api-monitoring"));
 const MessagingPage = lazy(() => import("@/pages/messaging"));
@@ -70,8 +61,6 @@ const EmailPreview = lazy(() => import("@/pages/email-preview"));
 const TemplateEditor = lazy(() => import("@/pages/template-editor"));
 const GamificationPage = lazy(() => import("@/pages/gamification-page"));
 const AcquisitionCriteriaPage = lazy(() => import("@/pages/acquisition-criteria"));
-const Leaderboard = lazy(() => import("@/pages/leaderboard"));
-const PreferredPartners = lazy(() => import("@/pages/preferred-partners"));
 const DatabaseManagement = lazy(() => import("@/pages/database-management"));
 const LandLinqDiscovery = lazy(() => import("@/pages/landlinq-discovery"));
 const ListingReview = lazy(() => import("@/pages/listing-review"));
@@ -89,7 +78,12 @@ const OffMarketSourcing = lazy(() => import("@/pages/off-market-sourcing"));
 const OutreachAnalytics = lazy(() => import("@/pages/outreach-analytics"));
 const MarketIntelligence = lazy(() => import("@/pages/market-intelligence"));
 const ApiKeysAdmin = lazy(() => import("@/pages/api-keys-admin"));
-const DemoPage = lazy(() => import("@/pages/demo"));
+const DeveloperDashboard = lazy(() => import("@/pages/developer-dashboard"));
+const DeveloperCrm = lazy(() => import("@/pages/developer-crm"));
+const DeveloperOutreach = lazy(() => import("@/pages/developer-outreach"));
+const DeveloperAnalytics = lazy(() => import("@/pages/developer-analytics"));
+const DeveloperCriteriaSettings = lazy(() => import("@/pages/developer-criteria-settings"));
+const DeveloperLogin = lazy(() => import("@/pages/developer-login"));
 
 // Loading component for lazy-loaded routes
 const LoadingFallback = () => (
@@ -114,6 +108,7 @@ function Router() {
           {/* Auth pages so the demo user can log out */}
           <Route path="/auth" component={AuthPage} />
           <Route path="/login" component={AuthPage} />
+          <Route path="/" component={PortalChooser} />
           {/* Everything else → analyst dashboard (scoped to demo deals) */}
           <Route>
             {() => (
@@ -125,6 +120,44 @@ function Router() {
                 <AnalystDashboard />
               </div>
             )}
+          </Route>
+        </Switch>
+      </Suspense>
+    );
+  }
+
+  // DEVELOPER users have a separate tenant-scoped navigation and route surface.
+  // Keep this branch before all internal role branches so they cannot fall
+  // through to the shared Catalyst navigation.
+  if (isAuthenticated && user && userRole === UserRole.DEVELOPER) {
+    if ((user as any).mustResetPassword === true) {
+      return (
+        <Suspense fallback={<LoadingFallback />}>
+          <Switch>
+            <Route path="/reset-password" component={PasswordReset} />
+            <Route>
+              {() => {
+                window.location.replace("/reset-password");
+                return <LoadingFallback />;
+              }}
+            </Route>
+          </Switch>
+        </Suspense>
+      );
+    }
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <Switch>
+          <Route path="/developer/dashboard" component={DeveloperDashboard} />
+          <Route path="/developer/crm" component={DeveloperCrm} />
+          <Route path="/developer/outreach" component={DeveloperOutreach} />
+          <Route path="/developer/analytics" component={DeveloperAnalytics} />
+          <Route path="/developer/settings" component={DeveloperCriteriaSettings} />
+          <Route>
+            {() => {
+              window.location.replace("/developer/dashboard");
+              return <LoadingFallback />;
+            }}
           </Route>
         </Switch>
       </Suspense>
@@ -187,7 +220,7 @@ function Router() {
           <Route path="/email-intake" component={EmailIntakePage} />
           <Route path="/dashboard" component={AnalystDashboard} />
           <Route path="/dashboard-v2" component={AnalystDashboardV2} />
-          <Route path="/" component={Launchpad} />
+          <Route path="/" component={PortalChooser} />
           {/* Catch all other routes - redirect to main dashboard */}
           <Route>
             {() => <AnalystDashboard />}
@@ -215,28 +248,17 @@ function Router() {
         <Route path="/auth" component={AuthPage} />
         <Route path="/login" component={AuthPage} />
         <Route path="/signup" component={AuthPage} />
+        <Route path="/developer/:slug/login" component={DeveloperLogin} />
         <Route path="/analyst-login" component={AnalystLogin} />
         <Route path="/reset-password" component={PasswordReset} />
         <Route path="/test" component={() => <div className="p-8 text-center"><h1 className="text-2xl">Test Route Works!</h1></div>} />
         
-        {/* Public routes */}
-        <Route path="/about" component={About} />
-        <Route path="/process" component={Process} />
-        <Route path="/criteria" component={CriteriaPage} />
-        <Route path="/what-we-look-for" component={CriteriaPage} />
-        <Route path="/submit-deal" component={SubmitDeal} />
-        <Route path="/developer-network" component={DeveloperNetworkPage} />
-        <Route path="/broker-portal" component={BrokerPortal} />
-        <Route path="/broker-network" component={BrokerNetworkPage} />
-        <Route path="/leaderboard" component={Leaderboard} />
-        <Route path="/preferred-partners" component={PreferredPartners} />
+        {/* Public routes that must remain reachable without authentication */}
         <Route path="/privacy" component={Privacy} />
         <Route path="/terms" component={Terms} />
         <Route path="/deals/:id" component={DealDetails} />
         <Route path="/unsubscribe" component={UnsubscribePage} />
         <Route path="/sms-opt-in" component={SMSOptIn} />
-        <Route path="/demo" component={DemoPage} />
-        <Route path="/theme-preview" component={ThemePreview} />
         <Route path="/tools/valuation" component={() => {
           const LandValuationPage = lazy(() => import("@/pages/land-valuation-page"));
           return (
@@ -639,30 +661,8 @@ function Router() {
         return <div className="p-8 text-center">Redirecting...</div>;
       }} />
       
-      {/* Home route - redirect brokers to dashboard, others see landing */}
-      <Route path="/" component={() => {
-        if (isAuthenticated && user) {
-          const userEmail = (user as any)?.claims?.email || (user as any)?.email || '';
-          
-          // Special redirect for crystal@catalystcp.com - go straight to add deal
-          if (userEmail.toLowerCase() === 'crystal@catalystcp.com') {
-            window.location.href = '/add-deal';
-            return <div className="p-8 text-center">Redirecting to Add Deal...</div>;
-          }
-          
-          // Redirect brokers to their deal pipeline dashboard
-          if (!userEmail.endsWith('@catalystcp.com')) {
-            window.location.href = '/dashboard';
-            return <div className="p-8 text-center">Redirecting to your dashboard...</div>;
-          }
-          
-          // Redirect analysts to their single main dashboard
-          if (userEmail.endsWith('@catalystcp.com')) {
-            return <AnalystDashboard />;
-          }
-        }
-        return <Landing />;
-      }} />
+      {/* Root entry point for both unauthenticated and authenticated visitors */}
+      <Route path="/" component={PortalChooser} />
       
         {/* 404 catch-all */}
         {/* Error page */}

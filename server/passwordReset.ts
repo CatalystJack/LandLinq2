@@ -31,6 +31,26 @@ export class PasswordResetService {
     return resetToken;
   }
 
+  // Generate a reset token after a successful temporary-password login.
+  // Unlike a user-requested reset, this does not send an email.
+  async generateForcedResetToken(email: string): Promise<string | null> {
+    const user = await storage.getUserByEmail(email);
+    if (!user) {
+      return null;
+    }
+
+    const resetToken = randomBytes(32).toString('hex');
+    const expiresAt = addMinutes(new Date(), 60);
+
+    await storage.createPasswordResetToken({
+      email: user.email,
+      token: resetToken,
+      expiresAt,
+    });
+
+    return resetToken;
+  }
+
   // Validate reset token
   async validateResetToken(token: string): Promise<string | null> {
     const resetRequest = await storage.getPasswordResetToken(token);

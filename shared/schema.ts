@@ -13,6 +13,7 @@ import {
   date,
   bigint,
   unique,
+  uniqueIndex,
   serial,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -29,12 +30,54 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// Investment Company profiles — tenant-specific branding and acquisition criteria
+export const developerProfiles = pgTable("developer_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: varchar("company_name").notNull(),
+  slug: varchar("slug").notNull().unique(),
+  logoUrl: varchar("logo_url"),
+  primaryColor: varchar("primary_color").default("#0A2B4A"),
+  secondaryColor: varchar("secondary_color").default("#4A90E2"),
+  isInternal: boolean("is_internal").default(false),
+  knownEmailDomains: text("known_email_domains").array(),
+
+  // Rent criteria — primary drives classification, secondary is reference only
+  rentMetric: varchar("rent_metric").notNull(), // 'psf' | 'per_unit'
+  minRentPsf: decimal("min_rent_psf"),
+  minRentPerUnit: decimal("min_rent_per_unit"),
+
+  // Acreage — flat default + optional per-product-type overrides
+  minAcres: decimal("min_acres").notNull(),
+  maxAcres: decimal("max_acres"),
+  acreageOverridesByProductType: jsonb("acreage_overrides_by_product_type").default('{}'),
+
+  // QCT/DDA/OZ rent-minimum override toggles
+  qctOverridesRentMinimum: boolean("qct_overrides_rent_minimum").default(false),
+  ddaOverridesRentMinimum: boolean("dda_overrides_rent_minimum").default(false),
+  ozOverridesRentMinimum: boolean("oz_overrides_rent_minimum").default(false),
+
+  targetStates: text("target_states").array().notNull(),
+  targetCounties: text("target_counties").array().notNull(),
+
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDeveloperProfileSchema = createInsertSchema(developerProfiles).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type DeveloperProfile = typeof developerProfiles.$inferSelect;
+export type InsertDeveloperProfile = z.infer<typeof insertDeveloperProfileSchema>;
+
 // User storage table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique().notNull(),
   password: varchar("password").notNull(),
   role: varchar("role").default("BROKER"), // System role for permissions
+  mustResetPassword: boolean("must_reset_password").default(false).notNull(),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   dealRole: varchar("deal_role"), // Role for deal dashboard workflow
@@ -45,13 +88,24 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Internal analysts may cover multiple Investment Companies
+export const analystProfileAssignments = pgTable("analyst_profile_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  unique("analyst_profile_unique").on(table.userId, table.developerProfileId),
+]);
+
 // Broker registration and profile
 export const brokers = pgTable("brokers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id),
   firstName: varchar("first_name").notNull(),
   lastName: varchar("last_name").notNull(),
-  email: varchar("email").unique(),
+  email: varchar("email"),
+  ownerDeveloperProfileId: varchar("owner_developer_profile_id").references(() => developerProfiles.id),
   phone: varchar("phone"),
   marketsCovered: text("markets_covered"),
   brokerage: varchar("brokerage"),
@@ -88,7 +142,13 @@ export const brokers = pgTable("brokers", {
   assignedTo: text("assigned_to"),   // Team member name/email responsible for outreach
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("brokers_owner_email_idx").on(table.ownerDeveloperProfileId, table.email),
+  uniqueIndex("brokers_owner_email_unique").on(table.ownerDeveloperProfileId, table.email),
+  uniqueIndex("brokers_shared_email_unique")
+    .on(table.email)
+    .where(sql`${table.ownerDeveloperProfileId} IS NULL AND ${table.email} IS NOT NULL`),
+]);
 
 // Deal status values: pending_review, pending_info, under_review, approved, rejected,
 // clear_no, potentially, high_priority, initial_review, due_diligence, financial_analysis,
@@ -214,6 +274,7 @@ export const deals = pgTable("deals", {
   actualCloseDate: date("actual_close_date"),
   aiAnalysisData: jsonb("ai_analysis_data"),
   submissionMethod: varchar("submission_method").notNull(), // email, sms, form
+  source: varchar("source").default("landlinq_sourced").notNull(),
   submissionCount: integer("submission_count").default(1), // Track duplicate submissions - increments when same address resubmitted
   lastResubmittedAt: timestamp("last_resubmitted_at"), // When the last duplicate submission occurred
   documentUrls: jsonb("document_urls"), // array of file URLs (attachments, links, images) - broker uploaded
@@ -278,13 +339,16 @@ export const deals = pgTable("deals", {
   emergencyReason: text("emergency_reason"),
   
   // QCT (Qualified Census Tract) Classification
+  isQct: boolean("is_qct").default(false),
   qctStatus: varchar("qct_status"), // "YES" or "NO" - indicates if property is in a Qualified Census Tract
   censusTractFips: varchar("census_tract_fips"), // Census tract FIPS code from Geocodio
   // OZ (Opportunity Zone) Designation
+  isOz: boolean("is_oz").default(false),
   ozStatus: varchar("oz_status"), // "YES" | "NO" | "N/A" - federally designated Qualified Opportunity Zone (IRC §1400Z)
 
   // DDA (Difficult Development Area) — HUD 2026 Designation
   // Properties in DDAs qualify for a 30% LIHTC basis boost (130% of normal eligible basis)
+  isDda: boolean("is_dda").default(false),
   ddaStatus: varchar("dda_status"), // "MDDA" | "NMDDA" | "NO" | "N/A"
   ddaAreaName: varchar("dda_area_name"), // HUD area name for the DDA (e.g. "Charlotte-Concord-Gastonia, NC-SC HUD Metro FMR Area")
   ddaVlil: integer("dda_vlil"),           // 4-Person Very Low Income Limit ($) for the area
@@ -2376,6 +2440,7 @@ export const apiCallLogs = pgTable("api_call_logs", {
 // Outreach campaigns table - Configures recurring outreach campaigns
 export const outreachCampaigns = pgTable("outreach_campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id),
   name: varchar("name").notNull(),
   status: varchar("status").default("active"),
   cadence: varchar("cadence").default("monthly"), // only 'monthly' for now
@@ -2458,6 +2523,7 @@ export const outreachMessages = pgTable("outreach_messages", {
 // Outreach senders table - Partner accounts for sending outreach emails via Outlook
 export const outreachSenders = pgTable("outreach_senders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id),
   name: varchar("name").notNull(), // e.g., "AJ Klenk", "Brian Ford"
   email: varchar("email").notNull().unique(), // aj@catalystcp.com, ford@catalystcp.com
   role: varchar("role").default("partner"), // partner, analyst, etc.
@@ -3262,6 +3328,7 @@ export type RssProcessedListing = typeof rssProcessedListings.$inferSelect;
 // so Catalyst can route deals that don't fit their own criteria
 export const partnerDevelopers = pgTable("partner_developers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id),
   companyName: text("company_name").notNull(),
   contactName: text("contact_name").notNull(),
   email: text("email").notNull(),
@@ -3302,6 +3369,7 @@ export type PartnerDeveloper = typeof partnerDevelopers.$inferSelect;
 export const partnerDeveloperSends = pgTable("partner_developer_sends", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   developerId: varchar("developer_id").notNull(),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id),
   dealId: varchar("deal_id").notNull(),
   sentAt: timestamp("sent_at"),
   classification: varchar("classification"),
@@ -3312,8 +3380,13 @@ export const partnerDeveloperSends = pgTable("partner_developer_sends", {
   zoningOverride: text("zoning_override"),
   summaryOverride: text("summary_override"),
   wetlandOverride: text("wetland_override"),
+  greenFlaggedByDeveloper: boolean("green_flagged_by_developer").default(false).notNull(),
+  greenFlaggedAt: timestamp("green_flagged_at"),
   matchedAt: timestamp("matched_at").defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("partner_developer_sends_profile_deal_unique")
+    .on(table.developerProfileId, table.dealId),
+]);
 
 // ── Partner Broker Portal Accounts ──────────────────────────────────────────
 // Separate from the broker CRM table — these are brokers with LandLinq portal access
@@ -3439,6 +3512,22 @@ export const insertBrokerPortalAccountSchema = createInsertSchema(brokerPortalAc
 });
 export type BrokerPortalAccount = typeof brokerPortalAccounts.$inferSelect;
 export type InsertBrokerPortalAccount = z.infer<typeof insertBrokerPortalAccountSchema>;
+
+// Investment Company self-service deal import audit records.
+export const developerDealImports = pgTable("developer_deal_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id).notNull(),
+  filename: varchar("filename").notNull(),
+  columnMapping: jsonb("column_mapping").notNull(),
+  rowCount: integer("row_count").notNull().default(0),
+  keptCount: integer("kept_count").notNull().default(0),
+  errorCount: integer("error_count").notNull().default(0),
+  uploadedBy: varchar("uploaded_by"),
+  importedAt: timestamp("imported_at").defaultNow(),
+});
+
+export type DeveloperDealImport = typeof developerDealImports.$inferSelect;
+export type InsertDeveloperDealImport = typeof developerDealImports.$inferInsert;
 
 // ── Off-Market Sourcing (county permit/parcel data → scored owner list) ────────
 // Each upload (one county's permit or parcel export) becomes one import batch.

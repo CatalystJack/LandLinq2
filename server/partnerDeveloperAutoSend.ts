@@ -1,7 +1,9 @@
 import { db } from './db';
-import { partnerDevelopers, partnerDeveloperSends } from '../shared/schema';
+import { developerProfiles, partnerDevelopers, partnerDeveloperSends } from '../shared/schema';
+import type { DeveloperProfile } from '../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { deals } from '../shared/schema';
+import { classifyDealForProfile } from './developerClassificationService';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Auto-send engine: matches a newly-classified deal against every active
@@ -17,29 +19,42 @@ import { deals } from '../shared/schema';
 export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> {
   try {
     // Fetch ALL active developers — not filtered by autoSendEnabled
-    const developers = await db
-      .select()
+    const recipients = await db
+      .select({
+        developer: partnerDevelopers,
+        profile: developerProfiles,
+      })
       .from(partnerDevelopers)
+      .leftJoin(
+        developerProfiles,
+        eq(partnerDevelopers.developerProfileId, developerProfiles.id),
+      )
       .where(eq(partnerDevelopers.isActive, true));
 
-    if (!developers.length) {
+    if (!recipients.length) {
       console.log('⏭️ [AUTO-SEND] No active partner developers registered');
       return;
     }
 
-    console.log(`🔍 [AUTO-SEND] Checking deal ${deal.id} against ${developers.length} active developers`);
+    console.log(`🔍 [AUTO-SEND] Checking deal ${deal.id} against ${recipients.length} active developers`);
 
-    for (const dev of developers) {
+    for (const { developer: dev, profile } of recipients) {
       try {
         if (!doesDealMatchDeveloper(deal, dev)) continue;
+        const classification = classifyDealForProfile(
+          deal,
+          profile || partnerDeveloperToClassificationProfile(dev),
+        );
 
         // Check if a record already exists (pending or sent)
         const existing = await db
           .select({ id: partnerDeveloperSends.id, status: partnerDeveloperSends.status })
           .from(partnerDeveloperSends)
           .where(and(
-            eq(partnerDeveloperSends.developerId, dev.id),
             eq(partnerDeveloperSends.dealId, deal.id),
+            profile?.id || dev.developerProfileId
+              ? eq(partnerDeveloperSends.developerProfileId, profile?.id || dev.developerProfileId!)
+              : eq(partnerDeveloperSends.developerId, dev.id),
           ))
           .limit(1);
 
@@ -53,8 +68,9 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
           await sendDeveloperDealEmail(deal, dev);
           await db.insert(partnerDeveloperSends).values({
             developerId: dev.id,
+            developerProfileId: profile?.id || dev.developerProfileId || null,
             dealId: deal.id,
-            classification: deal.classification,
+            classification,
             address: deal.address,
             status: 'sent',
             sentAt: new Date(),
@@ -64,8 +80,9 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
           // Queue as pending for manual review
           await db.insert(partnerDeveloperSends).values({
             developerId: dev.id,
+            developerProfileId: profile?.id || dev.developerProfileId || null,
             dealId: deal.id,
-            classification: deal.classification,
+            classification,
             address: deal.address,
             status: 'pending',
             sentAt: null,
@@ -79,6 +96,44 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
   } catch (err) {
     console.error('❌ [AUTO-SEND] Outer error:', err);
   }
+}
+
+/**
+ * The legacy partner developer directory predates developerProfiles. Keep its
+ * dispatch records compatible with the new classifier until those records are
+ * linked to a full developer profile.
+ */
+export function partnerDeveloperToClassificationProfile(dev: any): DeveloperProfile {
+  const usesPsf = dev.rentMetric === "psf" || (
+    dev.rentMetric == null &&
+    dev.minRentPsf != null &&
+    dev.minRentPerUnit == null
+  );
+
+  return {
+    id: dev.id,
+    companyName: dev.companyName || "",
+    slug: dev.slug || String(dev.id),
+    logoUrl: dev.logoUrl ?? null,
+    primaryColor: dev.primaryColor ?? "#0A2B4A",
+    secondaryColor: dev.secondaryColor ?? "#4A90E2",
+    isInternal: dev.isInternal ?? false,
+    knownEmailDomains: dev.knownEmailDomains ?? null,
+    rentMetric: usesPsf ? "psf" : "per_unit",
+    minRentPsf: dev.minRentPsf ?? null,
+    minRentPerUnit: dev.minRentPerUnit ?? null,
+    minAcres: dev.minAcres ?? null,
+    maxAcres: dev.maxAcres ?? null,
+    acreageOverridesByProductType: dev.acreageOverridesByProductType ?? {},
+    qctOverridesRentMinimum: dev.qctOverridesRentMinimum ?? dev.qctInterest ?? false,
+    ddaOverridesRentMinimum: dev.ddaOverridesRentMinimum ?? false,
+    ozOverridesRentMinimum: dev.ozOverridesRentMinimum ?? false,
+    targetStates: dev.targetStates ?? [],
+    targetCounties: dev.targetCounties ?? [],
+    isActive: dev.isActive ?? true,
+    createdAt: dev.createdAt ?? null,
+    updatedAt: dev.updatedAt ?? null,
+  } as DeveloperProfile;
 }
 
 // ── Matching logic (mirrors the routing endpoint in routes.ts) ─────────────

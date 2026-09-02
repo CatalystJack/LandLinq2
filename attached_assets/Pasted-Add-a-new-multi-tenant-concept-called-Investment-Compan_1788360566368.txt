@@ -1,0 +1,88 @@
+Add a new multi-tenant concept called "Investment Companies" to the schema. This is 
+schema-only work — do NOT create any actual company records (no Catalyst row, no NRP 
+row) and do NOT write any data migration script. The mechanism gets built now; real 
+companies get created later through the admin UI once everything is working.
+
+TASK 1 — New table in shared/schema.ts
+
+export const developerProfiles = pgTable("developer_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: varchar("company_name").notNull(),
+  slug: varchar("slug").notNull().unique(),
+  logoUrl: varchar("logo_url"),
+  primaryColor: varchar("primary_color").default("#0A2B4A"),
+  secondaryColor: varchar("secondary_color").default("#4A90E2"),
+  isInternal: boolean("is_internal").default(false),
+  knownEmailDomains: text("known_email_domains").array(),
+
+  // Rent criteria — primary drives classification, secondary is reference only
+  rentMetric: varchar("rent_metric").notNull(), // 'psf' | 'per_unit'
+  minRentPsf: decimal("min_rent_psf"),
+  minRentPerUnit: decimal("min_rent_per_unit"),
+
+  // Acreage — flat default + optional per-product-type overrides
+  minAcres: decimal("min_acres").notNull(),
+  maxAcres: decimal("max_acres"),
+  acreageOverridesByProductType: jsonb("acreage_overrides_by_product_type").default('{}'),
+
+  // QCT/DDA/OZ rent-minimum override toggles — set by the Investment Company itself
+  qctOverridesRentMinimum: boolean("qct_overrides_rent_minimum").default(false),
+  ddaOverridesRentMinimum: boolean("dda_overrides_rent_minimum").default(false),
+  ozOverridesRentMinimum: boolean("oz_overrides_rent_minimum").default(false),
+
+  targetStates: text("target_states").array().notNull(),
+  targetCounties: text("target_counties").array().notNull(),
+
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDeveloperProfileSchema = createInsertSchema(developerProfiles).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type DeveloperProfile = typeof developerProfiles.$inferSelect;
+export type InsertDeveloperProfile = z.infer<typeof insertDeveloperProfileSchema>;
+
+TASK 2 — Update users table
+Add to the existing users table in shared/schema.ts:
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id),
+Also add a many-to-many join table for internal analysts, since one analyst can be 
+assigned to cover multiple Investment Companies:
+
+export const analystProfileAssignments = pgTable("analyst_profile_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  unique("analyst_profile_unique").on(table.userId, table.developerProfileId),
+]);
+
+Wherever the `role` field's valid values are validated/typed elsewhere in the codebase, 
+add 'DEVELOPER' as a new valid role value alongside the existing ones (e.g. BROKER).
+
+TASK 3 — Update auth.ts
+In server/auth.ts, replace:
+  const isTeamMember = (email?: string) => email?.endsWith('@catalystcp.com');
+with:
+  const isPlatformAdmin = (email?: string) => email?.endsWith('@apexresi.com');
+Update any code elsewhere that referenced isTeamMember to use isPlatformAdmin instead. 
+Platform admins should retain full access exactly as isTeamMember did before — this 
+is a rename/scope change, not a permission change, at this stage.
+
+TASK 4 — Scope outreach and CRM tables
+Add a nullable column to each of these existing tables in shared/schema.ts:
+  outreachCampaigns: developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id)
+  outreachSenders: developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id)
+  brokers: ownerDeveloperProfileId: varchar("owner_developer_profile_id").references(() => developerProfiles.id)
+Null in all three means "belongs to LandLinq/Catalyst's existing global network" — 
+leave all existing rows as NULL for now, no backfill.
+
+TASK 5 — Run migration
+Run `npm run db:push` to apply schema changes.
+
+TASK 6 — Verify nothing breaks
+Confirm the existing app still boots and functions identically — this task is purely 
+additive (new tables/columns only), nothing existing should change behavior. No 
+Investment Company records exist yet, so no UI should show anything new at this stage.

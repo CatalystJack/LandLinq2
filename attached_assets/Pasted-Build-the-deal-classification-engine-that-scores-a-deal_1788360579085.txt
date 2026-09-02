@@ -1,0 +1,72 @@
+Build the deal classification engine that scores a deal against a specific Investment 
+Company's (developerProfiles) criteria. This runs independently per profile — the same 
+deal can classify differently for different companies.
+
+TASK 1 — Verify QCT/DDA/OZ fields exist on deals
+Check shared/schema.ts for boolean fields on the deals table indicating QCT (Qualified 
+Census Tract), DDA (Difficult Development Area), and OZ (Opportunity Zone) status — 
+these likely already exist given server/qctService.ts, server/ddaService.ts, and 
+server/ozService.ts. If they don't exist as boolean fields on deals, add them:
+  isQct: boolean("is_qct").default(false)
+  isDda: boolean("is_dda").default(false)
+  isOz: boolean("is_oz").default(false)
+Confirm which existing service populates each and reuse it — do not duplicate that logic.
+
+TASK 2 — New file server/developerClassificationService.ts
+
+export type DealClassification = 'passed' | 'review';
+
+export function classifyDealForProfile(deal: any, profile: DeveloperProfile): DealClassification {
+  const countyMatch = 
+    (profile.targetCounties || []).includes(deal.county) ||
+    (profile.targetStates || []).includes(deal.state);
+
+  const overrides = profile.acreageOverridesByProductType || {};
+  const requiredAcreage = overrides[deal.productType] ?? parseFloat(profile.minAcres);
+  const acreagePass = 
+    parseFloat(deal.sizeAcres) >= requiredAcreage &&
+    (!profile.maxAcres || parseFloat(deal.sizeAcres) <= parseFloat(profile.maxAcres));
+
+  // Primary rent metric drives pass/fail. PSF uses topRentPSF (highest comp), 
+  // per_unit uses avgRentPerUnit (average comp) — matches existing usage 
+  // conventions in dealScoringService.ts and hellodataService.ts.
+  let rentPass: boolean;
+  if (profile.rentMetric === 'psf') {
+    rentPass = parseFloat(deal.topRentPSF) >= parseFloat(profile.minRentPsf);
+  } else {
+    rentPass = parseFloat(deal.avgRentPerUnit) >= parseFloat(profile.minRentPerUnit);
+  }
+
+  if (countyMatch && acreagePass && rentPass) {
+    return 'review';
+  }
+
+  // QCT/DDA/OZ override: only rescues a deal that fails ON RENT ALONE.
+  // County and acreage must still both pass for the override to apply.
+  if (countyMatch && acreagePass && !rentPass) {
+    const qualifiesForOverride =
+      (deal.isQct && profile.qctOverridesRentMinimum) ||
+      (deal.isDda && profile.ddaOverridesRentMinimum) ||
+      (deal.isOz && profile.ozOverridesRentMinimum);
+    if (qualifiesForOverride) {
+      return 'review';
+    }
+  }
+
+  return 'passed';
+}
+
+Note: classification never auto-returns 'pursuing' — that only ever gets set manually 
+by the Investment Company themselves in a later task. This function's return type is 
+intentionally limited to 'passed' | 'review'.
+
+TASK 3 — Wire into partnerDeveloperSends
+Whenever a deal is queued to send to an Investment Company (via the existing 
+partnerDeveloperAutoSend.ts logic, or the future bulk-import/manual-send flows), call 
+classifyDealForProfile() and store the result in the existing `classification` field 
+on partnerDeveloperSends. Do not filter out 'passed' deals from being sent — every 
+classified deal still gets sent/shown, just labeled accordingly, per existing product 
+decision.
+
+Do not modify the existing internal dealScoringService.ts (the Catalyst-wide grading 
+algorithm) —

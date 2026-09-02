@@ -165,13 +165,8 @@ async function determineUserRole(user: any): Promise<UserRole | null> {
   }
   
   // Team member recognition by name (case insensitive)
-  const developers = ['john bell', 'steve hillebrand', 'mallie colavita'];
   const partners = ['aj klenk', 'brian ford'];
   const analysts = ['davis hammond', 'austin blondell'];
-  
-  if (developers.some(dev => name.includes(dev) || email.includes(dev.replace(' ', '')))) {
-    return UserRole.DEVELOPER;
-  }
   
   if (partners.some(partner => name.includes(partner) || email.includes(partner.replace(' ', '')))) {
     return UserRole.PARTNER;

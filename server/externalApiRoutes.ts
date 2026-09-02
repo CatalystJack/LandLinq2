@@ -20,7 +20,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "./db";
 import { isAuthenticated } from "./auth";
 import { apiKeys, leadAttachments, deals, brokers } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, isNull } from "drizzle-orm";
 import crypto from "crypto";
 import multer from "multer";
 
@@ -76,7 +76,10 @@ async function upsertBrokerByEmail(opts: {
   const existing = await db
     .select({ id: brokers.id })
     .from(brokers)
-    .where(eq(brokers.email, opts.email.toLowerCase()))
+    .where(and(
+      eq(brokers.email, opts.email.toLowerCase()),
+      isNull(brokers.ownerDeveloperProfileId),
+    ))
     .limit(1);
 
   if (existing.length) return existing[0].id;

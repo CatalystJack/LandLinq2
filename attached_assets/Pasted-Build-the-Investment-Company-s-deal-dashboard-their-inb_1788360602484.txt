@@ -1,0 +1,58 @@
+Build the Investment Company's deal dashboard — their inbox of sent deals — plus 
+self-service bulk deal import.
+
+TASK 1 — Dashboard page
+Build out client/src/pages/developer-dashboard.tsx (replacing the stub from the nav 
+shell task):
+  - New endpoint: GET /api/developer-profile/me/deals
+    - Resolves the profile from req.user.developerProfileId — NEVER trust a client- 
+      passed profile id
+    - Returns all partnerDeveloperSends rows for this profile, joined with the full 
+      deals record, ordered by most recent first
+  - Table/list view showing: address, county/state, acreage, rent, classification 
+    label (Passed / Review), and a "Mark as Pursuing" button
+  - Add fields to partnerDeveloperSends if not already present:
+      greenFlaggedByDeveloper: boolean("green_flagged_by_developer").default(false)
+      greenFlaggedAt: timestamp("green_flagged_at")
+  - "Mark as Pursuing" button calls PATCH /api/developer-profile/me/deals/:sendId/pursue
+    which sets greenFlaggedByDeveloper = true, greenFlaggedAt = now(), scoped to 
+    verify this send record belongs to the current user's own developerProfileId
+  - Show "Pursuing" as a distinct visual label/badge when greenFlaggedByDeveloper is 
+    true, taking precedence over the underlying Passed/Review classification in the UI
+
+TASK 2 — Bulk import
+Reuse the existing CSV/Excel column-mapping pattern from the off-market import feature 
+(search for offMarketImports / offMarketProperties in shared/schema.ts and the related 
+route in server/routes.ts — use this as your reference implementation).
+
+  - New table in shared/schema.ts:
+      export const developerDealImports = pgTable("developer_deal_imports", {
+        id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+        developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id).notNull(),
+        filename: varchar("filename").notNull(),
+        columnMapping: jsonb("column_mapping").notNull(),
+        rowCount: integer("row_count").notNull().default(0),
+        keptCount: integer("kept_count").notNull().default(0),
+        errorCount: integer("error_count").notNull().default(0),
+        uploadedBy: varchar("uploaded_by"),
+        importedAt: timestamp("imported_at").defaultNow(),
+      });
+
+  - New route: POST /api/developer-profile/me/import-deals
+    - Scoped strictly to req.user.developerProfileId
+    - Accepts uploaded CSV/XLSX, parses columns, lets the frontend present a column- 
+      mapping UI (reuse existing off-market import's mapping UI pattern/component if 
+      one exists client-side)
+    - For each row: parse address/county/state/acreage/rent/asking price per the 
+      mapping, deduplicate against existing deals by address (update if match found, 
+      insert if new)
+    - Tag each inserted/updated deal with source: 'developer_import' (add this field 
+      to deals if not present: source: varchar("source").default('landlinq_sourced'))
+    - Immediately run classifyDealForProfile() (from the previous task) on each row 
+      and create/update the corresponding partnerDeveloperSends record so it shows up 
+      in their dashboard right away — no separate send step needed
+    - Rows missing required fields (address, or unparseable acreage) should be counted 
+      in errorCount and skipped, not inserted or crashed on
+    - Return { inserted, updated, errorCount } summary to the frontend
+
+  - Add an "Import Deals" button/modal on developer-dashboard.tsx that drives this flow

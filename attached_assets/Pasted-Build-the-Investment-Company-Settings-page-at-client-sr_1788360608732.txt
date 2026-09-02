@@ -1,0 +1,46 @@
+Build the Investment Company Settings page at client/src/pages/developer-criteria-settings.tsx 
+(replacing the stub from the nav shell task), scoped entirely to the logged-in user's own 
+developerProfileId. This page has three sections.
+
+SECTION 1 — Criteria
+Form to view/edit their own developerProfiles row:
+  - Target states (multi-select)
+  - Target counties (multi-select or tag input)
+  - Rent metric: choice between "Rent Comps — Min $/SF" and "Rent Comps — Min $/Unit (Avg)"
+  - If $/SF selected: minRentPsf input (primary/required), minRentPerUnit input labeled 
+    "Secondary reference (optional)" — stored but does not affect classification
+  - If $/Unit selected: minRentPerUnit input (primary/required), minRentPsf input 
+    labeled "Secondary reference (optional)"
+  - Minimum acreage (flat default) + optional maximum acreage
+  - Product-type acreage overrides: a simple key-value list UI (product type → minimum 
+    acres) that writes to acreageOverridesByProductType jsonb field — allow adding 
+    multiple overrides (e.g. "garden_style" → 8)
+
+SECTION 2 — Rent Minimum Overrides
+Three checkboxes:
+  ☐ Qualified Census Tract (QCT) can override rent minimum
+  ☐ Difficult Development Area (DDA) can override rent minimum  
+  ☐ Opportunity Zone (OZ) can override rent minimum
+Bind to qctOverridesRentMinimum, ddaOverridesRentMinimum, ozOverridesRentMinimum.
+
+Both sections above save via: PATCH /api/developer-profile/me
+  - Server resolves target profile from req.user.developerProfileId — never from a 
+    client-passed id
+  - Any user with role='DEVELOPER' on this profile can submit successfully — no 
+    additional permission check beyond "is this their own profile"
+
+SECTION 3 — Team
+Table listing every user currently tied to this same developerProfileId (name, email, 
+date added). "Add Team Member" button opens a form: name + email. On submit:
+  - POST /api/developer-profile/me/team
+  - Creates a new users row: role = 'DEVELOPER', developerProfileId = current user's 
+    own profile id, mustResetPassword = true, generated temp password
+  - Sends the new teammate an email with their login link (/developer/:slug/login) 
+    and temp password — reuse existing email sending infrastructure/templates
+Any existing user on this developerProfileId can add a teammate — no primary/admin 
+distinction within one company.
+
+Server-side enforcement across all three sections: verify req.user.role === 'DEVELOPER' 
+and scope strictly to req.user.developerProfileId in every endpoint. A developer user 
+must never be able to view or modify another Investment Company's data, even by 
+guessing/passing a different id in the request.

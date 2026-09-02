@@ -1,0 +1,43 @@
+We're converting this app from a public-facing marketing site into a login-only 
+platform with two entry points: an internal admin portal (LandLinq/Apex team) and 
+branded login portals for individual "Investment Companies" (developer partners 
+like NRP, Catalyst, etc. — this term will be used throughout the app going forward).
+
+TASK 1 — Remove public marketing routes
+In client/src/App.tsx, remove these routes entirely (delete the <Route> lines and 
+their component imports if unused elsewhere):
+  /, /about, /process, /criteria, /what-we-look-for, /submit-deal, 
+  /developer-network, /broker-portal, /broker-network, /leaderboard, 
+  /preferred-partners, /demo, /theme-preview
+
+Do NOT remove these — they're hit by external links (email unsubscribe, SMS opt-in, 
+broker deal links) and must stay reachable without login:
+  /deals/:id, /sms-opt-in, /unsubscribe, /privacy, /terms
+
+TASK 2 — New portal chooser at root
+Replace whatever currently renders at path "/" with a new simple landing component 
+(client/src/pages/portal-chooser.tsx):
+  - Two buttons/options: "LandLinq / Apex Team Login" and "Investment Company Login"
+  - "LandLinq / Apex Team Login" links to /auth (existing admin login, unchanged)
+  - "Investment Company Login" shows a simple note: "Use the link provided by your 
+    LandLinq contact" — do NOT build a company picker/dropdown yet, that's a later 
+    phase once Investment Company profiles exist. For now this is just a placeholder 
+    message.
+  - Match existing app styling/components (reuse Card, Button from client/src/components/ui)
+
+TASK 3 — Server-side auth gate
+In server/routes.ts (or wherever route-level auth middleware is configured), add a 
+catch-all check: any request to a page route (not API, not the excluded public paths 
+listed in Task 1) without an active session should redirect to "/" rather than 
+rendering a blank page or throwing an error.
+
+TASK 4 — Verify nothing breaks
+After these changes, confirm:
+  - /auth (admin login) still works exactly as before
+  - /deals/:id, /sms-opt-in, /unsubscribe still load without login
+  - Removed routes return a redirect to "/", not a 404 or crash
+  - No other component imports the now-deleted page components (check for unused 
+    import errors on build)
+
+Do not touch: database schema, any file in /server/services, /shared/schema.ts, 
+or any outreach/email/SMS logic. This task is routing and UI only.

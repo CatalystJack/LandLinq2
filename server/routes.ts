@@ -4,6 +4,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import path from "path";
 import fs from "fs";
+import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import { db, pool } from "./db";
 import { 
@@ -30,7 +31,7 @@ import {
   crmTagRegistry,
   offMarketImports,
 } from "@shared/schema";
-import { or, like, eq, desc, gte, lte, sql, and, count, inArray } from "drizzle-orm";
+import { or, like, eq, desc, gte, lte, sql, and, count, inArray, isNull } from "drizzle-orm";
 import { setupAuth, isAuthenticated, hashPassword } from "./auth";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
@@ -2578,13 +2579,78 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     '/api/classification-progress',
     '/api/sessions',
   ];
-  app.use((req: any, res: any, next: any) => {
+  app.use(async (req: any, res: any, next: any) => {
     const email = (req.user?.claims?.email || req.user?.email || '').toLowerCase();
     if (email !== 'demo@catalystcp.com') return next();
     // Only gate API paths — let HTML/static assets through unconditionally
     if (!req.path.startsWith('/api/')) return next();
     const ok = _DEMO_ALLOWED.some(p => req.path === p || req.path.startsWith(p));
     if (!ok) return res.status(403).json({ error: 'Not available in demo mode' });
+    next();
+  });
+
+  // Login-only page gate. API endpoints, static assets, auth flows, and the
+  // explicitly public pages below must remain reachable without a session.
+  const DEVELOPER_ALLOWED_PAGE_PATHS = new Set([
+    '/developer/dashboard',
+    '/developer/crm',
+    '/developer/outreach',
+    '/developer/analytics',
+    '/developer/settings',
+  ]);
+  app.use(async (req: any, res: any, next: any) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    if (req.path.startsWith('/api/')) return next();
+    if (req.path === '/api') return next();
+
+    // Evaluate this allowlist before normal page routing so future internal
+    // routes cannot accidentally become available to DEVELOPER users.
+    const isDocumentRequest =
+      !req.path.includes('.') &&
+      !req.path.startsWith('/@') &&
+      !req.path.startsWith('/src/') &&
+      !req.path.startsWith('/node_modules/');
+    if (req.isAuthenticated?.()) {
+      const role = String(req.user?.role || '').toUpperCase();
+      if (role === 'DEVELOPER' && req.user?.mustResetPassword === true && req.path !== '/reset-password') {
+        try {
+          const { passwordResetService } = await import('./passwordReset');
+          const token = await passwordResetService.generateForcedResetToken(req.user.email);
+          if (token) {
+            return res.redirect(`/reset-password?token=${encodeURIComponent(token)}`);
+          }
+        } catch (error) {
+          return next(error);
+        }
+      }
+      if (role === 'DEVELOPER' && !DEVELOPER_ALLOWED_PAGE_PATHS.has(req.path)) {
+        return res.redirect('/developer/dashboard');
+      }
+      return next();
+    }
+
+    const publicPaths = [
+      '/',
+      '/auth',
+      '/login',
+      '/signup',
+      '/analyst-login',
+      '/reset-password',
+      '/privacy',
+      '/terms',
+      '/unsubscribe',
+      '/sms-opt-in',
+    ];
+    const isPublicPath =
+      publicPaths.includes(req.path) ||
+      /^\/developer\/[^/]+\/login$/.test(req.path) ||
+      req.path === '/deals' ||
+      req.path.startsWith('/deals/');
+
+    if (isPublicPath) return next();
+
+    if (isDocumentRequest) return res.redirect('/');
+
     next();
   });
 
@@ -2689,7 +2755,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       // Determine the correct role based on email domain (Dec 11, 2025)
       // This ensures @catalystcp.com users are always treated as analysts, not brokers
       let role = user?.role || user?.claims?.role || 'BROKER';
-      if (userEmail === 'demo@catalystcp.com') {
+      if (userEmail.toLowerCase().endsWith('@apexresi.com')) {
+        role = 'SUPER_ADMIN';
+      } else if (userEmail === 'demo@catalystcp.com') {
         role = 'DEMO';
       } else if (userEmail === 'jack@catalystcp.com') {
         role = 'SUPER_ADMIN';
@@ -4594,14 +4662,14 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       // --- Single batch email lookup ---
       const emailKeys = Array.from(emailMap.keys());
       const emailRows = emailKeys.length
-        ? await db.execute(sql`SELECT id, LOWER(email) AS email FROM brokers WHERE LOWER(email) = ANY(${sql`ARRAY[${sql.join(emailKeys.map(e => sql`${e}`), sql`, `)}]::text[]`})`)
+        ? await db.execute(sql`SELECT id, LOWER(email) AS email FROM brokers WHERE owner_developer_profile_id IS NULL AND LOWER(email) = ANY(${sql`ARRAY[${sql.join(emailKeys.map(e => sql`${e}`), sql`, `)}]::text[]`})`)
             .then(r => r.rows as any[])
         : [];
 
       // --- Single batch phone lookup ---
       const phoneKeys = Array.from(phoneMap.keys());
       const phoneRows = phoneKeys.length
-        ? await db.execute(sql`SELECT id, REGEXP_REPLACE(COALESCE(phone,''), '[^0-9]', '', 'g') AS digits FROM brokers WHERE REGEXP_REPLACE(COALESCE(phone,''), '[^0-9]', '', 'g') = ANY(${sql`ARRAY[${sql.join(phoneKeys.map(p => sql`${p}`), sql`, `)}]::text[]`})`)
+        ? await db.execute(sql`SELECT id, REGEXP_REPLACE(COALESCE(phone,''), '[^0-9]', '', 'g') AS digits FROM brokers WHERE owner_developer_profile_id IS NULL AND REGEXP_REPLACE(COALESCE(phone,''), '[^0-9]', '', 'g') = ANY(${sql`ARRAY[${sql.join(phoneKeys.map(p => sql`${p}`), sql`, `)}]::text[]`})`)
             .then(r => r.rows as any[])
         : [];
 
@@ -4620,7 +4688,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       for (const [key, at] of nameMap.entries()) {
         const [first, ...rest] = key.split('|');
         const last = rest.join('|');
-        const found = await db.execute(sql`SELECT id FROM brokers WHERE LOWER(first_name)=${first} AND LOWER(last_name)=${last} LIMIT 1`).then(r => r.rows as any[]);
+        const found = await db.execute(sql`SELECT id FROM brokers WHERE owner_developer_profile_id IS NULL AND LOWER(first_name)=${first} AND LOWER(last_name)=${last} LIMIT 1`).then(r => r.rows as any[]);
         if (found.length) updates.set(found[0].id, at);
       }
 
@@ -4706,7 +4774,10 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
         if (email) {
           const existing = await db.select({ id: brokers.id, crmTags: brokers.crmTags })
-            .from(brokers).where(sql`LOWER(email) = ${email}`).limit(1);
+            .from(brokers).where(and(
+              sql`LOWER(${brokers.email}) = ${email}`,
+              isNull(brokers.ownerDeveloperProfileId),
+            )).limit(1);
 
           if (existing.length) {
             const mergedTags = rawTags.length
@@ -12034,18 +12105,701 @@ RULES:
     }
   });
 
+  const developerDealUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 25 * 1024 * 1024 },
+  });
+
+  function getDeveloperProfileId(req: any, res: any): string | null {
+    if (String(req.user?.role || '').toUpperCase() !== 'DEVELOPER') {
+      res.status(403).json({ error: 'Investment Company access required' });
+      return null;
+    }
+    if (req.user?.mustResetPassword === true) {
+      res.status(403).json({
+        error: 'Password reset required before accessing the Investment Company portal',
+        code: 'PASSWORD_RESET_REQUIRED',
+      });
+      return null;
+    }
+    const developerProfileId = req.user?.developerProfileId;
+    if (!developerProfileId) {
+      res.status(403).json({ error: 'No Investment Company profile is assigned to this account' });
+      return null;
+    }
+    return developerProfileId;
+  }
+
+  function escapeEmailHtml(value: string): string {
+    return value.replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[character] || character));
+  }
+
+  app.get("/api/developer-profile/me", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const { developerProfiles } = await import('@shared/schema');
+      const [profile] = await db.select().from(developerProfiles).where(and(
+        eq(developerProfiles.id, developerProfileId),
+        eq(developerProfiles.isActive, true),
+      )).limit(1);
+      if (!profile) return res.status(404).json({ error: 'Investment Company profile not found' });
+      return res.json({ profile });
+    } catch (error: any) {
+      console.error('[developer-profile/me] Error:', error);
+      return res.status(500).json({ error: 'Failed to load company settings' });
+    }
+  });
+
+  app.patch("/api/developer-profile/me", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const { developerProfiles } = await import('@shared/schema');
+      const body = req.body || {};
+      const updates: Record<string, any> = {};
+
+      const stringArray = (value: any, field: string) => {
+        if (value === undefined) return;
+        if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) {
+          throw new Error(`${field} must be an array of strings`);
+        }
+        updates[field] = value.map((entry: string) => entry.trim()).filter(Boolean);
+      };
+      stringArray(body.targetStates, 'targetStates');
+      stringArray(body.targetCounties, 'targetCounties');
+
+      if (body.rentMetric !== undefined) {
+        if (!['psf', 'per_unit'].includes(body.rentMetric)) throw new Error('Invalid rent metric');
+        updates.rentMetric = body.rentMetric;
+      }
+
+      const decimalFields = ['minRentPsf', 'minRentPerUnit', 'minAcres', 'maxAcres'];
+      for (const field of decimalFields) {
+        if (body[field] === undefined || body[field] === null || body[field] === '') {
+          if (field === 'minAcres') throw new Error('Minimum acreage is required');
+          if (body[field] !== undefined) updates[field] = null;
+          continue;
+        }
+        const value = Number(body[field]);
+        if (!Number.isFinite(value) || value < 0) throw new Error(`${field} must be a non-negative number`);
+        updates[field] = String(value);
+      }
+
+      if (body.acreageOverridesByProductType !== undefined) {
+        if (!body.acreageOverridesByProductType || typeof body.acreageOverridesByProductType !== 'object' || Array.isArray(body.acreageOverridesByProductType)) {
+          throw new Error('Acreage overrides must be a key-value object');
+        }
+        const overrides: Record<string, number> = {};
+        for (const [key, rawValue] of Object.entries(body.acreageOverridesByProductType)) {
+          const name = key.trim();
+          const value = Number(rawValue);
+          if (!name || !Number.isFinite(value) || value < 0) throw new Error('Acreage overrides must contain valid product types and numbers');
+          overrides[name] = value;
+        }
+        updates.acreageOverridesByProductType = overrides;
+      }
+
+      for (const field of ['qctOverridesRentMinimum', 'ddaOverridesRentMinimum', 'ozOverridesRentMinimum']) {
+        if (body[field] !== undefined) {
+          if (typeof body[field] !== 'boolean') throw new Error(`${field} must be boolean`);
+          updates[field] = body[field];
+        }
+      }
+
+      const [currentProfile] = await db.select({
+        rentMetric: developerProfiles.rentMetric,
+        minRentPsf: developerProfiles.minRentPsf,
+        minRentPerUnit: developerProfiles.minRentPerUnit,
+      }).from(developerProfiles).where(and(
+        eq(developerProfiles.id, developerProfileId),
+        eq(developerProfiles.isActive, true),
+      )).limit(1);
+      if (!currentProfile) return res.status(404).json({ error: 'Investment Company profile not found' });
+      const effectiveMetric = updates.rentMetric ?? currentProfile.rentMetric;
+      const effectivePsf = updates.minRentPsf !== undefined ? updates.minRentPsf : currentProfile.minRentPsf;
+      const effectivePerUnit = updates.minRentPerUnit !== undefined ? updates.minRentPerUnit : currentProfile.minRentPerUnit;
+      if (effectiveMetric === 'psf' && (!effectivePsf || Number(effectivePsf) <= 0)) {
+        throw new Error('Minimum rent $/SF is required when $/SF is the primary metric');
+      }
+      if (effectiveMetric === 'per_unit' && (!effectivePerUnit || Number(effectivePerUnit) <= 0)) {
+        throw new Error('Minimum rent $/Unit is required when $/Unit is the primary metric');
+      }
+
+      const [updated] = await db.update(developerProfiles)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(and(
+          eq(developerProfiles.id, developerProfileId),
+          eq(developerProfiles.isActive, true),
+        ))
+        .returning();
+      if (!updated) return res.status(404).json({ error: 'Investment Company profile not found' });
+      return res.json({ profile: updated });
+    } catch (error: any) {
+      console.error('[developer-profile/me PATCH] Error:', error);
+      return res.status(400).json({ error: error.message || 'Invalid company settings' });
+    }
+  });
+
+  app.get("/api/developer-profile/me/team", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const rows = await db.select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        createdAt: users.createdAt,
+      }).from(users).where(and(
+        eq(users.developerProfileId, developerProfileId),
+        eq(users.role, 'DEVELOPER'),
+      )).orderBy(desc(users.createdAt));
+      return res.json({ team: rows });
+    } catch (error: any) {
+      console.error('[developer-profile/me/team] Error:', error);
+      return res.status(500).json({ error: 'Failed to load team members' });
+    }
+  });
+
+  app.post("/api/developer-profile/me/team", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const { developerProfiles } = await import('@shared/schema');
+      const { name, email } = req.body || {};
+      const normalizedEmail = String(email || '').trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!name || !normalizedEmail || !emailRegex.test(normalizedEmail)) {
+        return res.status(400).json({ error: 'Name and a valid email are required' });
+      }
+      const [profile] = await db.select({
+        companyName: developerProfiles.companyName,
+        slug: developerProfiles.slug,
+      }).from(developerProfiles).where(and(
+        eq(developerProfiles.id, developerProfileId),
+        eq(developerProfiles.isActive, true),
+      )).limit(1);
+      if (!profile) return res.status(404).json({ error: 'Investment Company profile not found' });
+      if (await storage.getUserByEmail(normalizedEmail)) {
+        return res.status(409).json({ error: 'An account with this email already exists' });
+      }
+
+      const nameParts = String(name).trim().split(/\s+/);
+      const firstName = nameParts.shift() || '';
+      const lastName = nameParts.join(' ') || null;
+      const temporaryPassword = randomBytes(12).toString('base64url');
+      const newUser = await storage.createUser({
+        email: normalizedEmail,
+        password: await hashPassword(temporaryPassword),
+        firstName,
+        lastName,
+        role: 'DEVELOPER',
+        developerProfileId,
+        mustResetPassword: true,
+      } as any);
+
+      const baseUrl = (
+        process.env.BASE_URL ||
+        (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : '') ||
+        'https://landlinq.ai'
+      ).replace(/\/$/, '');
+      const loginPath = `/developer/${encodeURIComponent(profile.slug)}/login`;
+      const loginUrl = `${baseUrl}${loginPath}`;
+      const safeName = escapeEmailHtml(firstName);
+      const safeCompany = escapeEmailHtml(profile.companyName);
+      const safeEmail = escapeEmailHtml(normalizedEmail);
+      const emailSent = await sendNotificationEmail({
+        to: normalizedEmail,
+        subject: `Your ${profile.companyName} Investment Company portal access`,
+        type: 'developer-team-invite',
+        priority: 'high',
+        text: `Hi ${firstName},\n\nYou've been invited to the ${profile.companyName} Investment Company portal.\nLogin: ${normalizedEmail}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be asked to set a new password after signing in.`,
+        html: `<p>Hi ${safeName},</p><p>You've been invited to the <strong>${safeCompany}</strong> Investment Company portal.</p><p><strong>Login:</strong> ${safeEmail}<br><strong>Temporary password:</strong> ${escapeEmailHtml(temporaryPassword)}</p><p>Open <a href="${loginUrl}">${loginUrl}</a> to sign in. You will be asked to set a new password after signing in.</p>`,
+      }).catch((error: any) => {
+        console.error('[developer-team-invite] Email failed:', error);
+        return false;
+      });
+
+      return res.status(201).json({
+        member: {
+          id: newUser.id,
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          createdAt: newUser.createdAt,
+        },
+        emailSent,
+      });
+    } catch (error: any) {
+      console.error('[developer-profile/me/team POST] Error:', error);
+      return res.status(500).json({ error: 'Failed to add team member' });
+    }
+  });
+
+  app.get("/api/developer-profile/me/contacts", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const contacts = await db.select({
+        id: brokers.id,
+        firstName: brokers.firstName,
+        lastName: brokers.lastName,
+        email: brokers.email,
+        phone: brokers.phone,
+        brokerage: brokers.brokerage,
+        stateRegion: brokers.stateRegion,
+        assignedTo: brokers.assignedTo,
+        crmTags: brokers.crmTags,
+        crmNotes: brokers.crmNotes,
+        lastContactedAt: brokers.lastContactedAt,
+        ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
+        createdAt: brokers.createdAt,
+      }).from(brokers)
+        .where(or(
+          eq(brokers.ownerDeveloperProfileId, developerProfileId),
+          isNull(brokers.ownerDeveloperProfileId),
+        ))
+        .orderBy(desc(brokers.createdAt));
+      return res.json({ contacts });
+    } catch (error: any) {
+      console.error('[developer-profile/me/contacts] Error:', error);
+      return res.status(500).json({ error: 'Failed to load contacts' });
+    }
+  });
+
+  app.post("/api/developer-profile/me/import-contacts", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const { contacts: rows } = req.body || {};
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ message: 'contacts array required' });
+      }
+
+      let inserted = 0;
+      let updated = 0;
+      for (const row of rows) {
+        const firstName = toTitleCase(String(row.firstName || '').trim());
+        const lastName = toTitleCase(String(row.lastName || '').trim());
+        const email = String(row.email || '').trim().toLowerCase() || null;
+        const phone = String(row.phone || '').trim() || null;
+        const brokerage = String(row.brokerage || '').trim() || null;
+        const stateRegion = String(row.stateRegion || '').trim() || null;
+        const assignedTo = String(row.assignedTo || '').trim() || null;
+        const rawTags = String(row.tags || '')
+          .split(/[;,]/)
+          .map((tag: string) => tag.trim())
+          .filter(Boolean);
+
+        if (!firstName && !lastName && !email) continue;
+
+        if (email) {
+          const [existing] = await db.select({
+            id: brokers.id,
+            crmTags: brokers.crmTags,
+          }).from(brokers).where(and(
+            sql`LOWER(${brokers.email}) = ${email}`,
+            eq(brokers.ownerDeveloperProfileId, developerProfileId),
+          )).limit(1);
+
+          if (existing) {
+            const mergedTags = rawTags.length
+              ? Array.from(new Set([...(existing.crmTags || []), ...rawTags]))
+              : existing.crmTags;
+            await db.update(brokers).set({
+              firstName: firstName || undefined,
+              lastName: lastName || undefined,
+              phone: phone || undefined,
+              brokerage: brokerage || undefined,
+              stateRegion: stateRegion || undefined,
+              assignedTo: assignedTo || undefined,
+              crmTags: mergedTags,
+              isActive: true,
+              updatedAt: new Date(),
+            } as any).where(eq(brokers.id, existing.id));
+            updated++;
+          } else {
+            const insertedRows = await db.insert(brokers).values({
+              firstName: firstName || 'Unknown',
+              lastName: lastName || '',
+              email,
+              phone,
+              brokerage,
+              stateRegion,
+              assignedTo,
+              crmTags: rawTags.length ? rawTags : null,
+              ownerDeveloperProfileId: developerProfileId,
+              isActive: true,
+            } as any).onConflictDoNothing({
+              target: [brokers.ownerDeveloperProfileId, brokers.email],
+            }).returning({ id: brokers.id });
+
+            if (insertedRows.length) {
+              inserted++;
+            } else {
+              const [concurrentExisting] = await db.select({
+                id: brokers.id,
+                crmTags: brokers.crmTags,
+              }).from(brokers).where(and(
+                eq(brokers.ownerDeveloperProfileId, developerProfileId),
+                sql`LOWER(${brokers.email}) = ${email}`,
+              )).limit(1);
+              if (concurrentExisting) {
+                const mergedTags = rawTags.length
+                  ? Array.from(new Set([...(concurrentExisting.crmTags || []), ...rawTags]))
+                  : concurrentExisting.crmTags;
+                await db.update(brokers).set({
+                  assignedTo: assignedTo || undefined,
+                  brokerage: brokerage || undefined,
+                  stateRegion: stateRegion || undefined,
+                  crmTags: mergedTags,
+                  isActive: true,
+                  updatedAt: new Date(),
+                } as any).where(eq(brokers.id, concurrentExisting.id));
+                updated++;
+              }
+            }
+          }
+        } else {
+          await db.insert(brokers).values({
+            firstName: firstName || 'Unknown',
+            lastName: lastName || '',
+            email: null,
+            phone,
+            brokerage,
+            stateRegion,
+            assignedTo,
+            crmTags: rawTags.length ? rawTags : null,
+            ownerDeveloperProfileId: developerProfileId,
+            isActive: true,
+          } as any);
+          inserted++;
+        }
+      }
+      return res.json({ inserted, updated });
+    } catch (error: any) {
+      console.error('[developer-profile/me/import-contacts] Error:', error);
+      return res.status(500).json({ message: 'Failed to import contacts' });
+    }
+  });
+
+  // Investment Company deal inbox. Tenant scope always comes from the session.
+  app.get("/api/developer-profile/me/deals", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const { partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
+
+      const rows = await db
+        .select({
+          send: partnerDeveloperSends,
+          deal: deals,
+        })
+        .from(partnerDeveloperSends)
+        .leftJoin(partnerDevelopers, eq(partnerDeveloperSends.developerId, partnerDevelopers.id))
+        .innerJoin(deals, eq(partnerDeveloperSends.dealId, deals.id))
+        .where(or(
+          eq(partnerDeveloperSends.developerProfileId, developerProfileId),
+          eq(partnerDevelopers.developerProfileId, developerProfileId),
+        ))
+        .orderBy(desc(partnerDeveloperSends.matchedAt), desc(deals.createdAt));
+
+      return res.json({
+        deals: rows.map(({ send, deal }) => ({
+          ...send,
+          deal,
+        })),
+      });
+    } catch (error: any) {
+      console.error('[developer-profile/me/deals] Error:', error);
+      return res.status(500).json({ error: 'Failed to load deals' });
+    }
+  });
+
+  // Mark one tenant-owned send as actively pursued.
+  app.patch("/api/developer-profile/me/deals/:sendId/pursue", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const { partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
+
+      const [ownedSend] = await db
+        .select({ id: partnerDeveloperSends.id })
+        .from(partnerDeveloperSends)
+        .leftJoin(partnerDevelopers, eq(partnerDeveloperSends.developerId, partnerDevelopers.id))
+        .where(and(
+          eq(partnerDeveloperSends.id, req.params.sendId),
+          or(
+            eq(partnerDeveloperSends.developerProfileId, developerProfileId),
+            eq(partnerDevelopers.developerProfileId, developerProfileId),
+          ),
+        ))
+        .limit(1);
+
+      if (!ownedSend) {
+        return res.status(404).json({ error: 'Deal was not found for this Investment Company' });
+      }
+
+      const [updated] = await db
+        .update(partnerDeveloperSends)
+        .set({
+          developerProfileId,
+          greenFlaggedByDeveloper: true,
+          greenFlaggedAt: new Date(),
+        })
+        .where(eq(partnerDeveloperSends.id, ownedSend.id))
+        .returning();
+
+      return res.json({ deal: updated });
+    } catch (error: any) {
+      console.error('[developer-profile/me/deals/:sendId/pursue] Error:', error);
+      return res.status(500).json({ error: 'Failed to mark deal as pursuing' });
+    }
+  });
+
+  function importedCell(row: Record<string, any>, mapping: Record<string, string>, field: string): string {
+    const header = mapping[field];
+    if (!header) return '';
+    const value = row[header];
+    return value === undefined || value === null ? '' : String(value).trim();
+  }
+
+  function importedNumber(value: string): number | null {
+    if (!value) return null;
+    const parsed = Number(value.replace(/[$,%\s,]/g, ''));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  // Self-service CSV/XLSX import. The server reparses the uploaded file and
+  // applies the submitted column mapping; it never accepts a tenant id.
+  app.post(
+    "/api/developer-profile/me/import-deals",
+    isAuthenticated,
+    developerDealUpload.single("file"),
+    async (req: any, res) => {
+      try {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!req.file) return res.status(400).json({ error: 'CSV or Excel file is required' });
+
+        let columnMapping: Record<string, string>;
+        try {
+          columnMapping = JSON.parse(req.body.columnMapping || '{}');
+        } catch {
+          return res.status(400).json({ error: 'Column mapping must be valid JSON' });
+        }
+        if (!columnMapping.address || !columnMapping.acreage) {
+          return res.status(400).json({ error: 'Address and acreage columns are required' });
+        }
+
+        const { developerProfiles, developerDealImports, partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
+        const [profile] = await db
+          .select()
+          .from(developerProfiles)
+          .where(and(
+            eq(developerProfiles.id, developerProfileId),
+            eq(developerProfiles.isActive, true),
+          ))
+          .limit(1);
+        if (!profile) {
+          return res.status(403).json({ error: 'Investment Company profile is inactive or unavailable' });
+        }
+
+        const XLSX = await import('xlsx');
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer', raw: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false }) as Record<string, any>[];
+        if (rows.length === 0) {
+          return res.status(400).json({ error: 'The uploaded file has no data rows' });
+        }
+        if (rows.length > 20000) {
+          return res.status(400).json({ error: 'Import files are limited to 20,000 rows' });
+        }
+
+        const [importRecord] = await db
+          .insert(developerDealImports)
+          .values({
+            developerProfileId,
+            filename: req.file.originalname,
+            columnMapping,
+            rowCount: rows.length,
+            uploadedBy: req.user?.email || null,
+          })
+          .returning();
+
+        const [linkedRecipient] = await db
+          .select({ id: partnerDevelopers.id })
+          .from(partnerDevelopers)
+          .where(eq(partnerDevelopers.developerProfileId, developerProfileId))
+          .limit(1);
+
+        const { classifyDealForProfile } = await import('./developerClassificationService');
+        let inserted = 0;
+        let updated = 0;
+        let errorCount = 0;
+
+        for (const row of rows) {
+          try {
+            const address = importedCell(row, columnMapping, 'address');
+            const acreage = importedNumber(importedCell(row, columnMapping, 'acreage'));
+            if (!address || acreage === null) {
+              errorCount++;
+              continue;
+            }
+
+            const county = importedCell(row, columnMapping, 'county');
+            const state = importedCell(row, columnMapping, 'state').toUpperCase().slice(0, 2);
+            const city = importedCell(row, columnMapping, 'city');
+            const rent = importedNumber(importedCell(row, columnMapping, 'rent'));
+            const askingPrice = importedNumber(importedCell(row, columnMapping, 'askingPrice'));
+            const productType = importedCell(row, columnMapping, 'productType');
+
+            const dealUpdates: Record<string, any> = {
+              address,
+              sizeAcres: String(acreage),
+              source: 'developer_import',
+              updatedAt: new Date(),
+            };
+            if (county) dealUpdates.county = county;
+            if (state) dealUpdates.state = state;
+            if (city) dealUpdates.city = city;
+            if (askingPrice !== null) dealUpdates.askingPrice = String(askingPrice);
+            if (productType) dealUpdates.productTypes = [productType];
+            if (rent !== null) {
+              if (profile.rentMetric === 'per_unit') dealUpdates.avgRentPerUnit = String(rent);
+              else dealUpdates.topRentPSF = String(rent);
+            }
+
+            const [existingDeal] = await db
+              .select()
+              .from(deals)
+              .where(sql`lower(trim(${deals.address})) = lower(trim(${address}))`)
+              .limit(1);
+
+            let deal: any;
+            let wasInserted = false;
+            if (existingDeal) {
+              const [ownedExistingSend] = await db
+                .select({ id: partnerDeveloperSends.id })
+                .from(partnerDeveloperSends)
+                .where(and(
+                  eq(partnerDeveloperSends.developerProfileId, developerProfileId),
+                  eq(partnerDeveloperSends.dealId, existingDeal.id),
+                ))
+                .limit(1);
+
+              // Reuse a shared canonical address match, but never let one
+              // tenant overwrite it unless that profile already owns the send.
+              if (ownedExistingSend) {
+                [deal] = await db
+                  .update(deals)
+                  .set(dealUpdates)
+                  .where(eq(deals.id, existingDeal.id))
+                  .returning();
+              } else {
+                deal = existingDeal;
+              }
+            } else {
+              deal = await storage.createDeal({
+                ...dealUpdates,
+                submissionMethod: 'developer_import',
+                status: 'pending_review',
+              } as any);
+              wasInserted = true;
+            }
+
+            const classification = classifyDealForProfile(deal, profile);
+            const [existingSend] = await db
+              .select({ id: partnerDeveloperSends.id })
+              .from(partnerDeveloperSends)
+              .where(and(
+                eq(partnerDeveloperSends.developerProfileId, developerProfileId),
+                eq(partnerDeveloperSends.dealId, deal.id),
+              ))
+              .limit(1);
+
+            if (existingSend) {
+              await db
+                .update(partnerDeveloperSends)
+                .set({
+                  classification,
+                  address: deal.address,
+                  matchedAt: new Date(),
+                })
+                .where(eq(partnerDeveloperSends.id, existingSend.id));
+            } else {
+              await db.insert(partnerDeveloperSends).values({
+                developerId: linkedRecipient?.id || developerProfileId,
+                developerProfileId,
+                dealId: deal.id,
+                classification,
+                address: deal.address,
+                status: 'sent',
+                matchedAt: new Date(),
+              }).onConflictDoUpdate({
+                target: [partnerDeveloperSends.developerProfileId, partnerDeveloperSends.dealId],
+                set: {
+                  classification,
+                  address: deal.address,
+                  matchedAt: new Date(),
+                },
+              });
+            }
+
+            if (wasInserted) inserted++;
+            else updated++;
+          } catch (rowError) {
+            errorCount++;
+            console.error('[developer import] Row skipped:', rowError);
+          }
+        }
+
+        await db
+          .update(developerDealImports)
+          .set({
+            keptCount: inserted + updated,
+            errorCount,
+          })
+          .where(eq(developerDealImports.id, importRecord.id));
+
+        return res.json({ inserted, updated, errorCount });
+      } catch (error: any) {
+        console.error('[developer-profile/me/import-deals] Error:', error);
+        return res.status(500).json({ error: 'Import failed: ' + error.message });
+      }
+    },
+  );
+
   // ── Outbox endpoints ────────────────────────────────────────────────────────
 
   // POST /api/partner-developers/outbox/backfill — queue all existing classified deals
   app.post("/api/partner-developers/outbox/backfill", isAuthenticated, async (req, res) => {
     try {
-      const { partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
+      const { developerProfiles, partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
       const { eq, and, isNotNull } = await import('drizzle-orm');
-      const { doesDealMatchDeveloper } = await import('./partnerDeveloperAutoSend');
+      const { classifyDealForProfile } = await import('./developerClassificationService');
+      const { doesDealMatchDeveloper, partnerDeveloperToClassificationProfile } = await import('./partnerDeveloperAutoSend');
 
       // Fetch all active developers
-      const developers = await db.select().from(partnerDevelopers).where(eq(partnerDevelopers.isActive, true));
-      if (!developers.length) return res.json({ success: true, queued: 0, message: 'No active developers' });
+      const recipients = await db
+        .select({
+          developer: partnerDevelopers,
+          profile: developerProfiles,
+        })
+        .from(partnerDevelopers)
+        .leftJoin(
+          developerProfiles,
+          eq(partnerDevelopers.developerProfileId, developerProfiles.id),
+        )
+        .where(eq(partnerDevelopers.isActive, true));
+      if (!recipients.length) return res.json({ success: true, queued: 0, message: 'No active developers' });
 
       // Fetch all classified deals (green or yellow — skip red/unclassified)
       const allDeals = await db
@@ -12061,7 +12815,7 @@ RULES:
       let skipped = 0;
 
       for (const deal of qualifying) {
-        for (const dev of developers) {
+        for (const { developer: dev, profile } of recipients) {
           if (!doesDealMatchDeveloper(deal, dev)) continue;
 
           // Skip if already queued or sent
@@ -12069,17 +12823,24 @@ RULES:
             .select({ id: partnerDeveloperSends.id })
             .from(partnerDeveloperSends)
             .where(and(
-              eq(partnerDeveloperSends.developerId, dev.id),
               eq(partnerDeveloperSends.dealId, deal.id),
+              profile?.id || dev.developerProfileId
+                ? eq(partnerDeveloperSends.developerProfileId, profile?.id || dev.developerProfileId!)
+                : eq(partnerDeveloperSends.developerId, dev.id),
             ))
             .limit(1);
 
           if (existing.length > 0) { skipped++; continue; }
 
+          const classification = classifyDealForProfile(
+            deal,
+            profile || partnerDeveloperToClassificationProfile(dev),
+          );
           await db.insert(partnerDeveloperSends).values({
             developerId: dev.id,
+            developerProfileId: profile?.id || dev.developerProfileId || null,
             dealId: deal.id,
-            classification: deal.classification,
+            classification,
             address: deal.address,
             status: 'pending',
             sentAt: null,
@@ -12089,7 +12850,7 @@ RULES:
       }
 
       console.log(`✅ [OUTBOX-BACKFILL] Queued ${queued} matches, skipped ${skipped} existing`);
-      return res.json({ success: true, queued, skipped, dealsScanned: qualifying.length, developers: developers.length });
+      return res.json({ success: true, queued, skipped, dealsScanned: qualifying.length, developers: recipients.length });
     } catch (err: any) {
       console.error('Error running outbox backfill:', err);
       return res.status(500).json({ error: 'Backfill failed: ' + err.message });
@@ -26990,7 +27751,10 @@ RULES:
       console.log(`📱 SMS opt-in request: ${name} (${email}) - ${phone}`);
       
       // Find or create broker by email
-      let broker = await db.select().from(brokers).where(eq(brokers.email, email)).limit(1);
+      let broker = await db.select().from(brokers).where(and(
+        eq(brokers.email, email),
+        isNull(brokers.ownerDeveloperProfileId),
+      )).limit(1);
       
       if (broker && broker.length > 0) {
         // Update existing broker - clear opt-out date when opting back in

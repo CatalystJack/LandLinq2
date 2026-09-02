@@ -10,8 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Eye, EyeOff } from "lucide-react";
-import Navigation from "@/components/navigation";
-import Footer from "@/components/footer";
 
 export default function AuthPage() {
   const [location, setLocation] = useLocation();
@@ -58,7 +56,9 @@ export default function AuthPage() {
         description: "You've successfully logged in.",
       });
       // Redirect to the intended destination or default to dashboard
-      const redirectPath = searchParams.get('redirect') || '/dashboard';
+      const redirectPath = userData?.role?.toUpperCase() === 'DEVELOPER'
+        ? '/developer/dashboard'
+        : (searchParams.get('redirect') || '/dashboard');
       setTimeout(() => {
         window.location.href = redirectPath;
       }, 100);
@@ -171,13 +171,12 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-catalyst-gold/10 via-white to-catalyst-gray-50">
-      <Navigation />
-      <div className="flex items-center justify-center p-4 py-16 lg:py-20">
-        <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-6 lg:gap-8 items-center">
+    <div className="flex min-h-screen items-center justify-center bg-[#f7f9fc] px-4 py-8">
+      <div className="flex w-full items-center justify-center">
+        <div className="w-full max-w-[460px]">
         
           {/* Left side - Form */}
-          <div className="w-full max-w-md mx-auto order-2 lg:order-1 px-6 sm:px-4 lg:px-0">
+          <div className="w-full">
             {/* Development Login Buttons */}
             {window.location.hostname === 'localhost' && (
               <div className="mb-6">
@@ -212,7 +211,7 @@ export default function AuthPage() {
             
             <div className="w-full">
               {/* Show toggle buttons only when no specific mode is set */}
-              {!searchParams.get('mode') && (
+              {false && !searchParams.get('mode') && (
                 <div className="grid w-full grid-cols-2 h-14 sm:h-12 bg-gray-100 p-1 rounded-lg mb-6">
                   <button 
                     onClick={() => window.location.href = '/auth?mode=login'}
@@ -230,8 +229,8 @@ export default function AuthPage() {
               )}
               
               {/* Show switch links when in a specific mode */}
-              {searchParams.get('mode') && (
-                <div className="text-center mb-6">
+              {(searchParams.get('mode') || authMode === 'login') && (
+                <div className="hidden text-center mb-6">
                   {authMode === 'login' ? (
                     <p className="text-sm text-catalyst-gray-600">
                       Don't have an account?{' '}
@@ -260,54 +259,57 @@ export default function AuthPage() {
               
               {/* Login Form */}
               {(authMode === 'login' || !searchParams.get('mode')) && (
-                <Card className="max-w-full overflow-hidden">
-                  <CardHeader>
-                    <CardTitle className="hidden sm:block">Sign In</CardTitle>
-                    <CardDescription className="text-sm sm:text-base break-words">
-                      Sign in to your LandLinq account to access your dashboard
+                <>
+                <Card className="max-w-full overflow-hidden rounded-xl border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
+                  <CardHeader className="px-6 pb-2 pt-6 sm:px-8 sm:pt-7">
+                    <CardTitle className="text-xl font-bold text-slate-900">Sign In</CardTitle>
+                    <CardDescription className="mt-1 text-[15px] leading-6 text-slate-500">
+                      Welcome back! Sign in to access your account.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="max-w-full overflow-hidden">
-                    <form onSubmit={handleLogin} className="space-y-4">
+                  <CardContent className="max-w-full overflow-hidden px-6 pb-7 pt-4 sm:px-8">
+                    <form onSubmit={handleLogin} className="space-y-5">
                       <div className="space-y-2">
-                        <Label htmlFor="login-email">Email</Label>
+                        <Label htmlFor="login-email" className="text-sm font-semibold text-slate-800">Email</Label>
                         <Input
                           id="login-email"
                           name="email"
                           type="email"
                           required
+                          autoFocus
+                          autoComplete="email"
                           data-testid="input-login-email"
-                          placeholder="Enter your email"
-                          className="h-12 text-base sm:text-sm"
+                          placeholder="you@example.com"
+                          className="h-12 rounded-lg border-slate-300 bg-white px-3 text-base shadow-none placeholder:text-slate-400 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/20"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="login-password">Password</Label>
+                        <Label htmlFor="login-password" className="text-sm font-semibold text-slate-800">Password</Label>
                         <div className="relative">
                           <Input
                             id="login-password"
                             name="password"
                             type={showLoginPassword ? "text" : "password"}
                             required
+                            autoComplete="current-password"
                             data-testid="input-login-password"
-                            placeholder="Enter your password"
-                            className="h-12 text-base sm:text-sm pr-10"
+                            className="h-12 rounded-lg border-slate-300 bg-white px-3 pr-11 text-base shadow-none placeholder:text-slate-400 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/20"
                           />
                           <button
                             type="button"
                             onClick={() => setShowLoginPassword(!showLoginPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700"
                             data-testid="button-toggle-login-password"
                           >
                             {showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                           </button>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-center">
                         <button 
                           type="button"
                           onClick={() => window.location.href = '/reset-password'}
-                          className="text-sm text-catalyst-gold hover:underline"
+                           className="text-sm font-medium text-[#4A90E2] hover:underline"
                           data-testid="link-forgot-password"
                         >
                           Forgot password?
@@ -315,7 +317,7 @@ export default function AuthPage() {
                       </div>
                       <Button 
                         type="submit" 
-                        className="w-full h-12 text-sm font-semibold bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border-2 border-[#4A90E2] rounded transition-all duration-200 shadow-sm hover:shadow-md"
+                        className="h-12 w-full rounded-lg border-0 bg-[#4A90E2] text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:bg-[#3d7fcf]"
                         disabled={loginMutation.isPending}
                         data-testid="button-login"
                       >
@@ -340,13 +342,13 @@ export default function AuthPage() {
                             toast({ title: 'Demo unavailable', description: 'Could not start the demo. Please try again.', variant: 'destructive' });
                           }
                         }}
-                        className="w-full h-12 flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded text-sm font-medium text-gray-600 hover:border-[#4A90E2] hover:text-[#4A90E2] hover:bg-blue-50 transition-all duration-200"
+                        className="hidden w-full h-12 flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded text-sm font-medium text-gray-600 hover:border-[#4A90E2] hover:text-[#4A90E2] hover:bg-blue-50 transition-all duration-200"
                       >
                         <span className="text-base">🚀</span> Try Live Demo — no account needed
                       </button>
 
                       {/* OAuth Divider */}
-                      <div className="relative my-6">
+                      <div className="relative my-6 hidden">
                         <div className="absolute inset-0 flex items-center">
                           <div className="w-full border-t border-gray-300"></div>
                         </div>
@@ -359,7 +361,7 @@ export default function AuthPage() {
                       <button
                         type="button"
                         onClick={() => window.location.href = '/auth/google'}
-                        className="w-full h-12 flex items-center justify-center gap-3 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                        className="hidden w-full h-12 flex items-center justify-center gap-3 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                         data-testid="button-google-login"
                       >
                         <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
@@ -377,7 +379,7 @@ export default function AuthPage() {
                       <button
                         type="button"
                         onClick={() => window.location.href = '/auth/microsoft'}
-                        className="w-full h-12 flex items-center justify-center gap-3 border border-gray-300 rounded hover:bg-gray-50 transition-colors mt-3"
+                        className="hidden w-full h-12 flex items-center justify-center gap-3 border border-gray-300 rounded hover:bg-gray-50 transition-colors mt-3"
                         data-testid="button-microsoft-login"
                       >
                         <svg width="21" height="21" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
@@ -391,6 +393,17 @@ export default function AuthPage() {
                     </form>
                   </CardContent>
                 </Card>
+                <p className="pt-5 text-center text-sm text-slate-600">
+                  Don't have an account?{' '}
+                  <a
+                    href="/auth?mode=register"
+                    className="font-medium text-[#4A90E2] hover:underline"
+                    data-testid="link-create-account"
+                  >
+                    Create one
+                  </a>
+                </p>
+                </>
               )}
               
               {/* Register Form */}
@@ -531,7 +544,7 @@ export default function AuthPage() {
           </div>
 
           {/* Right side - Hero */}
-          <div className="text-center lg:text-left order-1 lg:order-2 mb-8 lg:mb-0">
+          <div className="hidden text-center lg:text-left order-1 lg:order-2 mb-8 lg:mb-0">
             <div className="space-y-4 lg:space-y-6">
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-catalyst-gray-900">
                 Join <span className="text-catalyst-gold">LandLinq</span>
@@ -561,7 +574,6 @@ export default function AuthPage() {
             </div>
           </div>
         </div>
-        <Footer />
     </div>
     </div>
   );

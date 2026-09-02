@@ -901,7 +901,10 @@ export class DatabaseStorage implements IStorage {
 
   async getBrokerByEmail(email: string): Promise<Broker | undefined> {
     const [broker] = await db.select().from(brokers)
-      .where(sql`LOWER(email) = LOWER(${email})`);
+      .where(and(
+        sql`LOWER(${brokers.email}) = LOWER(${email})`,
+        isNull(brokers.ownerDeveloperProfileId),
+      ));
     return broker as Broker | undefined;
   }
 
@@ -916,7 +919,10 @@ export class DatabaseStorage implements IStorage {
     if (last10Digits.length !== 10) {
       console.log(`⚠️ [BROKER-PHONE-LOOKUP] Invalid phone length after normalization: "${phone}" → "${last10Digits}"`);
       // Try exact match as fallback
-      const [broker] = await db.select().from(brokers).where(eq(brokers.phone, phone));
+      const [broker] = await db.select().from(brokers).where(and(
+        eq(brokers.phone, phone),
+        isNull(brokers.ownerDeveloperProfileId),
+      ));
       return broker as Broker | undefined;
     }
     
@@ -932,13 +938,14 @@ export class DatabaseStorage implements IStorage {
       `1${last10Digits}`      // 17034744399
     ];
     
-    const [broker] = await db.select().from(brokers).where(
+    const [broker] = await db.select().from(brokers).where(and(
+      isNull(brokers.ownerDeveloperProfileId),
       or(
         eq(brokers.phone, possibleFormats[0]),
         eq(brokers.phone, possibleFormats[1]),
         eq(brokers.phone, possibleFormats[2])
-      )
-    );
+      ),
+    ));
     
     if (broker) {
       console.log(`✅ [BROKER-PHONE-LOOKUP] Found broker ${broker.id} with phone "${broker.phone}" (searched for "${phone}")`);
@@ -1595,7 +1602,10 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(deals)
       .innerJoin(brokers, eq(deals.brokerId, brokers.id))
-      .where(eq(brokers.email, email))
+      .where(and(
+        eq(brokers.email, email),
+        isNull(brokers.ownerDeveloperProfileId),
+      ))
       .orderBy(desc(deals.createdAt))
       .limit(5); // Get last 5 deals from this email
     
@@ -1707,6 +1717,21 @@ export class DatabaseStorage implements IStorage {
         (sanitizedUpdates as any)[field] = null;
       }
     });
+
+    // QCT, DDA, and OZ lookups continue to be owned by their existing
+    // services. Mirror those established status values into the boolean flags
+    // whenever a deal update persists a designation result.
+    if ('qctStatus' in sanitizedUpdates) {
+      sanitizedUpdates.isQct = sanitizedUpdates.qctStatus === 'YES';
+    }
+    if ('ddaStatus' in sanitizedUpdates) {
+      sanitizedUpdates.isDda =
+        sanitizedUpdates.ddaStatus === 'MDDA' ||
+        sanitizedUpdates.ddaStatus === 'NMDDA';
+    }
+    if ('ozStatus' in sanitizedUpdates) {
+      sanitizedUpdates.isOz = sanitizedUpdates.ozStatus === 'YES';
+    }
     
     // CRITICAL FIX: Ensure array fields (documentUrls, productTypes) are properly preserved
     // These are already sanitized by the PATCH endpoint, just ensure they pass through correctly
@@ -2456,7 +2481,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
-    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
+    await db.update(users)
+      .set({ password: hashedPassword, mustResetPassword: false })
+      .where(eq(users.id, userId));
   }
 
   // Valuation operations

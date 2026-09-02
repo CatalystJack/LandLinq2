@@ -1,0 +1,44 @@
+Build a recurring check-in requirement for Investment Companies. This feature must 
+ship completely invisible/inactive — no Investment Company should ever see or be 
+affected by it until explicitly enabled per-profile later.
+
+TASK 1 — Schema
+
+export const investorCheckIns = pgTable("investor_check_ins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id).notNull(),
+  submittedByUserId: varchar("submitted_by_user_id").references(() => users.id).notNull(),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  nextDueAt: timestamp("next_due_at").notNull(),
+  dealsSubmittedLoi: jsonb("deals_submitted_loi").default('[]'),
+  dealsUnderLoi: jsonb("deals_under_loi").default('[]'),
+  dealsUnderPsa: jsonb("deals_under_psa").default('[]'),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+Add to developerProfiles: 
+  checkInFeatureEnabled: boolean("check_in_feature_enabled").default(false)
+
+TASK 2 — Access-lock middleware
+Add middleware applied to all /developer/* routes (dashboard, criteria, outreach, 
+crm, analytics):
+
+async function requireCurrentCheckIn(req, res, next) {
+  const profile = await getDeveloperProfile(req.user.developerProfileId);
+  if (!profile.checkInFeatureEnabled) return next(); // feature off = never blocks
+  const lastCheckIn = await getLatestCheckIn(profile.id);
+  const isOverdue = !lastCheckIn || lastCheckIn.nextDueAt < new Date();
+  if (isOverdue) return res.status(423).json({ locked: true, reason: "check_in_required" });
+  next();
+}
+
+TASK 3 — Check-in form
+When the frontend receives a 423/locked response, show a mandatory form instead of 
+the normal page: list fields for deals submitted LOI on, under LOI, and under PSA 
+(with expected closing date field for each PSA entry). Submitting posts to 
+POST /api/developer-profile/me/check-in, creating a new investorCheckIns row with 
+nextDueAt = now() + 60 days, unlocking access.
+
+Verify: with checkInFeatureEnabled defaulting to false on every profile, this entire 
+feature should have zero visible effect on any current or future Investment Company 
+until you manually flip that boolean per-profile later.

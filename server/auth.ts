@@ -7,10 +7,10 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser } from "@shared/schema";
+import { User as SelectUser, developerProfiles } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import { db } from "./db";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 declare global {
   namespace Express {
@@ -52,7 +52,7 @@ export function setupAuth(app: Express) {
   const isSecure = isProduction;
   
   // Enhanced session configuration for financial platform security
-  const isTeamMember = (email?: string) => email?.endsWith('@catalystcp.com');
+  const isPlatformAdmin = (email?: string) => email?.endsWith('@apexresi.com');
   
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "catalyst-secret-key-2024",
@@ -84,7 +84,7 @@ export function setupAuth(app: Express) {
       
       // Different timeouts for team vs external users
       const user = req.user as any;
-      const maxIdleTime = isTeamMember(user?.email) ? 8 * 60 * 60 * 1000 : 4 * 60 * 60 * 1000; // 8hrs vs 4hrs
+       const maxIdleTime = isPlatformAdmin(user?.email) ? 8 * 60 * 60 * 1000 : 4 * 60 * 60 * 1000; // 8hrs vs 4hrs
       
       if (req.session.lastActivity) {
         const timeSinceActivity = Date.now() - new Date(req.session.lastActivity).getTime();
@@ -156,7 +156,7 @@ export function setupAuth(app: Express) {
         }
         
         console.log(`✅ [AUTH] Regular user login successful: ${normalizedEmail}`);
-        return done(null, user);
+        return done(null, isPlatformAdmin(normalizedEmail) ? { ...user, role: 'SUPER_ADMIN' } : user);
       } catch (error) {
         console.error(`💥 [AUTH] Authentication error:`, error);
         return done(error);
@@ -275,7 +275,7 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
-      done(null, user);
+      done(null, user && isPlatformAdmin(user.email) ? { ...user, role: 'SUPER_ADMIN' } : user);
     } catch (error) {
       done(error);
     }
@@ -404,14 +404,33 @@ export function setupAuth(app: Express) {
 
       if (user) {
         // Main system user (Catalyst team / internal)
-        return req.login(user, (loginErr) => {
-          if (loginErr) return next(loginErr);
-          console.log('✅ LOGIN SUCCESS (main) - User logged in:', user.email);
-          const role = user.email?.endsWith('@catalystcp.com') || user.email?.endsWith('@landlinq.ai')
-            ? 'CATALYST'
-            : (user.role || 'USER');
-          return res.status(200).json({ ...user, password: undefined, role });
-        });
+        const isDeveloper = String(user.role || '').toUpperCase() === 'DEVELOPER';
+        const needsPasswordReset = isDeveloper && user.mustResetPassword === true;
+
+        return (async () => {
+          const passwordResetToken = needsPasswordReset
+            ? await (await import('./passwordReset')).passwordResetService.generateForcedResetToken(user.email)
+            : null;
+
+          return req.login(user, (loginErr) => {
+            if (loginErr) return next(loginErr);
+            console.log('✅ LOGIN SUCCESS (main) - User logged in:', user.email);
+            const role = isPlatformAdmin(user.email)
+              ? 'SUPER_ADMIN'
+              : isDeveloper
+                ? 'DEVELOPER'
+              : (user.email?.endsWith('@catalystcp.com') || user.email?.endsWith('@landlinq.ai')
+                ? 'CATALYST'
+                : (user.role || 'USER'));
+            return res.status(200).json({
+              ...user,
+              password: undefined,
+              role,
+              mustResetPassword: needsPasswordReset,
+              passwordResetToken: needsPasswordReset ? passwordResetToken : undefined,
+            });
+          });
+        })().catch(next);
       }
 
       // Main auth failed — try broker portal accounts table
@@ -527,29 +546,71 @@ export function setupAuth(app: Express) {
       // CRITICAL FIX (Dec 15, 2025): Determine correct role based on email domain
       // This ensures @catalystcp.com users get analyst navigation, not broker navigation
       let role = user?.role || 'BROKER';
-      if (userEmail === 'demo@catalystcp.com') {
+      if (isPlatformAdmin(userEmail)) {
+        role = 'SUPER_ADMIN';
+      } else if (String(user?.role || '').toUpperCase() === 'DEVELOPER') {
+        role = 'DEVELOPER';
+      } else if (userEmail === 'demo@catalystcp.com') {
         role = 'DEMO';
       } else if (userEmail === 'jack@catalystcp.com') {
         role = 'SUPER_ADMIN';
       } else if (userEmail.endsWith('@catalystcp.com')) {
-        // Check for developers and partners
-        const developers = ['johnbell', 'stevehillebrand', 'malliecolavita'];
+        // Check for partners. DEVELOPER is intentionally never inferred from
+        // email because it is a tenant-isolated platform role.
         const partners = ['ajklenk', 'brianford'];
         const emailPrefix = userEmail.split('@')[0].toLowerCase().replace(/[^a-z]/g, '');
         
-        if (developers.some(dev => emailPrefix.includes(dev.replace(' ', '')))) {
-          role = 'DEVELOPER';
-        } else if (partners.some(partner => emailPrefix.includes(partner.replace(' ', '')))) {
+        if (partners.some(partner => emailPrefix.includes(partner.replace(' ', '')))) {
           role = 'PARTNER';
         } else {
           role = 'ANALYST';
         }
       }
       
-      res.json({ ...user, broker, isAnalyst, role, password: undefined });
+      let developerProfile = null;
+      const developerProfileId = (user as any).developerProfileId;
+      if (role === 'DEVELOPER' && developerProfileId) {
+        const profiles = await db
+          .select()
+          .from(developerProfiles)
+          .where(eq(developerProfiles.id, developerProfileId))
+          .limit(1);
+        developerProfile = profiles[0] || null;
+      }
+
+      res.json({ ...user, broker, developerProfile, isAnalyst, role, password: undefined });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Public branding lookup for Investment Company login pages. Keep this
+  // response intentionally limited to presentation fields only.
+  app.get("/api/developer-profile/by-slug/:slug", async (req, res) => {
+    try {
+      const [profile] = await db
+        .select({
+          companyName: developerProfiles.companyName,
+          logoUrl: developerProfiles.logoUrl,
+          primaryColor: developerProfiles.primaryColor,
+          secondaryColor: developerProfiles.secondaryColor,
+        })
+        .from(developerProfiles)
+        .where(and(
+          eq(developerProfiles.slug, req.params.slug),
+          eq(developerProfiles.isActive, true),
+        ))
+        .limit(1);
+
+      if (!profile) {
+        return res.status(404).json({ message: "Developer profile not found" });
+      }
+
+      return res.json(profile);
+    } catch (error) {
+      console.error("Developer profile branding lookup error:", error);
+      return res.status(500).json({ message: "Failed to load developer profile" });
     }
   });
 
@@ -633,7 +694,7 @@ export function setupAuth(app: Express) {
   app.get("/api/sessions/active", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      if (!isTeamMember(user?.email)) {
+      if (!isPlatformAdmin(user?.email)) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -666,7 +727,7 @@ export function setupAuth(app: Express) {
       const { sessionId } = req.body;
       
       // Only team members can terminate other sessions
-      if (!isTeamMember(user?.email)) {
+      if (!isPlatformAdmin(user?.email)) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -690,11 +751,11 @@ export function setupAuth(app: Express) {
     const user = req.user as any;
     res.json({
       user: user.email,
-      isTeamMember: isTeamMember(user?.email),
+      isPlatformAdmin: isPlatformAdmin(user?.email),
       lastActivity: req.session.lastActivity,
       maxAge: req.session.cookie.maxAge,
       expires: new Date(Date.now() + (req.session.cookie.maxAge || 0)),
-      idleTimeout: isTeamMember(user?.email) ? '2 hours' : '30 minutes'
+      idleTimeout: isPlatformAdmin(user?.email) ? '2 hours' : '30 minutes'
     });
   });
 }
