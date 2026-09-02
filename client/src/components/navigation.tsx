@@ -176,7 +176,13 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
         );
     }
     
-    return { catalystNav: catalyst, landlinqNav: landlinq, publicNav: publicItems };
+    // Investment Company users stay inside their branded LandLinq view and
+    // should not see Catalyst's external-tools tab.
+    return {
+      catalystNav: userRole === UserRole.DEVELOPER ? [] : catalyst,
+      landlinqNav: landlinq,
+      publicNav: publicItems,
+    };
   }, [userRole, isAuthenticated, userEmail]);
   
   // Combined navigation for mobile menu

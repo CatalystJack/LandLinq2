@@ -55,8 +55,12 @@ export default function AuthPage() {
         title: "Login successful",
         description: "You've successfully logged in.",
       });
-      // Redirect to the intended destination or default to dashboard
-      const redirectPath = userData?.role?.toUpperCase() === 'DEVELOPER'
+      // Apex users always enter the LandLinq/Apex parent platform. This takes
+      // priority over a stale or user-supplied redirect destination.
+      const isApexPlatformUser = String(userData?.email || "").toLowerCase().endsWith("@apexresi.com");
+      const redirectPath = isApexPlatformUser
+        ? "/dashboard"
+        : userData?.role?.toUpperCase() === 'DEVELOPER'
         ? '/developer/dashboard'
         : (searchParams.get('redirect') || '/dashboard');
       setTimeout(() => {

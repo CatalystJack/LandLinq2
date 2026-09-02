@@ -529,7 +529,8 @@ export function setupAuth(app: Express) {
     (req, res) => {
       // Successful authentication
       console.log('✅ [GOOGLE AUTH] Successful login, redirecting to launchpad');
-      res.redirect('/launchpad');
+      const email = String((req.user as any)?.email || '').toLowerCase();
+      res.redirect(email.endsWith('@apexresi.com') ? '/dashboard' : '/launchpad');
     }
   );
 
@@ -543,7 +544,8 @@ export function setupAuth(app: Express) {
     (req, res) => {
       // Successful authentication
       console.log('✅ [MICROSOFT AUTH] Successful login, redirecting to launchpad');
-      res.redirect('/launchpad');
+      const email = String((req.user as any)?.email || '').toLowerCase();
+      res.redirect(email.endsWith('@apexresi.com') ? '/dashboard' : '/launchpad');
     }
   );
 

@@ -127,6 +127,12 @@ const fetchUserOnce = async () => {
 // Helper function to determine user role
 async function determineUserRole(user: any): Promise<UserRole | null> {
   if (!user?.email) return null;
+
+  // Apex platform accounts always use the LandLinq/Apex parent view,
+  // regardless of a stale database role value.
+  if (user.email.toLowerCase().endsWith('@apexresi.com')) {
+    return UserRole.SUPER_ADMIN;
+  }
   
   // Check if user has explicit role from backend
   if (user.role) {

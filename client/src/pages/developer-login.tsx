@@ -75,6 +75,14 @@ export default function DeveloperLogin() {
       return response.json();
     },
     onSuccess: async (userData) => {
+      const isApexPlatformUser = String(userData?.email || "").toLowerCase().endsWith("@apexresi.com");
+      if (isApexPlatformUser) {
+        queryClient.setQueryData(["/api/user"], userData);
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        window.location.href = "/dashboard";
+        return;
+      }
+
       if (String(userData?.role || "").toUpperCase() !== "DEVELOPER") {
         await fetch("/api/logout", {
           method: "POST",
