@@ -442,6 +442,14 @@ export async function processDripEnrollments(): Promise<void> {
         JOIN outreach_senders s ON e.sender_id = s.id
         WHERE e.next_send_at <= NOW()
           AND e.status IN ('pending', 'in_progress')
+          AND t.is_active = true
+          AND s.is_active = true
+          AND NOT EXISTS (
+            SELECT 1
+            FROM outreach_campaigns c
+            WHERE c.broker_filter->>'templateId' = e.template_id
+              AND c.status <> 'active'
+          )
       )
       SELECT * FROM due
       ORDER BY rn ASC, next_send_at ASC
@@ -678,6 +686,17 @@ export async function processDripEnrollments(): Promise<void> {
             await new Promise(r => setTimeout(r, 2000));
           } catch (msError: any) {
             const { isMailboxBounceError } = await import('../microsoftAuth');
+            if (isMailboxBounceError(msError.message || '')) {
+              await db.execute(sql`
+                UPDATE drip_campaign_enrollments
+                SET status = 'cancelled',
+                    paused_reason = 'Hard bounce — mailbox does not exist',
+                    updated_at = NOW()
+                WHERE id = ${enrollment.id} AND sender_id = ${enrollment.sender_id}
+              `);
+              console.warn(`   ⚠️ [DRIP] Cancelled bounced enrollment ${enrollment.id} for sender ${enrollment.sender_id}`);
+              continue;
+            }
             if (isMailboxBounceError(msError.message || '')) {
               // Hard bounce — this address no longer exists. Delete the broker entirely.
               console.warn(`   🗑️ [DRIP] Hard bounce detected for ${enrollment.contact_email} — permanently deleting from system. Error: ${msError.message}`);
@@ -1362,6 +1381,17 @@ export async function processOutlookBouncedEmails(): Promise<void> {
 
         for (const email of bouncedEmails) {
           try {
+            await db.execute(sql`
+              UPDATE drip_campaign_enrollments
+              SET status = 'cancelled',
+                  paused_reason = 'Hard bounce — mailbox does not exist',
+                  updated_at = NOW()
+              WHERE sender_id = ${sender.id}
+                AND LOWER(contact_email) = LOWER(${email})
+                AND status IN ('pending', 'in_progress')
+            `);
+            console.log(`   ⚠️ [BOUNCE-POLL] Cancelled bounced enrollments for ${email} under sender ${sender.id}`);
+            continue;
             const lookup = await db.execute(sql`SELECT id, first_name, last_name FROM brokers WHERE email = ${email} LIMIT 1`);
             const brokerRow = (lookup.rows as any[])[0];
 

@@ -81,6 +81,12 @@ import { Client as ReplitObjectStorageClient } from "@replit/object-storage";
 
 // Cached Object Storage client for asset serving (avoid per-request initialization)
 let cachedObjectStorageClient: ReplitObjectStorageClient | null = null;
+const developerMicrosoftOAuthStates = new Map<string, {
+  senderId: string;
+  developerProfileId: string;
+  returnUrl: string;
+  expiresAt: number;
+}>();
 function getObjectStorageClient(): ReplitObjectStorageClient {
   if (!cachedObjectStorageClient) {
     cachedObjectStorageClient = new ReplitObjectStorageClient();
@@ -12140,6 +12146,19 @@ RULES:
     }[character] || character));
   }
 
+  async function requireActiveDeveloperProfile(developerProfileId: string, res: any): Promise<boolean> {
+    const active = await db.execute(sql`
+      SELECT id FROM developer_profiles
+      WHERE id = ${developerProfileId} AND is_active = true
+      LIMIT 1
+    `);
+    if (!active.rows?.length) {
+      res.status(403).json({ error: 'Investment Company profile is inactive or unavailable' });
+      return false;
+    }
+    return true;
+  }
+
   app.get("/api/developer-profile/me", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
@@ -12487,6 +12506,314 @@ RULES:
     } catch (error: any) {
       console.error('[developer-profile/me/import-contacts] Error:', error);
       return res.status(500).json({ message: 'Failed to import contacts' });
+    }
+  });
+
+  async function getDeveloperOutreachTargets(developerProfileId: string) {
+    const profileResult = await db.execute(sql`
+      SELECT target_states, target_counties
+      FROM developer_profiles
+      WHERE id = ${developerProfileId} AND is_active = true
+      LIMIT 1
+    `);
+    const profile = profileResult.rows?.[0] as any;
+    if (!profile) throw new Error('ACTIVE_DEVELOPER_PROFILE_REQUIRED');
+    const targetStates = (profile.target_states || []).map((value: string) => value.toUpperCase());
+    const targetCounties = (profile.target_counties || []).map((value: string) => value.toLowerCase());
+    const result = await db.execute(sql`
+      SELECT DISTINCT b.id, b.first_name as "firstName", b.last_name as "lastName",
+        b.email, b.phone, b.brokerage, b.state_region as "stateRegion",
+        b.owner_developer_profile_id as "ownerDeveloperProfileId"
+      FROM brokers b
+      LEFT JOIN deals d ON d.broker_id = b.id
+      WHERE b.is_active = true
+        AND b.email IS NOT NULL
+        AND (b.owner_developer_profile_id = ${developerProfileId} OR b.owner_developer_profile_id IS NULL)
+        AND (
+          ${targetStates.length === 0}
+          OR UPPER(COALESCE(b.state_region, '')) = ANY(${targetStates}::text[])
+          OR UPPER(COALESCE(d.state, '')) = ANY(${targetStates}::text[])
+        )
+        AND (
+          ${targetCounties.length === 0}
+          OR LOWER(COALESCE(d.county, '')) = ANY(${targetCounties}::text[])
+        )
+      ORDER BY b.last_name, b.first_name
+    `);
+    return {
+      contacts: (result.rows || []) as any[],
+      targetStates,
+      targetCounties: profile.target_counties || [],
+    };
+  }
+
+  app.get("/api/developer-profile/me/outreach/sender", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const result = await db.execute(sql`
+        SELECT id, name, email, outlook_connected as "outlookConnected",
+          microsoft_token_expiry as "microsoftTokenExpiry",
+          microsoft_refresh_token IS NOT NULL as "hasRefreshToken",
+          signature_html as "signatureHtml", is_active as "isActive"
+        FROM outreach_senders
+        WHERE developer_profile_id = ${developerProfileId}
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+      return res.json({ sender: result.rows?.[0] || null });
+    } catch (error) {
+      console.error('[developer outreach sender] Error:', error);
+      return res.status(500).json({ error: 'Failed to load email connection' });
+    }
+  });
+
+  app.post("/api/developer-profile/me/outreach/sender", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const email = String(req.user?.email || req.user?.claims?.email || '').trim().toLowerCase();
+      const name = [req.user?.firstName, req.user?.lastName].filter(Boolean).join(' ').trim()
+        || String(req.user?.name || email.split('@')[0] || 'Investment Company Sender');
+      if (!email) return res.status(400).json({ error: 'Your account does not have an email address' });
+
+      const existing = await db.execute(sql`
+        SELECT id, developer_profile_id
+        FROM outreach_senders
+        WHERE LOWER(email) = ${email}
+        LIMIT 1
+      `);
+      const sender = existing.rows?.[0] as any;
+      if (sender && sender.developer_profile_id !== developerProfileId) {
+        return res.status(409).json({ error: 'This email is already connected to another outreach sender' });
+      }
+      if (!sender) {
+        const created = await db.execute(sql`
+          INSERT INTO outreach_senders
+            (developer_profile_id, name, email, role, delivery_method, sms_followup_enabled, is_active)
+          VALUES
+            (${developerProfileId}, ${name}, ${email}, 'developer', 'email', false, true)
+          RETURNING id, name, email, outlook_connected as "outlookConnected", is_active as "isActive"
+        `);
+        return res.status(201).json({ sender: created.rows?.[0] });
+      }
+      const owned = await db.execute(sql`
+        SELECT id, name, email, outlook_connected as "outlookConnected", is_active as "isActive"
+        FROM outreach_senders WHERE id = ${sender.id} AND developer_profile_id = ${developerProfileId}
+      `);
+      return res.json({ sender: owned.rows?.[0] });
+    } catch (error) {
+      console.error('[developer outreach sender create] Error:', error);
+      return res.status(500).json({ error: 'Failed to prepare email connection' });
+    }
+  });
+
+  app.get("/api/developer-profile/me/outreach/targets", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const targets = await getDeveloperOutreachTargets(developerProfileId);
+      return res.json({ ...targets, count: targets.contacts.length });
+    } catch (error) {
+      console.error('[developer outreach targets] Error:', error);
+      return res.status(500).json({ error: 'Failed to load outreach contacts' });
+    }
+  });
+
+  app.get("/api/developer-profile/me/outreach/campaigns", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const result = await db.execute(sql`
+        SELECT c.*, s.subject, s.content, s.day_number as "dayNumber",
+          COALESCE(e.enrollment_count, 0)::int as "enrollmentCount"
+        FROM outreach_campaigns c
+        LEFT JOIN outreach_campaign_template_steps s
+          ON s.template_id = (c.broker_filter->>'templateId') AND s.sequence_index = 0
+        LEFT JOIN (
+          SELECT template_id, COUNT(*) as enrollment_count
+          FROM drip_campaign_enrollments
+          WHERE status IN ('pending', 'in_progress', 'completed')
+          GROUP BY template_id
+        ) e ON e.template_id = (c.broker_filter->>'templateId')
+        WHERE c.developer_profile_id = ${developerProfileId}
+          AND COALESCE(c.is_archived, false) = false
+        ORDER BY c.created_at DESC
+      `);
+      return res.json({ campaigns: result.rows || [] });
+    } catch (error) {
+      console.error('[developer outreach campaigns] Error:', error);
+      return res.status(500).json({ error: 'Failed to load campaigns' });
+    }
+  });
+
+  const developerCampaignSchema = z.object({
+    name: z.string().trim().min(1).max(160),
+    subject: z.string().trim().min(1).max(240),
+    content: z.string().trim().min(1).max(50000),
+    dayNumber: z.coerce.number().int().min(0).max(365).default(0),
+    status: z.enum(['paused', 'active']).default('paused'),
+  });
+
+  app.post("/api/developer-profile/me/outreach/campaigns", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const body = developerCampaignSchema.parse(req.body);
+      const senderResult = await db.execute(sql`
+        SELECT id, outlook_connected, microsoft_access_token
+        FROM outreach_senders
+        WHERE developer_profile_id = ${developerProfileId} AND is_active = true
+        ORDER BY created_at DESC LIMIT 1
+      `);
+      const sender = senderResult.rows?.[0] as any;
+      if (!sender) return res.status(400).json({ error: 'Connect your email account before creating a campaign' });
+      if (body.status === 'active' && (!sender.outlook_connected || !sender.microsoft_access_token)) {
+        return res.status(400).json({ error: 'Connect Outlook before activating a campaign' });
+      }
+
+      const campaign = await db.transaction(async (tx) => {
+        const createdCampaign = await tx.execute(sql`
+          INSERT INTO outreach_campaigns
+            (developer_profile_id, name, status, cadence, channels, broker_filter, rate_limit_per_minute)
+          VALUES
+            (${developerProfileId}, ${body.name}, ${body.status}, 'drip', '["email"]'::jsonb, '{}'::jsonb, 10)
+          RETURNING *
+        `);
+        const campaignRow = createdCampaign.rows?.[0] as any;
+        const triggerTag = `developer:${developerProfileId}:${campaignRow.id}`;
+        const createdTemplate = await tx.execute(sql`
+          INSERT INTO outreach_campaign_templates
+            (name, description, hubspot_trigger_tag, team_id, is_active)
+          VALUES
+            (${body.name}, 'Investment Company drip campaign', ${triggerTag}, ${developerProfileId}, true)
+          RETURNING id
+        `);
+        const templateId = (createdTemplate.rows?.[0] as any).id;
+        await tx.execute(sql`
+          INSERT INTO outreach_campaign_template_steps
+            (template_id, sequence_index, day_number, channel, subject, content, is_active)
+          VALUES (${templateId}, 0, ${body.dayNumber}, 'email', ${body.subject}, ${body.content}, true)
+        `);
+        await tx.execute(sql`
+          INSERT INTO outreach_campaign_steps
+            (sender_id, sequence_index, day_number, channel, subject, content, is_active)
+          VALUES (${sender.id}, 0, ${body.dayNumber}, 'email', ${body.subject}, ${body.content}, true)
+        `);
+        await tx.execute(sql`
+          UPDATE outreach_campaigns
+          SET broker_filter = ${JSON.stringify({ templateId, senderId: sender.id })}::jsonb
+          WHERE id = ${campaignRow.id} AND developer_profile_id = ${developerProfileId}
+        `);
+        return { ...campaignRow, brokerFilter: { templateId, senderId: sender.id }, subject: body.subject, content: body.content, dayNumber: body.dayNumber };
+      });
+      return res.status(201).json({ campaign });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: 'Invalid campaign data', details: error.errors });
+      console.error('[developer outreach campaign create] Error:', error);
+      return res.status(500).json({ error: 'Failed to create campaign' });
+    }
+  });
+
+  app.patch("/api/developer-profile/me/outreach/campaigns/:campaignId", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const body = developerCampaignSchema.parse(req.body);
+      const owned = await db.execute(sql`
+        SELECT id, broker_filter FROM outreach_campaigns
+        WHERE id = ${req.params.campaignId} AND developer_profile_id = ${developerProfileId}
+        LIMIT 1
+      `);
+      const campaign = owned.rows?.[0] as any;
+      if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+      const templateId = campaign.broker_filter?.templateId;
+      const senderId = campaign.broker_filter?.senderId;
+      if (!templateId || !senderId) return res.status(409).json({ error: 'Campaign configuration is incomplete' });
+      if (body.status === 'active') {
+        const sender = await db.execute(sql`
+          SELECT id FROM outreach_senders
+          WHERE id = ${senderId} AND developer_profile_id = ${developerProfileId}
+            AND outlook_connected = true AND microsoft_access_token IS NOT NULL AND is_active = true
+        `);
+        if (!sender.rows?.length) return res.status(400).json({ error: 'Reconnect Outlook before activating this campaign' });
+      }
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`
+          UPDATE outreach_campaigns SET name = ${body.name}, status = ${body.status}, updated_at = NOW()
+          WHERE id = ${campaign.id} AND developer_profile_id = ${developerProfileId}
+        `);
+        await tx.execute(sql`
+          UPDATE outreach_campaign_templates SET name = ${body.name}, is_active = true, updated_at = NOW()
+          WHERE id = ${templateId} AND team_id = ${developerProfileId}
+        `);
+        await tx.execute(sql`
+          UPDATE outreach_campaign_template_steps
+          SET subject = ${body.subject}, content = ${body.content}, day_number = ${body.dayNumber}, updated_at = NOW()
+          WHERE template_id = ${templateId} AND sequence_index = 0
+        `);
+      });
+      return res.json({ success: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: 'Invalid campaign data', details: error.errors });
+      console.error('[developer outreach campaign update] Error:', error);
+      return res.status(500).json({ error: 'Failed to update campaign' });
+    }
+  });
+
+  app.post("/api/developer-profile/me/outreach/campaigns/:campaignId/launch", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      const owned = await db.execute(sql`
+        SELECT id, broker_filter FROM outreach_campaigns
+        WHERE id = ${req.params.campaignId} AND developer_profile_id = ${developerProfileId}
+        LIMIT 1
+      `);
+      const campaign = owned.rows?.[0] as any;
+      if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+      const templateId = campaign.broker_filter?.templateId;
+      const senderId = campaign.broker_filter?.senderId;
+      const sender = await db.execute(sql`
+        SELECT id FROM outreach_senders
+        WHERE id = ${senderId} AND developer_profile_id = ${developerProfileId}
+          AND outlook_connected = true AND microsoft_access_token IS NOT NULL AND is_active = true
+      `);
+      if (!sender.rows?.length) return res.status(400).json({ error: 'Connect or reconnect Outlook before launching' });
+      const targets = await getDeveloperOutreachTargets(developerProfileId);
+      let enrolled = 0;
+      let skipped = 0;
+      for (const contact of targets.contacts) {
+        const existing = await db.execute(sql`
+          SELECT id FROM drip_campaign_enrollments
+          WHERE template_id = ${templateId}
+            AND (broker_id = ${contact.id} OR LOWER(contact_email) = LOWER(${contact.email}))
+            AND status IN ('pending', 'in_progress', 'completed')
+          LIMIT 1
+        `);
+        if (existing.rows?.length) {
+          skipped++;
+          continue;
+        }
+        await db.execute(sql`
+          INSERT INTO drip_campaign_enrollments
+            (broker_id, contact_email, contact_first_name, contact_last_name, contact_phone,
+             template_id, sender_id, current_step_index, next_send_at, status, target_state)
+          VALUES
+            (${contact.id}, ${contact.email}, ${contact.firstName || null}, ${contact.lastName || null},
+             ${contact.phone || null}, ${templateId}, ${senderId}, 0, NOW(), 'pending',
+             ${String(contact.stateRegion || '').toUpperCase().match(/^[A-Z]{2}$/)?.[0] || null})
+        `);
+        enrolled++;
+      }
+      await db.execute(sql`
+        UPDATE outreach_campaigns SET status = 'active', updated_at = NOW()
+        WHERE id = ${campaign.id} AND developer_profile_id = ${developerProfileId}
+      `);
+      return res.json({ enrolled, skipped, totalTargets: targets.contacts.length });
+    } catch (error) {
+      console.error('[developer outreach campaign launch] Error:', error);
+      return res.status(500).json({ error: 'Failed to launch campaign' });
     }
   });
 
@@ -27496,12 +27823,28 @@ RULES:
     try {
       const user = req.user as any;
       const isAnalyst = (user?.claims?.email || user?.email || '').includes('@catalystcp.com') || (user?.claims?.email || user?.email || '').includes('@catalyst');
+      const isDeveloper = String(user?.role || '').toUpperCase() === 'DEVELOPER' && !!user?.developerProfileId;
       
-      if (!isAnalyst) {
+      if (!isAnalyst && !isDeveloper) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
       }
 
       const { senderId } = req.params;
+      let returnUrl = '/outreach-onboarding';
+      if (isDeveloper) {
+        const senderCheck = await db.execute(sql`
+          SELECT s.id, p.slug
+          FROM outreach_senders s
+          JOIN developer_profiles p ON p.id = s.developer_profile_id
+          WHERE s.id = ${senderId}
+            AND s.developer_profile_id = ${user.developerProfileId}
+            AND p.is_active = true
+          LIMIT 1
+        `);
+        const ownedSender = senderCheck.rows?.[0] as any;
+        if (!ownedSender) return res.status(404).json({ error: 'Sender not found' });
+        returnUrl = `/developer/${ownedSender.slug}/outreach`;
+      }
 
       // Check if required env vars are set
       console.log(`🔑 [CONNECT-OUTLOOK] Starting OAuth for sender ID: ${senderId}`);
@@ -27525,7 +27868,11 @@ RULES:
 
       // Generate OAuth URL for Microsoft Graph API
       const scope = 'openid profile email offline_access User.Read Mail.Send Mail.Read';
-      const state = Buffer.from(JSON.stringify({ senderId, returnUrl: '/outreach-onboarding' })).toString('base64');
+      const state = Buffer.from(JSON.stringify({
+        senderId,
+        returnUrl,
+        ...(isDeveloper ? { developerProfileId: user.developerProfileId } : {}),
+      })).toString('base64');
       
       const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
         `client_id=${clientId}` +
@@ -27564,7 +27911,16 @@ RULES:
 
       // Decode state to get senderId
       const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
-      const { senderId, returnUrl } = stateData;
+      const { senderId, returnUrl, developerProfileId } = stateData;
+      if (developerProfileId) {
+        const callbackUser = (req as any).user;
+        if (
+          String(callbackUser?.role || '').toUpperCase() !== 'DEVELOPER'
+          || callbackUser?.developerProfileId !== developerProfileId
+        ) {
+          return res.redirect(`${returnUrl || '/'}?error=oauth_session_mismatch`);
+        }
+      }
 
       // Exchange code for tokens
       const clientId = process.env.MICROSOFT_CLIENT_ID;
@@ -27605,12 +27961,17 @@ RULES:
       
       // Get the sender's configured email to verify it matches the Microsoft account
       const senderResult = await db.execute(sql`
-        SELECT email, name FROM outreach_senders WHERE id = ${senderId}
+        SELECT email, name, developer_profile_id
+        FROM outreach_senders
+        WHERE id = ${senderId}
       `);
       const senderRecord = senderResult.rows?.[0] as any;
       if (!senderRecord) {
         console.error(`❌ [OAUTH-ERROR] Sender not found in database: ${senderId}`);
         return res.redirect(`${returnUrl || "/outreach-onboarding"}?error=sender_not_found&message=Sender+ID+no+longer+exists`);
+      }
+      if (developerProfileId && senderRecord.developer_profile_id !== developerProfileId) {
+        return res.redirect(`${returnUrl || '/'}?error=sender_not_owned`);
       }
       const senderEmail = senderRecord?.email?.toLowerCase() || '';
       const senderName = senderRecord?.name || 'Unknown';
@@ -27637,6 +27998,7 @@ RULES:
           microsoft_user_id = ${userInfo?.id || null},
           updated_at = now()
         WHERE id = ${senderId}
+          AND (${developerProfileId || null}::text IS NULL OR developer_profile_id = ${developerProfileId || null})
       `);
 
       console.log(`✅ Microsoft Outlook connected for sender: ${senderId} (${microsoftEmail})`);
