@@ -8,6 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -32,13 +33,10 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
   // Memoized user email to prevent object reference changes
   // FIX (Dec 15, 2025): Support both OIDC auth (user.claims.email) and traditional auth (user.email)
   const userEmail = useMemo(() => (user as any)?.claims?.email || (user as any)?.email || '', [user]);
+  const isApexUser = userEmail.toLowerCase().endsWith('@apexresi.com');
   
-  // Check if user is an analyst (only @catalystcp.com emails AND authenticated)
-  let isAnalyst = isAuthenticated && userEmail.includes('@catalystcp.com');
-
   // Categorized navigation for dropdown menus
-  const { catalystNav, landlinqNav, publicNav } = useMemo(() => {
-    const catalyst: any[] = [];
+  const { landlinqNav, publicNav } = useMemo(() => {
     const landlinq: any[] = [];
     const publicItems: any[] = [];
     
@@ -54,73 +52,65 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
         { name: "Brokers", href: "/broker-network", description: "Join our partner broker program" },
         { name: "Submit a Deal", href: "/submit-deal", description: "Submit a land deal" }
       );
-      return { catalystNav: catalyst, landlinqNav: landlinq, publicNav: publicItems };
+      return { landlinqNav: landlinq, publicNav: publicItems };
     }
     
-    // Catalyst = External tools (third-party links from Launchpad)
     // LandLinq = Internal platform features
     switch (userRole) {
       case UserRole.SUPER_ADMIN:
       case UserRole.ADMIN:
-        // Catalyst = External Tools (links to third-party sites)
-        catalyst.push(
-          { name: "Catalyst Website", href: "https://www.catalystcp.com", description: "Company website", external: true },
-          { name: "SharePoint", href: "https://catalystcp.sharepoint.com", description: "Team files & documents", external: true },
-          { name: "ClickUp", href: "https://app.clickup.com", description: "Project management", external: true },
-          { name: "HubSpot", href: "https://app.hubspot.com", description: "CRM & contacts", external: true },
-          { name: "Northspyre", href: "https://app.northspyre.com", description: "Development project management", external: true },
-          { name: "Outlook Calendar", href: "https://outlook.office.com/calendar", description: "Schedule & meetings", external: true },
-          { name: "Outlook Mail", href: "https://outlook.office.com/mail", description: "Email inbox", external: true },
-          { name: "CoStar", href: "https://www.costar.com", description: "Commercial real estate data", external: true },
-          { name: "ESRI / ArcGIS", href: "https://www.arcgis.com", description: "Mapping & GIS analytics", external: true },
-          { name: "Google News", href: "https://news.google.com", description: "Latest headlines", external: true },
-          { name: "Bloomberg Markets", href: "https://www.bloomberg.com/markets", description: "Financial news & data", external: true }
-        );
-        // LandLinq = Internal Platform Features
         landlinq.push(
-          { name: userEmail.toLowerCase().endsWith('@apexresi.com') ? "Platform Overview" : "Deal Dashboard", href: "/dashboard", description: userEmail.toLowerCase().endsWith('@apexresi.com') ? "Parent view across all Investment Companies and developers" : "Review and manage incoming deals" },
-          { name: "Email Intake", href: "/email-intake", description: "Review AI-parsed deal emails before approval" },
-          { name: "AI Training", href: "/ai-training", description: "Train AI on pipeline review sessions" },
-          { name: "CRM", href: "/crm", description: "Contact management & campaign outreach" },
-          { name: "Developers", href: "/partner-developers", description: "Registered developer buy boxes & deal routing" },
-          { name: "Partner Brokers", href: "/partner-brokers-admin", description: "Broker portal accounts & market access" },
-          { name: "Messaging", href: "/messaging", description: "Two-way SMS conversations" },
-          { name: "People", href: "/user-management", description: "Manage users and brokers" },
-          { name: "Outreach", href: "/outreach-management", description: "Email & SMS campaign templates" },
-          { name: "Outreach Analytics", href: "/outreach-analytics", description: "Emails sent, open rates & sender health" },
-          { name: "Outreach Setup", href: "/outreach-onboarding", description: "Configure senders & campaigns" },
-          { name: "LIHTC Scoring", href: "/affordable-housing", description: "NC affordable housing pre-scorer" },
-          { name: userEmail.toLowerCase().endsWith('@apexresi.com') ? "Data Warehouse" : "Data Hub", href: "/data-hub", description: "Market intelligence, deal data, and broker analytics" },
-          { name: "LoopNet Review", href: "/listing-review", description: "Review for-sale listings in your markets" },
-          { name: "Analytics", href: "/analytics", description: "Performance metrics & charts" },
-          { name: "API Monitoring", href: "/api-monitoring", description: "Track API health & costs" }
+          ...(isApexUser
+            ? [
+                { section: "Platform" },
+                { name: "Platform Overview", href: "/dashboard", description: "Parent view across all Investment Companies and developers" },
+                { name: "Master Pipeline", href: "/admin/master-pipeline", description: "View deal activity across every Investment Company" },
+                { name: "Investment Companies", href: "/admin/investment-companies", description: "Create company portals, criteria, and initial logins" },
+                { section: "Data & Insights" },
+                { name: "Data Warehouse", href: "/data-hub", description: "Market intelligence, deal data, and broker analytics" },
+                { name: "Analytics", href: "/analytics", description: "Performance metrics & charts" },
+                { section: "Deal Operations" },
+                { name: "Email Intake", href: "/email-intake", description: "Review AI-parsed deal emails before approval" },
+                { name: "AI Training", href: "/ai-training", description: "Train AI on pipeline review sessions" },
+                { name: "Developers", href: "/partner-developers", description: "Registered developer buy boxes & deal routing" },
+                { name: "Partner Brokers", href: "/partner-brokers-admin", description: "Broker portal accounts & market access" },
+                { name: "People", href: "/user-management", description: "Manage users and brokers" },
+                { section: "CRM & Outreach" },
+                { name: "CRM", href: "/crm", description: "Contact management & campaign outreach" },
+                { name: "Messaging", href: "/messaging", description: "Two-way SMS conversations" },
+                { name: "Outreach", href: "/outreach-management", description: "Email & SMS campaign templates" },
+                { name: "Outreach Analytics", href: "/outreach-analytics", description: "Emails sent, open rates & sender health" },
+                { name: "Outreach Setup", href: "/outreach-onboarding", description: "Configure senders & campaigns" },
+                { section: "Monitoring & Tools" },
+                { name: "LIHTC Scoring", href: "/affordable-housing", description: "NC affordable housing pre-scorer" },
+                { name: "LoopNet Review", href: "/listing-review", description: "Review for-sale listings in your markets" },
+                { name: "API Monitoring", href: "/api-monitoring", description: "Track API health & costs" },
+              ]
+            : [
+                { name: "Deal Dashboard", href: "/dashboard", description: "Review and manage incoming deals" },
+                { name: "Email Intake", href: "/email-intake", description: "Review AI-parsed deal emails before approval" },
+                { name: "AI Training", href: "/ai-training", description: "Train AI on pipeline review sessions" },
+                { name: "CRM", href: "/crm", description: "Contact management & campaign outreach" },
+                { name: "Developers", href: "/partner-developers", description: "Registered developer buy boxes & deal routing" },
+                { name: "Partner Brokers", href: "/partner-brokers-admin", description: "Broker portal accounts & market access" },
+                { name: "Messaging", href: "/messaging", description: "Two-way SMS conversations" },
+                { name: "People", href: "/user-management", description: "Manage users and brokers" },
+                { name: "Outreach", href: "/outreach-management", description: "Email & SMS campaign templates" },
+                { name: "Outreach Analytics", href: "/outreach-analytics", description: "Emails sent, open rates & sender health" },
+                { name: "Outreach Setup", href: "/outreach-onboarding", description: "Configure senders & campaigns" },
+                { name: "LIHTC Scoring", href: "/affordable-housing", description: "NC affordable housing pre-scorer" },
+                { name: "Data Hub", href: "/data-hub", description: "Market intelligence, deal data, and broker analytics" },
+                { name: "LoopNet Review", href: "/listing-review", description: "Review for-sale listings in your markets" },
+                { name: "Analytics", href: "/analytics", description: "Performance metrics & charts" },
+                { name: "API Monitoring", href: "/api-monitoring", description: "Track API health & costs" },
+              ]
+          )
         );
-        if (userEmail.toLowerCase().endsWith('@apexresi.com')) {
-          landlinq.push({
-            name: "Investment Companies",
-            href: "/admin/investment-companies",
-            description: "Create company portals, criteria, and initial logins",
-          });
-          landlinq.push({
-            name: "Master Pipeline",
-            href: "/admin/master-pipeline",
-            description: "View deal activity across every Investment Company",
-          });
-        }
         break;
         
       case UserRole.ANALYST:
       case UserRole.DEVELOPER:
       case UserRole.PARTNER:
-        // Catalyst = External Tools
-        catalyst.push(
-          { name: "Catalyst Website", href: "https://www.catalystcp.com", description: "Company website", external: true },
-          { name: "SharePoint", href: "https://catalystcp.sharepoint.com", description: "Team files & documents", external: true },
-          { name: "ClickUp", href: "https://app.clickup.com", description: "Project management", external: true },
-          { name: "HubSpot", href: "https://app.hubspot.com", description: "CRM & contacts", external: true },
-          { name: "CoStar", href: "https://www.costar.com", description: "Commercial real estate data", external: true }
-        );
-        // LandLinq = Internal Platform Features
         landlinq.push(
           { name: "Deal Dashboard", href: "/dashboard", description: "Deal queue and pending reviews" },
           { name: "Messaging", href: "/messaging", description: "Two-way SMS conversations" },
@@ -176,20 +166,17 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
         );
     }
     
-    // Investment Company users stay inside their branded LandLinq view and
-    // should not see Catalyst's external-tools tab.
     return {
-      catalystNav: userRole === UserRole.DEVELOPER ? [] : catalyst,
       landlinqNav: landlinq,
       publicNav: publicItems,
     };
-  }, [userRole, isAuthenticated, userEmail]);
+  }, [userRole, isAuthenticated, userEmail, isApexUser]);
   
   // Combined navigation for mobile menu
   const navigation = useMemo(() => {
     if (!isAuthenticated) return publicNav;
-    return [...catalystNav, ...landlinqNav];
-  }, [catalystNav, landlinqNav, publicNav, isAuthenticated]);
+    return landlinqNav;
+  }, [landlinqNav, publicNav, isAuthenticated]);
 
   return (
     <nav className="relative border-b border-slate-800 sticky top-0 z-50 shadow-lg" style={{ backgroundColor: '#081729' }}>
@@ -290,53 +277,27 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
             })}
             
             {/* Authenticated navigation - dropdown menus */}
-            {isAuthenticated && catalystNav.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-1 py-2 px-3 text-sm font-medium text-white hover:text-[#4A90E2] transition-colors rounded-md focus:outline-none">
-                    Catalyst
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56 bg-white border-slate-200 shadow-lg max-h-80 overflow-y-auto">
-                  {catalystNav.map((item: any) => (
-                    <DropdownMenuItem key={item.name} asChild className="focus:bg-blue-100 hover:bg-blue-100 cursor-pointer">
-                      {item.external ? (
-                        <a 
-                          href={item.href} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="w-full text-slate-800 hover:text-blue-600 flex items-center justify-between"
-                        >
-                          {item.name}
-                          <span className="text-xs text-slate-400 ml-2">↗</span>
-                        </a>
-                      ) : (
-                        <Link href={item.href} className="w-full text-slate-800 hover:text-blue-600">
-                          {item.name}
-                        </Link>
-                      )}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            
             {isAuthenticated && landlinqNav.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-1 py-2 px-3 text-sm font-medium text-white hover:text-[#4A90E2] transition-colors rounded-md focus:outline-none">
-                    LandLinq
+                    {isApexUser ? "Apex Platform" : "LandLinq"}
                     <ChevronDown className="h-4 w-4" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56 bg-white border-slate-200 shadow-lg max-h-80 overflow-y-auto">
                   {landlinqNav.map((item: any) => (
-                    <DropdownMenuItem key={item.name} asChild className="focus:bg-blue-100 hover:bg-blue-100 cursor-pointer">
-                      <Link href={item.href} className="w-full text-slate-800 hover:text-blue-600">
-                        {item.name}
-                      </Link>
-                    </DropdownMenuItem>
+                    item.section ? (
+                      <DropdownMenuLabel key={item.section} className="pt-3 pb-1 text-[11px] uppercase tracking-wider text-slate-400">
+                        {item.section}
+                      </DropdownMenuLabel>
+                    ) : (
+                      <DropdownMenuItem key={item.name} asChild className="focus:bg-blue-100 hover:bg-blue-100 cursor-pointer">
+                        <Link href={item.href} className="w-full text-slate-800 hover:text-blue-600">
+                          {item.name}
+                        </Link>
+                      </DropdownMenuItem>
+                    )
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -388,6 +349,17 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
           <div className="md:hidden border-t border-slate-700 py-4">
             <div className="flex flex-col space-y-2 px-4">
               {navigation.map((item: any) => {
+                if (item.section) {
+                  return (
+                    <div
+                      key={item.section}
+                      className="pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-500"
+                    >
+                      {item.section}
+                    </div>
+                  );
+                }
+
                 const isActive = location === item.href;
                 const isSubmitButton = item.name.toLowerCase().includes('submit');
                 const isExternal = item.external === true;

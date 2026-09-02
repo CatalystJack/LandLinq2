@@ -28653,25 +28653,43 @@ RULES:
   // ==========================================
   // DATA HUB - PROPRIETARY INTELLIGENCE APIs
   // ==========================================
+
+  const dataHubNumber = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const dataHubText = (value: unknown): string | null => {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return null;
+  };
   
   app.get("/api/data-hub/deal-insights", isAuthenticated, async (req, res) => {
     try {
       const allDeals = await storage.getAllDeals();
       
-      const deals = allDeals.map((deal: any) => ({
-        id: deal.id,
-        propertyName: deal.propertyName || deal.address,
-        city: deal.city,
-        state: deal.state,
-        productType: Array.isArray(deal.productTypes) ? deal.productTypes[0] : deal.productTypes,
-        acreage: deal.acreage ? parseFloat(deal.acreage) : null,
-        pricePerAcre: deal.pricePerAcre ? parseFloat(deal.pricePerAcre) : null,
-        askingPrice: deal.askingPrice ? parseFloat(deal.askingPrice) : null,
-        proposedUnits: deal.proposedUnits,
-        classification: deal.classification,
-        createdAt: deal.createdAt,
-        brokerId: deal.brokerId
-      }));
+      const deals = allDeals.map((deal: any) => {
+        const rawProductType = Array.isArray(deal.productTypes)
+          ? deal.productTypes[0]
+          : deal.productTypes;
+
+        return {
+          id: deal.id,
+          propertyName: dataHubText(deal.propertyName) || dataHubText(deal.address) || 'Unnamed',
+          city: dataHubText(deal.city),
+          state: dataHubText(deal.state),
+          productType: dataHubText(rawProductType),
+          acreage: dataHubNumber(deal.acreage),
+          pricePerAcre: dataHubNumber(deal.pricePerAcre),
+          askingPrice: dataHubNumber(deal.askingPrice),
+          proposedUnits: dataHubNumber(deal.proposedUnits),
+          classification: dataHubText(deal.classification),
+          createdAt: deal.createdAt,
+          brokerId: deal.brokerId
+        };
+      });
 
       const classificationCounts = {
         green: deals.filter((d: any) => d.classification === 'green').length,
@@ -28759,8 +28777,11 @@ RULES:
             marketGroups[key].priceCount++;
           }
           if (deal.proposedUnits) {
-            marketGroups[key].totalUnits += parseInt(deal.proposedUnits);
-            marketGroups[key].unitCount++;
+            const proposedUnits = dataHubNumber(deal.proposedUnits);
+            if (proposedUnits !== null) {
+              marketGroups[key].totalUnits += proposedUnits;
+              marketGroups[key].unitCount++;
+            }
           }
         }
       });
@@ -28851,14 +28872,20 @@ RULES:
         if (dealComparables && Array.isArray(dealComparables)) {
           dealComparables.forEach((comp: any) => {
             comparables.push({
-              propertyName: comp.propertyName || comp.property_name || comp.address,
-              city: comp.city,
-              state: comp.state,
-              units: comp.unitCount || comp.unit_count || comp.units,
-              yearBuilt: comp.yearBuilt || comp.year_built,
-              rentPsf: comp.rentPsf || comp.rent_psf || (comp.avgRent ? (comp.avgRent / (comp.buildingSize || 1000)) : comp.pricePerSqFt),
-              distance: comp.distance,
-              sourceDeal: deal.propertyName || deal.address
+              propertyName: dataHubText(comp.propertyName) || dataHubText(comp.property_name) || dataHubText(comp.address) || 'Unnamed',
+              city: dataHubText(comp.city),
+              state: dataHubText(comp.state),
+              units: dataHubNumber(comp.unitCount ?? comp.unit_count ?? comp.units),
+              yearBuilt: dataHubNumber(comp.yearBuilt ?? comp.year_built),
+              rentPsf: dataHubNumber(
+                comp.rentPsf ??
+                comp.rent_psf ??
+                (dataHubNumber(comp.avgRent) !== null
+                  ? dataHubNumber(comp.avgRent)! / (dataHubNumber(comp.buildingSize) || 1000)
+                  : comp.pricePerSqFt)
+              ),
+              distance: dataHubNumber(comp.distance),
+              sourceDeal: dataHubText(deal.propertyName) || dataHubText(deal.address)
             });
           });
         }

@@ -97,6 +97,17 @@ type LoopNetListing = {
   listingType: string;
 };
 
+function formatNumber(value: unknown, fractionDigits = 0): string {
+  if (value === null || value === undefined || value === '') return '-';
+  const number = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(number)
+    ? number.toLocaleString(undefined, {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits,
+      })
+    : '-';
+}
+
 export default function DataHub() {
   const [activeTab, setActiveTab] = useState("deals");
   const [searchQuery, setSearchQuery] = useState("");
@@ -363,9 +374,9 @@ export default function DataHub() {
                               <TableCell>
                                 <Badge variant="outline">{deal.productType || 'N/A'}</Badge>
                               </TableCell>
-                              <TableCell className="text-right">{deal.acreage?.toFixed(2) || '-'}</TableCell>
+                              <TableCell className="text-right">{formatNumber(deal.acreage, 2)}</TableCell>
                               <TableCell className="text-right">
-                                {deal.pricePerAcre ? `$${deal.pricePerAcre.toLocaleString()}` : '-'}
+                                {deal.pricePerAcre ? `$${formatNumber(deal.pricePerAcre)}` : '-'}
                               </TableCell>
                               <TableCell className="text-right">{deal.proposedUnits || '-'}</TableCell>
                               <TableCell>
@@ -403,7 +414,7 @@ export default function DataHub() {
                         {dealInsights.priceMetrics.byState?.slice(0, 5).map((item: any) => (
                           <div key={item.state} className="flex justify-between items-center">
                             <span className="font-medium">{item.state}</span>
-                            <span className="text-[#4A90E2]">${item.avgPricePerAcre?.toLocaleString()}</span>
+                            <span className="text-[#4A90E2]">${formatNumber(item.avgPricePerAcre)}</span>
                           </div>
                         ))}
                       </div>
@@ -491,13 +502,13 @@ export default function DataHub() {
                               <TableCell className="text-right">{market.dealCount}</TableCell>
                               <TableCell className="text-right text-green-600">{market.greenCount}</TableCell>
                               <TableCell className="text-right">
-                                {market.avgPricePerAcre ? `$${market.avgPricePerAcre.toLocaleString()}` : '-'}
+                                {market.avgPricePerAcre ? `$${formatNumber(market.avgPricePerAcre)}` : '-'}
                               </TableCell>
-                              <TableCell className="text-right">{market.avgUnits?.toFixed(0) || '-'}</TableCell>
+                              <TableCell className="text-right">{formatNumber(market.avgUnits)}</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   <Progress value={market.winRate || 0} className="h-2 w-20" />
-                                  <span className="text-sm">{market.winRate?.toFixed(0) || 0}%</span>
+                                  <span className="text-sm">{formatNumber(market.winRate) === '-' ? '0' : formatNumber(market.winRate)}%</span>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -549,7 +560,7 @@ export default function DataHub() {
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   <Progress value={broker.successRate || 0} className="h-2 w-20" />
-                                  <span className="text-sm">{broker.successRate?.toFixed(0) || 0}%</span>
+                                  <span className="text-sm">{formatNumber(broker.successRate) === '-' ? '0' : formatNumber(broker.successRate)}%</span>
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -610,9 +621,9 @@ export default function DataHub() {
                               <TableCell className="text-right">{comp.units}</TableCell>
                               <TableCell className="text-right">{comp.yearBuilt}</TableCell>
                               <TableCell className="text-right">
-                                {comp.rentPsf ? `$${comp.rentPsf.toFixed(2)}` : '-'}
+                                {comp.rentPsf ? `$${formatNumber(comp.rentPsf, 2)}` : '-'}
                               </TableCell>
-                              <TableCell className="text-right">{comp.distance?.toFixed(1)}</TableCell>
+                              <TableCell className="text-right">{formatNumber(comp.distance, 1)}</TableCell>
                               <TableCell className="text-gray-500 text-sm">{comp.sourceDeal || '-'}</TableCell>
                             </TableRow>
                           ))}
