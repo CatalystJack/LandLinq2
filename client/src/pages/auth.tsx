@@ -14,14 +14,20 @@ import { Eye, EyeOff } from "lucide-react";
 export default function AuthPage() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   
   // Get the auth mode from URL params
   const searchParams = new URLSearchParams(window.location.search);
   const authMode = searchParams.get('mode') || 'login'; // default to login
-  const redirectUrl = searchParams.get('redirect') || '/'; // default to home
+  const authenticatedEmail = String((user as any)?.claims?.email || (user as any)?.email || "").toLowerCase();
+  const authenticatedRole = String((user as any)?.role || "").toUpperCase();
+  const redirectUrl = authenticatedEmail.endsWith("@apexresi.com")
+    ? "/dashboard"
+    : authenticatedRole === "DEVELOPER"
+      ? "/developer/dashboard"
+      : (searchParams.get('redirect') || '/dashboard');
 
   // Redirect if already logged in
   useEffect(() => {
