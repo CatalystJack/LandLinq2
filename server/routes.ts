@@ -11635,6 +11635,157 @@ RULES:
     }
   });
 
+  app.get("/api/admin/analytics/by-profile", isAuthenticated, requirePlatformAdmin, async (_req: any, res) => {
+    try {
+      const result = await db.execute(sql`
+        WITH scoped_sends AS (
+          SELECT
+            pds.*,
+            COALESCE(pds.developer_profile_id, pd.developer_profile_id) AS resolved_profile_id
+          FROM partner_developer_sends pds
+          LEFT JOIN partner_developers pd ON pd.id = pds.developer_id
+          WHERE COALESCE(pds.developer_profile_id, pd.developer_profile_id) IS NOT NULL
+        )
+        SELECT
+          p.id,
+          p.company_name,
+          p.slug,
+          p.logo_url,
+          p.is_active,
+          COALESCE(deal_stats.total_deals, 0) AS total_deals,
+          COALESCE(deal_stats.passed_deals, 0) AS passed_deals,
+          COALESCE(deal_stats.review_deals, 0) AS review_deals,
+          COALESCE(deal_stats.pursuing_deals, 0) AS pursuing_deals,
+          COALESCE(deal_stats.bulk_imported_deals, 0) AS bulk_imported_deals,
+          COALESCE(deal_stats.sourced_deals, 0) AS sourced_deals,
+          COALESCE(contact_stats.crm_contact_count, 0) AS crm_contact_count,
+          COALESCE(outreach_stats.sent, 0) AS outreach_sent,
+          COALESCE(outreach_stats.opens, 0) AS outreach_opens,
+          COALESCE(outreach_stats.clicks, 0) AS outreach_clicks,
+          COALESCE(outreach_stats.replies, 0) AS outreach_replies,
+          GREATEST(
+            p.updated_at,
+            deal_stats.last_deal_activity,
+            contact_stats.last_contact_activity,
+            outreach_stats.last_outreach_activity,
+            user_stats.last_user_activity
+          ) AS last_activity_at
+        FROM developer_profiles p
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*) AS total_deals,
+            COUNT(*) FILTER (
+              WHERE COALESCE(s.green_flagged_by_developer, false) = false
+                AND COALESCE(s.classification, '') <> 'review'
+            ) AS passed_deals,
+            COUNT(*) FILTER (
+              WHERE COALESCE(s.green_flagged_by_developer, false) = false
+                AND COALESCE(s.classification, '') = 'review'
+            ) AS review_deals,
+            COUNT(*) FILTER (
+              WHERE COALESCE(s.green_flagged_by_developer, false) = true
+            ) AS pursuing_deals,
+            COUNT(*) FILTER (
+              WHERE d.source = 'developer_import' OR d.submission_method = 'developer_import'
+            ) AS bulk_imported_deals,
+            COUNT(*) FILTER (
+              WHERE COALESCE(d.source, '') <> 'developer_import'
+                AND COALESCE(d.submission_method, '') <> 'developer_import'
+            ) AS sourced_deals,
+            MAX(COALESCE(s.green_flagged_at, s.sent_at, s.matched_at, d.updated_at, d.created_at)) AS last_deal_activity
+          FROM scoped_sends s
+          INNER JOIN deals d ON d.id = s.deal_id
+          WHERE s.resolved_profile_id = p.id
+        ) deal_stats ON true
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*) AS crm_contact_count,
+            MAX(COALESCE(b.last_contacted_at, b.updated_at, b.created_at)) AS last_contact_activity
+          FROM brokers b
+          WHERE b.owner_developer_profile_id = p.id
+            AND COALESCE(b.is_archived, false) = false
+        ) contact_stats ON true
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*) FILTER (WHERE ev.event_type = 'sent') AS sent,
+            COUNT(*) FILTER (WHERE ev.event_type = 'opened') AS opens,
+            COUNT(*) FILTER (WHERE ev.event_type = 'clicked') AS clicks,
+            COUNT(*) FILTER (WHERE ev.event_type = 'replied') AS replies,
+            MAX(ev.event_timestamp) AS last_outreach_activity
+          FROM outreach_message_events ev
+          INNER JOIN outreach_senders sender ON sender.id = ev.sender_id
+          INNER JOIN outreach_campaigns campaign ON campaign.id = ev.campaign_id
+          WHERE sender.developer_profile_id = p.id
+            AND campaign.developer_profile_id = p.id
+            AND COALESCE(campaign.is_archived, false) = false
+        ) outreach_stats ON true
+        LEFT JOIN LATERAL (
+          SELECT MAX(u.updated_at) AS last_user_activity
+          FROM users u
+          WHERE u.developer_profile_id = p.id
+            AND UPPER(COALESCE(u.role, '')) = 'DEVELOPER'
+        ) user_stats ON true
+        ORDER BY p.company_name ASC
+      `);
+
+      const profiles = (result.rows || []).map((row: any) => {
+        const sent = Number(row.outreach_sent) || 0;
+        const opens = Number(row.outreach_opens) || 0;
+        const replies = Number(row.outreach_replies) || 0;
+        return {
+          id: row.id,
+          companyName: row.company_name,
+          slug: row.slug,
+          logoUrl: row.logo_url,
+          isActive: row.is_active === true,
+          deals: {
+            total: Number(row.total_deals) || 0,
+            passed: Number(row.passed_deals) || 0,
+            review: Number(row.review_deals) || 0,
+            pursuing: Number(row.pursuing_deals) || 0,
+          },
+          sources: {
+            bulkImported: Number(row.bulk_imported_deals) || 0,
+            sourced: Number(row.sourced_deals) || 0,
+          },
+          outreach: {
+            sent,
+            opens,
+            clicks: Number(row.outreach_clicks) || 0,
+            replies,
+            openRate: sent ? opens / sent * 100 : 0,
+            replyRate: sent ? replies / sent * 100 : 0,
+          },
+          crmContactCount: Number(row.crm_contact_count) || 0,
+          lastActivityAt: row.last_activity_at || null,
+        };
+      });
+
+      return res.json({
+        profiles,
+        summary: profiles.reduce((summary, profile) => {
+          summary.totalProfiles += 1;
+          if (profile.isActive) summary.activeProfiles += 1;
+          summary.totalDeals += profile.deals.total;
+          summary.pursuingDeals += profile.deals.pursuing;
+          summary.crmContacts += profile.crmContactCount;
+          summary.outreachSent += profile.outreach.sent;
+          return summary;
+        }, {
+          totalProfiles: 0,
+          activeProfiles: 0,
+          totalDeals: 0,
+          pursuingDeals: 0,
+          crmContacts: 0,
+          outreachSent: 0,
+        }),
+      });
+    } catch (error) {
+      console.error("[admin analytics by profile] Error:", error);
+      return res.status(500).json({ error: "Failed to load cross-company analytics" });
+    }
+  });
+
   function parseInvestmentCompanyPayload(body: any, partial = false) {
     const payload: Record<string, any> = {};
     const requiredString = (field: string, label: string) => {

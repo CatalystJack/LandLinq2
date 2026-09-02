@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter, SheetClose } from "@/components/ui/sheet";
 import { 
   BarChart3, 
@@ -34,6 +35,7 @@ import { Link } from "wouter";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ExecutiveStats {
   deals: {
@@ -91,6 +93,38 @@ interface NewsPreferences {
   excludedDomains: string[];
   sentiment: 'all' | 'positive' | 'negative' | 'neutral';
   enabled: boolean;
+}
+
+interface ProfileAnalytics {
+  id: string;
+  companyName: string;
+  slug: string;
+  logoUrl: string | null;
+  isActive: boolean;
+  deals: { total: number; passed: number; review: number; pursuing: number };
+  sources: { bulkImported: number; sourced: number };
+  outreach: {
+    sent: number;
+    opens: number;
+    clicks: number;
+    replies: number;
+    openRate: number;
+    replyRate: number;
+  };
+  crmContactCount: number;
+  lastActivityAt: string | null;
+}
+
+interface SystemWideAnalytics {
+  profiles: ProfileAnalytics[];
+  summary: {
+    totalProfiles: number;
+    activeProfiles: number;
+    totalDeals: number;
+    pursuingDeals: number;
+    crmContacts: number;
+    outreachSent: number;
+  };
 }
 
 const COLORS = {
@@ -212,9 +246,87 @@ function NewsCard({ article }: { article: NewsArticle }) {
   );
 }
 
+function SystemWideView() {
+  const { data, isLoading, isError } = useQuery<SystemWideAnalytics>({
+    queryKey: ["/api/admin/analytics/by-profile"],
+  });
+
+  if (isLoading) {
+    return <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">{[1, 2, 3, 4].map((item) => <Skeleton key={item} className="h-32" />)}</div>;
+  }
+  if (isError || !data) {
+    return <Card><CardContent className="py-16 text-center text-slate-500">Unable to load system-wide Investment Company analytics.</CardContent></Card>;
+  }
+
+  const summary = data.summary;
+  return <div className="space-y-6">
+    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <KPICard title="Investment Companies" value={summary.totalProfiles} subtitle={`${summary.activeProfiles} active`} icon={Building2} color="blue" />
+      <KPICard title="Company Deal Activity" value={summary.totalDeals} subtitle={`${summary.pursuingDeals} pursuing`} icon={FileText} color="green" />
+      <KPICard title="CRM Contacts" value={summary.crmContacts} subtitle="Company-owned contacts" icon={Users} color="purple" />
+      <KPICard title="Outreach Sent" value={summary.outreachSent} subtitle="Across company campaigns" icon={Mail} color="blue" />
+    </div>
+
+    <div className="grid gap-6 xl:grid-cols-2">
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-blue-600" />Classification by Investment Company</CardTitle></CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={340}>
+            <BarChart data={data.profiles} layout="vertical" margin={{ left: 20 }}>
+              <XAxis type="number" allowDecimals={false} />
+              <YAxis type="category" dataKey="companyName" width={120} fontSize={12} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="deals.passed" name="Passed" fill="#3b82f6" stackId="classification" />
+              <Bar dataKey="deals.review" name="Review" fill="#eab308" stackId="classification" />
+              <Bar dataKey="deals.pursuing" name="Pursuing" fill="#22c55e" stackId="classification" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-purple-600" />Deal Source Mix</CardTitle></CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={340}>
+            <BarChart data={data.profiles} layout="vertical" margin={{ left: 20 }}>
+              <XAxis type="number" allowDecimals={false} />
+              <YAxis type="category" dataKey="companyName" width={120} fontSize={12} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="sources.sourced" name="LandLinq sourced" fill="#081729" stackId="source" />
+              <Bar dataKey="sources.bulkImported" name="Bulk imported" fill="#4A90E2" stackId="source" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+
+    <Card>
+      <CardHeader><CardTitle>Company Activity Detail</CardTitle></CardHeader>
+      <CardContent className="overflow-x-auto p-0">
+        <table className="w-full min-w-[1050px] text-sm">
+          <thead className="border-y bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr><th className="px-5 py-3">Investment Company</th><th className="px-4 py-3">Deals</th><th className="px-4 py-3">Passed</th><th className="px-4 py-3">Review</th><th className="px-4 py-3">Pursuing</th><th className="px-4 py-3">CRM</th><th className="px-4 py-3">Sent</th><th className="px-4 py-3">Open rate</th><th className="px-4 py-3">Reply rate</th><th className="px-4 py-3">Last activity</th></tr>
+          </thead>
+          <tbody>
+            {data.profiles.map((profile) => <tr key={profile.id} className="border-b last:border-0">
+              <td className="px-5 py-4"><div className="flex items-center gap-3">{profile.logoUrl ? <img src={profile.logoUrl} alt="" className="h-9 w-9 rounded border object-contain p-1" /> : <div className="flex h-9 w-9 items-center justify-center rounded bg-slate-100"><Building2 className="h-4 w-4 text-slate-400" /></div>}<div><p className="font-semibold text-slate-900">{profile.companyName}</p><Badge variant={profile.isActive ? "default" : "secondary"} className="mt-1">{profile.isActive ? "Active" : "Inactive"}</Badge></div></div></td>
+              <td className="px-4 py-4 font-semibold">{profile.deals.total}</td><td className="px-4 py-4 text-blue-700">{profile.deals.passed}</td><td className="px-4 py-4 text-amber-700">{profile.deals.review}</td><td className="px-4 py-4 text-green-700">{profile.deals.pursuing}</td><td className="px-4 py-4">{profile.crmContactCount}</td><td className="px-4 py-4">{profile.outreach.sent}</td><td className="px-4 py-4">{profile.outreach.openRate.toFixed(1)}%</td><td className="px-4 py-4">{profile.outreach.replyRate.toFixed(1)}%</td><td className="px-4 py-4 text-slate-500">{profile.lastActivityAt ? format(new Date(profile.lastActivityAt), "MMM d, yyyy h:mm a") : "No activity"}</td>
+            </tr>)}
+          </tbody>
+        </table>
+        {!data.profiles.length && <div className="py-16 text-center text-slate-500">No Investment Company profiles have been created.</div>}
+      </CardContent>
+    </Card>
+  </div>;
+}
+
 export default function ExecutiveDashboard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
+  const email = String((user as any)?.claims?.email || (user as any)?.email || "").toLowerCase();
+  const isPlatformAdmin = isAuthenticated && email.endsWith("@apexresi.com");
   const [newKeyword, setNewKeyword] = useState('');
   const [newExcludedDomain, setNewExcludedDomain] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -473,7 +585,14 @@ export default function ExecutiveDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className={`grid w-full max-w-md ${isPlatformAdmin ? "grid-cols-2" : "grid-cols-1"}`}>
+            <TabsTrigger value="overview">LandLinq Overview</TabsTrigger>
+            {isPlatformAdmin && <TabsTrigger value="system-wide">System-Wide</TabsTrigger>}
+          </TabsList>
+          {isPlatformAdmin && <TabsContent value="system-wide"><SystemWideView /></TabsContent>}
+          <TabsContent value="overview" className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {statsLoading ? (
             <>
               {[1, 2, 3, 4].map(i => (
@@ -520,7 +639,7 @@ export default function ExecutiveDashboard() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -581,7 +700,7 @@ export default function ExecutiveDashboard() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -647,6 +766,8 @@ export default function ExecutiveDashboard() {
             </CardContent>
           </Card>
         </div>
+          </TabsContent>
+        </Tabs>
 
         <div className="mt-8 text-center text-sm text-gray-400">
           <p>Data refreshes automatically every minute. Last updated: {format(new Date(), 'h:mm a')}</p>
