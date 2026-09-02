@@ -43,15 +43,23 @@ interface AnalyticsData {
   monthlyTrends: { month: string; submissions: number; closings: number; revenue: number }[];
 }
 
-export default function AnalyticsDashboard() {
+export default function AnalyticsDashboard({
+  dataOverride,
+  allowFetch = true,
+}: {
+  dataOverride?: AnalyticsData;
+  allowFetch?: boolean;
+} = {}) {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
 
   // Fetch real analytics data from the API
-  const { data: analyticsData, isLoading, error } = useQuery<AnalyticsData>({
+  const { data: queriedAnalyticsData, isLoading, error } = useQuery<AnalyticsData>({
     queryKey: [`/api/analytics/dashboard?timeRange=${timeRange}`],
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    enabled: allowFetch && !dataOverride,
   });
+  const analyticsData = dataOverride || queriedAnalyticsData;
 
   // Loading state
   if (isLoading) {

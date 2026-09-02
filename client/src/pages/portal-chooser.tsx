@@ -54,30 +54,39 @@ export default function PortalChooser() {
 
             <div className="space-y-3">
               <Button
-                type="button"
-                variant="outline"
+                asChild
                 size="lg"
                 className="h-auto min-h-28 w-full justify-between whitespace-normal px-5 py-5 text-left normal-case tracking-normal"
+              >
+                <a href="/auth?mode=login&redirect=%2Fdeveloper%2Fdashboard">
+                  <span className="flex items-center gap-4">
+                    <Building2 className="h-6 w-6 shrink-0" aria-hidden="true" />
+                    <span>
+                      <span className="block text-base font-bold">
+                        Investment Company Login
+                      </span>
+                      <span className="mt-1 block text-sm font-normal opacity-85">
+                        Sign in to your developer portal
+                      </span>
+                    </span>
+                  </span>
+                  <ArrowRight className="h-5 w-5 shrink-0" aria-hidden="true" />
+                </a>
+              </Button>
+
+              <button
+                type="button"
+                className="w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-left text-sm leading-relaxed text-catalyst-gray-700 transition-colors hover:bg-slate-50"
                 onClick={() => setShowInvestmentCompanyNote((current) => !current)}
                 aria-expanded={showInvestmentCompanyNote}
               >
-                <span className="flex items-center gap-4">
-                  <Building2 className="h-6 w-6 shrink-0" aria-hidden="true" />
-                  <span>
-                    <span className="block text-base font-bold">
-                      Investment Company Login
-                    </span>
-                    <span className="mt-1 block text-sm font-normal opacity-75">
-                      For developer partners
-                    </span>
-                  </span>
-                </span>
-                <ArrowRight className="h-5 w-5 shrink-0" aria-hidden="true" />
-              </Button>
+                <span className="font-medium">First time accessing your company portal?</span>{" "}
+                Use the branded link provided by your LandLinq contact.
+              </button>
 
               {showInvestmentCompanyNote && (
                 <p className="rounded-md border border-catalyst-gold/30 bg-catalyst-gold/10 px-4 py-3 text-sm leading-relaxed text-catalyst-gray-700">
-                  Use the link provided by your LandLinq contact.
+                  Your Investment Company credentials work here after your account has been created through the company link. Returning users can use this Investment Company Login button.
                 </p>
               )}
             </div>

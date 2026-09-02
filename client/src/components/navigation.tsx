@@ -97,6 +97,13 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
           { name: "Analytics", href: "/analytics", description: "Performance metrics & charts" },
           { name: "API Monitoring", href: "/api-monitoring", description: "Track API health & costs" }
         );
+        if (userEmail.toLowerCase().endsWith('@apexresi.com')) {
+          landlinq.push({
+            name: "Investment Companies",
+            href: "/admin/investment-companies",
+            description: "Create company portals, criteria, and initial logins",
+          });
+        }
         break;
         
       case UserRole.ANALYST:
