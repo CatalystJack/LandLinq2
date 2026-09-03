@@ -592,7 +592,7 @@ export default function DataHub() {
               <Card>
                 <CardHeader>
                   <CardTitle>Cached Comparables</CardTitle>
-                  <CardDescription>Property comparables from HelloData analysis</CardDescription>
+                  <CardDescription>Property comparables from HelloData analysis within the last 3 months</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {comparablesLoading ? (

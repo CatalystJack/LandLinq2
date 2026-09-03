@@ -28864,10 +28864,20 @@ RULES:
   app.get("/api/data-hub/comparables-cache", isAuthenticated, async (req, res) => {
     try {
       const allDeals = await storage.getAllDeals();
+      // Keep the HelloData-backed warehouse focused on current market data.
+      // Use calendar months so the window is exactly three months rather than
+      // an approximate 60/90-day conversion.
+      const comparableDataCutoff = new Date();
+      comparableDataCutoff.setMonth(comparableDataCutoff.getMonth() - 3);
       
       const comparables: any[] = [];
       
       allDeals.forEach((deal: any) => {
+        const dealCreatedAt = deal.createdAt ? new Date(deal.createdAt) : null;
+        if (!dealCreatedAt || Number.isNaN(dealCreatedAt.getTime()) || dealCreatedAt < comparableDataCutoff) {
+          return;
+        }
+
         // Check comparablesJson field (the correct database column name)
         const dealComparables = deal.comparablesJson;
         if (dealComparables && Array.isArray(dealComparables)) {
@@ -28894,7 +28904,9 @@ RULES:
 
       res.json({
         totalComparables: comparables.length,
-        comparables: comparables.slice(0, 500)
+        comparables: comparables.slice(0, 500),
+        dataWindowMonths: 3,
+        dataWindowStart: comparableDataCutoff.toISOString()
       });
     } catch (error: any) {
       console.error("Data Hub comparables cache error:", error);
