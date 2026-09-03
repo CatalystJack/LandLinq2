@@ -32,6 +32,8 @@ import {
   acquisitionMarkets,
   crmTagRegistry,
   offMarketImports,
+  pipelineStages,
+  pipelineOpportunities,
 } from "@shared/schema";
 import { or, like, eq, desc, gte, lte, sql, and, count, inArray, isNull } from "drizzle-orm";
 import { setupAuth, isAuthenticated, hashPassword } from "./auth";
@@ -53,6 +55,14 @@ import { PropertySearchService } from "./propertySearchService";
 import { alertSystem } from "./alertSystem";
 import { competitiveIntelligence } from "./competitiveIntelligence";
 import { realPropertyDataService } from "./propertyDataService";
+
+const DEFAULT_PIPELINE_STAGES = [
+  { name: "New Lead", sortOrder: 1 },
+  { name: "Contacted", sortOrder: 2 },
+  { name: "Quoted", sortOrder: 3 },
+  { name: "Won", sortOrder: 4 },
+  { name: "Lost", sortOrder: 5 },
+] as const;
 // realDataService removed per user request
 // HelloDataService removed per user request
 import { emailService, sendNotificationEmail } from "./emailService";
@@ -11938,6 +11948,14 @@ RULES:
 
   function parseInvestmentCompanyPayload(body: any, partial = false) {
     const payload: Record<string, any> = {};
+    const profileType = body.profileType === undefined
+      ? (partial ? undefined : "real_estate")
+      : String(body.profileType).trim();
+    if (profileType !== undefined && !["real_estate", "general_sales"].includes(profileType)) {
+      throw new Error("Profile type must be real_estate or general_sales");
+    }
+    if (profileType !== undefined) payload.profileType = profileType;
+    const isGeneralSales = profileType === "general_sales";
     const requiredString = (field: string, label: string) => {
       if (partial && body[field] === undefined) return;
       const value = String(body[field] ?? "").trim();
@@ -11981,12 +11999,13 @@ RULES:
       payload[field] = value.toUpperCase();
     }
     if (!partial || body.rentMetric !== undefined) {
-      if (!["psf", "per_unit"].includes(body.rentMetric)) throw new Error("Rent metric must be psf or per_unit");
-      payload.rentMetric = body.rentMetric;
+      const metric = body.rentMetric ?? (isGeneralSales ? "psf" : undefined);
+      if (!["psf", "per_unit"].includes(metric)) throw new Error("Rent metric must be psf or per_unit");
+      payload.rentMetric = metric;
     }
     decimal("minRentPsf", "Minimum rent per square foot");
     decimal("minRentPerUnit", "Minimum rent per unit");
-    decimal("minAcres", "Minimum acreage", true);
+    decimal("minAcres", "Minimum acreage", !isGeneralSales);
     decimal("maxAcres", "Maximum acreage");
     if (!partial || body.acreageOverridesByProductType !== undefined) {
       const raw = body.acreageOverridesByProductType ?? {};
@@ -12010,8 +12029,19 @@ RULES:
       if (typeof body[field] !== "boolean") throw new Error(`${field} must be true or false`);
       payload[field] = body[field];
     }
-    stringArray("targetStates", "Target states");
-    stringArray("targetCounties", "Target counties");
+    if (isGeneralSales) {
+      payload.targetStates = [];
+      payload.targetCounties = [];
+      payload.rentMetric = payload.rentMetric ?? "psf";
+      payload.minAcres = payload.minAcres ?? "0";
+      payload.maxAcres = null;
+      payload.minRentPsf = null;
+      payload.minRentPerUnit = null;
+      payload.acreageOverridesByProductType = {};
+    } else {
+      stringArray("targetStates", "Target states");
+      stringArray("targetCounties", "Target counties");
+    }
     stringArray("knownEmailDomains", "Known email domains");
     if ((!partial || body.maxAcres !== undefined || body.minAcres !== undefined) &&
       payload.maxAcres !== null && payload.maxAcres !== undefined &&
@@ -12019,10 +12049,10 @@ RULES:
       throw new Error("Maximum acreage cannot be lower than minimum acreage");
     }
     const effectiveMetric = payload.rentMetric ?? body.rentMetric;
-    if (!partial && effectiveMetric === "psf" && (!payload.minRentPsf || Number(payload.minRentPsf) <= 0)) {
+    if (!isGeneralSales && !partial && effectiveMetric === "psf" && (!payload.minRentPsf || Number(payload.minRentPsf) <= 0)) {
       throw new Error("Minimum rent per square foot is required for the primary rent metric");
     }
-    if (!partial && effectiveMetric === "per_unit" && (!payload.minRentPerUnit || Number(payload.minRentPerUnit) <= 0)) {
+    if (!isGeneralSales && !partial && effectiveMetric === "per_unit" && (!payload.minRentPerUnit || Number(payload.minRentPerUnit) <= 0)) {
       throw new Error("Minimum rent per unit is required for the primary rent metric");
     }
     return payload;
@@ -12084,6 +12114,7 @@ RULES:
   });
 
   function parseAdminProductTypes(body: any, legacy: Record<string, any>) {
+    if ((body.profileType ?? legacy.profileType) === "general_sales") return [];
     const rawProductTypes = body.productTypes;
     if (rawProductTypes === undefined) {
       return [{
@@ -12165,22 +12196,30 @@ RULES:
       const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import("@shared/schema");
       const payload = parseInvestmentCompanyPayload(req.body || {});
       const productTypes = parseAdminProductTypes(req.body || {}, payload);
-      const firstActive = productTypes.find((productType: any) => productType.isActive)!;
+      const firstActive = productTypes.find((productType: any) => productType.isActive);
       const countyLabels = parseAdminCountyMarketLabels(req.body?.countyMarketLabels, payload.targetCounties || []);
-      payload.minAcres = firstActive.minAcres;
-      payload.maxAcres = firstActive.maxAcres;
-      payload.minRentPsf = firstActive.minRentPsf;
-      payload.minRentPerUnit = firstActive.minRentPerUnit;
+      if (firstActive) {
+        payload.minAcres = firstActive.minAcres;
+        payload.maxAcres = firstActive.maxAcres;
+        payload.minRentPsf = firstActive.minRentPsf;
+        payload.minRentPerUnit = firstActive.minRentPerUnit;
+      }
       payload.acreageOverridesByProductType = {};
       const [existing] = await db.select({ id: developerProfiles.id }).from(developerProfiles)
         .where(eq(developerProfiles.slug, payload.slug)).limit(1);
       if (existing) return res.status(409).json({ error: "That slug is already in use" });
       const profile = await db.transaction(async (tx) => {
         const [created] = await tx.insert(developerProfiles).values(payload as any).returning();
-        await tx.insert(developerProductTypes).values(productTypes.map((productType: any) => ({
+        await tx.insert(pipelineStages).values(DEFAULT_PIPELINE_STAGES.map((stage) => ({
           developerProfileId: created.id,
-          ...productType,
+          ...stage,
         })));
+        if (productTypes.length) {
+          await tx.insert(developerProductTypes).values(productTypes.map((productType: any) => ({
+            developerProfileId: created.id,
+            ...productType,
+          })));
+        }
         if (countyLabels?.length) {
           await tx.insert(developerCountyMarketLabels).values(countyLabels.map(({ county, marketLabel }) => ({
             developerProfileId: created.id,
@@ -12210,15 +12249,17 @@ RULES:
         { ...(req.body || {}), rentMetric: payload.rentMetric },
         existingProductTypes[0] || payload,
       );
-      const firstActive = productTypes.find((productType: any) => productType.isActive)!;
+      const firstActive = productTypes.find((productType: any) => productType.isActive);
       const countyLabels = parseAdminCountyMarketLabels(
         req.body?.countyMarketLabels,
         payload.targetCounties || current.targetCounties || [],
       );
-      payload.minAcres = firstActive.minAcres;
-      payload.maxAcres = firstActive.maxAcres;
-      payload.minRentPsf = firstActive.minRentPsf;
-      payload.minRentPerUnit = firstActive.minRentPerUnit;
+      if (firstActive) {
+        payload.minAcres = firstActive.minAcres;
+        payload.maxAcres = firstActive.maxAcres;
+        payload.minRentPsf = firstActive.minRentPsf;
+        payload.minRentPerUnit = firstActive.minRentPerUnit;
+      }
       payload.acreageOverridesByProductType = {};
       if (payload.slug) {
         const duplicate = await db.execute(sql`
@@ -12235,10 +12276,12 @@ RULES:
           .returning();
         await tx.delete(developerProductTypes)
           .where(eq(developerProductTypes.developerProfileId, req.params.profileId));
-        await tx.insert(developerProductTypes).values(productTypes.map((productType: any) => ({
-          developerProfileId: req.params.profileId,
-          ...productType,
-        })));
+        if (productTypes.length) {
+          await tx.insert(developerProductTypes).values(productTypes.map((productType: any) => ({
+            developerProfileId: req.params.profileId,
+            ...productType,
+          })));
+        }
         if (countyLabels !== undefined) {
           await tx.delete(developerCountyMarketLabels)
             .where(eq(developerCountyMarketLabels.developerProfileId, req.params.profileId));
@@ -12466,6 +12509,15 @@ RULES:
       const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import('@shared/schema');
       const body = req.body || {};
       const updates: Record<string, any> = {};
+      const [currentProfile] = await db.select({
+        profileType: developerProfiles.profileType,
+        rentMetric: developerProfiles.rentMetric,
+      }).from(developerProfiles).where(and(
+        eq(developerProfiles.id, developerProfileId),
+        eq(developerProfiles.isActive, true),
+      )).limit(1);
+      if (!currentProfile) return res.status(404).json({ error: 'Investment Company profile not found' });
+      const isGeneralSales = currentProfile.profileType === 'general_sales';
 
       const stringArray = (value: any, field: string) => {
         if (value === undefined) return;
@@ -12474,10 +12526,15 @@ RULES:
         }
         updates[field] = value.map((entry: string) => entry.trim()).filter(Boolean);
       };
-      stringArray(body.targetStates, 'targetStates');
-      stringArray(body.targetCounties, 'targetCounties');
+      if (isGeneralSales) {
+        updates.targetStates = [];
+        updates.targetCounties = [];
+      } else {
+        stringArray(body.targetStates, 'targetStates');
+        stringArray(body.targetCounties, 'targetCounties');
+      }
 
-      if (!Array.isArray(body.productTypes) || body.productTypes.length === 0) {
+      if (!isGeneralSales && (!Array.isArray(body.productTypes) || body.productTypes.length === 0)) {
         throw new Error('At least one product type is required');
       }
 
@@ -12488,6 +12545,7 @@ RULES:
 
       const decimalFields = ['compSearchRadiusMiles'];
       for (const field of decimalFields) {
+        if (isGeneralSales && body[field] === undefined) continue;
         if (body[field] === undefined || body[field] === null || body[field] === '') {
           if (field === 'compSearchRadiusMiles') {
             throw new Error('Comparable search radius is required');
@@ -12502,7 +12560,7 @@ RULES:
         updates[field] = String(value);
       }
 
-      const productTypes = body.productTypes.map((raw: any, index: number) => {
+      const productTypes = isGeneralSales ? [] : body.productTypes.map((raw: any, index: number) => {
         const name = String(raw?.name ?? '').trim();
         const minAcres = Number(raw?.minAcres);
         const maxAcres = raw?.maxAcres === null || raw?.maxAcres === undefined || raw?.maxAcres === ''
@@ -12535,7 +12593,7 @@ RULES:
           isActive,
         };
       });
-      if (!productTypes.some((productType: any) => productType.isActive)) {
+      if (!isGeneralSales && !productTypes.some((productType: any) => productType.isActive)) {
         throw new Error('At least one active product type is required');
       }
       const normalizedNames = productTypes.map((productType: any) => productType.name.toLowerCase());
@@ -12559,18 +12617,11 @@ RULES:
         }
       }
 
-      const [currentProfile] = await db.select({
-        rentMetric: developerProfiles.rentMetric,
-      }).from(developerProfiles).where(and(
-        eq(developerProfiles.id, developerProfileId),
-        eq(developerProfiles.isActive, true),
-      )).limit(1);
-      if (!currentProfile) return res.status(404).json({ error: 'Investment Company profile not found' });
       const effectiveMetric = updates.rentMetric ?? currentProfile.rentMetric;
-      if (effectiveMetric === 'psf' && productTypes.some((productType: any) => productType.isActive && !productType.minRentPsf)) {
+      if (!isGeneralSales && effectiveMetric === 'psf' && productTypes.some((productType: any) => productType.isActive && !productType.minRentPsf)) {
         throw new Error('Every active product type needs a minimum $/SF');
       }
-      if (effectiveMetric === 'per_unit' && productTypes.some((productType: any) => productType.isActive && !productType.minRentPerUnit)) {
+      if (!isGeneralSales && effectiveMetric === 'per_unit' && productTypes.some((productType: any) => productType.isActive && !productType.minRentPerUnit)) {
         throw new Error('Every active product type needs a minimum $/Unit');
       }
 
@@ -12578,10 +12629,10 @@ RULES:
       // admin lists and older records remain readable. Classification reads
       // only developer_product_types.
       const firstActive = productTypes.find((productType: any) => productType.isActive);
-      updates.minAcres = firstActive.minAcres;
-      updates.maxAcres = firstActive.maxAcres;
-      updates.minRentPsf = firstActive.minRentPsf;
-      updates.minRentPerUnit = firstActive.minRentPerUnit;
+      updates.minAcres = isGeneralSales ? '0' : firstActive.minAcres;
+      updates.maxAcres = isGeneralSales ? null : firstActive.maxAcres;
+      updates.minRentPsf = isGeneralSales ? null : firstActive.minRentPsf;
+      updates.minRentPerUnit = isGeneralSales ? null : firstActive.minRentPerUnit;
       updates.acreageOverridesByProductType = {};
 
       const updated = await db.transaction(async (tx) => {
@@ -12596,15 +12647,17 @@ RULES:
 
         await tx.delete(developerProductTypes)
           .where(eq(developerProductTypes.developerProfileId, developerProfileId));
-        await tx.insert(developerProductTypes).values(productTypes.map((productType: any) => ({
-          developerProfileId,
-          ...productType,
-        })));
+        if (productTypes.length) {
+          await tx.insert(developerProductTypes).values(productTypes.map((productType: any) => ({
+            developerProfileId,
+            ...productType,
+          })));
+        }
 
-        if (countyMarketLabels !== undefined) {
+        if (countyMarketLabels !== undefined || isGeneralSales) {
           await tx.delete(developerCountyMarketLabels)
             .where(eq(developerCountyMarketLabels.developerProfileId, developerProfileId));
-          const counties = new Set((updates.targetCounties || []).map((county: string) => county.toLowerCase()));
+          const counties = new Set((isGeneralSales ? [] : updates.targetCounties || []).map((county: string) => county.toLowerCase()));
           const labels = Object.entries(countyMarketLabels as Record<string, unknown>)
             .map(([county, marketLabel]) => ({
               county: county.trim(),
@@ -12616,7 +12669,7 @@ RULES:
               county,
               marketLabel,
             }));
-          if (labels.length) await tx.insert(developerCountyMarketLabels).values(labels);
+          if (!isGeneralSales && labels.length) await tx.insert(developerCountyMarketLabels).values(labels);
         }
 
         const [savedProducts, savedLabels] = await Promise.all([
@@ -12761,6 +12814,244 @@ RULES:
     } catch (error: any) {
       console.error('[developer-profile/me/contacts] Error:', error);
       return res.status(500).json({ error: 'Failed to load contacts' });
+    }
+  });
+
+  // Generic, industry-agnostic sales pipeline. All records are tenant-scoped
+  // from the authenticated developer profile, never from client-supplied IDs.
+  app.get("/api/developer-profile/me/pipeline/stages", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const stages = await db.select().from(pipelineStages)
+        .where(eq(pipelineStages.developerProfileId, developerProfileId))
+        .orderBy(sql`${pipelineStages.sortOrder} ASC, ${pipelineStages.name} ASC`);
+      return res.json({ stages });
+    } catch (error: any) {
+      console.error("[developer pipeline stages GET] Error:", error);
+      return res.status(500).json({ error: "Failed to load pipeline stages" });
+    }
+  });
+
+  app.post("/api/developer-profile/me/pipeline/stages", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const name = String(req.body?.name || "").trim();
+      const sortOrder = Number(req.body?.sortOrder);
+      if (!name) return res.status(400).json({ error: "Stage name is required" });
+      if (!Number.isInteger(sortOrder) || sortOrder < 1) {
+        return res.status(400).json({ error: "Stage sort order must be a positive whole number" });
+      }
+      const [stage] = await db.insert(pipelineStages).values({
+        developerProfileId,
+        name,
+        sortOrder,
+      }).returning();
+      return res.status(201).json({ stage });
+    } catch (error: any) {
+      console.error("[developer pipeline stages POST] Error:", error);
+      return res.status(500).json({ error: "Failed to create pipeline stage" });
+    }
+  });
+
+  app.patch("/api/developer-profile/me/pipeline/stages/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const updates: Record<string, any> = {};
+      if (req.body?.name !== undefined) {
+        const name = String(req.body.name).trim();
+        if (!name) return res.status(400).json({ error: "Stage name cannot be empty" });
+        updates.name = name;
+      }
+      if (req.body?.sortOrder !== undefined) {
+        const sortOrder = Number(req.body.sortOrder);
+        if (!Number.isInteger(sortOrder) || sortOrder < 1) {
+          return res.status(400).json({ error: "Stage sort order must be a positive whole number" });
+        }
+        updates.sortOrder = sortOrder;
+      }
+      if (req.body?.isActive !== undefined) {
+        if (typeof req.body.isActive !== "boolean") return res.status(400).json({ error: "Stage active status must be a boolean" });
+        updates.isActive = req.body.isActive;
+      }
+      if (!Object.keys(updates).length) return res.status(400).json({ error: "No stage changes supplied" });
+      const [stage] = await db.update(pipelineStages)
+        .set(updates)
+        .where(and(
+          eq(pipelineStages.id, req.params.id),
+          eq(pipelineStages.developerProfileId, developerProfileId),
+        ))
+        .returning();
+      if (!stage) return res.status(404).json({ error: "Pipeline stage not found" });
+      return res.json({ stage });
+    } catch (error: any) {
+      console.error("[developer pipeline stages PATCH] Error:", error);
+      return res.status(500).json({ error: "Failed to update pipeline stage" });
+    }
+  });
+
+  app.delete("/api/developer-profile/me/pipeline/stages/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const referenced = await db.select({ id: pipelineOpportunities.id })
+        .from(pipelineOpportunities)
+        .where(and(
+          eq(pipelineOpportunities.stageId, req.params.id),
+          eq(pipelineOpportunities.developerProfileId, developerProfileId),
+        ))
+        .limit(1);
+      if (referenced.length) {
+        return res.status(409).json({ error: "This stage cannot be deleted while opportunities reference it. Move those opportunities to another stage first." });
+      }
+      const deleted = await db.delete(pipelineStages)
+        .where(and(
+          eq(pipelineStages.id, req.params.id),
+          eq(pipelineStages.developerProfileId, developerProfileId),
+        ))
+        .returning({ id: pipelineStages.id });
+      if (!deleted.length) return res.status(404).json({ error: "Pipeline stage not found" });
+      return res.json({ success: true });
+    } catch (error: any) {
+      console.error("[developer pipeline stages DELETE] Error:", error);
+      return res.status(500).json({ error: "Failed to delete pipeline stage" });
+    }
+  });
+
+  app.get("/api/developer-profile/me/pipeline/opportunities", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const stageId = String(req.query?.stageId || "").trim();
+      const sort = String(req.query?.sort || "createdAt");
+      const conditions = [eq(pipelineOpportunities.developerProfileId, developerProfileId)];
+      if (stageId) conditions.push(eq(pipelineOpportunities.stageId, stageId));
+      const orderBy = sort === "value"
+        ? sql`${pipelineOpportunities.value} DESC NULLS LAST, ${pipelineOpportunities.updatedAt} DESC`
+        : sort === "contactName"
+          ? sql`LOWER(COALESCE(${brokers.firstName}, '') || ' ' || COALESCE(${brokers.lastName}, '')) ASC, ${pipelineOpportunities.updatedAt} DESC`
+          : sql`${pipelineOpportunities.createdAt} DESC`;
+      const opportunities = await db.select({
+        id: pipelineOpportunities.id,
+        developerProfileId: pipelineOpportunities.developerProfileId,
+        contactId: pipelineOpportunities.contactId,
+        stageId: pipelineOpportunities.stageId,
+        title: pipelineOpportunities.title,
+        value: pipelineOpportunities.value,
+        notes: pipelineOpportunities.notes,
+        createdAt: pipelineOpportunities.createdAt,
+        updatedAt: pipelineOpportunities.updatedAt,
+        stageName: pipelineStages.name,
+        stageIsActive: pipelineStages.isActive,
+        contactFirstName: brokers.firstName,
+        contactLastName: brokers.lastName,
+        contactEmail: brokers.email,
+      }).from(pipelineOpportunities)
+        .innerJoin(pipelineStages, and(
+          eq(pipelineStages.id, pipelineOpportunities.stageId),
+          eq(pipelineStages.developerProfileId, developerProfileId),
+        ))
+        .innerJoin(brokers, and(
+          eq(brokers.id, pipelineOpportunities.contactId),
+          or(eq(brokers.ownerDeveloperProfileId, developerProfileId), isNull(brokers.ownerDeveloperProfileId)),
+        ))
+        .where(and(...conditions))
+        .orderBy(orderBy);
+      return res.json({ opportunities });
+    } catch (error: any) {
+      console.error("[developer pipeline opportunities GET] Error:", error);
+      return res.status(500).json({ error: "Failed to load pipeline opportunities" });
+    }
+  });
+
+  app.post("/api/developer-profile/me/pipeline/opportunities", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const contactId = String(req.body?.contactId || "").trim();
+      const stageId = String(req.body?.stageId || "").trim();
+      if (!contactId || !stageId) return res.status(400).json({ error: "Contact and stage are required" });
+      const [contact] = await db.select({ id: brokers.id }).from(brokers).where(and(
+        eq(brokers.id, contactId),
+        or(eq(brokers.ownerDeveloperProfileId, developerProfileId), isNull(brokers.ownerDeveloperProfileId)),
+      )).limit(1);
+      if (!contact) return res.status(400).json({ error: "Contact is not available to this Investment Company" });
+      const [stage] = await db.select({ id: pipelineStages.id }).from(pipelineStages).where(and(
+        eq(pipelineStages.id, stageId),
+        eq(pipelineStages.developerProfileId, developerProfileId),
+        eq(pipelineStages.isActive, true),
+      )).limit(1);
+      if (!stage) return res.status(400).json({ error: "Active pipeline stage not found" });
+      const value = req.body?.value === undefined || req.body?.value === null || req.body?.value === ""
+        ? null
+        : Number(req.body.value);
+      if (value !== null && !Number.isFinite(value)) return res.status(400).json({ error: "Opportunity value must be a valid number" });
+      const [opportunity] = await db.insert(pipelineOpportunities).values({
+        developerProfileId,
+        contactId,
+        stageId,
+        title: String(req.body?.title || "").trim() || null,
+        value: value === null ? null : String(value),
+        notes: String(req.body?.notes || "").trim() || null,
+      }).returning();
+      return res.status(201).json({ opportunity });
+    } catch (error: any) {
+      console.error("[developer pipeline opportunities POST] Error:", error);
+      return res.status(500).json({ error: "Failed to create pipeline opportunity" });
+    }
+  });
+
+  app.patch("/api/developer-profile/me/pipeline/opportunities/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const updates: Record<string, any> = {};
+      if (req.body?.contactId !== undefined) {
+        const contactId = String(req.body.contactId || "").trim();
+        const [contact] = await db.select({ id: brokers.id }).from(brokers).where(and(
+          eq(brokers.id, contactId),
+          or(eq(brokers.ownerDeveloperProfileId, developerProfileId), isNull(brokers.ownerDeveloperProfileId)),
+        )).limit(1);
+        if (!contact) return res.status(400).json({ error: "Contact is not available to this Investment Company" });
+        updates.contactId = contactId;
+      }
+      if (req.body?.stageId !== undefined) {
+        const stageId = String(req.body.stageId || "").trim();
+        const [stage] = await db.select({ id: pipelineStages.id }).from(pipelineStages).where(and(
+          eq(pipelineStages.id, stageId),
+          eq(pipelineStages.developerProfileId, developerProfileId),
+          eq(pipelineStages.isActive, true),
+        )).limit(1);
+        if (!stage) return res.status(400).json({ error: "Active pipeline stage not found" });
+        updates.stageId = stageId;
+      }
+      if (req.body?.title !== undefined) updates.title = String(req.body.title || "").trim() || null;
+      if (req.body?.notes !== undefined) updates.notes = String(req.body.notes || "").trim() || null;
+      if (req.body?.value !== undefined) {
+        const value = req.body.value === null || req.body.value === "" ? null : Number(req.body.value);
+        if (value !== null && !Number.isFinite(value)) return res.status(400).json({ error: "Opportunity value must be a valid number" });
+        updates.value = value === null ? null : String(value);
+      }
+      if (!Object.keys(updates).length) return res.status(400).json({ error: "No opportunity changes supplied" });
+      updates.updatedAt = new Date();
+      const [opportunity] = await db.update(pipelineOpportunities).set(updates).where(and(
+        eq(pipelineOpportunities.id, req.params.id),
+        eq(pipelineOpportunities.developerProfileId, developerProfileId),
+      )).returning();
+      if (!opportunity) return res.status(404).json({ error: "Pipeline opportunity not found" });
+      return res.json({ opportunity });
+    } catch (error: any) {
+      console.error("[developer pipeline opportunities PATCH] Error:", error);
+      return res.status(500).json({ error: "Failed to update pipeline opportunity" });
     }
   });
 
@@ -13367,6 +13658,22 @@ RULES:
           AND COALESCE(c.is_archived, false) = false
       `);
       const engagement = (engagementResult.rows?.[0] || {}) as any;
+      const pipelineStageResult = await db.execute(sql`
+        SELECT s.name,
+               COUNT(o.id) FILTER (WHERE o.created_at >= date_trunc('month', CURRENT_DATE)) AS count
+        FROM pipeline_stages s
+        LEFT JOIN pipeline_opportunities o
+          ON o.stage_id = s.id
+         AND o.developer_profile_id = ${developerProfileId}
+        WHERE s.developer_profile_id = ${developerProfileId}
+          AND s.is_active = true
+        GROUP BY s.id, s.name, s.sort_order
+        ORDER BY s.sort_order ASC, s.name ASC
+      `);
+      const pipelineStageBreakdown = ((pipelineStageResult.rows || []) as any[]).map((row) => ({
+        stage: row.name,
+        count: Number(row.count) || 0,
+      }));
       const advancedDashboard = {
         dailySubmissions: dealsForClient.map((deal) => ({ date: deal.submittedDate, count: 1, value: Number(deal.askingPrice) || 0 })),
         regionActivity: cityDistribution.map((city) => ({ region: city.city, count: city.count, avgValue: city.avgValue, lat: 0, lng: 0 })),
@@ -13395,6 +13702,7 @@ RULES:
           clicks: Number(engagement.clicks) || 0,
           replies: Number(engagement.replies) || 0,
         },
+        pipelineStageBreakdown,
         advancedDashboard,
       });
     } catch (error: any) {
@@ -13740,6 +14048,7 @@ RULES:
       for (const deal of qualifying) {
         for (const { developer: dev, profile } of recipients) {
           if (profile) {
+            if (profile.profileType === 'general_sales') continue;
             if (!deal.apex || !isDealInProfileMarket(deal, profile)) continue;
           } else if (!doesDealMatchDeveloper(deal, dev)) {
             continue;

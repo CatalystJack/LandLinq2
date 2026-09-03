@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  Activity, BarChart3, Building, DollarSign, Download, Filter, MapPin,
+  Activity, BarChart3, BriefcaseBusiness, Building, DollarSign, Download, Filter, MapPin,
   PieChart, Shield, Target, TrendingUp, Users, Zap,
 } from "lucide-react";
 
@@ -33,6 +33,7 @@ interface Deal {
 interface AnalyticsData {
   deals: Deal[];
   outreachStats: { sent: number; opens: number; clicks: number; replies: number };
+  pipelineStageBreakdown?: { stage: string; count: number }[];
   advancedDashboard?: {
     dailySubmissions: { date: string; count: number; value: number }[];
     regionActivity: { region: string; count: number; avgValue: number; lat: number; lng: number }[];
@@ -172,6 +173,7 @@ export default function DeveloperAnalytics() {
           <TabsList className="grid w-full grid-cols-4"><TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="markets">Markets</TabsTrigger><TabsTrigger value="brokers">Brokers</TabsTrigger><TabsTrigger value="trends">Trends</TabsTrigger></TabsList>
           <TabsContent value="overview" className="space-y-6"><div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card><CardHeader><CardTitle className="flex items-center gap-2"><PieChart className="h-5 w-5" />Deal Status Distribution</CardTitle></CardHeader><CardContent className="space-y-4">{analytics.statusBreakdown.map((item) => <div key={item.status} className="flex items-center justify-between"><div className="flex items-center gap-3"><div className={`h-3 w-3 rounded-full ${item.status === "Pursuing" ? "bg-green-500" : item.status === "Passed" ? "bg-blue-500" : "bg-yellow-500"}`} /><span className="text-sm font-medium">{item.status}</span></div><div className="text-right"><div className="text-sm font-bold">{item.count}</div><div className="text-xs text-gray-500">{item.percentage.toFixed(1)}%</div></div></div>)}</CardContent></Card>
+             <Card><CardHeader><CardTitle className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5" />Pipeline Stages This Month</CardTitle></CardHeader><CardContent className="space-y-3">{(data?.pipelineStageBreakdown || []).length ? (data?.pipelineStageBreakdown || []).map((item) => <div key={item.stage} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"><span className="text-sm font-medium">{item.stage}</span><Badge variant="outline">{item.count}</Badge></div>) : <p className="text-sm text-slate-500">No pipeline stages configured yet.</p>}</CardContent></Card>
             <Card><CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5" />Key Performance Metrics</CardTitle></CardHeader><CardContent className="space-y-4">{analytics.marketInsights.map((item) => <div key={item.metric} className="flex items-center justify-between rounded-lg bg-gray-50 p-3"><div><div className="text-sm font-medium">{item.metric}</div><div className="text-xs text-gray-500">{item.description}</div></div><div className="text-right"><div className="text-lg font-bold">{item.value}</div><div className="flex items-center gap-1 text-xs text-gray-500"><TrendingUp className="h-3 w-3" />{Math.abs(item.trend)}%</div></div></div>)}</CardContent></Card>
           </div><Card><CardHeader><CardTitle>Advanced Analytics Dashboard</CardTitle></CardHeader><CardContent><AnalyticsDashboard dataOverride={data?.advancedDashboard} allowFetch={false} /></CardContent></Card>
           <Card><CardHeader><CardTitle>Outreach Engagement</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">{[["Sent", outreach.sent], ["Opens", outreach.opens], ["Clicks", outreach.clicks], ["Replies", outreach.replies]].map(([label, value]) => <div key={String(label)} className="rounded-lg bg-gray-50 p-4"><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold">{value}</p></div>)}</CardContent></Card></TabsContent>

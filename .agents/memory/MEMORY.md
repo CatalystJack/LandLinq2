@@ -16,3 +16,5 @@
 - [Production admin provisioning](production-admin-provisioning.md) — development users do not backfill production; provision the first Apex admin during its authenticated login, never blocking startup.
 - [Apex email authorization migration](apex-email-authorization.md) — internal domain checks use strict @apexresi.com matching; preserve legacy Catalyst demo, data, and delivery references unless separately migrated.
 - [Outreach trigger-tag tenant boundary](outreach-trigger-tag-tenancy.md) — tag enrollment must bind campaign, template, sender, and broker to one developer profile; Catalyst uses only shared contacts.
+- [General Sales profile criteria](general-sales-profile-criteria.md) — General Sales profiles have no deal criteria; preserve harmless legacy DB defaults only for non-null compatibility.
+- [Sales pipeline boundary](sales-pipeline-boundary.md) — the generic opportunity pipeline is tenant-scoped and separate from real-estate deal classification; both profile types use it.

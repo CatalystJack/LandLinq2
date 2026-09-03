@@ -82,6 +82,7 @@ const MasterPipeline = lazy(() => import("@/pages/master-pipeline"));
 const DeveloperDashboard = lazy(() => import("@/pages/developer-dashboard"));
 const DeveloperCrm = lazy(() => import("@/pages/developer-crm"));
 const DeveloperOutreach = lazy(() => import("@/pages/developer-outreach"));
+const DeveloperPipeline = lazy(() => import("@/pages/developer-pipeline"));
 const DeveloperAnalytics = lazy(() => import("@/pages/developer-analytics"));
 const DeveloperUserManagement = lazy(() => import("@/pages/developer-user-management"));
 const DeveloperCriteriaSettings = lazy(() => import("@/pages/developer-criteria-settings"));
@@ -167,15 +168,25 @@ function Router() {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <Switch>
-          <Route path="/developer/dashboard" component={DeveloperDashboard} />
+          <Route path="/developer/dashboard" component={() => {
+            if ((user as any)?.developerProfile?.profileType === "general_sales") {
+              window.location.replace("/developer/crm");
+              return <LoadingFallback />;
+            }
+            return <DeveloperDashboard />;
+          }} />
           <Route path="/developer/crm" component={DeveloperCrm} />
           <Route path="/developer/outreach" component={DeveloperOutreach} />
+          <Route path="/developer/pipeline" component={DeveloperPipeline} />
           <Route path="/developer/analytics" component={DeveloperAnalytics} />
           <Route path="/developer/user-management" component={DeveloperUserManagement} />
           <Route path="/developer/settings" component={DeveloperCriteriaSettings} />
           <Route>
             {() => {
-              window.location.replace("/developer/dashboard");
+              const home = (user as any)?.developerProfile?.profileType === "general_sales"
+                ? "/developer/crm"
+                : "/developer/dashboard";
+              window.location.replace(home);
               return <LoadingFallback />;
             }}
           </Route>

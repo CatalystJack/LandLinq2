@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 
 type Profile = {
   companyName: string;
+  profileType: "real_estate" | "general_sales";
   primaryColor: string | null;
   secondaryColor: string | null;
   targetStates: string[];
@@ -299,6 +300,10 @@ export default function DeveloperCriteriaSettings() {
 
   const save = () => {
     if (!form) return;
+    if (form.profileType === "general_sales") {
+      saveMutation.mutate({ profileType: "general_sales" });
+      return;
+    }
     if (!form.productTypes.length || !form.productTypes.some((productType) => productType.isActive)) {
       toast({ title: "Add at least one active product type before saving", variant: "destructive" });
       return;
@@ -395,8 +400,8 @@ export default function DeveloperCriteriaSettings() {
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em]" style={{ color: secondaryColor }}>Company Settings</p>
-            <h1 className="mt-1 text-3xl font-bold text-slate-950">Acquisition criteria</h1>
-            <p className="mt-2 text-slate-500">Control how {form.companyName} evaluates and receives deals.</p>
+            <h1 className="mt-1 text-3xl font-bold text-slate-950">{form.profileType === "general_sales" ? "Company settings" : "Acquisition criteria"}</h1>
+            <p className="mt-2 text-slate-500">{form.profileType === "general_sales" ? `Manage ${form.companyName} team access and account settings.` : `Control how ${form.companyName} evaluates and receives deals.`}</p>
           </div>
           <Button onClick={save} disabled={saveMutation.isPending} style={{ backgroundColor: primaryColor }} className="text-white">
             {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -405,7 +410,7 @@ export default function DeveloperCriteriaSettings() {
         </div>
 
         <div className="space-y-6">
-          <Card className="border-slate-200 shadow-sm">
+          {form.profileType === "real_estate" && <Card className="border-slate-200 shadow-sm">
             <CardHeader>
               <div className="flex items-start gap-3">
                 <div className="rounded-lg p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}><Settings2 className="h-5 w-5" /></div>
@@ -514,9 +519,9 @@ export default function DeveloperCriteriaSettings() {
                 )}
               </div>
             </CardContent>
-          </Card>
+          </Card>}
 
-          <Card className="border-slate-200 shadow-sm">
+          {form.profileType === "real_estate" && <Card className="border-slate-200 shadow-sm">
             <CardHeader className="cursor-pointer" onClick={() => setOverridesOpen((open) => !open)}>
               <div className="flex items-center justify-between">
                 <div><CardTitle>Rent minimum overrides</CardTitle><CardDescription>Allow qualifying public programs to bypass rent minimums.</CardDescription></div>
@@ -536,7 +541,7 @@ export default function DeveloperCriteriaSettings() {
               ))}
               <p className="text-xs text-slate-500 md:col-span-3">Overrides only rescue rent failures. County/state and acreage criteria still apply.</p>
             </CardContent>}
-          </Card>
+          </Card>}
 
           <Card className="border-slate-200 shadow-sm">
             <CardHeader className="cursor-pointer" onClick={() => setTeamOpen((open) => !open)}>

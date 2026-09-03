@@ -2,12 +2,12 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { preloadRoute } from "@/lib/route-preload";
 
-const tabs = [
+const realEstateTabs = [
   { label: "Deal Dashboard", href: "/developer/dashboard" },
   { label: "CRM", href: "/developer/crm" },
   { label: "Outreach", href: "/developer/outreach" },
+  { label: "Pipeline", href: "/developer/pipeline" },
   { label: "Analytics", href: "/developer/analytics" },
-  { label: "User Management", href: "/developer/user-management" },
   { label: "Settings", href: "/developer/settings" },
 ];
 
@@ -15,6 +15,9 @@ export default function DeveloperNavigation() {
   const { user } = useAuth();
   const [location] = useLocation();
   const profile = (user as any)?.developerProfile;
+  const tabs = profile?.profileType === "general_sales"
+    ? realEstateTabs.filter((tab) => tab.href !== "/developer/dashboard")
+    : realEstateTabs;
   const primaryColor = profile?.primaryColor || "#0A2B4A";
   const secondaryColor = profile?.secondaryColor || "#4A90E2";
   const companyName = profile?.companyName || "LandLinq";

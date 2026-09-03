@@ -110,7 +110,23 @@ export default function DeveloperLogin() {
         return;
       }
 
-      window.location.href = "/developer/dashboard";
+      // /api/login intentionally returns only the authenticated user record.
+      // Read the tenant profile before choosing the first page so General
+      // Sales accounts never land on the real-estate dashboard.
+      let profileType = "real_estate";
+      try {
+        const currentUserResponse = await fetch("/api/user", { credentials: "include" });
+        if (currentUserResponse.ok) {
+          const currentUser = await currentUserResponse.json();
+          profileType = currentUser?.developerProfile?.profileType || "real_estate";
+        }
+      } catch {
+        // The developer route will apply the same safe default if this read
+        // is temporarily unavailable.
+      }
+      window.location.href = profileType === "general_sales"
+        ? "/developer/crm"
+        : "/developer/dashboard";
     },
     onError: (error: Error) => {
       toast({

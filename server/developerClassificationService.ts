@@ -44,6 +44,9 @@ export function classifyDealForProfile(
   profile: DeveloperProfile,
   productTypes: DeveloperProductType[],
 ): DeveloperClassificationResult {
+  if (profile.profileType === "general_sales") {
+    return { classification: "passed", matchedProductTypes: [] };
+  }
   const countyMatch = isDealInProfileMarket(deal, profile);
   const dealAcreage = numericValue(deal?.sizeAcres);
   const dealRent = profile.rentMetric === "psf"

@@ -21,6 +21,7 @@ const routeLoaders: Record<string, RouteLoader> = {
   "/developer/dashboard": () => import("@/pages/developer-dashboard"),
   "/developer/crm": () => import("@/pages/developer-crm"),
   "/developer/outreach": () => import("@/pages/developer-outreach"),
+  "/developer/pipeline": () => import("@/pages/developer-pipeline"),
   "/developer/analytics": () => import("@/pages/developer-analytics"),
   "/developer/user-management": () => import("@/pages/developer-user-management"),
   "/developer/settings": () => import("@/pages/developer-criteria-settings"),

@@ -1,0 +1,54 @@
+Add support for "General Sales" seats — customers who want CRM and Outreach 
+capability only, with no real estate deal criteria or Deal Dashboard at all (e.g. 
+car dealerships, roofing companies). Rather than building a separate system, 
+generalize the existing developerProfiles model with a profileType flag, since 
+branding, login, team management, CRM, Outreach, and Analytics already work 
+identically regardless of industry.
+
+TASK 1 — Add profileType to developerProfiles
+Add: profileType: varchar("profile_type").notNull().default('real_estate')
+Valid values: 'real_estate' | 'general_sales'. Backfill all existing rows to 
+'real_estate' (the default already handles this).
+
+Make targetStates and targetCounties nullable/optional (they're currently required 
+arrays) — a general_sales profile has no geographic targeting at all. Do not require 
+developerProductTypes rows for profileType = 'general_sales' profiles — the "must 
+have at least one active product type" rule only applies to real_estate profiles.
+
+TASK 2 — Admin creation flow: pick a type upfront
+In client/src/pages/admin-investment-companies.tsx, add a profile-type selector 
+("Real Estate Investment Company" / "General Sales") at the start of the "Create 
+New Development Partner" flow. If General Sales is selected, skip the acquisition 
+criteria / product type / county steps entirely — go straight to branding and team 
+invite, same as today's flow minus the real-estate-specific steps.
+
+TASK 3 — Navigation shell: conditional tabs
+In client/src/components/developer-navigation.tsx, read the logged-in user's 
+profile.profileType and render tabs accordingly:
+  - real_estate: Deal Dashboard, CRM, Outreach, Analytics, Settings (unchanged, 
+    5 tabs as today)
+  - general_sales: CRM, Outreach, Analytics, Settings (4 tabs — no Deal Dashboard)
+Update the DEVELOPER-role route allowlist to reflect this per-type: a general_sales 
+user should be redirected away from /developer/dashboard if they somehow navigate 
+there directly, since it doesn't apply to them.
+
+TASK 4 — Settings page: hide real-estate-only sections
+In client/src/pages/developer-criteria-settings.tsx, hide the Product Types section, 
+county/state targeting, and QCT/DDA/OZ override toggles entirely when 
+profileType === 'general_sales'. Keep Team management and branding-related settings 
+(if any exist on this page) visible for both types.
+
+TASK 5 — Post-login redirect
+Update the post-login redirect logic so a general_sales user lands on /developer/crm 
+instead of /developer/dashboard, which won't exist for them.
+
+TASK 6 — No changes needed to auth/role logic
+The existing role check (role === 'DEVELOPER') and the getDeveloperProfileId() 
+tenant-isolation helper should NOT change — both profile types use the same role 
+and the same strict req.user-based scoping already in place. profileType only 
+affects which UI/features are shown, never security/access scoping.
+
+Verify: create one test profile of each type through the admin panel, confirm a 
+real_estate profile shows all 5 tabs and requires product types to save criteria, 
+and confirm a general_sales profile shows only 4 tabs, has no Deal Dashboard 
+reachable, and can save without any criteria at all.

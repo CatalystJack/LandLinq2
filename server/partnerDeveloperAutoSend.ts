@@ -41,6 +41,7 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
     for (const { developer: dev, profile } of recipients) {
       try {
         if (profile) {
+          if (profile.profileType === 'general_sales') continue;
           if (!deal.apex || !isDealInProfileMarket(deal, profile)) continue;
         } else if (!doesDealMatchDeveloper(deal, dev)) {
           continue;
@@ -127,6 +128,7 @@ export function partnerDeveloperToClassificationProfile(dev: any): DeveloperProf
     id: dev.id,
     companyName: dev.companyName || "",
     slug: dev.slug || String(dev.id),
+    profileType: "real_estate",
     logoUrl: dev.logoUrl ?? null,
     primaryColor: dev.primaryColor ?? "#0A2B4A",
     secondaryColor: dev.secondaryColor ?? "#4A90E2",

@@ -35,6 +35,7 @@ export const developerProfiles = pgTable("developer_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyName: varchar("company_name").notNull(),
   slug: varchar("slug").notNull().unique(),
+  profileType: varchar("profile_type").notNull().default("real_estate"),
   logoUrl: varchar("logo_url"),
   primaryColor: varchar("primary_color").default("#0A2B4A"),
   secondaryColor: varchar("secondary_color").default("#4A90E2"),
@@ -227,6 +228,49 @@ export const brokers = pgTable("brokers", {
     .on(table.email)
     .where(sql`${table.ownerDeveloperProfileId} IS NULL AND ${table.email} IS NOT NULL`),
 ]);
+
+export const pipelineStages = pgTable("pipeline_stages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id")
+    .references(() => developerProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  name: varchar("name").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+}, (table) => [
+  index("pipeline_stages_profile_idx").on(table.developerProfileId),
+]);
+
+export const pipelineOpportunities = pgTable("pipeline_opportunities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id")
+    .references(() => developerProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  contactId: varchar("contact_id").references(() => brokers.id).notNull(),
+  stageId: varchar("stage_id").references(() => pipelineStages.id).notNull(),
+  title: varchar("title"),
+  value: decimal("value"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("pipeline_opportunities_profile_idx").on(table.developerProfileId),
+  index("pipeline_opportunities_stage_idx").on(table.stageId),
+]);
+
+export const insertPipelineStageSchema = createInsertSchema(pipelineStages).omit({
+  id: true,
+});
+export type PipelineStage = typeof pipelineStages.$inferSelect;
+export type InsertPipelineStage = z.infer<typeof insertPipelineStageSchema>;
+
+export const insertPipelineOpportunitySchema = createInsertSchema(pipelineOpportunities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type PipelineOpportunity = typeof pipelineOpportunities.$inferSelect;
+export type InsertPipelineOpportunity = z.infer<typeof insertPipelineOpportunitySchema>;
 
 // Deal status values: pending_review, pending_info, under_review, approved, rejected,
 // clear_no, potentially, high_priority, initial_review, due_diligence, financial_analysis,
