@@ -1179,7 +1179,12 @@ export async function processCrmTaggedContacts(): Promise<{
   const noSenderSkips: Record<string, number> = {};
 
   // Helper: enroll a single broker into a template
-  async function enrollContact(broker: any, templateId: string, senderId: string | null) {
+  async function enrollContact(
+    broker: any,
+    templateId: string,
+    senderId: string | null,
+    initialStepIndex = 1,
+  ) {
     if (!broker.email || broker.email.includes('@temp.landlinq.ai')) {
       totalSkipped++;
       return;
@@ -1207,7 +1212,7 @@ export async function processCrmTaggedContacts(): Promise<{
           template_id, sender_id, current_step_index, next_send_at, status, enrolled_at
         ) VALUES (
           ${broker.id}, ${broker.email}, ${broker.first_name || null}, ${broker.last_name || null}, ${broker.phone || null},
-          ${templateId}, ${senderId}, 1, ${nextSendAt.toISOString()}, 'pending', NOW()
+          ${templateId}, ${senderId}, ${initialStepIndex}, ${nextSendAt.toISOString()}, 'pending', NOW()
         )
       `);
       totalEnrolled++;
@@ -1220,14 +1225,25 @@ export async function processCrmTaggedContacts(): Promise<{
   try {
     console.log('🔍 [CRM-POLL] Starting CRM-native enrollment sync...');
 
-    // ── PASS 1: Tag-based matching (explicit trigger tag on template) ──────────
+    // ── PASS 1A: Catalyst tag matching ────────────────────────────────────────
+    // Developer templates are linked to developer-owned outreach campaigns and
+    // are handled separately below. Catalyst matching is limited to shared
+    // contacts so an internal tag can never enroll a developer-owned contact.
     const templatesResult = await db.execute(sql`
       SELECT ct.id, ct.name, ct.hubspot_trigger_tag,
         (SELECT s.id FROM outreach_senders s
-         WHERE s.is_active = true AND ct.hubspot_trigger_tag = ANY(s.hubspot_trigger_tags)
+         WHERE s.is_active = true
+           AND s.developer_profile_id IS NULL
+           AND ct.hubspot_trigger_tag = ANY(s.hubspot_trigger_tags)
          ORDER BY s.created_at ASC LIMIT 1) AS sender_id
       FROM outreach_campaign_templates ct
       WHERE ct.is_active = true
+        AND NOT EXISTS (
+          SELECT 1
+          FROM outreach_campaigns c
+          WHERE c.developer_profile_id IS NOT NULL
+            AND c.broker_filter->>'templateId' = ct.id
+        )
     `);
     const templates = (templatesResult.rows || []) as any[];
 
@@ -1237,6 +1253,7 @@ export async function processCrmTaggedContacts(): Promise<{
         FROM brokers b
         WHERE ${template.hubspot_trigger_tag} = ANY(b.crm_tags)
           AND b.is_active = true
+          AND b.owner_developer_profile_id IS NULL
       `);
       const tagged = (taggedResult.rows || []) as any[];
       if (!tagged.length) continue;
@@ -1244,13 +1261,55 @@ export async function processCrmTaggedContacts(): Promise<{
       for (const broker of tagged) await enrollContact(broker, template.id, template.sender_id);
     }
 
-    // ── PASS 2: assigned_to matching (contact.assigned_to = sender.name) ──────
+    // ── PASS 1B: Investment Company tag matching ─────────────────────────────
+    // Every side of this join is tied to the same developer profile:
+    // campaign, template, sender, and broker. This prevents cross-company and
+    // Catalyst/developer tag leakage even when contacts carry identical tags.
+    const developerTemplatesResult = await db.execute(sql`
+      SELECT ct.id, ct.name, ct.hubspot_trigger_tag,
+        c.developer_profile_id, s.id AS sender_id
+      FROM outreach_campaigns c
+      INNER JOIN outreach_campaign_templates ct
+        ON ct.id = (c.broker_filter->>'templateId')
+        AND ct.team_id = c.developer_profile_id
+      INNER JOIN outreach_senders s
+        ON s.id = (c.broker_filter->>'senderId')
+        AND s.developer_profile_id = c.developer_profile_id
+      WHERE c.developer_profile_id IS NOT NULL
+        AND c.status = 'active'
+        AND COALESCE(c.is_archived, false) = false
+        AND COALESCE(c.is_deleted, false) = false
+        AND ct.is_active = true
+        AND s.is_active = true
+    `);
+    const developerTemplates = (developerTemplatesResult.rows || []) as any[];
+
+    for (const template of developerTemplates) {
+      const taggedResult = await db.execute(sql`
+        SELECT b.id, b.email, b.first_name, b.last_name, b.phone
+        FROM brokers b
+        WHERE b.owner_developer_profile_id = ${template.developer_profile_id}
+          AND ${template.hubspot_trigger_tag} = ANY(b.crm_tags)
+          AND b.is_active = true
+      `);
+      const tagged = (taggedResult.rows || []) as any[];
+      if (!tagged.length) continue;
+      console.log(`   🏷️  [DEVELOPER] Campaign "${template.name}": ${tagged.length} tagged contacts`);
+      for (const broker of tagged) {
+        await enrollContact(broker, template.id, template.sender_id, 0);
+      }
+    }
+
+    // ── PASS 2: Catalyst assigned_to matching ────────────────────────────────
     // Picks the best template per sender based on contact's CRM tags:
     //   • tag contains "Known"   → prefer a "Known" template for that sender
     //   • tag contains "Unknown" → prefer an "Unknown" template for that sender
     //   • no signal              → use the first active template for that sender
     const sendersResult = await db.execute(sql`
-      SELECT id, name FROM outreach_senders WHERE is_active = true ORDER BY name
+      SELECT id, name
+      FROM outreach_senders
+      WHERE is_active = true AND developer_profile_id IS NULL
+      ORDER BY name
     `);
     const senders = (sendersResult.rows || []) as any[];
 
@@ -1259,6 +1318,12 @@ export async function processCrmTaggedContacts(): Promise<{
       const senderTemplatesResult = await db.execute(sql`
         SELECT ct.id, ct.name FROM outreach_campaign_templates ct
         WHERE ct.is_active = true
+          AND NOT EXISTS (
+            SELECT 1
+            FROM outreach_campaigns c
+            WHERE c.developer_profile_id IS NOT NULL
+              AND c.broker_filter->>'templateId' = ct.id
+          )
           AND (
             ct.hubspot_trigger_tag = ANY(
               SELECT unnest(hubspot_trigger_tags) FROM outreach_senders WHERE id = ${sender.id}
@@ -1277,6 +1342,7 @@ export async function processCrmTaggedContacts(): Promise<{
         FROM brokers b
         WHERE (b.assigned_to = ${sender.name} OR b.assigned_to = ${senderFirstName})
           AND b.is_active = true
+          AND b.owner_developer_profile_id IS NULL
           AND b.email IS NOT NULL
           AND b.email NOT ILIKE '%@temp.landlinq.ai'
       `);

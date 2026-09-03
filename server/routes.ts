@@ -12751,8 +12751,12 @@ RULES:
       if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
       const result = await db.execute(sql`
         SELECT c.*, s.subject, s.content, s.day_number as "dayNumber",
+          ct.hubspot_trigger_tag as "triggerTag",
           COALESCE(e.enrollment_count, 0)::int as "enrollmentCount"
         FROM outreach_campaigns c
+        LEFT JOIN outreach_campaign_templates ct
+          ON ct.id = (c.broker_filter->>'templateId')
+          AND ct.team_id = c.developer_profile_id
         LEFT JOIN outreach_campaign_template_steps s
           ON s.template_id = (c.broker_filter->>'templateId') AND s.sequence_index = 0
         LEFT JOIN (
@@ -12776,6 +12780,7 @@ RULES:
     name: z.string().trim().min(1).max(160),
     subject: z.string().trim().min(1).max(240),
     content: z.string().trim().min(1).max(50000),
+    triggerTag: z.string().trim().max(160).optional(),
     dayNumber: z.coerce.number().int().min(0).max(365).default(0),
     status: z.enum(['paused', 'active']).default('paused'),
   });
@@ -12850,7 +12855,7 @@ RULES:
           RETURNING *
         `);
         const campaignRow = createdCampaign.rows?.[0] as any;
-        const triggerTag = `developer:${developerProfileId}:${campaignRow.id}`;
+        const triggerTag = body.triggerTag || `developer:${developerProfileId}:${campaignRow.id}`;
         const createdTemplate = await tx.execute(sql`
           INSERT INTO outreach_campaign_templates
             (name, description, hubspot_trigger_tag, team_id, is_active)
@@ -12874,14 +12879,22 @@ RULES:
           SET broker_filter = ${JSON.stringify({ templateId, senderId: sender.id })}::jsonb
           WHERE id = ${campaignRow.id} AND developer_profile_id = ${developerProfileId}
         `);
-        return { ...campaignRow, brokerFilter: { templateId, senderId: sender.id }, subject: body.subject, content: body.content, dayNumber: body.dayNumber };
+        return {
+          ...campaignRow,
+          brokerFilter: { templateId, senderId: sender.id },
+          subject: body.subject,
+          content: body.content,
+          dayNumber: body.dayNumber,
+          triggerTag,
+        };
       });
       const enrollment = body.status === 'active'
         ? await enrollDeveloperCampaign(campaign, developerProfileId)
         : null;
       return res.status(201).json({ campaign, enrollment });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: 'Invalid campaign data', details: error.errors });
+      if (error?.code === '23505') return res.status(409).json({ error: 'That trigger tag is already used by another campaign' });
       console.error('[developer outreach campaign create] Error:', error);
       return res.status(500).json({ error: 'Failed to create campaign' });
     }
@@ -12894,14 +12907,18 @@ RULES:
       if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
       const body = developerCampaignSchema.parse(req.body);
       const owned = await db.execute(sql`
-        SELECT id, broker_filter FROM outreach_campaigns
-        WHERE id = ${req.params.campaignId} AND developer_profile_id = ${developerProfileId}
+        SELECT c.id, c.broker_filter, ct.hubspot_trigger_tag as trigger_tag
+        FROM outreach_campaigns c
+        LEFT JOIN outreach_campaign_templates ct
+          ON ct.id = (c.broker_filter->>'templateId') AND ct.team_id = ${developerProfileId}
+        WHERE c.id = ${req.params.campaignId} AND c.developer_profile_id = ${developerProfileId}
         LIMIT 1
       `);
       const campaign = owned.rows?.[0] as any;
       if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
       const templateId = campaign.broker_filter?.templateId;
       const senderId = campaign.broker_filter?.senderId;
+      const triggerTag = body.triggerTag || campaign.trigger_tag;
       if (!templateId || !senderId) return res.status(409).json({ error: 'Campaign configuration is incomplete' });
       if (body.status === 'active') {
         const sender = await db.execute(sql`
@@ -12917,7 +12934,8 @@ RULES:
           WHERE id = ${campaign.id} AND developer_profile_id = ${developerProfileId}
         `);
         await tx.execute(sql`
-          UPDATE outreach_campaign_templates SET name = ${body.name}, is_active = true, updated_at = NOW()
+          UPDATE outreach_campaign_templates
+          SET name = ${body.name}, hubspot_trigger_tag = ${triggerTag}, is_active = true, updated_at = NOW()
           WHERE id = ${templateId} AND team_id = ${developerProfileId}
         `);
         await tx.execute(sql`
@@ -12927,8 +12945,9 @@ RULES:
         `);
       });
       return res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ error: 'Invalid campaign data', details: error.errors });
+      if (error?.code === '23505') return res.status(409).json({ error: 'That trigger tag is already used by another campaign' });
       console.error('[developer outreach campaign update] Error:', error);
       return res.status(500).json({ error: 'Failed to update campaign' });
     }

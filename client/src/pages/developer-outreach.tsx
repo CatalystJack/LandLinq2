@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Edit3, Loader2, Mail, MapPin, Plus, Rocket, Send, Users } from "lucide-react";
+import { CheckCircle2, Edit3, Loader2, Mail, MapPin, Plus, Rocket, Send, Tag, Users } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +29,7 @@ type Campaign = {
   content: string;
   dayNumber: number;
   enrollmentCount: number;
+  triggerTag?: string;
   created_at?: string;
   createdAt?: string;
 };
@@ -37,6 +38,7 @@ type CampaignForm = {
   name: string;
   subject: string;
   content: string;
+  triggerTag: string;
   dayNumber: number;
   status: "paused" | "active";
 };
@@ -45,6 +47,7 @@ const emptyForm: CampaignForm = {
   name: "",
   subject: "",
   content: "Hi {{firstName}},\n\n",
+  triggerTag: "",
   dayNumber: 0,
   status: "paused",
 };
@@ -154,6 +157,7 @@ export default function DeveloperOutreach() {
       name: campaign.name,
       subject: campaign.subject || "",
       content: campaign.content || "",
+      triggerTag: campaign.triggerTag || "",
       dayNumber: Number(campaign.dayNumber || 0),
       status: campaign.status === "active" ? "active" : "paused",
     });
@@ -206,7 +210,11 @@ export default function DeveloperOutreach() {
             ) : (
               <div className="divide-y divide-slate-100">{campaigns.map((campaign) => (
                 <div key={campaign.id} className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
-                  <div><div className="flex items-center gap-2"><p className="font-semibold text-slate-900">{campaign.name}</p><Badge variant={campaign.status === "active" ? "default" : "secondary"}>{campaign.status}</Badge></div><p className="mt-1 text-sm text-slate-500">{campaign.subject}</p><p className="mt-2 text-xs text-slate-400">{campaign.enrollmentCount || 0} enrolled · starts {campaign.dayNumber ? `after ${campaign.dayNumber} day${campaign.dayNumber === 1 ? "" : "s"}` : "immediately"}</p></div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{campaign.name}</p><Badge variant={campaign.status === "active" ? "default" : "secondary"}>{campaign.status}</Badge>{campaign.status === "active" && campaign.triggerTag && <Badge variant="outline" className="gap-1 font-normal"><Tag className="h-3 w-3" />{campaign.triggerTag}</Badge>}</div>
+                    <p className="mt-1 text-sm text-slate-500">{campaign.subject}</p>
+                    <p className="mt-2 text-xs text-slate-400">{campaign.enrollmentCount || 0} enrolled · starts {campaign.dayNumber ? `after ${campaign.dayNumber} day${campaign.dayNumber === 1 ? "" : "s"}` : "immediately"}</p>
+                  </div>
                   <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEdit(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Edit</Button><Button size="sm" onClick={() => launchMutation.mutate(campaign.id)} disabled={launchMutation.isPending || !sender?.outlookConnected} style={{ backgroundColor: primaryColor }} className="text-white"><Rocket className="mr-1.5 h-4 w-4" />Launch</Button></div>
                 </div>
               ))}</div>
@@ -217,10 +225,11 @@ export default function DeveloperOutreach() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>{editing ? "Edit campaign" : "Create campaign"}</DialogTitle><DialogDescription>Email will send only from your connected Outlook account to contacts within your company’s saved target geography.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? "Edit campaign" : "Create campaign"}</DialogTitle><DialogDescription>Email will send only from your connected Outlook account. Launching uses your saved target geography; tagged contacts can also enroll automatically.</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
             <div><Label htmlFor="campaign-name">Campaign name</Label><Input id="campaign-name" className="mt-1.5" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Broker introduction" /></div>
             <div><Label htmlFor="campaign-subject">Subject line</Label><Input id="campaign-subject" className="mt-1.5" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} placeholder="A quick introduction" /></div>
+            <div><Label htmlFor="campaign-trigger-tag">Auto-enrollment tag</Label><Input id="campaign-trigger-tag" className="mt-1.5" value={form.triggerTag} onChange={(event) => setForm({ ...form, triggerTag: event.target.value })} placeholder="Interested Broker" /><p className="mt-1 text-xs text-slate-500">Contacts owned by your company are enrolled when this exact CRM tag is added. Geography targeting remains available when you launch the campaign.</p></div>
             <div><Label htmlFor="campaign-content">Email message</Label><Textarea id="campaign-content" className="mt-1.5 min-h-44" value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} /><p className="mt-1 text-xs text-slate-500">Use {"{{firstName}}"} to personalize the greeting.</p></div>
             <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="campaign-delay">Send delay in days</Label><Input id="campaign-delay" type="number" min={0} max={365} className="mt-1.5" value={form.dayNumber} onChange={(event) => setForm({ ...form, dayNumber: Number(event.target.value) })} /></div><div><Label htmlFor="campaign-status">Status</Label><select id="campaign-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as "paused" | "active" })} className="mt-1.5 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option value="paused">Draft / paused</option><option value="active">Active</option></select></div></div>
           </div>

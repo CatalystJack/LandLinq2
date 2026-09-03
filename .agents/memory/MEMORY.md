@@ -15,3 +15,4 @@
 - [VM HTTPS readiness probes](vm-https-readiness-probes.md) — production HTTPS redirects must exempt loopback hosts or Replit VM promotion follows TLS to the app's plain HTTP port and times out.
 - [Production admin provisioning](production-admin-provisioning.md) — development users do not backfill production; provision the first Apex admin during its authenticated login, never blocking startup.
 - [Apex email authorization migration](apex-email-authorization.md) — internal domain checks use strict @apexresi.com matching; preserve legacy Catalyst demo, data, and delivery references unless separately migrated.
+- [Outreach trigger-tag tenant boundary](outreach-trigger-tag-tenancy.md) — tag enrollment must bind campaign, template, sender, and broker to one developer profile; Catalyst uses only shared contacts.
