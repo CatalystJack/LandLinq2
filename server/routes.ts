@@ -12086,7 +12086,6 @@ RULES:
   });
 
   app.post("/api/admin/investment-companies/:profileId/initial-login", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
-    let newUserId: string | null = null;
     try {
       const { developerProfiles } = await import("@shared/schema");
       const name = String(req.body?.name || "").trim();
@@ -12100,51 +12099,65 @@ RULES:
       if (await storage.getUserByEmail(normalizedEmail)) {
         return res.status(409).json({ error: "An account with this email already exists" });
       }
-
-      const nameParts = name.split(/\s+/);
-      const firstName = nameParts.shift() || "";
-      const lastName = nameParts.join(" ") || null;
-      const temporaryPassword = randomBytes(12).toString("base64url");
-      const newUser = await storage.createUser({
-        email: normalizedEmail,
-        password: await hashPassword(temporaryPassword),
-        firstName,
-        lastName,
-        role: "DEVELOPER",
-        developerProfileId: profile.id,
-        mustResetPassword: true,
-      } as any);
-      newUserId = newUser.id;
-
-      const baseUrl = (
-        process.env.BASE_URL ||
-        (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "") ||
-        "https://landlinq.ai"
-      ).replace(/\/$/, "");
-      const loginUrl = `${baseUrl}/developer/${encodeURIComponent(profile.slug)}/login`;
-      const emailSent = await sendNotificationEmail({
-        to: normalizedEmail,
-        subject: `Your ${profile.companyName} Investment Company portal access`,
-        type: "developer-team-invite",
-        priority: "high",
-        text: `Hi ${firstName},\n\nYour ${profile.companyName} Investment Company portal is ready.\nEmail: ${normalizedEmail}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be required to set a new password after signing in.`,
-        html: `<p>Hi ${escapeEmailHtml(firstName)},</p><p>Your <strong>${escapeEmailHtml(profile.companyName)}</strong> Investment Company portal is ready.</p><p><strong>Email:</strong> ${escapeEmailHtml(normalizedEmail)}<br><strong>Temporary password:</strong> ${escapeEmailHtml(temporaryPassword)}</p><p><a href="${loginUrl}">Open the company login</a>. You will be required to set a new password after signing in.</p>`,
-      });
-      if (!emailSent) {
-        await db.delete(users).where(eq(users.id, newUser.id));
-        newUserId = null;
-        return res.status(502).json({ error: "The invitation email could not be sent. No login was created; please try again." });
-      }
+      const invitation = await createDeveloperInvitation(profile, name, normalizedEmail);
       return res.status(201).json({
-        member: { id: newUser.id, email: newUser.email, firstName: newUser.firstName, lastName: newUser.lastName },
+        member: invitation.member,
         loginPath: `/developer/${profile.slug}/login`,
       });
     } catch (error: any) {
-      if (newUserId) {
-        await db.delete(users).where(eq(users.id, newUserId)).catch(() => undefined);
-      }
       console.error("[admin investment company initial login] Error:", error);
-      return res.status(500).json({ error: "Failed to create and send the initial login" });
+      const message = error?.message || "Failed to create and send the initial login";
+      return res.status(message.includes("email could not be sent") ? 502 : 500).json({ error: message });
+    }
+  });
+
+  app.post("/api/admin/investment-companies/:profileId/initial-login/bulk", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const { developerProfiles } = await import("@shared/schema");
+      const entries = Array.isArray(req.body) ? req.body : null;
+      if (!entries || entries.length === 0) {
+        return res.status(400).json({ error: "An array of team members is required" });
+      }
+      const [profile] = await db.select().from(developerProfiles)
+        .where(eq(developerProfiles.id, req.params.profileId)).limit(1);
+      if (!profile) return res.status(404).json({ error: "Investment Company profile not found" });
+
+      const invited: any[] = [];
+      const failed: Array<{ email: string; reason: string }> = [];
+      const emailCounts = entries.reduce((counts: Map<string, number>, entry: any) => {
+        const email = String(entry?.email || "").trim().toLowerCase();
+        if (email) counts.set(email, (counts.get(email) || 0) + 1);
+        return counts;
+      }, new Map<string, number>());
+      for (const entry of entries) {
+        const name = String(entry?.name || "").trim();
+        const normalizedEmail = String(entry?.email || "").trim().toLowerCase();
+        if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+          failed.push({ email: normalizedEmail || String(entry?.email || "").trim(), reason: "Name and a valid email are required" });
+          continue;
+        }
+        if ((emailCounts.get(normalizedEmail) || 0) > 1) {
+          failed.push({ email: normalizedEmail, reason: "This email appears more than once in the batch" });
+          continue;
+        }
+        if (await storage.getUserByEmail(normalizedEmail)) {
+          failed.push({ email: normalizedEmail, reason: "An account with this email already exists" });
+          continue;
+        }
+        try {
+          const invitation = await createDeveloperInvitation(profile, name, normalizedEmail);
+          invited.push(invitation.member);
+        } catch (error: any) {
+          failed.push({
+            email: normalizedEmail,
+            reason: error?.message || "Failed to create and send invitation",
+          });
+        }
+      }
+      return res.json({ invited: invited.length, failed });
+    } catch (error: any) {
+      console.error("[admin investment company bulk initial login] Error:", error);
+      return res.status(500).json({ error: "Failed to process team invitations" });
     }
   });
 
@@ -12181,6 +12194,55 @@ RULES:
       '"': '&quot;',
       "'": '&#39;',
     }[character] || character));
+  }
+
+  async function createDeveloperInvitation(profile: any, name: string, normalizedEmail: string) {
+    const nameParts = name.split(/\s+/);
+    const firstName = nameParts.shift() || "";
+    const lastName = nameParts.join(" ") || null;
+    const temporaryPassword = randomBytes(12).toString("base64url");
+    const newUser = await storage.createUser({
+      email: normalizedEmail,
+      password: await hashPassword(temporaryPassword),
+      firstName,
+      lastName,
+      role: "DEVELOPER",
+      developerProfileId: profile.id,
+      mustResetPassword: true,
+    } as any);
+
+    try {
+      const baseUrl = (
+        process.env.BASE_URL ||
+        (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "") ||
+        "https://landlinq.ai"
+      ).replace(/\/$/, "");
+      const loginUrl = `${baseUrl}/developer/${encodeURIComponent(profile.slug)}/login`;
+      const emailSent = await sendNotificationEmail({
+        to: normalizedEmail,
+        subject: `Your ${profile.companyName} Investment Company portal access`,
+        type: "developer-team-invite",
+        priority: "high",
+        text: `Hi ${firstName},\n\nYour ${profile.companyName} Investment Company portal is ready.\nEmail: ${normalizedEmail}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be required to set a new password after signing in.`,
+        html: `<p>Hi ${escapeEmailHtml(firstName)},</p><p>Your <strong>${escapeEmailHtml(profile.companyName)}</strong> Investment Company portal is ready.</p><p><strong>Email:</strong> ${escapeEmailHtml(normalizedEmail)}<br><strong>Temporary password:</strong> ${escapeEmailHtml(temporaryPassword)}</p><p><a href="${loginUrl}">Open the company login</a>. You will be required to set a new password after signing in.</p>`,
+      });
+      if (!emailSent) {
+        throw new Error("The invitation email could not be sent; no login was created");
+      }
+    } catch (error) {
+      await db.delete(users).where(eq(users.id, newUser.id)).catch(() => undefined);
+      throw error;
+    }
+
+    return {
+      member: {
+        id: newUser.id,
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        createdAt: newUser.createdAt,
+      },
+    };
   }
 
   async function requireActiveDeveloperProfile(developerProfileId: string, res: any): Promise<boolean> {
