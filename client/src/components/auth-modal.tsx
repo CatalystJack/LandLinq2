@@ -225,16 +225,6 @@ export function AuthModal({ isOpen, onClose, defaultMode = 'login' }: AuthModalP
             >
               {loginMutation.isPending ? "Signing in…" : "Sign In"}
             </Button>
-            <div className="text-center text-sm text-gray-600">
-              Don't have an account?{" "}
-              <button
-                type="button"
-                onClick={() => setMode('register')}
-                className="text-[#4A90E2] hover:underline font-medium"
-              >
-                Create one
-              </button>
-            </div>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-gray-200" />

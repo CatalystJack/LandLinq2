@@ -289,7 +289,11 @@ export default function CRMPage() {
       qc.invalidateQueries({ queryKey: ["/api/crm/tags"] });
       toast({ title: "Contact updated" });
     },
-    onError: () => toast({ title: "Update failed", variant: "destructive" }),
+    onError: (error: Error) => toast({
+      title: "Update failed",
+      description: error.message,
+      variant: "destructive",
+    }),
   });
 
   const enrollMutation = useMutation({
@@ -576,13 +580,13 @@ export default function CRMPage() {
     const current = contact.crmTags || [];
     if (current.includes(tag)) return;
     const next = [...current, tag];
-    updateContactMutation.mutate({ id: contact.id, data: { crmTags: next } });
+    updateContactMutation.mutate({ id: contact.id, data: { addTag: tag } });
     if (selectedContact?.id === contact.id) setSelectedContact({ ...contact, crmTags: next });
   };
 
   const removeTagFromContact = (contact: Contact, tag: string) => {
     const next = (contact.crmTags || []).filter(t => t !== tag);
-    updateContactMutation.mutate({ id: contact.id, data: { crmTags: next } });
+    updateContactMutation.mutate({ id: contact.id, data: { removeTag: tag } });
     if (selectedContact?.id === contact.id) setSelectedContact({ ...contact, crmTags: next });
   };
 

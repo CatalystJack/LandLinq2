@@ -367,8 +367,9 @@ export class AutoClassificationEngine {
         // Dec 17, 2025: Pass coordinates if available to avoid geocoding issues
         // Jan 12, 2026: Pass product type for custom filter criteria (BTR/Lot/Townhome/SF vs Conventional/AA)
         // Note: primaryProductType is now hoisted and defined before this if-else block
-        const helloDataOptions: { latitude?: number; longitude?: number; productType?: string } = {
-          productType: primaryProductType
+        const helloDataOptions: { latitude?: number; longitude?: number; productType?: string; radiusMiles?: number } = {
+          productType: primaryProductType,
+          radiusMiles: 3,
         };
         
         // Jan 13, 2026: Use stored coordinates to avoid geocoding "Coordinates: X, Y" address strings

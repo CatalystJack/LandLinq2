@@ -27,7 +27,7 @@ export default function PortalChooser() {
               <span className="flex items-center gap-4">
                 <Users className="h-5 w-5 shrink-0 text-[#9CCBFF]" aria-hidden="true" />
                 <span>
-                  <span className="block text-sm font-semibold">LandLinq / Apex Team</span>
+                  <span className="block text-sm font-semibold">LandLinq Team</span>
                   <span className="mt-1 block text-xs text-slate-300">Internal team portal</span>
                 </span>
               </span>

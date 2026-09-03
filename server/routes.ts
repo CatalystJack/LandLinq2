@@ -4308,9 +4308,34 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.patch("/api/crm/contacts/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { crmTags, crmNotes, lastContactedAt, assignedTo, firstName, lastName, email, phone, brokerage } = req.body;
+      const { crmTags, crmNotes, lastContactedAt, assignedTo, firstName, lastName, email, phone, brokerage, addTag, removeTag } = req.body;
+      if (email !== undefined && email !== null && email !== "") {
+        if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          return res.status(400).json({ message: "Enter a valid email address" });
+        }
+      }
+      if (phone !== undefined && phone !== null && phone !== "") {
+        if (typeof phone !== "string" || !/^\d{10,11}$/.test(phone.replace(/\D/g, ""))) {
+          return res.status(400).json({ message: "Enter a valid phone number with 10 or 11 digits" });
+        }
+      }
+      if (addTag !== undefined && (typeof addTag !== "string" || !addTag.trim())) {
+        return res.status(400).json({ message: "addTag must be a non-empty string" });
+      }
+      if (removeTag !== undefined && (typeof removeTag !== "string" || !removeTag.trim())) {
+        return res.status(400).json({ message: "removeTag must be a non-empty string" });
+      }
+      if (addTag !== undefined && removeTag !== undefined) {
+        return res.status(400).json({ message: "Add or remove one tag per request" });
+      }
       const updates: any = { updatedAt: new Date() };
-      if (crmTags !== undefined) updates.crmTags = crmTags;
+      if (addTag !== undefined) {
+        updates.crmTags = sql`array_append(COALESCE(${brokers.crmTags}, ARRAY[]::text[]), ${addTag.trim()})`;
+      } else if (removeTag !== undefined) {
+        updates.crmTags = sql`array_remove(COALESCE(${brokers.crmTags}, ARRAY[]::text[]), ${removeTag.trim()})`;
+      } else if (crmTags !== undefined) {
+        updates.crmTags = crmTags;
+      }
       if (crmNotes !== undefined) updates.crmNotes = crmNotes;
       if (lastContactedAt !== undefined) updates.lastContactedAt = lastContactedAt ? new Date(lastContactedAt) : null;
       if (assignedTo !== undefined) updates.assignedTo = assignedTo || null;
@@ -4320,7 +4345,17 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       if (phone !== undefined) updates.phone = phone || null;
       if (brokerage !== undefined) updates.brokerage = brokerage || null;
 
-      const [updated] = await db.update(brokers).set(updates).where(eq(brokers.id, id)).returning();
+      const tagCondition = addTag !== undefined
+        ? sql`NOT (${addTag.trim()} = ANY(COALESCE(${brokers.crmTags}, ARRAY[]::text[])))`
+        : undefined;
+      const [updated] = await db.update(brokers)
+        .set(updates)
+        .where(tagCondition ? and(eq(brokers.id, id), tagCondition) : eq(brokers.id, id))
+        .returning();
+      if (!updated && addTag !== undefined) {
+        const [existing] = await db.select().from(brokers).where(eq(brokers.id, id)).limit(1);
+        if (existing) return res.json(existing);
+      }
       if (!updated) return res.status(404).json({ message: "Contact not found" });
       res.json(updated);
     } catch (error) {
@@ -7611,36 +7646,99 @@ Provide your analysis in this exact JSON format:
   // GENERIC DEAL ROUTES (ID-BASED)
   // ==================================================
 
-  // Get individual deal by ID - Allow public access for shared links
+  const validateDealId = (id: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+
+  const getFullDeal = async (id: string) => {
+    const deal = await storage.getDealById(id);
+    if (!deal) return null;
+    let dealWithBroker: any = deal;
+    if (deal.brokerId) {
+      const broker = await storage.getBrokerById(deal.brokerId);
+      dealWithBroker = { ...deal, broker };
+    }
+    if (dealWithBroker.document_urls) {
+      dealWithBroker.documentUrls = dealWithBroker.document_urls;
+      delete dealWithBroker.document_urls;
+    }
+    return dealWithBroker;
+  };
+
+  app.post("/api/deals/:id/share", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      if (!validateDealId(id)) return res.status(400).json({ message: "Invalid deal ID format" });
+      const deal = await storage.getDealById(id);
+      if (!deal) return res.status(404).json({ message: "Deal not found" });
+      const token = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const userId = req.user?.id || req.user?.claims?.sub || null;
+      await db.execute(sql`
+        INSERT INTO deal_share_tokens (token, deal_id, created_by, expires_at)
+        VALUES (${token}, ${id}, ${userId}, ${expiresAt})
+      `);
+      return res.status(201).json({ token, expiresAt: expiresAt.toISOString() });
+    } catch (error) {
+      console.error("Error creating deal share token:", error);
+      return res.status(500).json({ message: "Failed to create share link" });
+    }
+  });
+
+  app.get("/api/deals/:id/full", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (!validateDealId(id)) return res.status(400).json({ message: "Invalid deal ID format" });
+      const deal = await getFullDeal(id);
+      if (!deal) return res.status(404).json({ message: "Deal not found" });
+      return res.json(deal);
+    } catch (error) {
+      console.error("Error fetching full deal:", error);
+      return res.status(500).json({ message: "Failed to fetch deal" });
+    }
+  });
+
+  // Public deal reads require a valid, unexpired seven-day share token.
   app.get("/api/deals/:id", async (req, res) => {
     try {
       const { id } = req.params;
-
-      // Validate UUID format
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(id)) {
+      if (!validateDealId(id)) {
         return res.status(400).json({ message: "Invalid deal ID format" });
       }
-
+      const token = typeof req.query.token === "string" ? req.query.token : "";
+      if (!/^[0-9a-f]{64}$/i.test(token)) {
+        return res.status(401).json({ message: "A valid share link is required" });
+      }
+      const validToken = await db.execute(sql`
+        SELECT token
+        FROM deal_share_tokens
+        WHERE token = ${token} AND deal_id = ${id} AND expires_at > NOW()
+        LIMIT 1
+      `);
+      if (!validToken.rows?.length) {
+        return res.status(401).json({ message: "This share link is invalid or has expired" });
+      }
       const deal = await storage.getDealById(id);
-      if (!deal) {
-        return res.status(404).json({ message: "Deal not found" });
-      }
-
-      // Get broker info for the deal
-      let dealWithBroker: any = deal;
-      if (deal.brokerId) {
-        const broker = await storage.getBrokerById(deal.brokerId);
-        dealWithBroker = { ...deal, broker };
-      }
-
-      // Transform database field names to match frontend expectations
-      if (dealWithBroker.document_urls) {
-        dealWithBroker.documentUrls = dealWithBroker.document_urls;
-        delete dealWithBroker.document_urls;
-      }
-
-      res.json(dealWithBroker);
+      if (!deal) return res.status(404).json({ message: "Deal not found" });
+      const publicDeal = {
+        id: deal.id,
+        propertyName: deal.propertyName,
+        address: deal.address,
+        city: deal.city,
+        state: deal.state,
+        zipCode: deal.zipCode,
+        parcelId: deal.parcelId,
+        productTypes: deal.productTypes,
+        askingPrice: deal.askingPrice,
+        pricePerAcre: deal.pricePerAcre,
+        sizeAcres: deal.sizeAcres,
+        unitCount: deal.unitCount,
+        proposedUnits: deal.proposedUnits,
+        zoning: deal.zoning,
+        classification: deal.classification,
+        yearBuilt: deal.yearBuilt,
+        createdAt: deal.createdAt,
+      };
+      return res.json(publicDeal);
     } catch (error) {
       console.error("Error fetching deal:", error);
       res.status(500).json({ message: "Failed to fetch deal" });
@@ -8258,10 +8356,14 @@ Provide your analysis in this exact JSON format:
       try {
         console.log(`\n📍 [RERUN-ANALYSIS] Calling HelloData for: ${fullAddress}`);
         
-        // Dec 17, 2025: Pass coordinates if available to avoid geocoding issues with coordinate-only deals
-        const helloDataOptions = (deal.latitude && deal.longitude) 
-          ? { latitude: parseFloat(String(deal.latitude)), longitude: parseFloat(String(deal.longitude)) }
-          : undefined;
+        // Internal analyst reruns are not tied to one Investment Company.
+        const helloDataOptions: { latitude?: number; longitude?: number; radiusMiles: number } = {
+          radiusMiles: 3,
+        };
+        if (deal.latitude && deal.longitude) {
+          helloDataOptions.latitude = parseFloat(String(deal.latitude));
+          helloDataOptions.longitude = parseFloat(String(deal.longitude));
+        }
         
         if (helloDataOptions) {
           console.log(`📍 [RERUN-ANALYSIS] Using coordinates for HelloData: ${helloDataOptions.latitude}, ${helloDataOptions.longitude}`);
@@ -8454,6 +8556,7 @@ Provide your analysis in this exact JSON format:
         comparableNotes: comparableResult.comparableNotes,
         aiExplanatoryNotes: comparableResult.aiExplanatoryNotes || null,
         comparablesJson: comparablesJsonForStorage,
+        comparablesFetchedAt: new Date(),
         // GUARANTEE rent fields are always populated (use "0" if API fails)
         topRentPSF: String(comparableResult.topRentPSF ?? 0),
         avgRentPSF: String(comparableResult.avgRentPSF ?? 0),
@@ -11478,6 +11581,34 @@ RULES:
     next();
   }
 
+  type ListingReviewScope = {
+    isPlatformAdmin: boolean;
+    userId: string;
+    assignedProfileIds: string[];
+  };
+
+  async function getListingReviewScope(req: any, res: any): Promise<ListingReviewScope | null> {
+    const email = String(req.user?.email || req.user?.claims?.email || "").trim().toLowerCase();
+    const userId = String(req.user?.id || req.user?.claims?.sub || "").trim();
+    if (email.endsWith("@apexresi.com")) {
+      return { isPlatformAdmin: true, userId, assignedProfileIds: [] };
+    }
+    if (String(req.user?.role || "").toUpperCase() !== "ANALYST" || !userId) {
+      res.status(403).json({ error: "Listing Review access requires an assigned analyst account" });
+      return null;
+    }
+    const assignments = await db.execute(sql`
+      SELECT developer_profile_id
+      FROM analyst_profile_assignments
+      WHERE user_id = ${userId}
+    `);
+    return {
+      isPlatformAdmin: false,
+      userId,
+      assignedProfileIds: (assignments.rows as any[]).map((row) => String(row.developer_profile_id)),
+    };
+  }
+
   app.get("/api/admin/master-pipeline", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
     try {
       const profileId = String(req.query.profileId || "").trim();
@@ -12105,15 +12236,19 @@ RULES:
         updates.rentMetric = body.rentMetric;
       }
 
-      const decimalFields = ['minRentPsf', 'minRentPerUnit', 'minAcres', 'maxAcres'];
+      const decimalFields = ['minRentPsf', 'minRentPerUnit', 'minAcres', 'maxAcres', 'compSearchRadiusMiles'];
       for (const field of decimalFields) {
         if (body[field] === undefined || body[field] === null || body[field] === '') {
-          if (field === 'minAcres') throw new Error('Minimum acreage is required');
+          if (field === 'minAcres' || field === 'compSearchRadiusMiles') {
+            throw new Error(field === 'minAcres' ? 'Minimum acreage is required' : 'Comparable search radius is required');
+          }
           if (body[field] !== undefined) updates[field] = null;
           continue;
         }
         const value = Number(body[field]);
-        if (!Number.isFinite(value) || value < 0) throw new Error(`${field} must be a non-negative number`);
+        if (!Number.isFinite(value) || value < 0 || (field === 'compSearchRadiusMiles' && value === 0)) {
+          throw new Error(field === 'compSearchRadiusMiles' ? 'Comparable search radius must be greater than zero' : `${field} must be a non-negative number`);
+        }
         updates[field] = String(value);
       }
 
@@ -16304,11 +16439,24 @@ RULES:
       }
       
       const { hellodataService } = await import('./hellodataService');
+      const developerProfileId = (req.user as any)?.developerProfileId as string | undefined;
+      let searchRadius = 3;
+      if (developerProfileId) {
+        const { developerProfiles } = await import('@shared/schema');
+        const [profile] = await db.select({
+          compSearchRadiusMiles: developerProfiles.compSearchRadiusMiles,
+        }).from(developerProfiles).where(and(
+          eq(developerProfiles.id, developerProfileId),
+          eq(developerProfiles.isActive, true),
+        )).limit(1);
+        const configuredRadius = Number(profile?.compSearchRadiusMiles);
+        if (Number.isFinite(configuredRadius) && configuredRadius > 0) searchRadius = configuredRadius;
+      }
       // Dec 17, 2025: Pass coordinates to skip geocoding
       // Jan 21, 2026: Also pass productType for dynamic filter criteria
       const result = await hellodataService.searchQualifyingComparables(
         `${deal.address}, ${geocodedCity}, ${geocodedState} ${geocodedZip}`.trim(),
-        { latitude: lat!, longitude: lng!, productType: (deal as any).productType }
+        { latitude: lat!, longitude: lng!, productType: (deal as any).productType, radiusMiles: searchRadius }
       );
 
       // Step 3: Format and save results
@@ -16371,6 +16519,7 @@ RULES:
           comparableNotes: comparableNotes,
           comparableCount: result.qualifyingCount,
           comparablesJson: comparablesJson,
+          comparablesFetchedAt: new Date(),
           avgRentPSF: result.avgRentPSF?.toString() || null,
           avgRentPerUnit: result.avgRentPerUnit?.toString() || null,
           topRentPSF: result.topRentPSF?.toString() || null,
@@ -16431,6 +16580,7 @@ RULES:
           
           await storage.updateDeal(dealId, {
             comparablesJson: comparablesJsonForStorage,
+            comparablesFetchedAt: new Date(),
             comparableCount: 0,
             avgRentPSF: result.avgRentPSF?.toString() || null,
             avgRentPerUnit: result.avgRentPerUnit?.toString() || null,
@@ -22672,6 +22822,19 @@ RULES:
 
   // Classification criteria reference endpoint
   app.get('/api/classification-criteria', isAuthenticated, async (req, res) => {
+    let searchRadius = 3;
+    const developerProfileId = (req.user as any)?.developerProfileId as string | undefined;
+    if (developerProfileId) {
+      const { developerProfiles } = await import('@shared/schema');
+      const [profile] = await db.select({
+        compSearchRadiusMiles: developerProfiles.compSearchRadiusMiles,
+      }).from(developerProfiles).where(and(
+        eq(developerProfiles.id, developerProfileId),
+        eq(developerProfiles.isActive, true),
+      )).limit(1);
+      const configuredRadius = Number(profile?.compSearchRadiusMiles);
+      if (Number.isFinite(configuredRadius) && configuredRadius > 0) searchRadius = configuredRadius;
+    }
     res.json({
       land: {
         label: 'Land Deals',
@@ -22681,7 +22844,7 @@ RULES:
         ],
         hellodataSearch: {
           topN: 50,
-          radiusMiles: 3,
+          radiusMiles: searchRadius,
           propertyTypeFilter: 'is_apartment=true, is_single_family=false',
           postFilter: 'Multifamily (5+ units), apartments, townhomes — no SFR',
         },
@@ -22705,7 +22868,7 @@ RULES:
           ],
           hellodataSearch: {
             topN: 50,
-            radiusMiles: 3,
+            radiusMiles: searchRadius,
             propertyTypeFilter: 'is_apartment=true, is_single_family=false',
             postFilter: 'Multifamily (5+ units), apartments, townhomes — no SFR',
           },
@@ -22726,7 +22889,7 @@ RULES:
           ],
           hellodataSearch: {
             topN: 50,
-            radiusMiles: 3,
+            radiusMiles: searchRadius,
             propertyTypeFilter: 'is_apartment=true, is_single_family=false',
             postFilter: 'Multifamily (5+ units), apartments, townhomes — no SFR',
           },
@@ -28667,8 +28830,12 @@ RULES:
     return null;
   };
   
-  app.get("/api/data-hub/deal-insights", isAuthenticated, async (req, res) => {
+  app.get("/api/data-hub/deal-insights", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
+      const parsedOffset = Number.parseInt(String(req.query.offset ?? "0"), 10);
+      const parsedLimit = Number.parseInt(String(req.query.limit ?? "200"), 10);
+      const offset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+      const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 500) : 200;
       const allDeals = await storage.getAllDeals();
       
       const deals = allDeals.map((deal: any) => {
@@ -28728,9 +28895,14 @@ RULES:
         .map(([type, count]) => ({ type, count }))
         .sort((a, b) => b.count - a.count);
 
+      const pageDeals = deals.slice(offset, offset + limit);
       res.json({
         totalDeals: deals.length,
-        deals: deals.slice(0, 200),
+        deals: pageDeals,
+        returnedCount: pageDeals.length,
+        truncated: offset + pageDeals.length < deals.length,
+        offset,
+        limit,
         classificationCounts,
         priceMetrics,
         productTypeCounts
@@ -28741,7 +28913,7 @@ RULES:
     }
   });
 
-  app.get("/api/data-hub/market-intelligence", isAuthenticated, async (req, res) => {
+  app.get("/api/data-hub/market-intelligence", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const allDeals = await storage.getAllDeals();
       
@@ -28807,7 +28979,7 @@ RULES:
     }
   });
 
-  app.get("/api/data-hub/broker-analytics", isAuthenticated, async (req, res) => {
+  app.get("/api/data-hub/broker-analytics", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const allDeals = await storage.getAllDeals();
       const allBrokers = await storage.getAllBrokers();
@@ -28861,20 +29033,17 @@ RULES:
     }
   });
 
-  app.get("/api/data-hub/comparables-cache", isAuthenticated, async (req, res) => {
+  app.get("/api/data-hub/comparables-cache", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const allDeals = await storage.getAllDeals();
-      // Keep the HelloData-backed warehouse focused on current market data.
-      // Use calendar months so the window is exactly three months rather than
-      // an approximate 60/90-day conversion.
-      const comparableDataCutoff = new Date();
-      comparableDataCutoff.setMonth(comparableDataCutoff.getMonth() - 3);
+      // Keep the HelloData-backed warehouse focused on data fetched in the last 90 days.
+      const comparableDataCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
       
       const comparables: any[] = [];
       
       allDeals.forEach((deal: any) => {
-        const dealCreatedAt = deal.createdAt ? new Date(deal.createdAt) : null;
-        if (!dealCreatedAt || Number.isNaN(dealCreatedAt.getTime()) || dealCreatedAt < comparableDataCutoff) {
+        const comparablesFetchedAt = deal.comparablesFetchedAt ? new Date(deal.comparablesFetchedAt) : null;
+        if (!comparablesFetchedAt || Number.isNaN(comparablesFetchedAt.getTime()) || comparablesFetchedAt < comparableDataCutoff) {
           return;
         }
 
@@ -31373,26 +31542,75 @@ RULES:
 
   // ─── LoopNet Staging Routes ─────────────────────────────────────────────────
 
+  app.get('/api/listings/stage-profiles', isAuthenticated, async (req: any, res) => {
+    try {
+      const scope = await getListingReviewScope(req, res);
+      if (!scope) return;
+      const rows = scope.isPlatformAdmin
+        ? await db.execute(sql`
+            SELECT id, company_name AS "companyName"
+            FROM developer_profiles
+            WHERE is_active = true
+            ORDER BY company_name
+          `)
+        : await db.execute(sql`
+            SELECT p.id, p.company_name AS "companyName"
+            FROM developer_profiles p
+            JOIN analyst_profile_assignments a ON a.developer_profile_id = p.id
+            WHERE a.user_id = ${scope.userId} AND p.is_active = true
+            ORDER BY p.company_name
+          `);
+      return res.json({ profiles: rows.rows });
+    } catch (error: any) {
+      console.error('Listing profile options error:', error);
+      return res.status(500).json({ error: 'Failed to load Investment Company options' });
+    }
+  });
+
   // POST /api/listings/stage — save a listing to the staging queue (no deal created)
   app.post('/api/listings/stage', isAuthenticated, async (req: any, res) => {
     try {
+      const scope = await getListingReviewScope(req, res);
+      if (!scope) return;
       const {
         listingId, address, city, state, zipCode, propertyType, listingType,
         listingPrice, sizeAcres, squareFootage, daysOnMarket,
         description, listingBroker, brokerCompany, brokerEmail,
-        sourceUrl, latitude, longitude,
+        sourceUrl, latitude, longitude, developerProfileId: requestedProfileId,
       } = req.body;
       if (!address) return res.status(400).json({ error: 'address is required' });
+      let developerProfileId = requestedProfileId ? String(requestedProfileId) : null;
+      if (!scope.isPlatformAdmin) {
+        if (!developerProfileId && scope.assignedProfileIds.length === 1) {
+          developerProfileId = scope.assignedProfileIds[0];
+        }
+        if (!developerProfileId) {
+          return res.status(400).json({ error: 'Choose an assigned Investment Company before staging this listing' });
+        }
+        if (!scope.assignedProfileIds.includes(developerProfileId)) {
+          return res.status(403).json({ error: 'You are not assigned to that Investment Company' });
+        }
+      }
+      if (!developerProfileId) {
+        return res.status(400).json({ error: 'Choose an Investment Company before staging this listing' });
+      }
+      if (developerProfileId) {
+        const [profile] = await db.select({ id: developerProfiles.id })
+          .from(developerProfiles)
+          .where(and(eq(developerProfiles.id, developerProfileId), eq(developerProfiles.isActive, true)))
+          .limit(1);
+        if (!profile) return res.status(400).json({ error: 'Investment Company not found or inactive' });
+      }
       const userId = req.user?.id || req.user?.claims?.sub || null;
       await db.execute(sql`
         INSERT INTO loopnet_staged_listings (
-          id, staged_by, status,
+          id, staged_by, developer_profile_id, status,
           listing_id, address, city, state, zip_code,
           property_type, listing_type, listing_price, size_acres, square_footage,
           days_on_market, description, listing_broker, broker_company, broker_email,
           source_url, latitude, longitude
         ) VALUES (
-          gen_random_uuid(), ${userId}, 'pending',
+          gen_random_uuid(), ${userId}, ${developerProfileId}, 'pending',
           ${listingId || null}, ${address}, ${city || null}, ${state || null}, ${zipCode || null},
           ${propertyType || null}, ${listingType || null}, ${listingPrice || null}, ${sizeAcres || null}, ${squareFootage || null},
           ${daysOnMarket || null}, ${description || null}, ${listingBroker || null}, ${brokerCompany || null}, ${brokerEmail || null},
@@ -31409,21 +31627,30 @@ RULES:
   // GET /api/listings/staged — list pending staged listings
   app.get('/api/listings/staged', isAuthenticated, async (req: any, res) => {
     try {
+      const scope = await getListingReviewScope(req, res);
+      if (!scope) return;
       const status = (req.query.status as string) || 'pending';
+      const accessFilter = scope.isPlatformAdmin
+        ? sql`TRUE`
+        : scope.assignedProfileIds.length > 0
+          ? sql`l.developer_profile_id IN (${sql.join(scope.assignedProfileIds.map((id) => sql`${id}`), sql`, `)})`
+          : sql`FALSE`;
       const rows = await db.execute(sql`
         SELECT
-          id, staged_at as "stagedAt", staged_by as "stagedBy", status,
-          listing_id as "listingId", address, city, state, zip_code as "zipCode",
-          property_type as "propertyType", listing_type as "listingType",
-          listing_price as "listingPrice", size_acres as "sizeAcres",
-          square_footage as "squareFootage", days_on_market as "daysOnMarket",
-          description, listing_broker as "listingBroker",
-          broker_company as "brokerCompany", broker_email as "brokerEmail",
-          source_url as "sourceUrl", latitude, longitude,
-          deal_id as "dealId", approved_at as "approvedAt"
-        FROM loopnet_staged_listings
-        WHERE status = ${status}
-        ORDER BY staged_at DESC
+          l.id, l.staged_at as "stagedAt", l.staged_by as "stagedBy", l.status,
+          l.developer_profile_id as "developerProfileId", p.company_name as "companyName",
+          l.listing_id as "listingId", l.address, l.city, l.state, l.zip_code as "zipCode",
+          l.property_type as "propertyType", l.listing_type as "listingType",
+          l.listing_price as "listingPrice", l.size_acres as "sizeAcres",
+          l.square_footage as "squareFootage", l.days_on_market as "daysOnMarket",
+          l.description, l.listing_broker as "listingBroker",
+          l.broker_company as "brokerCompany", l.broker_email as "brokerEmail",
+          l.source_url as "sourceUrl", l.latitude, l.longitude,
+          l.deal_id as "dealId", l.approved_at as "approvedAt"
+        FROM loopnet_staged_listings l
+        LEFT JOIN developer_profiles p ON p.id = l.developer_profile_id
+        WHERE l.status = ${status} AND ${accessFilter}
+        ORDER BY l.staged_at DESC
       `);
       res.json({ listings: rows.rows, total: rows.rows.length });
     } catch (error: any) {
@@ -31435,12 +31662,17 @@ RULES:
   // POST /api/listings/staged/:id/approve — approve: create deal + mark approved
   app.post('/api/listings/staged/:id/approve', isAuthenticated, async (req: any, res) => {
     try {
+      const scope = await getListingReviewScope(req, res);
+      if (!scope) return;
       const { id } = req.params;
       const row = await db.execute(sql`
         SELECT * FROM loopnet_staged_listings WHERE id = ${id}
       `);
       if (!row.rows?.length) return res.status(404).json({ error: 'Staged listing not found' });
       const l = row.rows[0] as any;
+      if (!scope.isPlatformAdmin && !scope.assignedProfileIds.includes(String(l.developer_profile_id || ''))) {
+        return res.status(403).json({ error: 'You are not assigned to this listing’s Investment Company' });
+      }
 
       const ingestionNotes = [
         `Source: LoopNet (${l.listing_type === 'lease' ? 'For Lease' : 'For Sale'})`,
@@ -31474,6 +31706,18 @@ RULES:
         RETURNING id, deal_number
       `);
       const newDeal = (dealResult.rows || [])[0] as any;
+      if (l.developer_profile_id && newDeal?.id) {
+        await db.execute(sql`
+          INSERT INTO partner_developer_sends (
+            id, developer_id, developer_profile_id, deal_id, classification,
+            address, status, matched_at
+          ) VALUES (
+            gen_random_uuid(), ${l.developer_profile_id}, ${l.developer_profile_id},
+            ${newDeal.id}, 'unclassified', ${l.address}, 'pending', NOW()
+          )
+          ON CONFLICT (developer_profile_id, deal_id) DO NOTHING
+        `);
+      }
 
       await db.execute(sql`
         UPDATE loopnet_staged_listings
@@ -31496,7 +31740,17 @@ RULES:
   // DELETE /api/listings/staged/:id — reject / remove from staging queue
   app.delete('/api/listings/staged/:id', isAuthenticated, async (req: any, res) => {
     try {
+      const scope = await getListingReviewScope(req, res);
+      if (!scope) return;
       const { id } = req.params;
+      const row = await db.execute(sql`
+        SELECT developer_profile_id FROM loopnet_staged_listings WHERE id = ${id}
+      `);
+      if (!row.rows?.length) return res.status(404).json({ error: 'Staged listing not found' });
+      const developerProfileId = String((row.rows[0] as any).developer_profile_id || '');
+      if (!scope.isPlatformAdmin && !scope.assignedProfileIds.includes(developerProfileId)) {
+        return res.status(403).json({ error: 'You are not assigned to this listing’s Investment Company' });
+      }
       await db.execute(sql`
         UPDATE loopnet_staged_listings SET status = 'rejected' WHERE id = ${id}
       `);

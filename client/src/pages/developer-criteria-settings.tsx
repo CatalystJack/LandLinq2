@@ -31,6 +31,7 @@ type Profile = {
   rentMetric: "psf" | "per_unit";
   minRentPsf: string | null;
   minRentPerUnit: string | null;
+  compSearchRadiusMiles: string;
   minAcres: string;
   maxAcres: string | null;
   acreageOverridesByProductType: Record<string, number> | null;
@@ -169,6 +170,7 @@ export default function DeveloperCriteriaSettings() {
         acreageOverridesByProductType: profile.acreageOverridesByProductType || {},
         minRentPsf: profile.minRentPsf || "",
         minRentPerUnit: profile.minRentPerUnit || "",
+        compSearchRadiusMiles: profile.compSearchRadiusMiles || "3",
         maxAcres: profile.maxAcres || "",
       });
     }
@@ -221,6 +223,10 @@ export default function DeveloperCriteriaSettings() {
       toast({ title: "Minimum acreage is required", variant: "destructive" });
       return;
     }
+    if (!form.compSearchRadiusMiles || Number(form.compSearchRadiusMiles) <= 0) {
+      toast({ title: "Comparable search radius must be greater than zero", variant: "destructive" });
+      return;
+    }
     if (form.rentMetric === "psf" && !form.minRentPsf) {
       toast({ title: "Minimum $/SF is required for this rent metric", variant: "destructive" });
       return;
@@ -235,6 +241,7 @@ export default function DeveloperCriteriaSettings() {
       rentMetric: form.rentMetric,
       minRentPsf: form.minRentPsf || null,
       minRentPerUnit: form.minRentPerUnit || null,
+      compSearchRadiusMiles: form.compSearchRadiusMiles,
       minAcres: form.minAcres,
       maxAcres: form.maxAcres || null,
       acreageOverridesByProductType: form.acreageOverridesByProductType || {},
@@ -339,6 +346,13 @@ export default function DeveloperCriteriaSettings() {
                   value={isPsf ? form.minRentPerUnit || "" : form.minRentPsf || ""}
                   onChange={(value) => update(isPsf ? "minRentPerUnit" : "minRentPsf", value)}
                   placeholder="Stored for reference only"
+                />
+                <NumberField
+                  label="Comparable search radius (miles)"
+                  value={form.compSearchRadiusMiles}
+                  onChange={(value) => update("compSearchRadiusMiles", value)}
+                  placeholder="3"
+                  required
                 />
                 <NumberField label="Minimum acreage" value={form.minAcres} onChange={(value) => update("minAcres", value)} required />
                 <NumberField label="Maximum acreage (optional)" value={form.maxAcres || ""} onChange={(value) => update("maxAcres", value)} placeholder="No maximum" />

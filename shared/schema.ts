@@ -45,6 +45,7 @@ export const developerProfiles = pgTable("developer_profiles", {
   rentMetric: varchar("rent_metric").notNull(), // 'psf' | 'per_unit'
   minRentPsf: decimal("min_rent_psf"),
   minRentPerUnit: decimal("min_rent_per_unit"),
+  compSearchRadiusMiles: decimal("comp_search_radius_miles").default("3"),
 
   // Acreage — flat default + optional per-product-type overrides
   minAcres: decimal("min_acres").notNull(),
@@ -375,6 +376,7 @@ export const deals = pgTable("deals", {
   comparableNotes: text("comparable_notes"), // Verbose HelloData comparable listing (individual properties, rent metrics)
   aiExplanatoryNotes: text("ai_explanatory_notes"), // Concise AI reasoning for acceptance/classification decision
   comparablesJson: jsonb("comparables_json"), // Structured HelloData comparables with lat/lng coordinates for map display
+  comparablesFetchedAt: timestamp("comparables_fetched_at"), // When HelloData comparables were last fetched/refreshed
   
   // Regrid Parcel Data - Property enrichment from Regrid API
   regridData: jsonb("regrid_data"), // Full Regrid parcel data (owner, assessed values, tax info, etc.)
@@ -1358,6 +1360,17 @@ export const insertBrokerSchema = createInsertSchema(brokers).omit({
   }
 );
 
+export const dealShareTokens = pgTable("deal_share_tokens", {
+  token: varchar("token", { length: 64 }).primaryKey(),
+  dealId: varchar("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  createdBy: varchar("created_by"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("deal_share_tokens_deal_idx").on(table.dealId),
+  index("deal_share_tokens_expires_idx").on(table.expiresAt),
+]);
+
 export const insertDealSchema = createInsertSchema(deals).omit({
   id: true,
   status: true,
@@ -2066,6 +2079,7 @@ export const loopnetStagedListings = pgTable("loopnet_staged_listings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   stagedAt: timestamp("staged_at").defaultNow(),
   stagedBy: varchar("staged_by"), // user id who staged it
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id),
   status: varchar("status").default("pending"), // pending | approved | rejected
 
   // Raw listing fields from LoopNet search

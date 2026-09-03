@@ -38,6 +38,10 @@ import {
 interface DealInsights {
   totalDeals: number;
   deals: any[];
+  returnedCount: number;
+  truncated: boolean;
+  offset: number;
+  limit: number;
   priceMetrics?: { byState: any[] };
   classificationCounts?: { green: number; yellow: number; red: number };
   productTypeCounts?: any[];
@@ -97,6 +101,29 @@ type LoopNetListing = {
   listingType: string;
 };
 
+type StageProfile = { id: string; companyName: string };
+
+function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
+  if (rows.length === 0) return false;
+  const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+  const escape = (value: unknown) => {
+    const text = value === null || value === undefined
+      ? ""
+      : typeof value === "object"
+        ? JSON.stringify(value)
+        : String(value);
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+  const csv = [columns.map(escape).join(","), ...rows.map((row) => columns.map((column) => escape(row[column])).join(","))].join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+  return true;
+}
+
 function formatNumber(value: unknown, fractionDigits = 0): string {
   if (value === null || value === undefined || value === '') return '-';
   const number = typeof value === 'number' ? value : Number(value);
@@ -123,6 +150,7 @@ export default function DataHub() {
   const [listingTotal, setListingTotal] = useState(0);
   const [listingSearching, setListingSearching] = useState(false);
   const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
+  const [listingProfileId, setListingProfileId] = useState("");
   const [rawFirst, setRawFirst] = useState<any>(null);
 
   async function searchLoopNet() {
@@ -156,7 +184,7 @@ export default function DataHub() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(l),
+        body: JSON.stringify({ ...l, developerProfileId: listingProfileId || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -176,7 +204,7 @@ export default function DataHub() {
   }
 
   const { data: dealInsights, isLoading: dealsLoading } = useQuery<DealInsights>({
-    queryKey: ["/api/data-hub/deal-insights"],
+    queryKey: ["/api/data-hub/deal-insights?offset=0&limit=200"],
   });
 
   const { data: marketData, isLoading: marketLoading } = useQuery<MarketData>({
@@ -194,6 +222,35 @@ export default function DataHub() {
   const { data: apiSources, isLoading: apiSourcesLoading } = useQuery<ApiSourcesData>({
     queryKey: ["/api/data-hub/api-sources"],
   });
+  const { data: stageProfileData } = useQuery<{ profiles: StageProfile[] }>({
+    queryKey: ["/api/listings/stage-profiles"],
+  });
+  const stageProfiles = stageProfileData?.profiles || [];
+
+  const exportRows = (filename: string, rows: Record<string, unknown>[] | undefined) => {
+    if (!downloadCsv(filename, rows || [])) {
+      toast({ title: "No data available to export", variant: "destructive" });
+    }
+  };
+
+  const exportDeals = async () => {
+    try {
+      const rows: Record<string, unknown>[] = [];
+      let offset = 0;
+      let truncated = true;
+      while (truncated) {
+        const response = await fetch(`/api/data-hub/deal-insights?offset=${offset}&limit=500`, { credentials: "include" });
+        const page = await response.json();
+        if (!response.ok) throw new Error(page.error || "Could not export deals");
+        rows.push(...(page.deals || []));
+        offset += page.returnedCount || 0;
+        truncated = Boolean(page.truncated) && page.returnedCount > 0;
+      }
+      exportRows("landlinq-deals.csv", rows);
+    } catch (error: any) {
+      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    }
+  };
 
   return (
     <>
@@ -344,7 +401,12 @@ export default function DataHub() {
                       <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
                     </div>
                   ) : dealInsights?.deals?.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <div>
+                      <p className="mb-3 text-sm text-gray-500">
+                        Showing {dealInsights.returnedCount} of {dealInsights.totalDeals} deals.
+                        {dealInsights.truncated ? " Narrow the filters to focus the table, or export all deals as CSV." : ""}
+                      </p>
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -393,6 +455,7 @@ export default function DataHub() {
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-12 text-gray-500">
@@ -740,9 +803,9 @@ export default function DataHub() {
                     <p className="text-sm text-gray-600">
                       Export includes: Property details, pricing, acreage, classifications, broker info, and analysis results
                     </p>
-                    <Button className="w-full" data-testid="button-export-deals">
+                    <Button className="w-full" data-testid="button-export-deals" onClick={exportDeals}>
                       <Download className="h-4 w-4 mr-2" />
-                      Export Deals to Excel
+                      Export Deals to CSV
                     </Button>
                   </CardContent>
                 </Card>
@@ -759,7 +822,7 @@ export default function DataHub() {
                     <p className="text-sm text-gray-600">
                       Export includes: Market summaries, pricing trends, deal volume, and success rates by geography
                     </p>
-                    <Button className="w-full" variant="outline" data-testid="button-export-markets">
+                    <Button className="w-full" variant="outline" data-testid="button-export-markets" onClick={() => exportRows("landlinq-markets.csv", marketData?.markets)}>
                       <Download className="h-4 w-4 mr-2" />
                       Export Market Data
                     </Button>
@@ -778,7 +841,7 @@ export default function DataHub() {
                     <p className="text-sm text-gray-600">
                       Export includes: Broker profiles, deal counts, success rates, and market coverage
                     </p>
-                    <Button className="w-full" variant="outline" data-testid="button-export-brokers">
+                    <Button className="w-full" variant="outline" data-testid="button-export-brokers" onClick={() => exportRows("landlinq-brokers.csv", brokerAnalytics?.topBrokers)}>
                       <Download className="h-4 w-4 mr-2" />
                       Export Broker Data
                     </Button>
@@ -797,7 +860,7 @@ export default function DataHub() {
                     <p className="text-sm text-gray-600">
                       Export includes: Property names, locations, units, year built, rent PSF, and distance data
                     </p>
-                    <Button className="w-full" variant="outline" data-testid="button-export-comparables">
+                    <Button className="w-full" variant="outline" data-testid="button-export-comparables" onClick={() => exportRows("landlinq-comparables.csv", comparablesCache?.comparables)}>
                       <Download className="h-4 w-4 mr-2" />
                       Export Comparables
                     </Button>
@@ -837,6 +900,16 @@ export default function DataHub() {
                 <CardContent>
                   {/* Search form */}
                   <div className="flex flex-wrap gap-3 mb-6">
+                    <Select value={listingProfileId} onValueChange={setListingProfileId}>
+                      <SelectTrigger className="w-56">
+                        <SelectValue placeholder="Investment Company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stageProfiles.map((profile) => (
+                          <SelectItem key={profile.id} value={profile.id}>{profile.companyName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Input
                       placeholder="City"
                       value={listingCity}

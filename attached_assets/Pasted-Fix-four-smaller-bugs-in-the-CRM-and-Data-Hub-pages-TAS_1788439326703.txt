@@ -1,0 +1,63 @@
+Fix four smaller bugs in the CRM and Data Hub pages.
+
+TASK 1 — Server-side validation on CRM contact updates
+In server/routes.ts, PATCH /api/crm/contacts/:id (~line 4308), add validation before 
+writing to the database:
+  - If email is provided and non-empty, validate it matches a standard email format 
+    (e.g. /^[^\s@]+@[^\s@]+\.[^\s@]+$/). Return 400 with a clear message if invalid.
+  - If phone is provided and non-empty, validate it contains a reasonable phone number 
+    pattern (e.g. strip non-digits, require 10-11 digits). Return 400 if invalid.
+  - Do NOT silently strip or auto-correct bad input — reject it with a clear error 
+    message so the frontend can show the user what's wrong.
+Client-side (client/src/pages/crm.tsx), surface the 400 error from the API in a toast 
+so the user sees why their edit didn't save, rather than the edit silently failing.
+
+TASK 2 — Fix CRM tag update race condition
+In client/src/pages/crm.tsx, the addTagToContact and removeTagFromContact functions 
+(~lines 573-585) compute the new tags array from the client's local (potentially 
+stale) contact.crmTags, then send the full array to the server. Rapid sequential 
+calls can overwrite each other because each one starts from stale state.
+
+Fix by moving the merge logic server-side instead of sending a full replacement array:
+  - Change PATCH /api/crm/contacts/:id in server/routes.ts to accept optional 
+    addTag / removeTag string fields instead of (or in addition to) a full crmTags 
+    array replacement
+  - When addTag is provided, do an atomic Postgres array append that won't clobber 
+    concurrent writes:
+      UPDATE brokers SET crm_tags = array_append(crm_tags, ${addTag}) 
+      WHERE id = ${id} AND NOT (${addTag} = ANY(crm_tags))
+  - When removeTag is provided, do an atomic array_remove similarly
+  - Update addTagToContact/removeTagFromContact in crm.tsx to send { addTag: tag } or 
+    { removeTag: tag } instead of computing and sending the full array
+
+TASK 3 — Wire up or remove Data Hub export buttons
+In client/src/pages/data-hub.tsx, four buttons currently render with no onClick 
+handler (data-testid="button-export-deals", "button-export-markets", 
+"button-export-brokers", "button-export-comparables", ~lines 743, 762, 781, 800).
+
+For each button, either:
+  (a) Add a working onClick that calls a new export endpoint returning a CSV download 
+      (e.g. GET /api/data-hub/export/deals returning Content-Type: text/csv), reusing 
+      the data already being fetched for that tab's display, OR
+  (b) If export isn't a current priority, remove the buttons entirely rather than 
+      leaving non-functional UI that looks like it should work.
+Default to option (a) using the data already loaded on the page (client-side CSV 
+generation via a small utility, e.g. converting the existing displayed rows to CSV 
+and triggering a browser download) if a server export endpoint would be significant 
+new work — confirm which approach before building if unsure.
+
+TASK 4 — Fix silent 200-record cap on deal history
+In server/routes.ts, GET /api/data-hub/deal-insights (~line 28733), the response 
+currently reports totalDeals: deals.length (the true count) but only returns 
+deals: deals.slice(0, 200) — silently truncating without indicating this to the 
+client.
+
+Add proper pagination:
+  - Accept optional ?offset= and ?limit= query params (default limit 200, cap at a 
+    reasonable max like 500)
+  - Return deals: deals.slice(offset, offset + limit)
+  - Add to the response: truncated: (offset + limit) < deals.length, and 
+    returnedCount: deals.slice(offset, offset + limit).length
+Update the Data Hub frontend page to show a "Showing X of Y deals" indicator and, if 
+truncated is true, either a "Load more" control or a note to narrow filters — whichever 
+fits the existing page's UI pattern better.

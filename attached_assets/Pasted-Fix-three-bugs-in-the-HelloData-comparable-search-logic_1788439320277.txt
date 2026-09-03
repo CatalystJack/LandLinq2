@@ -1,0 +1,63 @@
+Fix three bugs in the HelloData comparable-search logic and make search radius a 
+per-Investment-Company setting instead of a hardcoded value.
+
+TASK 1 — Add per-profile comp search radius
+In shared/schema.ts, add to the developerProfiles table:
+  compSearchRadiusMiles: decimal("comp_search_radius_miles").default('3'),
+
+Add this as an editable numeric field in the Criteria section of 
+client/src/pages/developer-criteria-settings.tsx, saved via the existing 
+PATCH /api/developer-profile/me endpoint.
+
+TASK 2 — Remove the auto-expanding radius fallback
+In server/hellodataService.ts, find and remove the "search with expanding radius" 
+logic (~lines 1206-1250, the function trying 3 miles first then expanding to 5 miles 
+if too few comparables are found). Replace all call sites of this expanding-search 
+function with a single search at the profile's compSearchRadiusMiles — no retry, no 
+automatic expansion. The company's configured radius is a hard limit, never silently 
+exceeded.
+
+TASK 3 — Replace hardcoded radius values with the resolved profile value
+In server/hellodataService.ts, at these locations (and any other hardcoded radius 
+defaults you find in this file), replace the hardcoded fallback of 3 (or 5, or 4) 
+with a value resolved from the relevant developerProfile's compSearchRadiusMiles:
+  Line ~831: const searchRadius = maxRadius || 3;
+  Line ~987: const searchRadius = maxRadius || 3;
+  Line ~2716: radiusMiles: number = 4 (default parameter)
+In server/routes.ts, at lines ~22684, ~22708, ~22729, replace hardcoded 
+radiusMiles: 3 with the resolved profile's compSearchRadiusMiles, passed through 
+from whichever Investment Company the comp search is being run for. If a comp search 
+isn't tied to any specific Investment Company (e.g. internal/Catalyst-side or admin 
+tooling), fall back to a default of 3 miles.
+
+TASK 4 — Fix all radius messaging to reflect the actual value used
+Search server/hellodataService.ts for every hardcoded string containing "3 miles" or 
+"5 miles" in log messages, error messages, and summary text (confirmed locations 
+include but are not limited to lines ~1449, ~1572, ~1836, ~2234, ~2332, ~2369). 
+Replace each hardcoded string with a template literal interpolating the actual radius 
+value used in that search call (e.g. `within ${searchRadius} miles` instead of 
+`within 3 miles`), so messaging always matches the real radius searched.
+
+TASK 5 — Fix the 3-month comparables data window
+In server/routes.ts, GET /api/data-hub/comparables-cache (~line 28864):
+
+5a. The date math bug: replace
+  const comparableDataCutoff = new Date();
+  comparableDataCutoff.setMonth(comparableDataCutoff.getMonth() - 3);
+with day-based arithmetic that doesn't overflow near month boundaries:
+  const comparableDataCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+5b. The wrong-timestamp bug: this route currently filters on deal.createdAt, which 
+means a freshly-refreshed comp on an OLD deal gets excluded, and a stale comp attached 
+to a NEW deal gets included. Add a proper fetch/refresh timestamp:
+  - Add to the deals table in shared/schema.ts (if not already present): 
+    comparablesFetchedAt: timestamp("comparables_fetched_at")
+  - Find wherever comparablesJson gets written/refreshed on a deal (in 
+    hellodataService.ts or wherever the comp-fetch result is saved back to the deals 
+    table) and set comparablesFetchedAt = new Date() at that same point
+  - Update the comparables-cache route to filter on deal.comparablesFetchedAt instead 
+    of deal.createdAt
+
+Verify after these changes: run the comparables-cache endpoint and confirm the 
+returned comparables reflect genuinely recent HelloData pulls, not just recently 
+created deals.

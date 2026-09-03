@@ -403,16 +403,6 @@ export default function AuthPage() {
                     </form>
                   </CardContent>
                 </Card>
-                <p className="pt-5 text-center text-sm text-slate-600">
-                  Don't have an account?{' '}
-                  <a
-                    href="/auth?mode=register"
-                    className="font-medium text-[#4A90E2] hover:underline"
-                    data-testid="link-create-account"
-                  >
-                    Create one
-                  </a>
-                </p>
                 </>
               )}
               

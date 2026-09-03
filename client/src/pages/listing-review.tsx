@@ -46,6 +46,7 @@ type LoopNetListing = {
 
 type StagedListing = {
   id: string; stagedAt: string; status: string;
+  developerProfileId: string | null; companyName: string | null;
   address: string; city: string | null; state: string | null; zipCode: string | null;
   propertyType: string | null; listingType: string | null;
   listingPrice: string | null; sizeAcres: string | null;
@@ -246,6 +247,7 @@ function StagedCard({ l, onApprove, onReject, isPending }: {
             <div className="flex items-center gap-2 flex-wrap mb-0.5">
               <span className="font-semibold text-gray-900 dark:text-white text-sm">{l.address}</span>
               {l.propertyType && <Badge variant="outline" className="text-xs">{l.propertyType}</Badge>}
+              {l.companyName && <Badge variant="secondary" className="text-xs">{l.companyName}</Badge>}
             </div>
             <p className="text-xs text-gray-500 flex items-center gap-1 mb-2">
               <MapPin className="h-3 w-3" />{[l.city, l.state, l.zipCode].filter(Boolean).join(", ") || "—"}

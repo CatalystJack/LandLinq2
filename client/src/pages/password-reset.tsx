@@ -1,7 +1,5 @@
-import Footer from "@/components/footer";
-import Navigation from "@/components/navigation";
 import { useState } from "react";
-import { useLocation, useRoute } from "wouter";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,8 +10,6 @@ import { AuthModal } from "@/components/auth-modal";
 
 export default function PasswordReset() {
   const [, setLocation] = useLocation();
-  const [match, params] = useRoute("/reset-password");
-  
   // Check for token in URL query parameters to determine initial step
   const hasToken = new URLSearchParams(window.location.search).get("token");
   const [step, setStep] = useState<"request" | "reset">(hasToken ? "reset" : "request");
@@ -109,11 +105,10 @@ export default function PasswordReset() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-catalyst-gold/10 via-white to-catalyst-gray-50">
-      <Navigation />
-      <div className="flex items-center justify-center px-4 py-16 lg:py-20">
+    <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
+      <div className="flex w-full items-center justify-center">
         <div className="max-w-md w-full">
-          <Card>
+          <Card className="border-slate-200 bg-white shadow-sm">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Button
@@ -237,8 +232,6 @@ export default function PasswordReset() {
         </Card>
         </div>
       </div>
-      <Footer />
-      
       {/* Auth Modal - Opens when "Back to Login" is clicked */}
       <AuthModal 
         isOpen={isAuthModalOpen} 

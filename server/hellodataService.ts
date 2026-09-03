@@ -828,7 +828,7 @@ export class HelloDataService {
       
       // Dec 30, 2025: RESPECT the caller's radius - use 3 miles as default
       // The caller determines the search radius, not a hardcoded minimum
-      const searchRadius = maxRadius || 3;  // Default 3 miles per user requirement
+      const searchRadius = maxRadius ?? 3;
       params.append('maxDistance', searchRadius.toString());
       console.log(`   Search radius: ${searchRadius} miles`);
       console.log(`   Requesting up to 50 properties from HelloData`);
@@ -984,7 +984,7 @@ export class HelloDataService {
       // Dec 30, 2025: Request 50 properties (HelloData max), respect caller's radius
       const params = new URLSearchParams();
       params.append('topN', '50');  // HelloData max is 50
-      const searchRadius = maxRadius || 3;  // Default 3 miles per user requirement
+      const searchRadius = maxRadius ?? 3;
       params.append('maxDistance', searchRadius.toString());
       console.log(`   Search radius: ${searchRadius} miles, topN: 50`);
       
@@ -1203,62 +1203,11 @@ export class HelloDataService {
   }
 
   /**
-   * Search with expanding radius (3 miles -> 5 miles if needed)
-   */
-  async searchComparablesWithExpanding(
-    address: string,
-    propertyType: string | null,
-    latitude?: number,
-    longitude?: number
-  ): Promise<ComparableSearchResult> {
-    const currentYear = new Date().getFullYear();
-    const yearBuiltMin = currentYear - 5; // Built in last 5 years
-
-    // Try 3 miles first
-    console.log(`🎯 Attempting comparable search at 3 miles radius`);
-    let result = await this.searchComparables({
-      address,
-      latitude,
-      longitude,
-      propertyType: propertyType || undefined,
-      radiusMiles: 3,
-      yearBuiltMin,
-      limit: 5
-    });
-
-    // If we found at least 1 comparable, we're done
-    if (result.success && result.comparableCount >= 1) {
-      console.log(`✅ Found ${result.comparableCount} comparables within 3 miles`);
-      return result;
-    }
-
-    // Expand to 5 miles
-    console.log(`🔄 Expanding search to 5 miles radius (found only ${result.comparableCount} at 3 miles)`);
-    result = await this.searchComparables({
-      address,
-      latitude,
-      longitude,
-      propertyType: propertyType || undefined,
-      radiusMiles: 5,
-      yearBuiltMin,
-      limit: 5
-    });
-
-    if (result.success && result.comparableCount >= 1) {
-      console.log(`✅ Found ${result.comparableCount} comparables within 5 miles`);
-    } else {
-      console.log(`⚠️ Only found ${result.comparableCount} comparables even at 5 miles`);
-    }
-
-    return result;
-  }
-
-  /**
    * NEW CLASSIFICATION WORKFLOW: Search for multifamily properties meeting specific criteria
    * - Rent per sqft >= $1.75  (REQUIRES property details API call)
    * - Vintage year >= 2020
    * - Units >= 150
-   * - Within 3-mile radius
+   * - Within the caller-configured radius (3 miles by default)
    * 
    * Smart API usage: Filter by vintage/units first, then fetch property details only for candidates
    */
@@ -1266,6 +1215,7 @@ export class HelloDataService {
     latitude?: number;
     longitude?: number;
     productType?: string;  // Jan 12, 2026: Product type for custom filter criteria
+    radiusMiles?: number;
   }): Promise<{
     success: boolean;
     qualifyingCount: number;
@@ -1277,7 +1227,7 @@ export class HelloDataService {
     avgRentPerUnit?: number;
     error?: string;
     // ENHANCEMENT (Dec 9, 2025): Raw counts for educational rejection reasons
-    totalComparables?: number;    // All properties within 3 miles
+    totalComparables?: number;    // All properties within the configured radius
     candidateCount?: number;      // Properties meeting vintage/units criteria
     candidatesWithPricing?: number; // Candidates that had valid pricing data
     // Dec 11, 2025: Suggested address when exact match not found
@@ -1287,6 +1237,10 @@ export class HelloDataService {
     usedCoordinateFallback?: boolean;
   }> {
     try {
+      const searchRadius = options?.radiusMiles ?? 3;
+      if (!Number.isFinite(searchRadius) || searchRadius <= 0) {
+        throw new Error("Comparable search radius must be greater than zero");
+      }
       console.log(`\n${'='.repeat(80)}`);
       console.log(`🔍 [HELLODATA] Starting Qualifying Comparable Search`);
       console.log(`${'='.repeat(80)}`);
@@ -1427,14 +1381,13 @@ export class HelloDataService {
       let usedCoordinateFallback = false;
       
       // Always use coordinate-based search with Geocodio's accurate coordinates
-      // CRITICAL FIX (Dec 18, 2025): Increased radius to 5 miles and topN to 20 to find more comparables
-      console.log(`📍 [HELLODATA] Searching for comparables at ${geocoded.lat}, ${geocoded.lng} (ZIP: ${geocoded.zipCode || 'N/A'})`);
+      console.log(`📍 [HELLODATA] Searching for comparables at ${geocoded.lat}, ${geocoded.lng} within ${searchRadius} miles (ZIP: ${geocoded.zipCode || 'N/A'})`);
       rawComparables = await this.findComparablesWithCoordinates(
         geocoded.lat!, 
         geocoded.lng!, 
         geocoded.zipCode || undefined,
-        20, 
-        5
+        20,
+        searchRadius
       );
       
       if (rawComparables.length === 0) {
@@ -1446,7 +1399,7 @@ export class HelloDataService {
             success: true, // Not an error - coordinate search completed successfully
             qualifyingCount: 0,
             comparables: [],
-            summary: `[ZIP CENTER] Searched using ${locationUsed} coordinates. No qualifying comparables found within 3 miles.`,
+            summary: `[ZIP CENTER] Searched using ${locationUsed} coordinates. No qualifying comparables found within ${searchRadius} miles.`,
             usedCoordinateFallback: true,
             totalComparables: 0,
             candidateCount: 0,
@@ -1462,8 +1415,8 @@ export class HelloDataService {
           success: false,
           qualifyingCount: 0,
           comparables: [],
-          summary: 'No qualifying multifamily comparables found within 3-mile radius. Property may be in an area without similar rental developments.',
-          error: `No qualifying comparables found within 3-mile radius (${criteriaText} required)`
+          summary: `No qualifying multifamily comparables found within ${searchRadius} miles. Property may be in an area without similar rental developments.`,
+          error: `No qualifying comparables found within ${searchRadius} miles (${criteriaText} required)`
         };
       }
 
@@ -1569,7 +1522,7 @@ export class HelloDataService {
           : 0;
         
         // Build summary showing ALL apartments with criteria breakdown
-        let summary = `Found ${rawComparables.length} total comparables within 3 miles\n`;
+        let summary = `Found ${rawComparables.length} total comparables within ${searchRadius} miles\n`;
         summary += `0 met vintage/units criteria (>=${filterCriteria.minVintage}, >=${filterCriteria.minUnits} units)\n`;
         const rentCriteriaText = filterCriteria.minGrossRent 
           ? `rent >= $${filterCriteria.minGrossRent.toLocaleString()}/unit` 
@@ -1833,7 +1786,7 @@ export class HelloDataService {
         }
         
         // Build detailed summary in consistent format for frontend parsing
-        let detailedSummary = `Found ${multifamilyComps.length} total comparables within 3 miles\n`;
+        let detailedSummary = `Found ${multifamilyComps.length} total comparables within ${searchRadius} miles\n`;
         detailedSummary += `0 met vintage/units criteria (>=${filterCriteria.minVintage}, >=${filterCriteria.minUnits} units)\n`;
         const rentCriteriaMsg = filterCriteria.minGrossRent 
           ? `rent >= $${filterCriteria.minGrossRent.toLocaleString()}/unit`
@@ -2231,7 +2184,7 @@ export class HelloDataService {
         summary += `These are properties in the general area, not address-specific.\n\n`;
       }
       
-      summary += `Found ${rawComparables.length} total comparables within 3 miles\n`;
+      summary += `Found ${rawComparables.length} total comparables within ${searchRadius} miles\n`;
       summary += `${candidates.length} met vintage/units criteria (>=${filterCriteria.minVintage}, >=${filterCriteria.minUnits} units)\n`;
       const rentCriteriaDisplay = filterCriteria.minGrossRent 
         ? `rent >= $${filterCriteria.minGrossRent.toLocaleString()}/unit`
@@ -2329,7 +2282,7 @@ export class HelloDataService {
       let aiExplanatoryNotes = '';
       if (qualifyingCount === 0) {
         summary += `\nClassification: CLEAR NO (RED) - No qualifying comparables found`;
-        aiExplanatoryNotes = `RED: No qualifying comparables found within 3 miles. ${rawComparables.length} total properties checked, ${candidates.length} met vintage/units criteria but none met rent requirements.`;
+        aiExplanatoryNotes = `RED: No qualifying comparables found within ${searchRadius} miles. ${rawComparables.length} total properties checked, ${candidates.length} met vintage/units criteria but none met rent requirements.`;
       } else {
         summary += `\nClassification: REVIEWING (YELLOW) - Found ${qualifyingCount} qualifying comparable${qualifyingCount > 1 ? 's' : ''}`;
         const rentDisplay = filterCriteria.minGrossRent 
@@ -2366,7 +2319,7 @@ export class HelloDataService {
         topRentPerUnit: allCandidatesTopRentPerUnit, // Use ALL candidates top rent/unit
         avgRentPerUnit: allCandidatesAvgRentPerUnit, // Use ALL candidates avg rent/unit
         // ENHANCEMENT (Dec 9, 2025): Return raw counts for educational rejection reasons
-        totalComparables: rawComparables.length,     // All properties within 3 miles
+        totalComparables: rawComparables.length,     // All properties within the configured radius
         candidateCount: candidates.length,           // Properties meeting vintage/units criteria
         candidatesWithPricing: allComparables.length // Candidates that had valid pricing data
       };
@@ -2705,7 +2658,7 @@ export class HelloDataService {
 
   /**
    * Search comparables for ACQUISITION deals.
-   * Finds all multifamily properties within `radiusMiles` (default 4 miles),
+   * Finds all multifamily properties within `radiusMiles` (default 3 miles),
    * filtered to ±5 years of `subjectVintage` (if provided).
    * Fetches rent data for each property and returns formatted notes.
    */
@@ -2713,7 +2666,7 @@ export class HelloDataService {
     lat: number,
     lng: number,
     subjectVintage: number | null,
-    radiusMiles: number = 4
+    radiusMiles: number = 3
   ): Promise<{
     success: boolean;
     count: number;

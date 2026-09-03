@@ -1,0 +1,70 @@
+Fix three security issues in the LandLinq2 app. These routes currently expose 
+proprietary data to any authenticated user (or in one case, anyone at all with a 
+URL), regardless of role.
+
+TASK 1 — Lock down Data Hub APIs to platform admins only
+In server/routes.ts, these four routes currently only check isAuthenticated:
+  GET /api/data-hub/deal-insights        (~line 28670)
+  GET /api/data-hub/market-intelligence  (~line 28744)
+  GET /api/data-hub/broker-analytics     (~line 28810)
+  GET /api/data-hub/comparables-cache    (~line 28864)
+
+Add the existing requirePlatformAdmin middleware (already defined at ~line 11473 and 
+already used on /api/admin/master-pipeline and /api/admin/analytics/by-profile) to 
+all four routes, e.g.:
+  app.get("/api/data-hub/deal-insights", isAuthenticated, requirePlatformAdmin, async (req, res) => {
+
+Do this for all four routes. Do not change any other logic in these handlers.
+
+TASK 2 — Lock down listing staging/review routes
+In server/routes.ts, these routes currently only check isAuthenticated:
+  POST   /api/listings/stage             (~line 31376)
+  GET    /api/listings/staged            (~line 31405)
+  POST   /api/listings/staged/:id/approve (~line 31436)
+  DELETE /api/listings/staged/:id        (the reject/remove route, near line 31496)
+
+Add requirePlatformAdmin to all four routes, same pattern as Task 1. If any internal 
+analyst (non-admin) role currently needs to use these routes in normal workflow, flag 
+that back to me before making this change rather than assuming admin-only is correct 
+— check for any existing frontend usage of these routes outside of an admin-only page 
+first.
+
+TASK 3 — Sanitize the public deal-sharing endpoint
+GET /api/deals/:id (~line 7615) is intentionally public (no auth) for deal-sharing 
+purposes, but currently returns the ENTIRE deal record plus the full broker object 
+(including broker email/phone) to anyone with a valid or guessed UUID.
+
+3a. Add a new table to shared/schema.ts:
+
+export const dealShareTokens = pgTable("deal_share_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  token: varchar("token").notNull().unique(),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+3b. Add a new authenticated route to generate a share link:
+POST /api/deals/:id/share (isAuthenticated)
+  - Creates a dealShareTokens row with a random token (crypto.randomUUID() or similar) 
+    and expiresAt = now() + 7 days (adjustable, but must have a real expiry)
+  - Returns the shareable URL: /api/deals/:id?token=<token>
+
+3c. Modify GET /api/deals/:id:
+  - Require a valid, non-expired ?token= query param matching a dealShareTokens row 
+    for this dealId. Return 401/403 if missing or invalid/expired.
+  - Return a SANITIZED projection only: address, city, state, sizeAcres, askingPrice, 
+    productType, description, and any high-level analysis fields appropriate for 
+    external sharing. Do NOT include: broker object, broker email, broker phone, 
+    document URLs, internal notes, or any internal classification/scoring fields.
+  - Keep the existing UUID format validation and 404-if-not-found behavior.
+
+3d. Update any frontend code that currently generates or uses a /api/deals/:id link 
+for sharing purposes to call the new /share endpoint first and use the token-bearing 
+URL, rather than linking directly to the bare deal ID.
+
+Verify after all three tasks: existing internal pages that rely on GET /api/deals/:id 
+(if any use it while logged in) still work — check if the internal admin/analyst UI 
+also hits this same public route, and if so, give it a separate internal-only route 
+returning the full record instead of breaking that flow.

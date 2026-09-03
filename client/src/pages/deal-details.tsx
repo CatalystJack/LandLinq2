@@ -57,6 +57,7 @@ export default function DealDetails() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const shareToken = new URLSearchParams(window.location.search).get("token");
 
   // Fetch deal data - Allow public access for shared links
   const {
@@ -65,8 +66,8 @@ export default function DealDetails() {
     isError,
     error
   } = useQuery<DealWithBroker>({
-    queryKey: ["/api/deals", id],
-    enabled: !!id, // Remove authentication requirement for shared links
+    queryKey: [isAuthenticated ? `/api/deals/${id}/full` : `/api/deals/${id}?token=${encodeURIComponent(shareToken || "")}`],
+    enabled: !!id && (isAuthenticated || !!shareToken),
     retry: 1,
   });
 
@@ -97,10 +98,17 @@ export default function DealDetails() {
   const previousDeal = currentIndex > 0 ? allDeals[currentIndex - 1] : null;
   const nextDeal = currentIndex < allDeals.length - 1 ? allDeals[currentIndex + 1] : null;
 
-  const handleShareDeal = () => {
+  const handleShareDeal = async () => {
     if (!deal) return;
-    
-    const shareUrl = `${window.location.origin}/deals/${id}`;
+    try {
+      const response = await fetch(`/api/deals/${id}/share`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "Could not create share link");
+      const shareUrl = `${window.location.origin}/deals/${id}?token=${encodeURIComponent(payload.token)}`;
     
     // Create formatted email
     const subject = `Investment Opportunity: ${deal.address}`;
@@ -120,7 +128,10 @@ Best regards`;
 
     // Open email client with pre-filled content
     const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailtoLink;
+      window.location.href = mailtoLink;
+    } catch (error: any) {
+      toast({ title: "Could not share deal", description: error.message, variant: "destructive" });
+    }
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {

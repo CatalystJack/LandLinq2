@@ -117,8 +117,16 @@ export default function MySubmissions() {
   };
 
   // Share deal via email functionality
-  const handleShareDeal = (deal: Deal) => {
-    const shareUrl = `${window.location.origin}/deals/${deal.id}`;
+  const handleShareDeal = async (deal: Deal) => {
+    try {
+      const response = await fetch(`/api/deals/${deal.id}/share`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "Could not create share link");
+      const shareUrl = `${window.location.origin}/deals/${deal.id}?token=${encodeURIComponent(payload.token)}`;
     
     // Create formatted email
     const subject = `Investment Opportunity: ${deal.address}`;
@@ -138,7 +146,10 @@ Best regards`;
 
     // Open email client with pre-filled content
     const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailtoLink;
+      window.location.href = mailtoLink;
+    } catch (error: any) {
+      toast({ title: "Could not share deal", description: error.message, variant: "destructive" });
+    }
   };
 
   // Handle authentication errors

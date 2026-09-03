@@ -1367,6 +1367,7 @@ export class UnifiedDealPipeline {
       // Dec 11, 2025: Store structured comparables with lat/lng for map display
       if (comparableResult.comparablesJson && comparableResult.comparablesJson.length > 0) {
         classificationUpdates.comparablesJson = comparableResult.comparablesJson;
+        classificationUpdates.comparablesFetchedAt = new Date();
         console.log(`📍 [PIPELINE-STEP-7] Storing ${comparableResult.comparablesJson.length} comparables with coordinates for map`);
       }
       
