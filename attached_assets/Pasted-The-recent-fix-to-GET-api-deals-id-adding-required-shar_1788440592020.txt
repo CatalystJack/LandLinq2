@@ -1,0 +1,37 @@
+The recent fix to GET /api/deals/:id (adding required share-token auth + sanitized 
+response) broke two internal, authenticated call sites that relied on the old 
+behavior of returning the full deal record to any logged-in user:
+
+  1. client/src/components/lihtc-score-modal.tsx (line ~123) — 
+     fetch(`/api/deals/${dealId}`) with no token, needs full deal data for LIHTC scoring
+  2. client/src/pages/analyst-dashboard.tsx (line ~2200) — 
+     fetch(`/api/deals/${variables.dealId}`, { credentials: 'include' }) with no token, 
+     polls for classification changes after an update, needs the full record including 
+     the classification field
+
+Both will now receive a 401 "A valid share link is required" instead of deal data, 
+breaking LIHTC scoring and the reclassification-polling UI in the analyst dashboard.
+
+FIX — add a separate internal, authenticated route rather than reusing the now-public 
+sanitized endpoint:
+
+TASK 1 — New internal route
+Add GET /api/deals/:id/full (isAuthenticated, no share token needed) in server/routes.ts, 
+returning the same full deal + broker object shape that GET /api/deals/:id used to 
+return before the security fix. This is for internal authenticated use only.
+
+TASK 2 — Update the two broken call sites
+- client/src/components/lihtc-score-modal.tsx line ~123: change to 
+  fetch(`/api/deals/${dealId}/full`)
+- client/src/pages/analyst-dashboard.tsx line ~2200: change to 
+  fetch(`/api/deals/${variables.dealId}/full`, { credentials: 'include' })
+
+TASK 3 — Audit for other broken call sites
+Search the entire client/src/ directory for any other fetch(`/api/deals/${...}`) or 
+apiRequest("GET", `/api/deals/${...}`) calls (a GET with no method specified defaults 
+to GET) that do NOT include a ?token= param and are NOT part of the deal-sharing flow 
+— each of these is now broken the same way. Redirect each one to the new 
+/api/deals/:id/full route instead.
+
+Do not modify the sanitized public GET /api/deals/:id route itself — that fix is 
+correct and should remain exactly as is for the public sharing use case.

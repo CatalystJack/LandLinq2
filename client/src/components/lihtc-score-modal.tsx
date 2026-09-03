@@ -120,7 +120,7 @@ export function LIHTCScoreModal({ dealId, isOpen, onClose, onRefresh }: LIHTCSco
 
   const { data: deal } = useQuery<any>({
     queryKey: ['/api/deals', dealId],
-    queryFn: () => fetch(`/api/deals/${dealId}`).then(r => r.json()),
+    queryFn: () => fetch(`/api/deals/${dealId}/full`, { credentials: "include" }).then(r => r.json()),
     enabled: isOpen && !!dealId,
   });
 

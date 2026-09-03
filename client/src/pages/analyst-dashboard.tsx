@@ -2197,7 +2197,7 @@ export default function AnalystDashboard() {
           }
           
           try {
-            const response = await fetch(`/api/deals/${variables.dealId}`, { credentials: 'include' });
+            const response = await fetch(`/api/deals/${variables.dealId}/full`, { credentials: 'include' });
             if (response.ok) {
               const updatedDeal = await response.json();
               if (updatedDeal.classification !== originalClassification) {
