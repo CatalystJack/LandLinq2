@@ -1,0 +1,52 @@
+Replace SendGrid with Microsoft Graph (app-only/client-credentials auth) for all 
+platform system/transactional emails — password resets, login/invite emails, 
+notifications, alerts. Send all of these from a dedicated LandLinq mailbox:
+  [PASTE EXACT @landlinq.ai ADDRESS HERE]
+
+Do NOT modify the existing per-user delegated OAuth outreach system 
+(server/jobs/recurringOutreach.ts) — that already correctly sends each Investment 
+Company's outreach from their own individually-connected Outlook/Gmail account, and 
+must stay exactly as-is. This task only touches platform system emails, not outreach.
+
+TASK 1 — Add app-only token acquisition
+In server/microsoftAuth.ts, add getAppOnlyGraphToken() requesting a client-credentials 
+token (grant_type=client_credentials, scope=https://graph.microsoft.com/.default) 
+using the existing MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and 
+MICROSOFT_TENANT_ID env vars. No user login involved — the application authenticates 
+as itself.
+
+TASK 2 — Add a system-mailbox send function
+Add sendSystemEmail(to, subject, htmlBody) in server/emailService.ts that:
+  1. Gets an app-only token via getAppOnlyGraphToken()
+  2. Sends via POST https://graph.microsoft.com/v1.0/users/{NOTIFICATIONS_MAILBOX}/sendMail
+  3. Add NOTIFICATIONS_MAILBOX as a new env var set to [PASTE ADDRESS HERE]
+  4. Returns success/failure matching sendNotificationEmail()'s current return shape
+
+TASK 3 — Swap the implementation, keep the interface
+Update sendNotificationEmail() in server/emailService.ts to call sendSystemEmail() 
+internally instead of sgMail.send(). Keep the exact same function signature and 
+return behavior so the ~19 files currently calling sendNotificationEmail() don't 
+need any changes.
+
+TASK 4 — Audit for direct SendGrid usage bypassing the shared function
+Before removing anything, search every file in server/ for @sendgrid/mail imports 
+or sgMail.send() calls that do NOT go through sendNotificationEmail(). Report each 
+one found — these would need individual attention rather than being covered by the 
+Task 3 swap.
+
+TASK 5 — Test before removing SendGrid
+Test at minimum: a real password reset email, a real initial-login invite email 
+(single and bulk), and one notification/alert email, confirming each successfully 
+sends via Microsoft Graph and arrives with [NOTIFICATIONS_MAILBOX ADDRESS] as the 
+sender. Do NOT remove the @sendgrid/mail dependency or API key until all of these 
+are confirmed working — keep SendGrid as a working fallback until Microsoft Graph 
+is proven in practice.
+
+TASK 6 — Remove SendGrid once confirmed
+Once Task 5 passes, remove @sendgrid/mail from emailService.ts and package.json, 
+and flag the SENDGRID_API_KEY secret as safe to remove (don't delete it yourself — 
+just confirm it's no longer referenced anywhere).
+
+TASK 7 — Report the Azure permission requirement clearly
+This requires the existing Azure app registration to have the Mail.Send APPLICATION 
+permissio
