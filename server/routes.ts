@@ -12030,8 +12030,24 @@ RULES:
 
   app.get("/api/admin/investment-companies", isAuthenticated, requirePlatformAdmin, async (_req: any, res) => {
     try {
-      const { developerProfiles } = await import("@shared/schema");
-      const profiles = await db.select().from(developerProfiles).orderBy(developerProfiles.companyName);
+      const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import("@shared/schema");
+      const [profiles, productTypes, countyLabels] = await Promise.all([
+        db.select().from(developerProfiles).orderBy(developerProfiles.companyName),
+        db.select().from(developerProductTypes),
+        db.select().from(developerCountyMarketLabels),
+      ]);
+      const productTypesByProfile = new Map<string, typeof productTypes>();
+      for (const productType of productTypes) {
+        const rows = productTypesByProfile.get(productType.developerProfileId) || [];
+        rows.push(productType);
+        productTypesByProfile.set(productType.developerProfileId, rows);
+      }
+      const labelsByProfile = new Map<string, Record<string, string>>();
+      for (const label of countyLabels) {
+        const labels = labelsByProfile.get(label.developerProfileId) || {};
+        labels[label.county] = label.marketLabel;
+        labelsByProfile.set(label.developerProfileId, labels);
+      }
       const teamCounts = await db.execute(sql`
         SELECT developer_profile_id, COUNT(*)::int AS count
         FROM users
@@ -12040,7 +12056,12 @@ RULES:
       `);
       const countMap = new Map((teamCounts.rows as any[]).map((row) => [row.developer_profile_id, Number(row.count)]));
       return res.json({
-        profiles: profiles.map((profile) => ({ ...profile, teamMemberCount: countMap.get(profile.id) || 0 })),
+        profiles: profiles.map((profile) => ({
+          ...profile,
+          productTypes: productTypesByProfile.get(profile.id) || [],
+          countyMarketLabels: labelsByProfile.get(profile.id) || {},
+          teamMemberCount: countMap.get(profile.id) || 0,
+        })),
       });
     } catch (error: any) {
       console.error("[admin investment companies GET] Error:", error);
@@ -12062,24 +12083,111 @@ RULES:
     }
   });
 
+  function parseAdminProductTypes(body: any, legacy: Record<string, any>) {
+    const rawProductTypes = body.productTypes;
+    if (rawProductTypes === undefined) {
+      return [{
+        name: "General",
+        minAcres: String(legacy.minAcres),
+        maxAcres: legacy.maxAcres ?? null,
+        minRentPsf: legacy.minRentPsf ?? null,
+        minRentPerUnit: legacy.minRentPerUnit ?? null,
+        isActive: true,
+      }];
+    }
+    if (!Array.isArray(rawProductTypes) || rawProductTypes.length === 0) {
+      throw new Error("At least one product type is required");
+    }
+    const productTypes = rawProductTypes.map((raw: any, index: number) => {
+      const name = String(raw?.name ?? "").trim();
+      const minAcres = Number(raw?.minAcres);
+      const maxAcres = raw?.maxAcres === null || raw?.maxAcres === undefined || raw?.maxAcres === ""
+        ? null
+        : Number(raw.maxAcres);
+      const minRentPsf = raw?.minRentPsf === null || raw?.minRentPsf === undefined || raw?.minRentPsf === ""
+        ? null
+        : Number(raw.minRentPsf);
+      const minRentPerUnit = raw?.minRentPerUnit === null || raw?.minRentPerUnit === undefined || raw?.minRentPerUnit === ""
+        ? null
+        : Number(raw.minRentPerUnit);
+      const isActive = raw?.isActive !== false;
+      if (!name) throw new Error(`Product type ${index + 1} needs a name`);
+      if (!Number.isFinite(minAcres) || minAcres < 0) throw new Error(`${name}: minimum acreage must be a non-negative number`);
+      if (maxAcres !== null && (!Number.isFinite(maxAcres) || maxAcres < minAcres)) {
+        throw new Error(`${name}: maximum acreage must be greater than or equal to minimum acreage`);
+      }
+      if (minRentPsf !== null && (!Number.isFinite(minRentPsf) || minRentPsf < 0)) {
+        throw new Error(`${name}: minimum $/SF must be a non-negative number`);
+      }
+      if (minRentPerUnit !== null && (!Number.isFinite(minRentPerUnit) || minRentPerUnit < 0)) {
+        throw new Error(`${name}: minimum $/Unit must be a non-negative number`);
+      }
+      return {
+        name,
+        minAcres: String(minAcres),
+        maxAcres: maxAcres === null ? null : String(maxAcres),
+        minRentPsf: minRentPsf === null ? null : String(minRentPsf),
+        minRentPerUnit: minRentPerUnit === null ? null : String(minRentPerUnit),
+        isActive,
+      };
+    });
+    if (!productTypes.some((productType: any) => productType.isActive)) {
+      throw new Error("At least one active product type is required");
+    }
+    const metric = body.rentMetric ?? legacy.rentMetric;
+    if (metric === "psf" && productTypes.some((productType: any) => productType.isActive && (!productType.minRentPsf || Number(productType.minRentPsf) <= 0))) {
+      throw new Error("Every active product type needs a minimum $/SF");
+    }
+    if (metric === "per_unit" && productTypes.some((productType: any) => productType.isActive && (!productType.minRentPerUnit || Number(productType.minRentPerUnit) <= 0))) {
+      throw new Error("Every active product type needs a minimum $/Unit");
+    }
+    const names = productTypes.map((productType: any) => productType.name.toLowerCase());
+    if (new Set(names).size !== names.length) throw new Error("Product type names must be unique");
+    return productTypes;
+  }
+
+  function parseAdminCountyMarketLabels(value: any, targetCounties: string[]) {
+    if (value === undefined) return undefined;
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("County market labels must be an object");
+    }
+    const counties = new Set(targetCounties.map((county) => county.toLowerCase()));
+    return Object.entries(value as Record<string, unknown>)
+      .map(([county, marketLabel]) => ({
+        county: county.trim(),
+        marketLabel: String(marketLabel ?? "").trim(),
+      }))
+      .filter(({ county, marketLabel }) => county && marketLabel && counties.has(county.toLowerCase()));
+  }
+
   app.post("/api/admin/investment-companies", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
     try {
-      const { developerProductTypes, developerProfiles } = await import("@shared/schema");
+      const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import("@shared/schema");
       const payload = parseInvestmentCompanyPayload(req.body || {});
+      const productTypes = parseAdminProductTypes(req.body || {}, payload);
+      const firstActive = productTypes.find((productType: any) => productType.isActive)!;
+      const countyLabels = parseAdminCountyMarketLabels(req.body?.countyMarketLabels, payload.targetCounties || []);
+      payload.minAcres = firstActive.minAcres;
+      payload.maxAcres = firstActive.maxAcres;
+      payload.minRentPsf = firstActive.minRentPsf;
+      payload.minRentPerUnit = firstActive.minRentPerUnit;
+      payload.acreageOverridesByProductType = {};
       const [existing] = await db.select({ id: developerProfiles.id }).from(developerProfiles)
         .where(eq(developerProfiles.slug, payload.slug)).limit(1);
       if (existing) return res.status(409).json({ error: "That slug is already in use" });
       const profile = await db.transaction(async (tx) => {
         const [created] = await tx.insert(developerProfiles).values(payload as any).returning();
-        await tx.insert(developerProductTypes).values({
+        await tx.insert(developerProductTypes).values(productTypes.map((productType: any) => ({
           developerProfileId: created.id,
-          name: "General",
-          minAcres: payload.minAcres,
-          maxAcres: payload.maxAcres,
-          minRentPsf: payload.minRentPsf,
-          minRentPerUnit: payload.minRentPerUnit,
-          isActive: true,
-        });
+          ...productType,
+        })));
+        if (countyLabels?.length) {
+          await tx.insert(developerCountyMarketLabels).values(countyLabels.map(({ county, marketLabel }) => ({
+            developerProfileId: created.id,
+            county,
+            marketLabel,
+          })));
+        }
         return created;
       });
       return res.status(201).json({ profile: { ...profile, teamMemberCount: 0 } });
@@ -12091,11 +12199,27 @@ RULES:
 
   app.patch("/api/admin/investment-companies/:profileId", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
     try {
-      const { developerProfiles } = await import("@shared/schema");
+      const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import("@shared/schema");
       const [current] = await db.select().from(developerProfiles)
         .where(eq(developerProfiles.id, req.params.profileId)).limit(1);
       if (!current) return res.status(404).json({ error: "Investment Company profile not found" });
       const payload = parseInvestmentCompanyPayload({ ...current, ...(req.body || {}) });
+      const existingProductTypes = await db.select().from(developerProductTypes)
+        .where(eq(developerProductTypes.developerProfileId, req.params.profileId));
+      const productTypes = parseAdminProductTypes(
+        { ...(req.body || {}), rentMetric: payload.rentMetric },
+        existingProductTypes[0] || payload,
+      );
+      const firstActive = productTypes.find((productType: any) => productType.isActive)!;
+      const countyLabels = parseAdminCountyMarketLabels(
+        req.body?.countyMarketLabels,
+        payload.targetCounties || current.targetCounties || [],
+      );
+      payload.minAcres = firstActive.minAcres;
+      payload.maxAcres = firstActive.maxAcres;
+      payload.minRentPsf = firstActive.minRentPsf;
+      payload.minRentPerUnit = firstActive.minRentPerUnit;
+      payload.acreageOverridesByProductType = {};
       if (payload.slug) {
         const duplicate = await db.execute(sql`
           SELECT id FROM developer_profiles
@@ -12104,10 +12228,30 @@ RULES:
         `);
         if (duplicate.rows?.length) return res.status(409).json({ error: "That slug is already in use" });
       }
-      const [profile] = await db.update(developerProfiles)
-        .set({ ...payload, updatedAt: new Date() })
-        .where(eq(developerProfiles.id, req.params.profileId))
-        .returning();
+      const profile = await db.transaction(async (tx) => {
+        const [saved] = await tx.update(developerProfiles)
+          .set({ ...payload, updatedAt: new Date() })
+          .where(eq(developerProfiles.id, req.params.profileId))
+          .returning();
+        await tx.delete(developerProductTypes)
+          .where(eq(developerProductTypes.developerProfileId, req.params.profileId));
+        await tx.insert(developerProductTypes).values(productTypes.map((productType: any) => ({
+          developerProfileId: req.params.profileId,
+          ...productType,
+        })));
+        if (countyLabels !== undefined) {
+          await tx.delete(developerCountyMarketLabels)
+            .where(eq(developerCountyMarketLabels.developerProfileId, req.params.profileId));
+          if (countyLabels.length) {
+            await tx.insert(developerCountyMarketLabels).values(countyLabels.map(({ county, marketLabel }) => ({
+              developerProfileId: req.params.profileId,
+              county,
+              marketLabel,
+            })));
+          }
+        }
+        return saved;
+      });
       return res.json({ profile });
     } catch (error: any) {
       console.error("[admin investment companies PATCH] Error:", error);

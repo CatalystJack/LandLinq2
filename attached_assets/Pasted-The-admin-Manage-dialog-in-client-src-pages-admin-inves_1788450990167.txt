@@ -1,0 +1,39 @@
+The admin "Manage" dialog in client/src/pages/admin-investment-companies.tsx currently 
+has no way to view or edit an Investment Company's Product Types — it only shows the 
+old flat rent/acreage fields. The self-service version already built in 
+client/src/pages/developer-criteria-settings.tsx (Phase 2) has the correct UI pattern: 
+a repeatable list of product types, each with name, min/max acreage, and min rent for 
+whichever metric the profile uses, with add/remove row controls and a requirement of 
+at least one active product type.
+
+TASK 1 — Add the same product-type editor to the admin Manage dialog
+Port the repeatable product-type list UI from developer-criteria-settings.tsx into 
+the admin-investment-companies.tsx Manage dialog. Same fields, same add/remove 
+behavior, same validation (at least one active product type required, every active 
+product type needs a minimum for whichever rent metric the profile uses).
+
+TASK 2 — Add the admin endpoint to support this
+Confirm whether PATCH /api/developer-profile/me (used by the self-service Settings 
+page) can be reused here, or whether a separate admin endpoint 
+(PATCH /api/admin/investment-companies/:id) already exists and needs the same 
+product-type save logic added to it (transactionally replacing product type rows, 
+same as the self-service version does). Use whichever endpoint the admin panel 
+already calls for other profile edits — do not create a duplicate, parallel saving 
+mechanism if one already exists.
+
+TASK 3 — Add the county market-label editor too
+The self-service Settings page also got county market-label grouping (CLT/RDU/etc.) 
+in Phase 2. Add the same grouped county editing UI to the admin Manage dialog as well, 
+so your team can also organize a company's counties by market when setting them up 
+initially.
+
+TASK 4 — Update the admin card display
+Once product types are editable from the admin side, update the summary shown on 
+each company's card (currently "Primary rent: $0.75/SF", pulled from the synced 
+legacy field) to something that reflects the real data — e.g. "3 product types 
+defined" or the range across all active product types, rather than one arbitrary 
+"first active" value.
+
+Verify: after this change, your team should be able to fully set up a new Investment 
+Company's product types and county market labels directly from the admin panel at 
+creation time, without needing to log in as that company to configure it themselves.
