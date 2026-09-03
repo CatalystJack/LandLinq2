@@ -457,19 +457,18 @@ ${alert.actionRequired}
 Check your API Monitoring Dashboard for more details.
       `.trim();
 
-      // Send email via SendGrid
+      // Send platform alert through the shared system-mail path.
       try {
-        const sgMail = await import('@sendgrid/mail');
-        sgMail.default.setApiKey(process.env.SENDGRID_API_KEY || '');
-        
-        await sgMail.default.send({
+        const { sendNotificationEmail } = await import('./emailService');
+        const sent = await sendNotificationEmail({
           to: 'jack@catalystcp.com',
-          from: 'deals@catalyst.landlinq.ai',
           subject,
           text: message,
+          type: 'api_safety_alert',
+          priority: alert.severity === 'critical' ? 'high' : 'medium',
         });
-        
-        console.log('✅ [SAFETY] Alert email sent to jack@catalystcp.com');
+        if (sent) console.log('✅ [SAFETY] Alert email sent to jack@catalystcp.com');
+        else console.error('❌ [SAFETY] Shared email service could not send alert');
       } catch (emailError) {
         console.error('❌ [SAFETY] Failed to send email alert:', emailError);
       }

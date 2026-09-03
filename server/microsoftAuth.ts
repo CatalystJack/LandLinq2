@@ -5,6 +5,59 @@ const GRAPH_SEND_URL = 'https://graph.microsoft.com/v1.0/me/sendMail';
 const TOKEN_URL = (tenantId: string) =>
   `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
 
+let appOnlyTokenCache: { accessToken: string; expiresAt: number } | null = null;
+
+/**
+ * Acquire an application-only Microsoft Graph token for platform mail.
+ * This uses the app registration's application permissions and never
+ * impersonates the currently logged-in user.
+ */
+export async function getAppOnlyGraphToken(): Promise<string> {
+  const clientId = process.env.MICROSOFT_CLIENT_ID;
+  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+  const tenantId = process.env.MICROSOFT_TENANT_ID;
+
+  if (!clientId || !clientSecret || !tenantId) {
+    throw new Error('MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and MICROSOFT_TENANT_ID are required for system email');
+  }
+
+  if (appOnlyTokenCache && appOnlyTokenCache.expiresAt > Date.now() + 60_000) {
+    return appOnlyTokenCache.accessToken;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  let response: Response;
+  try {
+    response = await fetch(TOKEN_URL(tenantId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      signal: controller.signal,
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        scope: 'https://graph.microsoft.com/.default',
+        grant_type: 'client_credentials',
+      }),
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Microsoft app-only token request failed (${response.status}): ${body}`);
+  }
+
+  const tokens = await response.json() as { access_token?: string; expires_in?: number };
+  if (!tokens.access_token) throw new Error('Microsoft app-only token response did not include access_token');
+  appOnlyTokenCache = {
+    accessToken: tokens.access_token,
+    expiresAt: Date.now() + Math.max(60, tokens.expires_in || 3600) * 1_000,
+  };
+  return tokens.access_token;
+}
+
 export interface MicrosoftTokens {
   accessToken: string;
   refreshToken?: string;

@@ -9,7 +9,7 @@ import { TemplateService } from './templateService';
 import { apiCallTracker } from './apiCallTracker.js';
 import { storage } from './storage';
 
-// Import for SendGrid integration
+import { getAppOnlyGraphToken } from './microsoftAuth';
 import sgMail from '@sendgrid/mail';
 
 /**
@@ -46,43 +46,92 @@ async function getRawEmailTemplate(eventType: string): Promise<any | null> {
   }
 }
 
-// Replit SendGrid Connector - Get fresh client with credentials from connector system
 async function getSendGridClient() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found - cannot authenticate with SendGrid connector');
-  }
-
+  const xReplitToken = process.env.REPL_IDENTITY
+    ? 'repl ' + process.env.REPL_IDENTITY
+    : process.env.WEB_REPL_RENEWAL
+      ? 'depl ' + process.env.WEB_REPL_RENEWAL
+      : null;
+  if (!xReplitToken) throw new Error('X_REPLIT_TOKEN not found - cannot authenticate with SendGrid connector');
   const connectionSettings = await fetch(
     'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=sendgrid',
     {
       headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  if (!connectionSettings || (!connectionSettings.settings.api_key || !connectionSettings.settings.from_email)) {
+        Accept: 'application/json',
+        X_REPLIT_TOKEN: xReplitToken,
+      },
+    },
+  ).then((res) => res.json()).then((data) => data.items?.[0]);
+  if (!connectionSettings || !connectionSettings.settings.api_key || !connectionSettings.settings.from_email) {
     throw new Error('SendGrid not connected via Replit connector');
   }
-  
   sgMail.setApiKey(connectionSettings.settings.api_key);
-  return {
-    client: sgMail,
-    fromEmail: connectionSettings.settings.from_email
-  };
+  return { client: sgMail, fromEmail: connectionSettings.settings.from_email };
 }
 
-// Fallback: Configure SendGrid from environment variable if connector unavailable
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+if (process.env.SENDGRID_API_KEY) sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+export async function sendSystemEmail(
+  to: string,
+  subject: string,
+  htmlBody: string,
+  attachments: EmailNotification['attachments'] = [],
+): Promise<boolean> {
+  const startTime = Date.now();
+  const mailbox = process.env.NOTIFICATIONS_MAILBOX;
+  if (!mailbox) {
+    console.error('❌ [GRAPH-SYSTEM] NOTIFICATIONS_MAILBOX is not configured');
+    return false;
+  }
+  try {
+    const accessToken = await getAppOnlyGraphToken();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    let response: Response;
+    try {
+      response = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(mailbox)}/sendMail`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          message: {
+            subject,
+            body: { contentType: 'HTML', content: htmlBody },
+            toRecipients: [{ emailAddress: { address: to } }],
+            ...(attachments?.length ? {
+              attachments: attachments.map((attachment) => ({
+                '@odata.type': '#microsoft.graph.fileAttachment',
+                name: attachment.filename,
+                contentType: attachment.type,
+                contentBytes: attachment.content,
+                isInline: attachment.disposition === 'inline',
+              })),
+            } : {}),
+          },
+          saveToSentItems: true,
+        }),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Microsoft Graph send failed (${response.status}): ${errorBody}`);
+    }
+    apiCallTracker.logCall('Other', 'Microsoft Graph sendMail', true, Date.now() - startTime);
+    console.log(`✅ [GRAPH-SYSTEM] Email sent from ${mailbox} to ${to}`);
+    return true;
+  } catch (error: any) {
+    apiCallTracker.logCall('Other', 'Microsoft Graph sendMail', false, Date.now() - startTime, {
+      errorMessage: error?.message || String(error),
+    });
+    console.error(`❌ [GRAPH-SYSTEM] Failed to send from ${mailbox} to ${to}:`, error?.message || error);
+    return false;
+  }
 }
 
 // Email sending function
@@ -109,6 +158,21 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
     } catch (toggleError) {
       // If we can't check the toggle, fail open (allow sending) to not break critical notifications
       console.warn('⚠️ [EMAIL] Could not check master toggle, proceeding with send:', toggleError);
+    }
+
+    const graphHtml = notification.html || (notification.text ? transformTextToHTML(notification.text) : '');
+    if (notification.subject && graphHtml) {
+      console.log(`📧 [GRAPH-SYSTEM] Attempting platform email to ${notification.to}`);
+      const graphSent = await sendSystemEmail(
+        notification.to,
+        notification.subject,
+        graphHtml,
+        notification.attachments,
+      );
+      if (graphSent) return true;
+      console.warn('⚠️ [GRAPH-SYSTEM] Graph delivery failed; using temporary SendGrid fallback');
+    } else {
+      console.warn('⚠️ [GRAPH-SYSTEM] Message has no rendered subject/body; using temporary SendGrid dynamic-template fallback');
     }
     
     console.log('📧 [SENDGRID] Attempting to send email...');
