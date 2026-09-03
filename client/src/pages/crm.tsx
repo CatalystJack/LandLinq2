@@ -11,10 +11,17 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Search, Users, Tag, Mail, Phone, MapPin, Building2, MessageSquare,
   Calendar, ChevronRight, ChevronLeft, X, Plus, Send, FileText, TrendingUp,
   CheckCircle, XCircle, Clock, AlertCircle, MoreHorizontal, RefreshCw,
-  MessageCircle, Filter, Inbox, Upload, UserCheck, Megaphone, Trash2, GitMerge, Settings2, Loader2, AlertTriangle, Pencil, Save
+  MessageCircle, Filter, Inbox, Upload, Megaphone, Trash2, Settings2, Loader2, AlertTriangle, Pencil, Save, ChevronDown
 } from "lucide-react";
 
 interface Contact {
@@ -178,9 +185,6 @@ export default function CRMPage() {
   const [bulkTagInput, setBulkTagInput] = useState("");
   const [showBulkTagModal, setShowBulkTagModal] = useState(false);
   const [bulkTagAction, setBulkTagAction] = useState<"add" | "remove">("add");
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [importPreview, setImportPreview] = useState<{ identifier: string; assignedTo: string }[]>([]);
-  const [importResult, setImportResult] = useState<{ matched: number; unmatched: string[] } | null>(null);
   const [showContactImportModal, setShowContactImportModal] = useState(false);
   const [contactImportPreview, setContactImportPreview] = useState<any[]>([]);
   const [contactImportResult, setContactImportResult] = useState<{ inserted: number; updated: number } | null>(null);
@@ -191,6 +195,7 @@ export default function CRMPage() {
   const [manageTagsOpen, setManageTagsOpen] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const contactImportInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setEditFields({
       firstName: selectedContact?.firstName || "",
@@ -419,17 +424,6 @@ export default function CRMPage() {
     onError: () => toast({ title: "Failed to delete contacts", variant: "destructive" }),
   });
 
-  const importAssignmentsMutation = useMutation({
-    mutationFn: (assignments: { identifier: string; assignedTo: string }[]) =>
-      apiRequest("POST", "/api/crm/import-assignments", { assignments }).then(r => r.json()),
-    onSuccess: (data: any) => {
-      qc.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
-      setImportResult({ matched: data.matched, unmatched: data.unmatched || [] });
-      setImportPreview([]);
-    },
-    onError: () => toast({ title: "Import failed", variant: "destructive" }),
-  });
-
   const importContactsMutation = useMutation({
     mutationFn: (contacts: any[]) =>
       apiRequest("POST", "/api/crm/import-contacts", { contacts }).then(r => r.json()),
@@ -461,86 +455,6 @@ export default function CRMPage() {
     },
     onError: () => toast({ title: "Failed to delete tag", variant: "destructive" }),
   });
-
-  const normalizeNamesMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/crm/normalize-names").then(r => r.json()),
-    onSuccess: (data: any) => {
-      qc.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
-      toast({ title: `Names normalized — ${data.updated ?? 0} contacts updated` });
-    },
-    onError: () => toast({ title: "Failed to normalize names", variant: "destructive" }),
-  });
-
-  const backfillAssignedToMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/crm/backfill-assigned-to").then(r => r.json()),
-    onSuccess: (data: any) => {
-      qc.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
-      toast({ title: `Assigned To backfilled — ${data.updated ?? 0} contacts updated` });
-    },
-    onError: () => toast({ title: "Failed to backfill Assigned To", variant: "destructive" }),
-  });
-
-  const stripMiddleNamesMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/crm/contacts/strip-middle-names").then(r => r.json()),
-    onSuccess: (data: any) => {
-      qc.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
-      toast({ title: `Middle names removed — ${data.updated ?? 0} contacts updated` });
-    },
-    onError: () => toast({ title: "Failed to strip middle names", variant: "destructive" }),
-  });
-
-  const deduplicateEmailMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/brokers/deduplicate-email").then(r => r.json()),
-    onSuccess: (data: any) => {
-      qc.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
-      toast({
-        title: "Duplicates merged",
-        description: data.message || `Removed ${data.brokersRemoved ?? 0} duplicate contacts`,
-      });
-    },
-    onError: () => toast({ title: "Merge failed", variant: "destructive" }),
-  });
-
-  const handleExcelFile = async (file: File) => {
-    try {
-      const XLSX = await import("xlsx");
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-      if (rows.length < 2) {
-        toast({ title: "File is empty or missing rows.", variant: "destructive" });
-        return;
-      }
-
-      // Detect column indices from headers (row 0)
-      const headerRow = (rows[0] as any[]).map(h => String(h ?? "").toLowerCase().trim());
-      const findCol = (...terms: string[]) => headerRow.findIndex(h => terms.some(t => h.includes(t)));
-
-      // Prefer email as identifier; fall back to full-name or col 0
-      const identCol   = findCol("email") !== -1 ? findCol("email") : findCol("phone") !== -1 ? findCol("phone") : findCol("name") !== -1 ? findCol("name") : 0;
-      // Detect assignment column: "assigned to", "assign", "brian or aj", "brian", "rep", "owner" — fallback col 1
-      const assignCol  = findCol("assign", "brian", "rep", "owner", "agent") !== -1 ? findCol("assign", "brian", "rep", "owner", "agent") : 1;
-
-      const assignments = rows
-        .slice(1)
-        .filter((r: any[]) => r[identCol] && r[assignCol])
-        .map((r: any[]) => ({
-          identifier: String(r[identCol]).trim(),
-          assignedTo: String(r[assignCol]).trim(),
-        }));
-
-      if (!assignments.length) {
-        toast({ title: "No valid rows found. Check the file format.", variant: "destructive" });
-        return;
-      }
-      setImportPreview(assignments);
-      setImportResult(null);
-      setShowImportModal(true);
-    } catch (err) {
-      toast({ title: "Could not read file", variant: "destructive" });
-    }
-  };
 
   const handleContactImportFile = async (file: File) => {
     try {
@@ -693,62 +607,13 @@ export default function CRMPage() {
                   </Button>
                 </>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                    className="h-7 border-[#c6d9ea] text-xs text-[#1554a3] hover:border-[#1554a3] hover:bg-[#1554a3] hover:text-white"
-                onClick={() => {
-                  if (confirm("This will convert all contact names to Title Case (e.g. BETHANY TERRY → Bethany Terry). Continue?")) {
-                    normalizeNamesMutation.mutate();
-                  }
-                }}
-                disabled={normalizeNamesMutation.isPending}
-              >
-                <Tag size={12} className="mr-1" />
-                {normalizeNamesMutation.isPending ? "Normalizing..." : "Fix Name Casing"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 border-[#c6d9ea] text-xs text-[#1554a3] hover:border-[#1554a3] hover:bg-[#1554a3] hover:text-white"
-                onClick={() => {
-                  if (confirm("This will remove middle names and middle initials from all contacts' first names (e.g. 'Monica Anne Young' → first name becomes 'Monica'). Cannot be undone. Continue?")) {
-                    stripMiddleNamesMutation.mutate();
-                  }
-                }}
-                disabled={stripMiddleNamesMutation.isPending}
-              >
-                {stripMiddleNamesMutation.isPending ? <Loader2 size={12} className="mr-1 animate-spin" /> : <X size={12} className="mr-1" />}
-                {stripMiddleNamesMutation.isPending ? "Stripping..." : "Strip Middle Names"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 border-[#c6d9ea] text-xs text-[#1554a3] hover:border-[#1554a3] hover:bg-[#1554a3] hover:text-white"
-                onClick={() => {
-                  if (confirm("This will set 'Assigned To' for all contacts that have a per-rep tag (e.g. 'AJ - Unknown Sophisticated' → AJ Klenk) but no assigned rep yet. Continue?")) {
-                    backfillAssignedToMutation.mutate();
-                  }
-                }}
-                disabled={backfillAssignedToMutation.isPending}
-              >
-                {backfillAssignedToMutation.isPending ? <Loader2 size={12} className="mr-1 animate-spin" /> : <UserCheck size={12} className="mr-1" />}
-                {backfillAssignedToMutation.isPending ? "Fixing..." : "Fix Assignments"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 border-[#c6d9ea] text-xs text-[#1554a3] hover:border-[#1554a3] hover:bg-[#1554a3] hover:text-white"
-                onClick={() => {
-                  if (confirm("This will merge all contacts that share the same email address into one record. This cannot be undone. Continue?")) {
-                    deduplicateEmailMutation.mutate();
-                  }
-                }}
-                disabled={deduplicateEmailMutation.isPending}
-              >
-                <GitMerge size={12} className="mr-1" />
-                {deduplicateEmailMutation.isPending ? "Merging..." : "Merge Duplicates"}
-              </Button>
+              <input
+                ref={contactImportInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={e => { if (e.target.files?.[0]) { handleContactImportFile(e.target.files[0]); e.target.value = ""; } }}
+              />
               <Button
                 size="sm"
                 className="h-7 border-0 bg-[#0b3159] text-xs text-white hover:bg-[#164b7d]"
@@ -756,31 +621,30 @@ export default function CRMPage() {
               >
                 <Plus size={12} className="mr-1" />New Contact
               </Button>
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  className="hidden"
-                  onChange={e => { if (e.target.files?.[0]) { handleContactImportFile(e.target.files[0]); e.target.value = ""; } }}
-                />
-                <Button size="sm" className="h-7 text-xs bg-[#07172A] hover:bg-[#0d2d4e] text-white border-0" asChild>
-                  <span><Upload size={12} className="mr-1" />Import Contacts</span>
-                </Button>
-              </label>
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  className="hidden"
-                  onChange={e => e.target.files?.[0] && handleExcelFile(e.target.files[0])}
-                />
-                <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                  <span><Upload size={12} className="mr-1" />Import Assignments</span>
-                </Button>
-              </label>
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => qc.invalidateQueries({ queryKey: ["/api/crm/contacts"] })}>
-                <RefreshCw size={12} />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 border-[#c6d9ea] text-xs text-[#1554a3] hover:border-[#1554a3] hover:bg-[#1554a3] hover:text-white"
+                  >
+                    <Settings2 size={12} className="mr-1" />
+                    CRM Tools
+                    <ChevronDown size={12} className="ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60">
+                  <DropdownMenuLabel>Import & refresh</DropdownMenuLabel>
+                  <DropdownMenuItem onSelect={() => contactImportInputRef.current?.click()}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Import Contacts
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => qc.invalidateQueries({ queryKey: ["/api/crm/contacts"] })}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh Contacts
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -2055,83 +1919,6 @@ export default function CRMPage() {
       </>)}
 
       </div> {/* end inner flex row */}
-
-      {/* Excel Import Modal */}
-      <Dialog open={showImportModal} onOpenChange={v => { setShowImportModal(v); if (!v) { setImportPreview([]); setImportResult(null); } }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Upload size={16} />
-              Import Contact Assignments
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            {importResult ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle size={18} className="text-green-600 shrink-0" />
-                  <div>
-                    <p className="font-medium text-green-800 text-sm">{importResult.matched} contact{importResult.matched !== 1 ? "s" : ""} assigned successfully</p>
-                  </div>
-                </div>
-                {importResult.unmatched.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-red-700">{importResult.unmatched.length} unmatched (not found in system):</p>
-                    <div className="max-h-32 overflow-y-auto bg-red-50 border border-red-100 rounded p-2 space-y-0.5">
-                      {importResult.unmatched.map((id, i) => (
-                        <p key={i} className="text-[11px] text-red-600">{id}</p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <Button className="w-full" onClick={() => { setShowImportModal(false); setImportResult(null); }}>Done</Button>
-              </div>
-            ) : (
-              <>
-                <div className="bg-blue-50 border border-blue-100 rounded p-3 text-xs text-blue-700 space-y-1">
-                  <p className="font-medium">Accepted formats:</p>
-                  <p>• Any CSV/Excel with an <strong>Email</strong> column and an assignment column named <strong>Assigned To</strong>, <strong>Brian or AJ</strong>, <strong>Rep</strong>, or <strong>Owner</strong></p>
-                  <p>• Or a 2-column file: Column A = identifier, Column B = assignee</p>
-                  <p className="text-blue-500">Row 1 is treated as a header and skipped.</p>
-                </div>
-                <div className="border border-gray-200 rounded overflow-hidden">
-                  <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
-                    <p className="text-xs font-medium text-gray-600">Preview — {importPreview.length} row{importPreview.length !== 1 ? "s" : ""}</p>
-                  </div>
-                  <div className="max-h-52 overflow-y-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-gray-100 text-gray-400">
-                          <th className="px-3 py-1.5 text-left font-normal">Identifier</th>
-                          <th className="px-3 py-1.5 text-left font-normal">Assign To</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {importPreview.slice(0, 50).map((r, i) => (
-                          <tr key={i} className="border-b border-gray-50">
-                            <td className="px-3 py-1.5 text-gray-700">{r.identifier}</td>
-                            <td className="px-3 py-1.5 text-indigo-700 font-medium">{r.assignedTo}</td>
-                          </tr>
-                        ))}
-                        {importPreview.length > 50 && (
-                          <tr><td colSpan={2} className="px-3 py-1.5 text-gray-400 italic">...and {importPreview.length - 50} more rows</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                <Button
-                  className="w-full"
-                  disabled={importAssignmentsMutation.isPending || importPreview.length === 0}
-                  onClick={() => importAssignmentsMutation.mutate(importPreview)}
-                >
-                  {importAssignmentsMutation.isPending ? "Importing..." : `Import ${importPreview.length} Assignment${importPreview.length !== 1 ? "s" : ""}`}
-                </Button>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Enroll in Campaign Modal */}
       <Dialog open={showEnrollModal} onOpenChange={setShowEnrollModal}>
