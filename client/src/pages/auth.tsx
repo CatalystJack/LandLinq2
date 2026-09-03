@@ -187,38 +187,6 @@ export default function AuthPage() {
         
           {/* Left side - Form */}
           <div className="w-full">
-            {/* Development Login Buttons */}
-            {window.location.hostname === 'localhost' && (
-              <div className="mb-6">
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-yellow-800 mb-2">Development Login</h3>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => devLogin('admin')}
-                      className="w-full text-left px-3 py-2 text-sm bg-blue-100 hover:bg-blue-200 rounded border border-blue-300 transition-colors"
-                      data-testid="button-dev-login-admin"
-                    >
-                      Login as Super Admin (Jack)
-                    </button>
-                    <button
-                      onClick={() => devLogin('analyst')}
-                      className="w-full text-left px-3 py-2 text-sm bg-green-100 hover:bg-green-200 rounded border border-green-300 transition-colors"
-                      data-testid="button-dev-login-analyst"
-                    >
-                      Login as Analyst (Austin)
-                    </button>
-                    <button
-                      onClick={() => devLogin('broker')}
-                      className="w-full text-left px-3 py-2 text-sm bg-purple-100 hover:bg-purple-200 rounded border border-purple-300 transition-colors"
-                      data-testid="button-dev-login-broker"
-                    >
-                      Login as Broker (Test User)
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-            
             <div className="w-full">
               {/* Show toggle buttons only when no specific mode is set */}
               {false && !searchParams.get('mode') && (
@@ -270,7 +238,7 @@ export default function AuthPage() {
               {/* Login Form */}
               {(authMode === 'login' || !searchParams.get('mode')) && (
                 <>
-                <Card className="max-w-full overflow-hidden rounded-xl border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
+                <Card className="max-w-full overflow-hidden rounded-xl border border-[#dce3ec] bg-white shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
                   <CardHeader className="px-6 pb-2 pt-6 sm:px-8 sm:pt-7">
                     <CardTitle className="text-xl font-bold text-slate-900">Sign In</CardTitle>
                     <CardDescription className="mt-1 text-[15px] leading-6 text-slate-500">
@@ -290,7 +258,7 @@ export default function AuthPage() {
                           autoComplete="email"
                           data-testid="input-login-email"
                           placeholder="you@example.com"
-                          className="h-12 rounded-lg border-slate-300 bg-white px-3 text-base shadow-none placeholder:text-slate-400 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/20"
+                           className="h-12 rounded-lg border-[#bac9dc] bg-[#eaf2ff] px-3 text-base shadow-none placeholder:text-slate-400 focus:border-[#4A90E2] focus:ring-2 focus:ring-[#4A90E2]/20"
                         />
                       </div>
                       <div className="space-y-2">
@@ -303,7 +271,7 @@ export default function AuthPage() {
                             required
                             autoComplete="current-password"
                             data-testid="input-login-password"
-                            className="h-12 rounded-lg border-slate-300 bg-white px-3 pr-11 text-base shadow-none placeholder:text-slate-400 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/20"
+                             className="h-12 rounded-lg border-[#bac9dc] bg-[#eaf2ff] px-3 pr-11 text-base shadow-none placeholder:text-slate-400 focus:border-[#4A90E2] focus:ring-2 focus:ring-[#4A90E2]/20"
                           />
                           <button
                             type="button"

@@ -21,7 +21,6 @@ import { ClassificationProgress } from "@/components/ClassificationProgress";
 import AuthPage from "@/pages/auth";
 import NotFound from "@/pages/not-found";
 import ErrorPage from "@/pages/error-page";
-import PortalChooser from "@/pages/portal-chooser";
 import Landing from "@/pages/landing";
 
 // Lazy load ALL other pages to reduce initial bundle size
@@ -111,7 +110,7 @@ function Router() {
           {/* Auth pages so the demo user can log out */}
           <Route path="/auth" component={AuthPage} />
           <Route path="/login" component={AuthPage} />
-          <Route path="/" component={PortalChooser} />
+          <Route path="/" component={AuthPage} />
           {/* Everything else → analyst dashboard (scoped to demo deals) */}
           <Route>
             {() => (
@@ -253,7 +252,7 @@ function Router() {
             return userEmail.endsWith('@apexresi.com') ? <ExecutiveDashboard /> : <AnalystDashboard />;
           }} />
           <Route path="/dashboard-v2" component={AnalystDashboardV2} />
-          <Route path="/" component={PortalChooser} />
+          <Route path="/" component={AuthPage} />
           {/* Catch all other routes - redirect to main dashboard */}
           <Route>
             {() => <AnalystDashboard />}
@@ -695,7 +694,7 @@ function Router() {
       }} />
       
       {/* Root entry point for both unauthenticated and authenticated visitors */}
-      <Route path="/" component={PortalChooser} />
+      <Route path="/" component={AuthPage} />
       
         {/* 404 catch-all */}
         {/* Error page */}
