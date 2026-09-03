@@ -16560,7 +16560,13 @@ RULES:
       // Jan 21, 2026: Also pass productType for dynamic filter criteria
       const result = await hellodataService.searchQualifyingComparables(
         `${deal.address}, ${geocodedCity}, ${geocodedState} ${geocodedZip}`.trim(),
-        { latitude: lat!, longitude: lng!, productType: (deal as any).productType, radiusMiles: searchRadius }
+        {
+          latitude: lat!,
+          longitude: lng!,
+          productType: (deal as any).productType,
+          radiusMiles: searchRadius,
+          sourceDeveloperProfileId: developerProfileId,
+        }
       );
 
       // Step 3: Format and save results

@@ -6,6 +6,8 @@
 import { GeocodioService } from './geocodioService.js';
 import { apiCallTracker } from './apiCallTracker.js';
 import { apiSafetyGuards } from './apiSafetyGuards.js';
+import { db } from './db.js';
+import { sql } from 'drizzle-orm';
 
 /**
  * Product-type-specific comparable search criteria
@@ -504,6 +506,7 @@ interface ComparableSearchParams {
   radiusMiles: number;
   yearBuiltMin: number;
   limit: number;
+  sourceDeveloperProfileId?: string;
 }
 
 interface ComparableSearchResult {
@@ -515,6 +518,144 @@ interface ComparableSearchResult {
   searchRadius: number;
   error?: string;
   suggestedAddress?: string; // Dec 11, 2025: Closest address from HelloData when exact match not found
+}
+
+type CompWarehouseResultKind = 'searchComparables' | 'searchQualifyingComparables';
+
+interface CompWarehouseEnvelope {
+  cacheKind: CompWarehouseResultKind;
+  result: any;
+}
+
+function haversineDistanceMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const earthRadiusMiles = 3959;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return earthRadiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export async function checkCompWarehouse(
+  latitude: number,
+  longitude: number,
+  radiusMiles: number,
+  productType?: string,
+  cacheKind?: CompWarehouseResultKind,
+): Promise<any | null> {
+  if (![latitude, longitude, radiusMiles].every(Number.isFinite) || radiusMiles <= 0) {
+    return null;
+  }
+
+  const normalizedProductType = productType?.trim() || null;
+
+  try {
+    const queryResult = await db.execute(sql`
+      SELECT
+        center_latitude,
+        center_longitude,
+        search_radius_miles,
+        comparables_json,
+        fetched_at
+      FROM market_comp_cache
+      WHERE expires_at > NOW()
+        AND (
+          product_type = ${normalizedProductType}::text
+          OR (product_type IS NULL AND ${normalizedProductType}::text IS NULL)
+        )
+        AND search_radius_miles >= ${radiusMiles}
+      ORDER BY fetched_at DESC
+    `);
+
+    for (const row of queryResult.rows as any[]) {
+      const cachedLatitude = Number(row.center_latitude);
+      const cachedLongitude = Number(row.center_longitude);
+      const cachedRadius = Number(row.search_radius_miles);
+      if (![cachedLatitude, cachedLongitude, cachedRadius].every(Number.isFinite)) continue;
+
+      const centerDistance = haversineDistanceMiles(
+        latitude,
+        longitude,
+        cachedLatitude,
+        cachedLongitude,
+      );
+      if (centerDistance > radiusMiles) continue;
+
+      let payload = row.comparables_json;
+      if (typeof payload === 'string') {
+        try {
+          payload = JSON.parse(payload);
+        } catch {
+          continue;
+        }
+      }
+
+      if (cacheKind) {
+        if (!payload || payload.cacheKind !== cacheKind) continue;
+        console.log(
+          `📦 [HELLODATA-WAREHOUSE] HIT ${cacheKind}: cached center ${centerDistance.toFixed(2)} miles away, radius ${cachedRadius} miles`,
+        );
+        return payload.result;
+      }
+
+      console.log(
+        `📦 [HELLODATA-WAREHOUSE] HIT: cached center ${centerDistance.toFixed(2)} miles away, radius ${cachedRadius} miles`,
+      );
+      return payload?.result ?? payload;
+    }
+  } catch (error) {
+    console.warn(`⚠️ [HELLODATA-WAREHOUSE] Lookup unavailable; using live API: ${error}`);
+  }
+
+  return null;
+}
+
+async function storeCompWarehouse(
+  latitude: number,
+  longitude: number,
+  radiusMiles: number,
+  productType: string | undefined,
+  cacheKind: CompWarehouseResultKind,
+  result: any,
+  sourceDeveloperProfileId?: string,
+): Promise<void> {
+  const envelope: CompWarehouseEnvelope = { cacheKind, result };
+  const avgRentPsf = Number(result.avgRentPSF ?? result.averagePricePerSqFt);
+  const avgRentPerUnit = Number(result.avgRentPerUnit);
+
+  try {
+    await db.execute(sql`
+      INSERT INTO market_comp_cache (
+        center_latitude,
+        center_longitude,
+        search_radius_miles,
+        product_type,
+        comparables_json,
+        avg_rent_psf,
+        avg_rent_per_unit,
+        fetched_at,
+        expires_at,
+        source_developer_profile_id
+      ) VALUES (
+        ${latitude},
+        ${longitude},
+        ${radiusMiles},
+        ${productType?.trim() || null},
+        ${JSON.stringify(envelope)}::jsonb,
+        ${Number.isFinite(avgRentPsf) ? avgRentPsf : null},
+        ${Number.isFinite(avgRentPerUnit) ? avgRentPerUnit : null},
+        NOW(),
+        NOW() + INTERVAL '3 months',
+        ${sourceDeveloperProfileId || null}
+      )
+    `);
+    console.log(`💾 [HELLODATA-WAREHOUSE] Stored ${cacheKind} live result for 3 months`);
+  } catch (error) {
+    console.warn(`⚠️ [HELLODATA-WAREHOUSE] Could not store live result: ${error}`);
+  }
 }
 
 // Internal result type for searchPropertyWithSuggestions
@@ -1107,6 +1248,17 @@ export class HelloDataService {
         };
       }
 
+      const warehouseResult = await checkCompWarehouse(
+        searchLat,
+        searchLng,
+        params.radiusMiles,
+        params.propertyType,
+        'searchComparables',
+      );
+      if (warehouseResult) return warehouseResult as ComparableSearchResult;
+
+      console.log(`🌐 [HELLODATA-WAREHOUSE] MISS searchComparables; calling live HelloData API`);
+
       // Step 3: Find comparables using coordinates-based search with apartment filters
       // CRITICAL FIX (Dec 29, 2025): Use Geocodio coordinates directly, skip HelloData's searchProperty
       // which was returning incorrect subject properties
@@ -1180,7 +1332,7 @@ export class HelloDataService {
       console.log(`   Average price/sqft: $${averagePricePerSqFt.toFixed(2)}`);
       console.log(`   Median price/sqft: $${medianPricePerSqFt.toFixed(2)}`);
 
-      return {
+      const result: ComparableSearchResult = {
         success: true,
         comparables: filteredComparables,
         averagePricePerSqFt,
@@ -1188,6 +1340,16 @@ export class HelloDataService {
         comparableCount: filteredComparables.length,
         searchRadius: params.radiusMiles
       };
+      await storeCompWarehouse(
+        searchLat,
+        searchLng,
+        params.radiusMiles,
+        params.propertyType,
+        'searchComparables',
+        result,
+        params.sourceDeveloperProfileId,
+      );
+      return result;
     } catch (error) {
       console.error('❌ HelloData comparable search failed:', error);
       return {
@@ -1216,6 +1378,7 @@ export class HelloDataService {
     longitude?: number;
     productType?: string;  // Jan 12, 2026: Product type for custom filter criteria
     radiusMiles?: number;
+    sourceDeveloperProfileId?: string;
   }): Promise<{
     success: boolean;
     qualifyingCount: number;
@@ -1376,6 +1539,17 @@ export class HelloDataService {
       console.log(`   Latitude: ${geocoded.lat}, Longitude: ${geocoded.lng}`);
       console.log(`   ZIP: ${geocoded.zipCode || 'N/A'}`);
       console.log(`   Source: ${options?.latitude ? 'caller-provided' : 'Geocodio (trusted)'}`);
+
+      const warehouseResult = await checkCompWarehouse(
+        geocoded.lat!,
+        geocoded.lng!,
+        searchRadius,
+        options?.productType,
+        'searchQualifyingComparables',
+      );
+      if (warehouseResult) return warehouseResult;
+
+      console.log(`🌐 [HELLODATA-WAREHOUSE] MISS searchQualifyingComparables; calling live HelloData API`);
       
       let rawComparables: any[] = [];
       let usedCoordinateFallback = false;
@@ -1823,7 +1997,7 @@ export class HelloDataService {
           }
         }
         
-        return {
+        const result = {
           success: true,
           qualifyingCount: 0,
           comparables: allRawForMap,
@@ -1836,6 +2010,16 @@ export class HelloDataService {
           topRentPerUnit: topRentPerUnit || 0,
           avgRentPerUnit: avgRentPerUnit || 0
         };
+        await storeCompWarehouse(
+          geocoded.lat!,
+          geocoded.lng!,
+          searchRadius,
+          options?.productType,
+          'searchQualifyingComparables',
+          result,
+          options?.sourceDeveloperProfileId,
+        );
+        return result;
       }
 
       // Step 4: Fetch property details + pricing for candidates to get rent_psf
@@ -2308,7 +2492,7 @@ export class HelloDataService {
 
       // 🆕 ALWAYS return metrics from ALL candidates (not just qualifying)
       // This ensures Top Rent PSF and Top Rent/Unit columns are populated even when 0 qualify
-      return {
+      const result = {
         success: true,
         qualifyingCount,
         comparables: allComparables, // Return ALL comparables (not just qualifying) so UI always shows property details
@@ -2323,6 +2507,16 @@ export class HelloDataService {
         candidateCount: candidates.length,           // Properties meeting vintage/units criteria
         candidatesWithPricing: allComparables.length // Candidates that had valid pricing data
       };
+      await storeCompWarehouse(
+        geocoded.lat!,
+        geocoded.lng!,
+        searchRadius,
+        options?.productType,
+        'searchQualifyingComparables',
+        result,
+        options?.sourceDeveloperProfileId,
+      );
+      return result;
 
     } catch (error) {
       console.error(`\n${'='.repeat(80)}`);

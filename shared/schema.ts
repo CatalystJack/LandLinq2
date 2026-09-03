@@ -65,6 +65,34 @@ export const developerProfiles = pgTable("developer_profiles", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Shared HelloData comparable warehouse. Results are reusable across companies
+// when a later search is geographically covered by an unexpired cached search.
+export const marketCompCache = pgTable("market_comp_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  centerLatitude: decimal("center_latitude", { precision: 10, scale: 7 }).notNull(),
+  centerLongitude: decimal("center_longitude", { precision: 10, scale: 7 }).notNull(),
+  searchRadiusMiles: decimal("search_radius_miles", { precision: 6, scale: 2 }).notNull(),
+  productType: varchar("product_type"),
+  comparablesJson: jsonb("comparables_json").notNull(),
+  avgRentPsf: decimal("avg_rent_psf", { precision: 10, scale: 2 }),
+  avgRentPerUnit: decimal("avg_rent_per_unit", { precision: 12, scale: 2 }),
+  fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  sourceDeveloperProfileId: varchar("source_developer_profile_id").references(() => developerProfiles.id, { onDelete: "set null" }),
+}, (table) => ({
+  activeLookupIdx: index("market_comp_cache_active_lookup_idx").on(
+    table.productType,
+    table.expiresAt,
+  ),
+}));
+
+export const insertMarketCompCacheSchema = createInsertSchema(marketCompCache).omit({
+  id: true,
+  fetchedAt: true,
+});
+export type InsertMarketCompCache = z.infer<typeof insertMarketCompCacheSchema>;
+export type MarketCompCache = typeof marketCompCache.$inferSelect;
+
 export const insertDeveloperProfileSchema = createInsertSchema(developerProfiles).omit({
   id: true, createdAt: true, updatedAt: true,
 });

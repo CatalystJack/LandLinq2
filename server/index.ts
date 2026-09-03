@@ -416,6 +416,21 @@ setTimeout(() => {
       try {
         const { pool } = await import('./db');
         await pool.query(`
+          CREATE TABLE IF NOT EXISTS market_comp_cache (
+            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+            center_latitude DECIMAL(10,7) NOT NULL,
+            center_longitude DECIMAL(10,7) NOT NULL,
+            search_radius_miles DECIMAL(6,2) NOT NULL,
+            product_type VARCHAR,
+            comparables_json JSONB NOT NULL,
+            avg_rent_psf DECIMAL(10,2),
+            avg_rent_per_unit DECIMAL(12,2),
+            fetched_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            expires_at TIMESTAMP NOT NULL,
+            source_developer_profile_id VARCHAR REFERENCES developer_profiles(id) ON DELETE SET NULL
+          );
+          CREATE INDEX IF NOT EXISTS market_comp_cache_active_lookup_idx
+            ON market_comp_cache (product_type, expires_at);
           CREATE TABLE IF NOT EXISTS zoning_agenda_items (
             id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
             market VARCHAR NOT NULL,

@@ -1,0 +1,69 @@
+Add a shared, platform-level comp warehouse so HelloData isn't called redundantly 
+when multiple deals (across any Investment Company) are near the same location. 
+Check the warehouse first; only call the live HelloData API on a genuine miss.
+
+TASK 1 — New warehouse table in shared/schema.ts
+
+export const marketCompCache = pgTable("market_comp_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  latitude: decimal("latitude", { precision: 9, scale: 6 }).notNull(),
+  longitude: decimal("longitude", { precision: 9, scale: 6 }).notNull(),
+  radiusMiles: decimal("radius_miles").notNull(),
+  productType: varchar("product_type"),
+  comparablesJson: jsonb("comparables_json").notNull(),
+  avgRentPsf: decimal("avg_rent_psf"),
+  avgRentPerUnit: decimal("avg_rent_per_unit"),
+  sourceDeveloperProfileId: varchar("source_developer_profile_id"),
+  fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+}, (table) => [
+  index("market_comp_cache_location_idx").on(table.latitude, table.longitude),
+  index("market_comp_cache_expires_idx").on(table.expiresAt),
+]);
+
+TASK 2 — Warehouse-check wrapper in server/hellodataService.ts
+Add a new function checkCompWarehouse(latitude, longitude, radiusMiles, productType) 
+that:
+  1. Queries marketCompCache for rows matching the same productType where 
+     expires_at > NOW() — this enforces the 3-month freshness requirement, since 
+     expiresAt is always set to fetchedAt + 3 months (see Task 3)
+  2. Computes distance (haversine formula, straight-line miles) from the requested 
+     lat/lng to each candidate row's lat/lng
+  3. Returns the first row found within radiusMiles, or null if no match (either no 
+     nearby row exists, or the only nearby rows are older than 3 months)
+
+TASK 3 — Wire the check into searchComparables (line ~1056)
+At the top of searchComparables(), before making any live HelloData call:
+  - Call checkCompWarehouse() using the same lat/lng/radius/productType this search 
+    was going to use
+  - If a warehouse match is found (meaning data exists AND is under 3 months old), 
+    return it directly in the same shape searchComparables() normally returns, and 
+    log that this was served from the warehouse — skip the live API call entirely
+  - If no match (no nearby data, or nearby data is older than 3 months), proceed 
+    with the existing live HelloData call exactly as today, then after a successful 
+    result, INSERT the result into marketCompCache with fetchedAt = NOW() and 
+    expiresAt = NOW() + INTERVAL '3 months' in the SQL insert
+  - Use Postgres's own date/interval arithmetic (NOW() + INTERVAL '3 months') rather 
+    than JavaScript's setMonth(), which is what caused the month-end overflow bug 
+    fixed earlier in the comparables-cache route — Postgres interval math handles 
+    calendar months correctly without that overflow issue
+
+TASK 4 — Respect per-company radius
+The radiusMiles used for the warehouse lookup should be the SAME value already 
+resolved from the calling Investment Company's compSearchRadiusMiles setting (from 
+the earlier per-profile radius work) — do not introduce a separate hardcoded radius 
+for the warehouse check itself. If no profile is associated with this particular 
+search (e.g. internal/Catalyst-side calls), fall back to the existing default of 
+3 miles, consistent with prior work.
+
+TASK 5 — Verify
+After this change, confirm: two deals located within the configured radius of each 
+other, requesting comps for the same product type within 3 months of each other, 
+result in only ONE live HelloData API call, not two — and confirm that data older 
+than 3 months is correctly treated as expired and triggers a fresh live pull rather 
+than being reused. Log warehouse hits vs. live API calls so this can be monitored 
+over time.
+
+Do not change the existing per-Investment-Company radius setting logic 
+(compSearchRadiusMiles) or the expanding-radius removal from earlier work — this 
+task only adds the warehouse layer in front of the existing live search.
