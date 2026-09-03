@@ -1,0 +1,45 @@
+The app was migrated from Catalyst-only access to Apex-admin access 
+(@apexresi.com), but that migration was only applied to a small number of newer 
+routes. 220 occurrences of the old @catalystcp.com check remain across 
+server/routes.ts, alongside the 3 correctly-migrated @apexresi.com checks. This 
+means most of the app's internal admin/analyst permission checks are currently 
+STALE and likely locking the real team out of their own tools.
+
+TASK 1 — Audit before changing anything
+Search server/routes.ts for every occurrence of "catalystcp.com" and 
+"includes('@catalyst'" (220 total). For each one, categorize it as:
+  (a) A general domain check (e.g. userEmail.endsWith('@catalystcp.com')) that 
+      should become userEmail.endsWith('@apexresi.com')
+  (b) A specific hardcoded email check (e.g. userEmail === 'jack@catalystcp.com') 
+      that should become userEmail === 'jack@apexresi.com' — do NOT convert this 
+      to a domain-wide check, since it's clearly meant to restrict to one specific 
+      person (used for user management / delete-user access)
+  (c) Any use of .includes('@catalyst') as a loose substring match — these must 
+      become .endsWith('@apexresi.com') regardless of category, since substring 
+      matching is itself a separate security bug (an email merely containing that 
+      text anywhere would incorrectly pass)
+Report back a categorized list before making changes, so we can confirm the (b) 
+cases are correctly identified — do not guess if a case is ambiguous, list it 
+separately for a decision.
+
+TASK 2 — Apply the fix
+Once categorization is confirmed:
+  - Replace all category (a) checks with @apexresi.com equivalents
+  - Replace all category (b) checks with the corresponding @apexresi.com email 
+    (jack@catalystcp.com → jack@apexresi.com; check for any other specific hardcoded 
+    person-emails beyond jack@ and flag them the same way)
+  - Fix all .includes('@catalyst') substring checks to proper .endsWith('@apexresi.com')
+  - Leave the demo account checks (demo@catalystcp.com) as-is unless told otherwise — 
+    these appear to be test/demo account logic, not real admin permission checks, 
+    and may be intentionally separate. Flag these specifically rather than changing 
+    them automatically.
+
+TASK 3 — Verify
+After the fix, confirm: an account with an @apexresi.com email can access every 
+internal admin/analyst-only feature that an old @catalystcp.com account could 
+previously access (outreach master toggle, dry-run mode, user management, etc.), 
+and that no plain broker/developer-role account can pass any of these checks.
+
+Do not touch the DEVELOPER-role scoping logic already correctly built 
+(developerProfileId-based checks) — this task is only about the internal 
+admin/analyst identity checks.

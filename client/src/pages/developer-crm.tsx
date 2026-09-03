@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
-import { FileSpreadsheet, Loader2, Search, Upload, Users } from "lucide-react";
+import { Building2, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, SlidersHorizontal } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -53,6 +54,7 @@ export default function DeveloperCrm() {
   const primaryColor = profile?.primaryColor || "#0A2B4A";
   const secondaryColor = profile?.secondaryColor || "#4A90E2";
   const [search, setSearch] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("all");
   const [importOpen, setImportOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -87,13 +89,29 @@ export default function DeveloperCrm() {
   const filteredContacts = useMemo(() => {
     const term = search.trim().toLowerCase();
     const contacts = contactsQuery.data?.contacts || [];
-    if (!term) return contacts;
-    return contacts.filter((contact) =>
-      [contact.firstName, contact.lastName, contact.email, contact.phone, contact.brokerage, contact.stateRegion]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term)),
-    );
-  }, [contactsQuery.data?.contacts, search]);
+    return contacts.filter((contact) => {
+      const matchesCompany = companyFilter === "all" || contact.brokerage?.trim().toLowerCase() === companyFilter;
+      if (!matchesCompany) return false;
+      if (!term) return true;
+      return [contact.firstName, contact.lastName, contact.email, contact.phone, contact.brokerage, contact.stateRegion]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(term));
+    });
+  }, [contactsQuery.data?.contacts, search, companyFilter]);
+
+  const companyProfiles = useMemo(() => {
+    const profiles = new Map<string, { name: string; people: number }>();
+    for (const contact of contactsQuery.data?.contacts || []) {
+      const company = contact.brokerage?.trim();
+      if (company) {
+        const key = company.toLowerCase();
+        const existing = profiles.get(key);
+        profiles.set(key, { name: existing?.name || company, people: (existing?.people || 0) + 1 });
+      }
+    }
+    return Array.from(profiles.values())
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [contactsQuery.data?.contacts]);
 
   const readFile = (selected: File) => {
     setParsing(true);
@@ -134,49 +152,83 @@ export default function DeveloperCrm() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-[100dvh] bg-[#f3f6f9] text-[#172b3d]">
       <DeveloperNavigation />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
+        <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em]" style={{ color: secondaryColor }}>Relationship Management</p>
-            <h1 className="mt-1 text-3xl font-bold text-slate-950">CRM</h1>
-            <p className="mt-2 text-slate-500">Manage your company’s contacts alongside the shared LandLinq network.</p>
+            <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: secondaryColor }}>
+              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: secondaryColor }} /> Relationship management
+            </div>
+            <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[#10283b] sm:text-4xl">Company contacts</h1>
+            <p className="mt-2 max-w-xl text-sm text-[#6e8192]">A focused directory for the relationships your team is building across the LandLinq network.</p>
           </div>
-          <Button onClick={() => setImportOpen(true)} style={{ backgroundColor: primaryColor }} className="text-white">
+          <Button onClick={() => setImportOpen(true)} style={{ backgroundColor: primaryColor }} className="h-10 rounded-lg px-4 text-white shadow-sm hover:opacity-90">
             <Upload className="mr-2 h-4 w-4" />Import Contacts
           </Button>
         </div>
 
-        <Card className="overflow-hidden border-slate-200 shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <Card className="overflow-hidden rounded-xl border-[#dce5eb] bg-[#fbfcfd] shadow-[0_12px_30px_rgba(25,53,74,0.06)]">
+          <div className="flex flex-col gap-4 border-b border-[#e3e9ee] bg-[#f8fafb] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-slate-100 p-2 text-slate-600"><Users className="h-5 w-5" /></div>
-              <div><h2 className="font-semibold text-slate-900">Contacts</h2><p className="text-sm text-slate-500">{contactsQuery.data?.contacts.length || 0} available contacts</p></div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg text-white" style={{ backgroundColor: primaryColor }}><Users className="h-5 w-5" /></div>
+              <div><h2 className="font-semibold text-[#1d3448]">Contacts</h2><p className="text-xs text-[#7b8d9b]">{contactsQuery.data?.contacts.length || 0} available contacts</p></div>
             </div>
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search contacts" className="pl-9" />
+            <div className="relative w-full sm:w-[360px]">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#91a2af]" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email, company…" className="h-10 rounded-lg border-[#d7e2e9] bg-white pl-10 text-sm shadow-none focus-visible:ring-1" style={{ "--tw-ring-color": secondaryColor } as CSSProperties} />
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2 border-b border-[#e6edf1] px-5 py-3 text-xs text-[#718493]">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span className="font-medium">Directory view</span>
+            <div className="ml-1 flex items-center gap-2">
+              <Building2 className="h-3.5 w-3.5" />
+              <select
+                value={companyFilter}
+                onChange={(event) => setCompanyFilter(event.target.value)}
+                className="h-8 max-w-[260px] rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] outline-none"
+              >
+                <option value="all">All companies ({companyProfiles.length})</option>
+                {companyProfiles.map((company) => (
+                  <option key={company.name} value={company.name.toLowerCase()}>{company.name} ({company.people})</option>
+                ))}
+              </select>
+            </div>
+            <span className="ml-auto hidden sm:inline">Search updates as you type</span>
+          </div>
           {contactsQuery.isLoading ? (
-            <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" style={{ color: primaryColor }} /></div>
+            <div className="space-y-3 p-5">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-[#eef2f5]" />)}</div>
           ) : contactsQuery.isError ? (
-            <div className="p-8 text-center text-sm text-red-600">{(contactsQuery.error as Error).message}</div>
+            <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center"><p className="text-sm font-medium text-[#9b4545]">{(contactsQuery.error as Error).message}</p><Button variant="outline" className="mt-4 h-9" onClick={() => contactsQuery.refetch()}><RefreshCw className="mr-2 h-3.5 w-3.5" />Try again</Button></div>
           ) : filteredContacts.length === 0 ? (
-            <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center"><Users className="mb-3 h-10 w-10 text-slate-300" /><h3 className="font-semibold text-slate-800">{search ? "No matching contacts" : "No contacts yet"}</h3><p className="mt-1 text-sm text-slate-500">Import a contact list to get started.</p></div>
+            <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search ? "No matching contacts" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search ? "Try a broader name, email, or company search." : "Import a contact list to get started."}</p></div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader><TableRow className="bg-slate-50"><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Phone</TableHead><TableHead>Brokerage</TableHead><TableHead>Region</TableHead><TableHead>Source</TableHead></TableRow></TableHeader>
+              <Table className="min-w-[900px]">
+                <TableHeader><TableRow className="border-[#e3e9ee] bg-[#f8fafb] hover:bg-[#f8fafb]"><TableHead className="h-11 pl-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Name</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Email</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Phone</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Brokerage</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Region</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source</TableHead></TableRow></TableHeader>
                 <TableBody>{filteredContacts.map((contact) => (
-                  <TableRow key={contact.id}>
-                    <TableCell className="font-medium text-slate-900">{[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unknown"}</TableCell>
-                    <TableCell className="text-slate-600">{contact.email || "—"}</TableCell>
-                    <TableCell className="text-slate-600">{contact.phone || "—"}</TableCell>
-                    <TableCell className="text-slate-600">{contact.brokerage || "—"}</TableCell>
-                    <TableCell className="text-slate-600">{contact.stateRegion || "—"}</TableCell>
-                    <TableCell>{contact.ownerDeveloperProfileId ? <Badge variant="secondary" className="bg-blue-50 text-blue-700">Your contact</Badge> : <Badge variant="outline">Shared network</Badge>}</TableCell>
+                  <TableRow key={contact.id} className="border-[#e8edf1] transition-colors hover:bg-[#f4f8fa]">
+                    <TableCell className="pl-5"><div className="flex items-center gap-3"><div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>{(contact.firstName?.[0] || "").toUpperCase()}{(contact.lastName?.[0] || "").toUpperCase()}</div><span className="font-semibold text-[#21394c]">{[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unknown"}</span></div></TableCell>
+                    <TableCell className="text-sm text-[#5f7382]">{contact.email || "—"}</TableCell>
+                    <TableCell className="text-sm text-[#5f7382]">{contact.phone || "—"}</TableCell>
+                    <TableCell className="max-w-[210px] text-sm text-[#5f7382]">
+                      {contact.brokerage ? (
+                        <button
+                          type="button"
+                          className="group flex max-w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-[#eaf1f6]"
+                          onClick={() => setCompanyFilter(contact.brokerage?.trim().toLowerCase() || "all")}
+                        >
+                          <Building2 className="h-3.5 w-3.5 shrink-0 text-[#8195a5]" />
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium text-[#405a70]">{contact.brokerage}</span>
+                            <span className="block text-[10px] text-[#8a9ba8]">{companyProfiles.find(company => company.name.toLowerCase() === contact.brokerage?.trim().toLowerCase())?.people || 1} people</span>
+                          </span>
+                        </button>
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-[#5f7382]">{contact.stateRegion || "—"}</TableCell>
+                    <TableCell>{contact.ownerDeveloperProfileId ? <Badge variant="secondary" className="border px-2 py-0.5 text-[10px]" style={{ backgroundColor: `${secondaryColor}15`, color: primaryColor, borderColor: `${secondaryColor}35` }}><UserRound className="mr-1 h-3 w-3" />Your contact</Badge> : <Badge variant="outline" className="border-[#d7e1e7] bg-[#f8fafb] text-[10px] text-[#718493]">Shared network</Badge>}</TableCell>
                   </TableRow>
                 ))}</TableBody>
               </Table>

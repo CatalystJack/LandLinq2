@@ -14,7 +14,7 @@ import {
   Search, Users, Tag, Mail, Phone, MapPin, Building2, MessageSquare,
   Calendar, ChevronRight, ChevronLeft, X, Plus, Send, FileText, TrendingUp,
   CheckCircle, XCircle, Clock, AlertCircle, MoreHorizontal, RefreshCw,
-  MessageCircle, Filter, Inbox, Upload, UserCheck, Megaphone, Trash2, GitMerge, Settings2, Loader2, AlertTriangle, Pencil
+  MessageCircle, Filter, Inbox, Upload, UserCheck, Megaphone, Trash2, GitMerge, Settings2, Loader2, AlertTriangle, Pencil, Save
 } from "lucide-react";
 
 interface Contact {
@@ -33,6 +33,7 @@ interface Contact {
   createdAt?: string;
   dealCount?: number;
   assignedTo?: string;
+  companyMemberCount?: number;
 }
 
 interface ActivityData {
@@ -125,7 +126,7 @@ const TAG_COLORS: Record<string, string> = {
   "warm": "bg-orange-100 text-orange-700 border-orange-200",
   "follow-up": "bg-yellow-100 text-yellow-700 border-yellow-200",
   "active": "bg-green-100 text-green-700 border-green-200",
-  "vip": "bg-purple-100 text-purple-700 border-purple-200",
+  "vip": "bg-[#e7f0ff] text-[#1554a3] border-[#b9d2f5]",
   "new": "bg-blue-100 text-blue-700 border-blue-200",
   "inactive": "bg-gray-100 text-gray-600 border-gray-200",
   "do-not-contact": "bg-red-200 text-red-800 border-red-300",
@@ -165,10 +166,11 @@ export default function CRMPage() {
   const [msaFilter, setMsaFilter] = useState("all");
   const [countyFilter, setCountyFilter] = useState("all");
   const [assignedToFilter, setAssignedToFilter] = useState("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
   const [multiCampaignTagFilter, setMultiCampaignTagFilter] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [detailTab, setDetailTab] = useState<"overview" | "activity">("overview");
-  const [editFields, setEditFields] = useState({ firstName: "", lastName: "", email: "", phone: "", brokerage: "" });
+  const [editFields, setEditFields] = useState({ firstName: "", lastName: "", email: "", phone: "", brokerage: "", assignedTo: "", crmNotes: "" });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [enrollTargetId, setEnrollTargetId] = useState<string | null>(null);
@@ -196,6 +198,8 @@ export default function CRMPage() {
       email: selectedContact?.email || "",
       phone: selectedContact?.phone || "",
       brokerage: selectedContact?.brokerage || "",
+      assignedTo: selectedContact?.assignedTo || "",
+      crmNotes: selectedContact?.crmNotes || "",
     });
   }, [selectedContact?.id]);
 
@@ -212,7 +216,7 @@ export default function CRMPage() {
   }, [tagDropdownOpen]);
 
   const contactsQuery = useQuery<ContactsResponse>({
-    queryKey: ["/api/crm/contacts", page, limit, search, tagFilter, marketFilter, smsFilter, stateFilter, msaFilter, countyFilter, assignedToFilter, multiCampaignTagFilter],
+    queryKey: ["/api/crm/contacts", page, limit, search, tagFilter, marketFilter, smsFilter, stateFilter, msaFilter, countyFilter, assignedToFilter, companyFilter, multiCampaignTagFilter],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), limit: limit === "all" ? "9999" : String(limit) });
       if (search) params.set("search", search);
@@ -223,6 +227,7 @@ export default function CRMPage() {
       if (msaFilter && msaFilter !== "all") params.set("msa", msaFilter);
       if (countyFilter && countyFilter !== "all") params.set("county", countyFilter);
       if (assignedToFilter && assignedToFilter !== "all") params.set("assignedTo", assignedToFilter);
+      if (companyFilter && companyFilter !== "all") params.set("brokerage", companyFilter);
       if (multiCampaignTagFilter) params.set("multiCampaignTag", "true");
       return fetchJson(`/api/crm/contacts?${params}`).then(normalizeContactsResponse);
     },
@@ -234,6 +239,7 @@ export default function CRMPage() {
     countiesByMsa: Record<string, string[]>;
     counties: string[];
     assignedTos: string[];
+    brokerages: string[];
   }>({
     queryKey: ["/api/crm/geo-options"],
     queryFn: async () => {
@@ -251,6 +257,7 @@ export default function CRMPage() {
         countiesByMsa: Object.fromEntries(Object.entries(rawCounties).map(([key, item]) => [key, asStringArray(item)])),
         counties: asStringArray(payload.counties),
         assignedTos: asStringArray(payload.assignedTos),
+        brokerages: asStringArray(payload.brokerages),
       };
     },
   });
@@ -303,6 +310,37 @@ export default function CRMPage() {
       variant: "destructive",
     }),
   });
+
+  const hasUnsavedContactChanges = !!selectedContact && (
+    editFields.firstName.trim() !== (selectedContact.firstName || "") ||
+    editFields.lastName.trim() !== (selectedContact.lastName || "") ||
+    editFields.email.trim() !== (selectedContact.email || "") ||
+    editFields.phone.trim() !== (selectedContact.phone || "") ||
+    editFields.brokerage.trim() !== (selectedContact.brokerage || "") ||
+    editFields.assignedTo.trim() !== (selectedContact.assignedTo || "") ||
+    editFields.crmNotes !== (selectedContact.crmNotes || "")
+  );
+
+  const saveContactChanges = () => {
+    if (!selectedContact || !hasUnsavedContactChanges) return;
+    const data = {
+      firstName: editFields.firstName.trim(),
+      lastName: editFields.lastName.trim(),
+      email: editFields.email.trim(),
+      phone: editFields.phone.trim(),
+      brokerage: editFields.brokerage.trim(),
+      assignedTo: editFields.assignedTo.trim(),
+      crmNotes: editFields.crmNotes,
+    };
+    updateContactMutation.mutate(
+      { id: selectedContact.id, data },
+      {
+        onSuccess: () => {
+          setSelectedContact(current => current ? { ...current, ...data } : current);
+        },
+      },
+    );
+  };
 
   const enrollMutation = useMutation({
     mutationFn: ({ id, templateId, senderId }: { id: string; templateId: string; senderId?: string | null }) =>
@@ -599,14 +637,14 @@ export default function CRMPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-[100dvh] bg-[#eef3f9]">
+    <div className="flex min-h-[100dvh] flex-col bg-[#edf3f8] text-[#18334e]">
       <Navigation />
-      <div className="flex flex-1 overflow-hidden min-h-0 bg-[#eef3f9]">
+      <div className="flex min-h-0 flex-1 overflow-hidden bg-[#edf3f8]">
       {/* LEFT: Contacts List */}
-      <div className={`flex flex-col ${selectedContact ? 'hidden' : 'w-full'} transition-all duration-200 border-r border-[#d7e2ef] bg-[#f8fbff]`}>
+      <div className={`flex flex-col ${selectedContact ? 'hidden' : 'w-full'} transition-all duration-200 border-r border-[#d4e0eb] bg-[#f7fafd]`}>
 
         {/* Header */}
-        <div className="shrink-0 border-b border-[#d7e2ef] px-5 py-5 bg-[#f8fbff]">
+        <div className="shrink-0 border-b border-[#d4e0eb] bg-[#f7fafd] px-5 py-5">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex items-center gap-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0b3159] text-[#b9dcff] shadow-sm">
@@ -658,7 +696,7 @@ export default function CRMPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600"
+                    className="h-7 border-[#c6d9ea] text-xs text-[#1554a3] hover:border-[#1554a3] hover:bg-[#1554a3] hover:text-white"
                 onClick={() => {
                   if (confirm("This will convert all contact names to Title Case (e.g. BETHANY TERRY → Bethany Terry). Continue?")) {
                     normalizeNamesMutation.mutate();
@@ -672,7 +710,7 @@ export default function CRMPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-xs text-purple-600 border-purple-200 hover:bg-purple-600 hover:text-white hover:border-purple-600"
+                className="h-7 border-[#c6d9ea] text-xs text-[#1554a3] hover:border-[#1554a3] hover:bg-[#1554a3] hover:text-white"
                 onClick={() => {
                   if (confirm("This will remove middle names and middle initials from all contacts' first names (e.g. 'Monica Anne Young' → first name becomes 'Monica'). Cannot be undone. Continue?")) {
                     stripMiddleNamesMutation.mutate();
@@ -686,7 +724,7 @@ export default function CRMPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-xs text-orange-600 border-orange-200 hover:bg-orange-600 hover:text-white hover:border-orange-600"
+                className="h-7 border-[#c6d9ea] text-xs text-[#1554a3] hover:border-[#1554a3] hover:bg-[#1554a3] hover:text-white"
                 onClick={() => {
                   if (confirm("This will set 'Assigned To' for all contacts that have a per-rep tag (e.g. 'AJ - Unknown Sophisticated' → AJ Klenk) but no assigned rep yet. Continue?")) {
                     backfillAssignedToMutation.mutate();
@@ -700,7 +738,7 @@ export default function CRMPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-xs text-blue-600 border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600"
+                className="h-7 border-[#c6d9ea] text-xs text-[#1554a3] hover:border-[#1554a3] hover:bg-[#1554a3] hover:text-white"
                 onClick={() => {
                   if (confirm("This will merge all contacts that share the same email address into one record. This cannot be undone. Continue?")) {
                     deduplicateEmailMutation.mutate();
@@ -713,7 +751,7 @@ export default function CRMPage() {
               </Button>
               <Button
                 size="sm"
-                className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white border-0"
+                className="h-7 border-0 bg-[#0b3159] text-xs text-white hover:bg-[#164b7d]"
                 onClick={() => setShowNewContactModal(true)}
               >
                 <Plus size={12} className="mr-1" />New Contact
@@ -763,7 +801,7 @@ export default function CRMPage() {
                 onClick={() => setTagDropdownOpen(v => !v)}
                 className={`h-9 px-3 flex items-center gap-1.5 rounded-lg border text-xs w-[170px] justify-between transition-colors ${
                   tagFilter !== "all"
-                    ? "border-violet-400 bg-violet-50 text-violet-800"
+                    ? "border-[#8eafd0] bg-[#e7f0ff] text-[#1554a3]"
                     : "border-[#c9d9e9] bg-white text-[#45627f] hover:border-[#8ab1d8] hover:bg-[#f3f8fe]"
                 }`}
               >
@@ -773,19 +811,19 @@ export default function CRMPage() {
               {tagDropdownOpen && (
                 <div className="absolute z-50 top-full mt-1 left-0 w-64 bg-white border border-gray-200 rounded-md shadow-lg max-h-72 overflow-y-auto">
                   <button
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-1.5 ${tagFilter === "all" ? "font-semibold text-violet-700" : "text-gray-700"}`}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-1.5 ${tagFilter === "all" ? "font-semibold text-[#1554a3]" : "text-gray-700"}`}
                     onClick={() => { setTagFilter("all"); setPage(1); setTagDropdownOpen(false); }}
                   >
-                    {tagFilter === "all" && <CheckCircle size={10} className="text-violet-500 shrink-0" />}
+                    {tagFilter === "all" && <CheckCircle size={10} className="text-[#3278c7] shrink-0" />}
                     <span>All tags</span>
                   </button>
                   {(tagsQuery.data || []).map(t => (
                     <div key={t} className="flex items-center group hover:bg-gray-50">
                       <button
-                        className={`flex-1 text-left px-3 py-1.5 text-xs flex items-center gap-1.5 min-w-0 ${tagFilter === t ? "font-semibold text-violet-700" : "text-gray-700"}`}
+                        className={`flex-1 text-left px-3 py-1.5 text-xs flex items-center gap-1.5 min-w-0 ${tagFilter === t ? "font-semibold text-[#1554a3]" : "text-gray-700"}`}
                         onClick={() => { setTagFilter(t); setPage(1); setTagDropdownOpen(false); }}
                       >
-                        {tagFilter === t && <CheckCircle size={10} className="text-violet-500 shrink-0" />}
+                        {tagFilter === t && <CheckCircle size={10} className="text-[#3278c7] shrink-0" />}
                         <span className="truncate">{t}</span>
                       </button>
                       <button
@@ -828,8 +866,8 @@ export default function CRMPage() {
               onClick={() => { setMultiCampaignTagFilter(v => !v); setPage(1); }}
               title="Show contacts tagged with more than 1 outreach campaign"
               className={`h-7 px-2 flex items-center gap-1 rounded border text-xs font-medium transition-colors ${
-                multiCampaignTagFilter
-                  ? "bg-amber-100 border-amber-400 text-amber-800 hover:bg-amber-200"
+                  multiCampaignTagFilter
+                  ? "border-[#8eafd0] bg-[#e7f0ff] text-[#1554a3] hover:bg-[#dceaff]"
                   : "border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
               }`}
             >
@@ -837,12 +875,12 @@ export default function CRMPage() {
               Multi-campaign
             </button>
             {/* Clear all geo filters button */}
-            {(stateFilter !== "all" || msaFilter !== "all" || countyFilter !== "all" || assignedToFilter !== "all") && (
+            {(stateFilter !== "all" || msaFilter !== "all" || countyFilter !== "all" || assignedToFilter !== "all" || companyFilter !== "all") && (
               <button
-                onClick={() => { setStateFilter("all"); setMsaFilter("all"); setCountyFilter("all"); setAssignedToFilter("all"); setPage(1); }}
-                className="h-7 px-2 flex items-center gap-1 rounded bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors text-xs font-medium"
+                onClick={() => { setStateFilter("all"); setMsaFilter("all"); setCountyFilter("all"); setAssignedToFilter("all"); setCompanyFilter("all"); setPage(1); }}
+                className="h-7 rounded border border-[#c6d9ea] bg-[#e7f0ff] px-2 text-xs font-medium text-[#1554a3] transition-colors hover:bg-[#dceaff] flex items-center gap-1"
               >
-                <X size={11} /> Clear geo
+                <X size={11} /> Clear filters
               </button>
             )}
           </div>
@@ -901,6 +939,18 @@ export default function CRMPage() {
                 <SelectItem value="all">All Reps</SelectItem>
                 {(geoOptionsQuery.data?.assignedTos || []).map(a => (
                   <SelectItem key={a} value={a}>{a}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={companyFilter} onValueChange={v => { setCompanyFilter(v); setPage(1); }}>
+              <SelectTrigger className={`h-7 text-xs w-[220px] ${companyFilter !== "all" ? "border-blue-400 bg-blue-50 text-blue-800" : ""}`}>
+                <Building2 size={12} className="mr-1.5 shrink-0" />
+                <SelectValue placeholder="Company profile" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Companies</SelectItem>
+                {(geoOptionsQuery.data?.brokerages || []).map(company => (
+                  <SelectItem key={company} value={company}>{company}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -1106,10 +1156,10 @@ export default function CRMPage() {
 
       {/* RIGHT: Contact Detail Panel */}
       {selectedContact && (<>
-        <div className="w-full flex flex-col bg-[#f3f2ef] overflow-hidden">
+        <div className="w-full flex flex-col bg-[#eef3f8] overflow-hidden">
           {/* Contact record header */}
-          <div className="shrink-0 bg-[#0a3769] text-white px-5 sm:px-8 pt-3 pb-5">
-            <div className="flex items-center justify-between mb-3">
+          <div className="shrink-0 bg-[#0b3159] text-white px-5 sm:px-8 pt-3 pb-6 shadow-[0_5px_18px_rgba(8,23,41,0.12)]">
+            <div className="flex items-center justify-between mb-5">
               <button
                 onClick={() => setSelectedContact(null)}
                 className="inline-flex items-center gap-1.5 text-xs text-blue-100 hover:text-white transition-colors"
@@ -1153,9 +1203,9 @@ export default function CRMPage() {
               </div>
             </div>
 
-            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-5">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-12 h-12 rounded-full bg-[#1176c9] border-2 border-blue-200/50 flex items-center justify-center text-sm font-semibold shrink-0">
+                <div className="w-14 h-14 rounded-2xl bg-[#2b82cf] border border-blue-200/50 flex items-center justify-center text-base font-semibold shrink-0 shadow-inner shadow-white/10">
                   {(selectedContact.firstName?.[0] || "").toUpperCase()}{(selectedContact.lastName?.[0] || "").toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -1164,48 +1214,28 @@ export default function CRMPage() {
                       id="crm-contact-first-name"
                       value={editFields.firstName}
                       placeholder="First name"
-                      className="font-semibold text-xl bg-transparent border-b border-transparent hover:border-blue-200 focus:border-white focus:outline-none min-w-0 w-[45%] text-white placeholder:text-blue-200"
+                      className="font-semibold text-2xl tracking-[-0.03em] bg-transparent border-b border-transparent hover:border-blue-200 focus:border-white focus:outline-none min-w-0 w-[45%] text-white placeholder:text-blue-200"
                       onChange={e => setEditFields(f => ({ ...f, firstName: e.target.value }))}
-                      onBlur={e => {
-                        const val = e.target.value.trim();
-                        if (val !== (selectedContact.firstName || "")) {
-                          updateContactMutation.mutate({ id: selectedContact.id, data: { firstName: val } });
-                          setSelectedContact({ ...selectedContact, firstName: val });
-                        }
-                      }}
                     />
                     <input
                       value={editFields.lastName}
                       placeholder="Last name"
-                      className="font-semibold text-xl bg-transparent border-b border-transparent hover:border-blue-200 focus:border-white focus:outline-none min-w-0 flex-1 text-white placeholder:text-blue-200"
+                      className="font-semibold text-2xl tracking-[-0.03em] bg-transparent border-b border-transparent hover:border-blue-200 focus:border-white focus:outline-none min-w-0 flex-1 text-white placeholder:text-blue-200"
                       onChange={e => setEditFields(f => ({ ...f, lastName: e.target.value }))}
-                      onBlur={e => {
-                        const val = e.target.value.trim();
-                        if (val !== (selectedContact.lastName || "")) {
-                          updateContactMutation.mutate({ id: selectedContact.id, data: { lastName: val } });
-                          setSelectedContact({ ...selectedContact, lastName: val });
-                        }
-                      }}
                     />
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs text-blue-100">
+                  <div className="flex items-center gap-2 mt-1 text-xs text-blue-100">
                     <input
                       value={editFields.brokerage}
                       placeholder="Company / brokerage"
+                      list="crm-company-profiles"
                       className="bg-transparent border-b border-transparent hover:border-blue-200 focus:border-white focus:outline-none min-w-0 max-w-[280px] text-blue-100 placeholder:text-blue-200"
                       onChange={e => setEditFields(f => ({ ...f, brokerage: e.target.value }))}
-                      onBlur={e => {
-                        const val = e.target.value.trim();
-                        if (val !== (selectedContact.brokerage || "")) {
-                          updateContactMutation.mutate({ id: selectedContact.id, data: { brokerage: val } });
-                          setSelectedContact({ ...selectedContact, brokerage: val });
-                        }
-                      }}
                     />
                     <span className="text-blue-200/70">•</span>
                     <span>{selectedContact.assignedTo || "Unassigned"}</span>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
+                  <div className="flex flex-wrap gap-1.5 mt-3">
                     {(selectedContact.crmTags || []).slice(0, 3).map(tag => (
                       <span key={tag} className="rounded bg-white/15 border border-white/20 px-2 py-0.5 text-[10px] text-blue-50">{tag}</span>
                     ))}
@@ -1214,11 +1244,11 @@ export default function CRMPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {selectedContact.email && (
                   <a
                     href={`mailto:${selectedContact.email}`}
-                    className="inline-flex items-center gap-1.5 rounded border border-blue-200/40 bg-white/5 px-3 py-2 text-xs font-medium text-white hover:bg-white/15 transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200/40 bg-white/[0.08] px-3 py-2 text-xs font-medium text-white hover:bg-white/15 transition-colors"
                   >
                     <Mail size={13} /> Email
                   </a>
@@ -1226,28 +1256,42 @@ export default function CRMPage() {
                 {selectedContact.phone && (
                   <a
                     href={`tel:${selectedContact.phone}`}
-                    className="inline-flex items-center gap-1.5 rounded border border-blue-200/40 bg-white/5 px-3 py-2 text-xs font-medium text-white hover:bg-white/15 transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200/40 bg-white/[0.08] px-3 py-2 text-xs font-medium text-white hover:bg-white/15 transition-colors"
                   >
                     <Phone size={13} /> Call
                   </a>
                 )}
                 <button
                   onClick={() => document.getElementById("crm-contact-first-name")?.focus()}
-                  className="inline-flex items-center gap-1.5 rounded border border-blue-200/40 bg-white/5 px-3 py-2 text-xs font-medium text-white hover:bg-white/15 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200/40 bg-white/[0.08] px-3 py-2 text-xs font-medium text-white hover:bg-white/15 transition-colors"
                 >
                   <Pencil size={13} /> Edit
                 </button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!hasUnsavedContactChanges || updateContactMutation.isPending}
+                  onClick={saveContactChanges}
+                  className={`h-9 rounded-lg border px-3 text-xs font-semibold transition-colors ${
+                    hasUnsavedContactChanges
+                      ? "border-[#9dd0f1] bg-[#2b82cf] text-white hover:bg-[#1f6fae]"
+                      : "border-blue-200/30 bg-white/5 text-blue-200/60"
+                  }`}
+                >
+                  {updateContactMutation.isPending ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : <Save size={13} className="mr-1.5" />}
+                  {updateContactMutation.isPending ? "Saving…" : "Save changes"}
+                </Button>
                 <button
                   onClick={() => setConfirmDeleteId(selectedContact.id)}
                   title="Delete contact"
-                  className="p-2 rounded border border-red-200/30 bg-white/5 text-red-200 hover:bg-red-500/30 hover:text-white transition-colors"
+                  className="p-2 rounded-lg border border-red-200/30 bg-white/5 text-red-200 hover:bg-red-500/30 hover:text-white transition-colors"
                 >
                   <Trash2 size={14} />
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 pt-4 border-t border-blue-200/20">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-3 mt-6 pt-4 border-t border-blue-200/20">
               <div>
                 <p className="text-[9px] uppercase tracking-wider text-blue-200/70 font-semibold">Phone</p>
                 <p className="mt-1 text-xs font-medium text-white">{selectedContact.phone || "—"}</p>
@@ -1260,15 +1304,22 @@ export default function CRMPage() {
                 <p className="text-[9px] uppercase tracking-wider text-blue-200/70 font-semibold">Company</p>
                 <p className="mt-1 text-xs font-medium text-white truncate">{selectedContact.brokerage || "—"}</p>
               </div>
+              <div>
+                <p className="text-[9px] uppercase tracking-wider text-blue-200/70 font-semibold">Last contacted</p>
+                <p className="mt-1 text-xs font-medium text-white">{selectedContact.lastContactedAt ? new Date(selectedContact.lastContactedAt).toLocaleDateString() : "—"}</p>
+              </div>
             </div>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row">
-            <aside className="w-full lg:w-[30%] lg:min-w-[260px] lg:max-w-[360px] shrink-0 overflow-visible lg:overflow-y-auto bg-white border-b lg:border-b-0 lg:border-r border-gray-200 px-5 py-5">
+             <aside className="w-full lg:w-[30%] lg:min-w-[280px] lg:max-w-[380px] shrink-0 overflow-visible lg:overflow-y-auto bg-[#f8fbfd] border-b lg:border-b-0 lg:border-r border-[#d6e2ec] px-5 py-6">
               {/* Contact Details */}
-              <div className="border border-gray-200 rounded-sm bg-white">
-                <div className="flex items-center justify-between px-3 py-3 border-b border-gray-200">
-                  <p className="text-xs font-semibold text-gray-700">Contact Details</p>
+               <div className="border border-[#d6e2ec] rounded-xl bg-white shadow-[0_2px_8px_rgba(28,67,101,0.04)]">
+                 <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#e4edf4]">
+                   <div>
+                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7891a9]">Record</p>
+                     <p className="mt-0.5 text-sm font-semibold text-[#173b5d]">Contact details</p>
+                   </div>
                   <button
                     onClick={() => document.getElementById("crm-contact-first-name")?.focus()}
                     className="text-[11px] font-medium text-[#1683c5] hover:text-[#0a3769]"
@@ -1276,7 +1327,7 @@ export default function CRMPage() {
                     Edit
                   </button>
                 </div>
-                <div className="px-3 divide-y divide-gray-100">
+                 <div className="px-4 divide-y divide-[#edf2f6]">
                   <div className="py-3">
                     <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Name</p>
                     <p className="mt-1 text-xs font-medium text-gray-800">{selectedContact.firstName} {selectedContact.lastName}</p>
@@ -1289,13 +1340,6 @@ export default function CRMPage() {
                       type="email"
                       className="mt-1 w-full bg-transparent border-b border-gray-200 focus:border-[#1683c5] focus:outline-none text-xs text-[#1683c5] pb-1"
                       onChange={e => setEditFields(f => ({ ...f, email: e.target.value }))}
-                      onBlur={e => {
-                        const val = e.target.value.trim();
-                        if (val !== (selectedContact.email || "")) {
-                          updateContactMutation.mutate({ id: selectedContact.id, data: { email: val } });
-                          setSelectedContact({ ...selectedContact, email: val });
-                        }
-                      }}
                     />
                   </div>
                   <div className="py-3">
@@ -1306,31 +1350,39 @@ export default function CRMPage() {
                       type="tel"
                       className="mt-1 w-full bg-transparent border-b border-gray-200 focus:border-[#1683c5] focus:outline-none text-xs text-[#1683c5] pb-1"
                       onChange={e => setEditFields(f => ({ ...f, phone: e.target.value }))}
-                      onBlur={e => {
-                        const val = e.target.value.trim();
-                        if (val !== (selectedContact.phone || "")) {
-                          updateContactMutation.mutate({ id: selectedContact.id, data: { phone: val } });
-                          setSelectedContact({ ...selectedContact, phone: val });
-                        }
-                      }}
                     />
                   </div>
                   <div className="py-3">
                     <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Account / Company</p>
-                    <p className="mt-1 text-xs text-gray-700">{selectedContact.brokerage || "—"}</p>
+                     {selectedContact.brokerage ? (
+                       <button
+                         type="button"
+                         className="mt-1 flex w-full items-center justify-between gap-2 rounded-lg border border-[#dbe7f0] bg-[#f7fafd] px-3 py-2 text-left transition-colors hover:border-[#9fc2df] hover:bg-[#eef6fc]"
+                         onClick={() => {
+                           setCompanyFilter(selectedContact.brokerage || "all");
+                           setPage(1);
+                           setSelectedContact(null);
+                         }}
+                       >
+                         <span className="min-w-0">
+                           <span className="block truncate text-xs font-semibold text-[#173b5d]">{selectedContact.brokerage}</span>
+                           <span className="mt-0.5 block text-[10px] text-[#7891a9]">
+                             {selectedContact.companyMemberCount || 1} {(selectedContact.companyMemberCount || 1) === 1 ? "person" : "people"} at this company
+                           </span>
+                         </span>
+                         <ChevronRight size={13} className="shrink-0 text-[#7891a9]" />
+                       </button>
+                     ) : (
+                       <p className="mt-1 text-xs text-gray-500">No company assigned</p>
+                     )}
                   </div>
                   <div className="py-3">
                     <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Assigned to</p>
                     <Input
                       placeholder="Assign to team member..."
-                      defaultValue={selectedContact.assignedTo || ""}
+                       value={editFields.assignedTo}
                       className="mt-1 h-7 text-xs px-0 border-0 border-b border-gray-200 rounded-none focus-visible:ring-0 focus-visible:border-[#1683c5]"
-                      onBlur={e => {
-                        if (e.target.value !== (selectedContact.assignedTo || "")) {
-                          updateContactMutation.mutate({ id: selectedContact.id, data: { assignedTo: e.target.value } });
-                          setSelectedContact({ ...selectedContact, assignedTo: e.target.value || undefined });
-                        }
-                      }}
+                       onChange={e => setEditFields(f => ({ ...f, assignedTo: e.target.value }))}
                     />
                   </div>
                   <div className="py-3">
@@ -1359,9 +1411,12 @@ export default function CRMPage() {
               </div>
 
               {/* Contact metadata rail */}
-              <div className="mt-4 border border-gray-200 rounded-sm bg-white p-3 space-y-3">
+               <div className="mt-4 border border-[#d6e2ec] rounded-xl bg-white p-4 space-y-3.5 shadow-[0_2px_8px_rgba(28,67,101,0.04)]">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-gray-700">Contact preferences</p>
+                   <div>
+                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7891a9]">Preferences</p>
+                     <p className="mt-0.5 text-sm font-semibold text-[#173b5d]">Contact preferences</p>
+                   </div>
                   <MessageCircle size={14} className={selectedContact.smsOptIn ? "text-green-500" : "text-gray-300"} />
                 </div>
                 <div className="flex items-center justify-between text-xs">
@@ -1379,66 +1434,73 @@ export default function CRMPage() {
               </div>
             </aside>
 
-            <main className="flex-1 min-w-0 overflow-visible lg:overflow-y-auto bg-[#f3f2ef]">
-              <div className="sticky top-0 z-10 flex items-center gap-6 h-12 px-5 sm:px-7 bg-white border-b border-gray-200">
+             <main className="flex-1 min-w-0 overflow-visible lg:overflow-y-auto bg-[#eef3f8]">
+               <div className="sticky top-0 z-10 flex items-center gap-7 h-14 px-5 sm:px-8 bg-white/95 backdrop-blur border-b border-[#d6e2ec]">
                 <button
                   onClick={() => setDetailTab("overview")}
-                  className={`h-full border-b-2 text-xs font-medium transition-colors ${detailTab === "overview" ? "border-[#1683c5] text-[#1683c5]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+                   className={`h-full border-b-2 text-xs font-semibold transition-colors ${detailTab === "overview" ? "border-[#1683c5] text-[#126da9]" : "border-transparent text-[#71869a] hover:text-[#173b5d]"}`}
                 >
                   Overview
                 </button>
                 <button
                   onClick={() => setDetailTab("activity")}
-                  className={`h-full border-b-2 text-xs font-medium transition-colors ${detailTab === "activity" ? "border-[#1683c5] text-[#1683c5]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+                   className={`h-full border-b-2 text-xs font-semibold transition-colors ${detailTab === "activity" ? "border-[#1683c5] text-[#126da9]" : "border-transparent text-[#71869a] hover:text-[#173b5d]"}`}
                 >
                   Activity
                 </button>
               </div>
 
-              <div className="p-5 sm:p-7">
+               <div className="p-5 sm:p-8">
                 {detailTab === "overview" ? (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="bg-white border border-gray-200 rounded-sm p-3">
-                        <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Created</p>
+                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                      <div className="bg-white border border-[#d6e2ec] rounded-xl p-4 shadow-[0_2px_8px_rgba(28,67,101,0.04)]">
+                        <p className="text-[9px] uppercase tracking-[0.14em] text-[#7891a9] font-semibold">Created</p>
                         <p className="mt-1 text-xs font-semibold text-gray-800">
                           {selectedContact.createdAt ? new Date(selectedContact.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
                         </p>
                       </div>
-                      <div className="bg-white border border-gray-200 rounded-sm p-3">
-                        <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Type</p>
+                      <div className="bg-white border border-[#d6e2ec] rounded-xl p-4 shadow-[0_2px_8px_rgba(28,67,101,0.04)]">
+                        <p className="text-[9px] uppercase tracking-[0.14em] text-[#7891a9] font-semibold">Type</p>
                         <p className="mt-1 text-xs font-semibold text-gray-800">{(selectedContact.crmTags || [])[0] || "Broker contact"}</p>
                       </div>
-                      <div className="bg-white border border-gray-200 rounded-sm p-3">
-                        <p className="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Deals</p>
+                      <div className="bg-white border border-[#d6e2ec] rounded-xl p-4 shadow-[0_2px_8px_rgba(28,67,101,0.04)]">
+                        <p className="text-[9px] uppercase tracking-[0.14em] text-[#7891a9] font-semibold">Deals</p>
                         <p className="mt-1 text-xs font-semibold text-gray-800">{selectedContact.dealCount || 0}</p>
+                      </div>
+                      <div className="bg-white border border-[#d6e2ec] rounded-xl p-4 shadow-[0_2px_8px_rgba(28,67,101,0.04)]">
+                        <p className="text-[9px] uppercase tracking-[0.14em] text-[#7891a9] font-semibold">Campaigns</p>
+                        <p className="mt-1 text-xs font-semibold text-gray-800">{activityQuery.data?.enrollments?.length || 0}</p>
                       </div>
                     </div>
 
-                    <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 flex items-start gap-3">
-                      <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                        <UserCheck size={13} className="text-gray-500" />
+                    <div className="mt-5 bg-[#f8fbfd] border border-[#d6e2ec] rounded-xl p-4 flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-[#e7f0ff] flex items-center justify-center shrink-0">
+                        <UserCheck size={14} className="text-[#1b6aa6]" />
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-gray-700">Contact created</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
+                        <p className="text-xs font-semibold text-[#294c6b]">Contact created</p>
+                        <p className="text-[11px] text-[#7891a9] mt-0.5">
                           Added via manual entry · {selectedContact.createdAt ? new Date(selectedContact.createdAt).toLocaleDateString() : "date unavailable"}
                         </p>
                       </div>
                     </div>
 
                     {/* Tags */}
-                    <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 space-y-3">
+                    <div className="mt-5 bg-white border border-[#d6e2ec] rounded-xl p-5 space-y-3.5 shadow-[0_2px_8px_rgba(28,67,101,0.04)]">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-gray-700">Tags</p>
-                        <span className="text-[10px] text-gray-400">{(selectedContact.crmTags || []).length} applied</span>
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7891a9]">Organization</p>
+                          <p className="mt-0.5 text-sm font-semibold text-[#173b5d]">Tags</p>
+                        </div>
+                        <span className="rounded-full bg-[#edf4fa] px-2 py-1 text-[10px] font-semibold text-[#5d7892]">{(selectedContact.crmTags || []).length} applied</span>
                       </div>
                       {(selectedContact.crmTags || []).length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
                           {(selectedContact.crmTags || []).map(tag => {
                             const isOutreach = (outreachTagsQuery.data || []).some(ot => ot.tag === tag);
                             return (
-                              <span key={tag} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border ${isOutreach ? "bg-violet-50 text-violet-700 border-violet-200" : tagColor(tag)}`}>
+                              <span key={tag} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border ${isOutreach ? "bg-[#e7f0ff] text-[#1554a3] border-[#c6d9ea]" : tagColor(tag)}`}>
                                 {isOutreach && <Megaphone size={9} />}
                                 {tag}
                                 <button onClick={() => removeTagFromContact(selectedContact, tag)} className="hover:opacity-70 ml-0.5">
@@ -1480,10 +1542,11 @@ export default function CRMPage() {
                     </div>
 
                     {(outreachTagsQuery.data || []).length > 0 && (
-                      <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 space-y-3">
+                      <div className="mt-5 bg-[#f8fbfd] border border-[#c9ddeb] rounded-xl p-5 space-y-3.5">
                         <div>
-                          <p className="text-xs font-semibold text-gray-700">Outreach campaigns</p>
-                          <p className="text-[11px] text-gray-400 mt-0.5">Select a campaign to tag and enroll this contact.</p>
+                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7891a9]">Outreach</p>
+                         <p className="mt-0.5 text-sm font-semibold text-[#173b5d]">Campaigns</p>
+                         <p className="text-[11px] text-[#7891a9] mt-1">Select a campaign to tag and enroll this contact.</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {(outreachTagsQuery.data || []).map(ot => {
@@ -1492,7 +1555,7 @@ export default function CRMPage() {
                               (e: any) => e.template_id === ot.id && ["pending", "in_progress"].includes(e.status)
                             );
                             return applied ? (
-                              <span key={ot.id} className="inline-flex items-center overflow-hidden rounded-full border border-violet-600 bg-violet-600 text-[11px] font-medium text-white">
+                              <span key={ot.id} className="inline-flex items-center overflow-hidden rounded-full border border-[#1554a3] bg-[#1554a3] text-[11px] font-medium text-white">
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1">
                                   <Megaphone size={9} />{ot.name}
                                   {activeEnrollment && <span className="rounded-full bg-green-500 px-1 text-[9px]">Active</span>}
@@ -1500,7 +1563,7 @@ export default function CRMPage() {
                                 <button
                                   onClick={() => removeTagFromContact(selectedContact, ot.tag)}
                                   title={`Remove "${ot.name}" tag`}
-                                  className="self-stretch px-2 hover:bg-violet-800"
+                                  className="self-stretch px-2 hover:bg-[#0b3159]"
                                 >
                                   <X size={10} />
                                 </button>
@@ -1512,7 +1575,7 @@ export default function CRMPage() {
                                   addTagToContact(selectedContact, ot.tag);
                                   enrollMutation.mutate({ id: selectedContact.id, templateId: ot.id, senderId: ot.senderId });
                                 }}
-                                className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+                                className="inline-flex items-center gap-1 rounded-full border border-[#c6d9ea] bg-[#e7f0ff] px-2.5 py-1 text-[11px] font-medium text-[#1554a3] hover:bg-[#dceaff]"
                               >
                                 <Megaphone size={9} />{ot.name}
                               </button>
@@ -1523,26 +1586,27 @@ export default function CRMPage() {
                     )}
 
                     {/* Notes */}
-                    <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 space-y-2">
-                      <p className="text-xs font-semibold text-gray-700">Notes</p>
+                    <div className="mt-5 bg-white border border-[#d6e2ec] rounded-xl p-5 space-y-2.5 shadow-[0_2px_8px_rgba(28,67,101,0.04)]">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7891a9]">Private workspace</p>
+                        <p className="mt-0.5 text-sm font-semibold text-[#173b5d]">Notes</p>
+                      </div>
                       <Textarea
-                        key={selectedContact.id}
                         placeholder="Add internal notes about this contact..."
-                        defaultValue={selectedContact.crmNotes || ""}
+                        value={editFields.crmNotes}
                         rows={3}
                         className="text-xs resize-none"
-                        onBlur={e => {
-                          if (e.target.value !== (selectedContact.crmNotes || "")) {
-                            updateContactMutation.mutate({ id: selectedContact.id, data: { crmNotes: e.target.value } });
-                          }
-                        }}
+                        onChange={e => setEditFields(f => ({ ...f, crmNotes: e.target.value }))}
                       />
                     </div>
 
                     {/* Campaign Enrollments */}
-                    <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 space-y-3">
+                    <div className="mt-5 bg-white border border-[#d6e2ec] rounded-xl p-5 space-y-3.5 shadow-[0_2px_8px_rgba(28,67,101,0.04)]">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-gray-700">Campaign enrollments</p>
+                         <div>
+                           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7891a9]">Sequences</p>
+                           <p className="mt-0.5 text-sm font-semibold text-[#173b5d]">Campaign enrollments</p>
+                         </div>
                         <Button
                           size="sm"
                           variant="outline"
@@ -1561,7 +1625,7 @@ export default function CRMPage() {
                       ) : (
                         <div className="space-y-1.5">
                           {(activityQuery.data?.enrollments || []).map((e: any) => (
-                            <div key={e.id} className="flex items-center justify-between bg-gray-50 rounded px-3 py-2 border border-gray-100">
+                             <div key={e.id} className="flex items-center justify-between bg-[#f5f9fc] rounded-lg px-3 py-2.5 border border-[#e2ebf2]">
                               <div>
                                 <p className="text-xs font-medium text-gray-700">{e.template_name || "Campaign"}</p>
                                 <p className="text-[10px] text-gray-400">
@@ -1579,8 +1643,11 @@ export default function CRMPage() {
                     </div>
 
                     {/* Deals */}
-                    <div className="mt-5 bg-white border border-gray-200 rounded-sm p-4 space-y-3">
-                      <p className="text-xs font-semibold text-gray-700">Deals ({activityQuery.data?.deals?.length || 0})</p>
+                    <div className="mt-5 bg-white border border-[#d6e2ec] rounded-xl p-5 space-y-3.5 shadow-[0_2px_8px_rgba(28,67,101,0.04)]">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7891a9]">Pipeline</p>
+                        <p className="mt-0.5 text-sm font-semibold text-[#173b5d]">Deals <span className="text-[#7891a9]">({activityQuery.data?.deals?.length || 0})</span></p>
+                      </div>
                       {activityQuery.isLoading ? (
                         <div className="h-8 bg-gray-100 rounded animate-pulse" />
                       ) : activityQuery.isError ? (
@@ -1590,7 +1657,7 @@ export default function CRMPage() {
                       ) : (
                         <div className="space-y-1.5">
                           {(activityQuery.data?.deals || []).map((deal: any) => (
-                            <div key={deal.id} className="flex items-center justify-between bg-gray-50 rounded px-3 py-2 border border-gray-100">
+                           <div key={deal.id} className="flex items-center justify-between bg-[#f5f9fc] rounded-lg px-3 py-2.5 border border-[#e2ebf2]">
                               <div>
                                 <p className="text-xs font-medium text-gray-700">#{deal.dealNumber} — {deal.address}, {deal.city}, {deal.state}</p>
                                 <div className="flex items-center gap-2 mt-0.5">
@@ -1606,13 +1673,14 @@ export default function CRMPage() {
                     </div>
                   </>
                 ) : (
-                  <div className="bg-white border border-gray-200 rounded-sm p-4">
+                   <div className="bg-white border border-[#d6e2ec] rounded-xl p-5 shadow-[0_2px_8px_rgba(28,67,101,0.04)]">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <p className="text-xs font-semibold text-gray-700">Activity timeline</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">Recent emails and SMS activity for this contact</p>
-                      </div>
-                      <span className="text-[10px] text-gray-400">{(activityQuery.data?.communications || []).length} records</span>
+                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7891a9]">Engagement</p>
+                         <p className="mt-0.5 text-sm font-semibold text-[#173b5d]">Activity timeline</p>
+                         <p className="text-[11px] text-[#7891a9] mt-1">Recent emails and SMS activity for this contact</p>
+                       </div>
+                       <span className="rounded-full bg-[#edf4fa] px-2 py-1 text-[10px] font-semibold text-[#5d7892]">{(activityQuery.data?.communications || []).length} records</span>
                     </div>
                     {activityQuery.isLoading ? (
                       <div className="h-20 bg-gray-100 rounded animate-pulse" />
@@ -1627,7 +1695,7 @@ export default function CRMPage() {
                       <div className="space-y-0 divide-y divide-gray-100">
                         {(activityQuery.data?.communications || []).map((c: any) => (
                           <div key={c.id} className="flex gap-3 py-3 first:pt-0 last:pb-0 text-xs text-gray-600">
-                            <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                             <div className="w-8 h-8 rounded-lg bg-[#edf4fa] flex items-center justify-center shrink-0">
                               {c.type === "email" ? (
                                 <Mail size={12} className={c.direction === "outbound" ? "text-blue-500" : "text-gray-400"} />
                               ) : (
@@ -1667,13 +1735,6 @@ export default function CRMPage() {
                     type="email"
                     className="flex-1 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-400 focus:outline-none text-xs text-gray-600 truncate"
                     onChange={e => setEditFields(f => ({ ...f, email: e.target.value }))}
-                    onBlur={e => {
-                      const val = e.target.value.trim();
-                      if (val !== (selectedContact.email || "")) {
-                        updateContactMutation.mutate({ id: selectedContact.id, data: { email: val } });
-                        setSelectedContact({ ...selectedContact, email: val });
-                      }
-                    }}
                   />
                 </div>
                 <div className="flex items-center gap-1.5 col-span-2">
@@ -1684,13 +1745,6 @@ export default function CRMPage() {
                     type="tel"
                     className="flex-1 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-400 focus:outline-none text-xs text-gray-600"
                     onChange={e => setEditFields(f => ({ ...f, phone: e.target.value }))}
-                    onBlur={e => {
-                      const val = e.target.value.trim();
-                      if (val !== (selectedContact.phone || "")) {
-                        updateContactMutation.mutate({ id: selectedContact.id, data: { phone: val } });
-                        setSelectedContact({ ...selectedContact, phone: val });
-                      }
-                    }}
                   />
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -1709,14 +1763,9 @@ export default function CRMPage() {
                   <UserCheck size={12} className="text-gray-400 shrink-0" />
                   <Input
                     placeholder="Assign to team member..."
-                    defaultValue={selectedContact.assignedTo || ""}
+                    value={editFields.assignedTo}
                     className="h-6 text-[11px] flex-1"
-                    onBlur={e => {
-                      if (e.target.value !== (selectedContact.assignedTo || "")) {
-                        updateContactMutation.mutate({ id: selectedContact.id, data: { assignedTo: e.target.value } });
-                        setSelectedContact({ ...selectedContact, assignedTo: e.target.value || undefined });
-                      }
-                    }}
+                    onChange={e => setEditFields(f => ({ ...f, assignedTo: e.target.value }))}
                   />
                 </div>
               </div>
@@ -1732,7 +1781,7 @@ export default function CRMPage() {
                   {(selectedContact.crmTags || []).map(tag => {
                     const isOutreach = (outreachTagsQuery.data || []).some(ot => ot.tag === tag);
                     return (
-                      <span key={tag} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border ${isOutreach ? "bg-violet-50 text-violet-700 border-violet-200" : tagColor(tag)}`}>
+                      <span key={tag} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border ${isOutreach ? "bg-[#e7f0ff] text-[#1554a3] border-[#c6d9ea]" : tagColor(tag)}`}>
                         {isOutreach && <Megaphone size={9} />}
                         {tag}
                         <button onClick={() => removeTagFromContact(selectedContact, tag)} className="hover:opacity-70 ml-0.5">
@@ -1748,7 +1797,7 @@ export default function CRMPage() {
               {(outreachTagsQuery.data || []).length > 0 && (
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <p className="text-[9px] font-semibold uppercase tracking-wide text-violet-500 flex items-center gap-1">
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-[#3278c7] flex items-center gap-1">
                       <Megaphone size={9} /> Outreach Campaigns — click to assign &amp; enroll
                     </p>
                     {(() => {
@@ -1778,7 +1827,7 @@ export default function CRMPage() {
                       return applied ? (
                         <span
                           key={ot.id}
-                          className="inline-flex items-center rounded-full border bg-violet-600 text-white border-violet-600 shadow-sm text-[11px] font-medium overflow-hidden"
+                          className="inline-flex items-center rounded-full border border-[#1554a3] bg-[#1554a3] text-white shadow-sm text-[11px] font-medium overflow-hidden"
                         >
                           <span className="flex items-center gap-1 pl-2.5 pr-1.5 py-1">
                             <Megaphone size={9} />
@@ -1792,7 +1841,7 @@ export default function CRMPage() {
                           <button
                             onClick={() => removeTagFromContact(selectedContact, ot.tag)}
                             title={`Remove "${ot.name}" tag`}
-                            className="pr-2 pl-0.5 py-1 hover:bg-violet-800 transition-colors self-stretch flex items-center"
+                            className="pr-2 pl-0.5 py-1 hover:bg-[#0b3159] transition-colors self-stretch flex items-center"
                           >
                             <X size={10} />
                           </button>
@@ -1809,7 +1858,7 @@ export default function CRMPage() {
                               senderId: ot.senderId,
                             });
                           }}
-                          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] border transition-all font-medium bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100"
+                          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] border border-[#c6d9ea] bg-[#e7f0ff] text-[#1554a3] transition-all font-medium hover:bg-[#dceaff]"
                         >
                           <Megaphone size={9} />
                           {ot.name}
@@ -1876,16 +1925,11 @@ export default function CRMPage() {
             <div className="space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Notes</p>
               <Textarea
-                key={selectedContact.id}
                 placeholder="Add internal notes about this contact..."
-                defaultValue={selectedContact.crmNotes || ""}
+                value={editFields.crmNotes}
                 rows={3}
                 className="text-xs resize-none"
-                onBlur={e => {
-                  if (e.target.value !== (selectedContact.crmNotes || "")) {
-                    updateContactMutation.mutate({ id: selectedContact.id, data: { crmNotes: e.target.value } });
-                  }
-                }}
+                onChange={e => setEditFields(f => ({ ...f, crmNotes: e.target.value }))}
               />
             </div>
 
@@ -2150,7 +2194,7 @@ export default function CRMPage() {
             {/* Outreach campaign tags — shown first and most prominently */}
             {(outreachTagsQuery.data || []).length > 0 && bulkTagAction === "add" && (
               <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600 flex items-center gap-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-[#3278c7] flex items-center gap-1">
                   <Megaphone size={10} /> Assign to Outreach Campaign
                 </p>
                 <p className="text-[11px] text-gray-500">
@@ -2175,11 +2219,11 @@ export default function CRMPage() {
                         setShowBulkTagModal(false);
                         toast({ title: `${ids.length} contacts tagged & enrolled in "${ot.name}"${geoState ? ` [${geoState}]` : ""}` });
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium border bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100 transition-all"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[#c6d9ea] bg-[#e7f0ff] px-3 py-1.5 text-[12px] font-medium text-[#1554a3] transition-all hover:bg-[#dceaff]"
                     >
                       <Megaphone size={10} />
                       {ot.name}
-                      {ot.senderName && <span className="text-violet-400">· {ot.senderName.split(" ")[0]}</span>}
+                      {ot.senderName && <span className="text-[#78a1c8]">· {ot.senderName.split(" ")[0]}</span>}
                     </button>
                   ))}
                 </div>
@@ -2430,10 +2474,13 @@ export default function CRMPage() {
       </Dialog>
 
       {/* New Contact Dialog */}
+      <datalist id="crm-company-profiles">
+        {(geoOptionsQuery.data?.brokerages || []).map(company => <option key={company} value={company} />)}
+      </datalist>
       <Dialog open={showNewContactModal} onOpenChange={open => { setShowNewContactModal(open); if (!open) setNewContact({ firstName: "", lastName: "", email: "", phone: "", brokerage: "", assignedTo: "", crmNotes: "" }); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Plus size={16} className="text-green-600" />New Contact</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Plus size={16} className="text-[#1554a3]" />New Contact</DialogTitle>
             <DialogDescription>Add a contact to your CRM manually.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-1">
@@ -2478,9 +2525,10 @@ export default function CRMPage() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-700">Brokerage / Company</label>
+              <label className="text-xs font-medium text-gray-700">Company profile</label>
               <Input
-                placeholder="ABC Realty"
+                placeholder="Choose an existing company or enter a new one"
+                list="crm-company-profiles"
                 value={newContact.brokerage}
                 onChange={e => setNewContact(p => ({ ...p, brokerage: e.target.value }))}
                 className="h-8 text-sm"
@@ -2509,7 +2557,7 @@ export default function CRMPage() {
           <div className="flex gap-2 justify-end mt-4">
             <Button variant="outline" onClick={() => setShowNewContactModal(false)}>Cancel</Button>
             <Button
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-[#0b3159] text-white hover:bg-[#164b7d]"
               disabled={!newContact.firstName.trim() || !newContact.lastName.trim() || createContactMutation.isPending}
               onClick={() => createContactMutation.mutate(newContact)}
             >
