@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
+import { useLocation } from "wouter";
 import {
   Building2,
   CheckCircle2,
@@ -108,11 +109,19 @@ function DealStatus({ row }: { row: DeveloperDeal }) {
 
 export default function DeveloperDashboard() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const profile = (user as any)?.developerProfile;
+  const isGeneralSales = profile?.profileType === "general_sales";
   const primaryColor = profile?.primaryColor || "#0A2B4A";
   const secondaryColor = profile?.secondaryColor || "#4A90E2";
+
+  useEffect(() => {
+    if (isGeneralSales) {
+      setLocation("/developer/crm");
+    }
+  }, [isGeneralSales, setLocation]);
 
   const [search, setSearch] = useState("");
   const [importOpen, setImportOpen] = useState(false);
@@ -127,6 +136,7 @@ export default function DeveloperDashboard() {
 
   const dealsQuery = useQuery<{ deals: DeveloperDeal[] }>({
     queryKey: ["/api/developer-profile/me/deals"],
+    enabled: !isGeneralSales,
     queryFn: async () => {
       const response = await fetch("/api/developer-profile/me/deals", { credentials: "include" });
       if (!response.ok) {
@@ -281,6 +291,10 @@ export default function DeveloperDashboard() {
     const value = Number(deal.topRentPSF);
     return Number.isFinite(value) ? `$${value.toFixed(2)}/SF` : "—";
   };
+
+  if (isGeneralSales) {
+    return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">Redirecting to CRM…</div>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">

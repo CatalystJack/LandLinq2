@@ -2612,11 +2612,34 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const DEVELOPER_ALLOWED_PAGE_PATHS = new Set([
     '/developer/dashboard',
     '/developer/crm',
+    '/developer/pipeline',
     '/developer/outreach',
     '/developer/analytics',
     '/developer/user-management',
     '/developer/settings',
   ]);
+  const getDeveloperHomePath = async (user: any) => {
+    if (user?.developerProfile?.profileType === 'general_sales') {
+      return '/developer/crm';
+    }
+
+    const developerProfileId = user?.developerProfileId;
+    if (!developerProfileId) return '/developer/dashboard';
+
+    try {
+      const [profile] = await db
+        .select({ profileType: developerProfiles.profileType })
+        .from(developerProfiles)
+        .where(eq(developerProfiles.id, developerProfileId))
+        .limit(1);
+      return profile?.profileType === 'general_sales'
+        ? '/developer/crm'
+        : '/developer/dashboard';
+    } catch (error) {
+      console.error('[DEVELOPER ROUTE] Could not resolve profile type for redirect:', error);
+      return '/developer/dashboard';
+    }
+  };
   app.use(async (req: any, res: any, next: any) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
     if (req.path.startsWith('/api/')) return next();
@@ -2643,7 +2666,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         }
       }
       if (role === 'DEVELOPER' && !DEVELOPER_ALLOWED_PAGE_PATHS.has(req.path)) {
-        return res.redirect('/developer/dashboard');
+        return res.redirect(await getDeveloperHomePath(req.user));
       }
       return next();
     }

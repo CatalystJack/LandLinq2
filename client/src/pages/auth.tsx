@@ -23,10 +23,13 @@ export default function AuthPage() {
   const authMode = searchParams.get('mode') || 'login'; // default to login
   const authenticatedEmail = String((user as any)?.claims?.email || (user as any)?.email || "").toLowerCase();
   const authenticatedRole = String((user as any)?.role || "").toUpperCase();
+  const authenticatedDeveloperHome = (user as any)?.developerProfile?.profileType === "general_sales"
+    ? "/developer/crm"
+    : "/developer/dashboard";
   const redirectUrl = authenticatedEmail.endsWith("@apexresi.com")
     ? "/dashboard"
     : authenticatedRole === "DEVELOPER"
-      ? "/developer/dashboard"
+      ? authenticatedDeveloperHome
       : (searchParams.get('redirect') || '/dashboard');
 
   // Redirect if already logged in
@@ -54,8 +57,17 @@ export default function AuthPage() {
       }
       return response.json();
     },
-    onSuccess: (userData) => {
-      queryClient.setQueryData(["/api/user"], userData);
+    onSuccess: async (userData) => {
+      let authenticatedUser = userData;
+      const isDeveloper = String(userData?.role || "").toUpperCase() === "DEVELOPER";
+      if (isDeveloper) {
+        const currentUserResponse = await fetch("/api/user", { credentials: "include" }).catch(() => null);
+        if (currentUserResponse?.ok) {
+          authenticatedUser = await currentUserResponse.json();
+        }
+      }
+
+      queryClient.setQueryData(["/api/user"], authenticatedUser);
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({
         title: "Login successful",
@@ -63,11 +75,14 @@ export default function AuthPage() {
       });
       // Apex users always enter the LandLinq/Apex parent platform. This takes
       // priority over a stale or user-supplied redirect destination.
-      const isApexPlatformUser = String(userData?.email || "").toLowerCase().endsWith("@apexresi.com");
+      const isApexPlatformUser = String(authenticatedUser?.email || "").toLowerCase().endsWith("@apexresi.com");
+      const developerHome = authenticatedUser?.developerProfile?.profileType === "general_sales"
+        ? "/developer/crm"
+        : "/developer/dashboard";
       const redirectPath = isApexPlatformUser
         ? "/dashboard"
-        : userData?.role?.toUpperCase() === 'DEVELOPER'
-        ? '/developer/dashboard'
+        : String(authenticatedUser?.role || "").toUpperCase() === "DEVELOPER"
+        ? developerHome
         : (searchParams.get('redirect') || '/dashboard');
       setTimeout(() => {
         window.location.href = redirectPath;
@@ -300,7 +315,7 @@ export default function AuthPage() {
                       </div>
                       <Button 
                         type="submit" 
-                        className="h-12 w-full rounded-lg border-0 bg-[#4A90E2] text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:bg-[#3d7fcf]"
+                        className="h-12 w-full rounded-lg border border-transparent bg-[#4A90E2] text-sm font-bold uppercase tracking-wide text-white shadow-sm transition-colors hover:border-[#4A90E2] hover:bg-white hover:text-[#4A90E2]"
                         disabled={loginMutation.isPending}
                         data-testid="button-login"
                       >

@@ -1,0 +1,41 @@
+Fix two bugs in the DEVELOPER-role server-side route allowlist in server/routes.ts 
+(~line 2612).
+
+TASK 1 — Add missing /developer/pipeline to the allowlist
+DEVELOPER_ALLOWED_PAGE_PATHS is missing '/developer/pipeline', even though the 
+Pipeline feature was built and added to client-side navigation and route-preload. 
+This means directly visiting or refreshing /developer/pipeline currently gets 
+redirected away by this server-side guard before the page loads. Add 
+'/developer/pipeline' to the Set.
+
+TASK 2 — Make the fallback redirect target profileType-aware
+The redirect at line ~2645 (when a DEVELOPER user hits a path not in the allowlist) 
+currently always sends them to '/developer/dashboard', regardless of profileType. 
+For a general_sales account, /developer/dashboard is not a page they should ever 
+see — it has no nav link to it, and the page itself has no handling for a profile 
+with no real estate deals or classification.
+
+Fix: before redirecting, look up the authenticated user's developerProfile.profileType. 
+If profileType === 'general_sales', redirect to '/developer/crm' instead of 
+'/developer/dashboard'. If profileType === 'real_estate' (or profileType is missing/ 
+undefined for any legacy reason), keep the existing '/developer/dashboard' redirect.
+
+Also apply this same profileType-aware logic to the mustResetPassword redirect 
+target if it exists elsewhere, and to the actual post-login redirect (search for 
+wherever a successful DEVELOPER login currently redirects to '/developer/dashboard' 
+unconditionally — this may be a separate code path from the allowlist guard checked 
+here).
+
+TASK 3 — Defense in depth: handle a general_sales account loading the dashboard page
+As a second safety net (in case any other path still sends a general_sales account 
+to /developer/dashboard), add a check in client/src/pages/developer-dashboard.tsx: 
+if the logged-in profile's profileType === 'general_sales', render a redirect to 
+/developer/crm immediately instead of attempting to load/display any deal data. 
+This ensures even a stray link or bookmark can't put a general_sales user on a 
+broken page.
+
+Verify: log in as a general_sales test account and confirm navigating to any 
+disallowed path (including a stale /developer/dashboard bookmark) correctly lands 
+on /developer/crm, never on a broken or empty Deal Dashboard. Confirm 
+/developer/pipeline loads correctly on direct navigation and on a full page refresh 
+for both profile types.
