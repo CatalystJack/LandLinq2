@@ -1,0 +1,86 @@
+Phase 2: wire the new developerProductTypes table (added in Phase 1) into actual 
+classification, Settings, and dashboard display. Every Investment Company must have 
+at least one active product type — classification now checks a deal against every 
+one of a company's product types, not one flat threshold.
+
+TASK 1 — Rewrite the classification engine
+In server/developerClassificationService.ts, replace the existing 
+classifyDealForProfile logic with:
+
+export function classifyDealForProfile(deal, profile, productTypes): { 
+  classification: 'passed' | 'review'; 
+  matchedProductTypes: string[] 
+} {
+  const countyMatch = (profile.targetCounties || []).includes(deal.county) 
+    || (profile.targetStates || []).includes(deal.state);
+
+  if (!countyMatch) {
+    return { classification: 'passed', matchedProductTypes: [] };
+  }
+
+  const matched: string[] = [];
+  for (const pt of productTypes.filter(p => p.isActive)) {
+    const acreagePass = parseFloat(deal.sizeAcres) >= parseFloat(pt.minAcres)
+      && (!pt.maxAcres || parseFloat(deal.sizeAcres) <= parseFloat(pt.maxAcres));
+
+    let rentPass: boolean;
+    if (profile.rentMetric === 'psf') {
+      rentPass = parseFloat(deal.topRentPSF) >= parseFloat(pt.minRentPsf);
+    } else {
+      rentPass = parseFloat(deal.avgRentPerUnit) >= parseFloat(pt.minRentPerUnit);
+    }
+
+    // QCT/DDA/OZ override still applies per product type: only rescues a
+    // rent-only failure — acreage must still pass on its own.
+    if (acreagePass && !rentPass) {
+      const qualifiesForOverride =
+        (deal.isQct && profile.qctOverridesRentMinimum) ||
+        (deal.isDda && profile.ddaOverridesRentMinimum) ||
+        (deal.isOz && profile.ozOverridesRentMinimum);
+      if (qualifiesForOverride) rentPass = true;
+    }
+
+    if (acreagePass && rentPass) matched.push(pt.name);
+  }
+
+  return {
+    classification: matched.length > 0 ? 'review' : 'passed',
+    matchedProductTypes: matched,
+  };
+}
+
+Update every call site of classifyDealForProfile (auto-send, bulk import, manual 
+send, and any email-intake routing) to first fetch that profile's active 
+developerProductTypes, pass them in, and store the returned matchedProductTypes 
+array on the partnerDeveloperSends record alongside the classification.
+
+TASK 2 — Settings UI: manage product types
+In client/src/pages/developer-criteria-settings.tsx, replace the single flat 
+acreage/rent input fields with a repeatable list: each row is one product type 
+(name, min acres, max acres, min rent — labeled by whichever metric the profile 
+uses, $/SF or $/Unit). Include "Add product type" and per-row remove controls. 
+Require at least one product type row before allowing save — show a clear validation 
+error if the list would be empty on submit.
+
+Also add the market-label grouping (developer_county_market_labels, from Phase 1) 
+to the county selection UI in this same page, so counties display grouped under 
+headers like "CLT" / "RDU" / "Wilmington" / "Charleston" for readability — purely 
+visual grouping, no change to how county matching works.
+
+TASK 3 — Dashboard: show matched product types
+In client/src/pages/developer-dashboard.tsx, display matchedProductTypes as small 
+badges next to the classification label for any deal marked "Review" — e.g. pills 
+reading "3-Story Garden" and/or "4-Story" when a deal clears both. No badge shown 
+for "Passed" deals, since matchedProductTypes will be empty.
+
+TASK 4 — Retire the old flat fields
+Once the above is verified working end-to-end (test with at least one real 
+Investment Company profile created through the admin panel), remove minAcres, 
+maxAcres, minRentPsf, minRentPerUnit, and acreageOverridesByProductType from 
+developerProfiles entirely. Search the whole codebase for each field name first and 
+report any remaining usages before removing — do not drop these columns until 
+confirmed nothing else still references them.
+
+Do not change QCT/DDA/OZ toggle logic itself (qctOverridesRentMinimum, etc. stay on 
+developerProfiles, unchanged) — only how they interact with rent-per-product-type 
+checks, as shown above.

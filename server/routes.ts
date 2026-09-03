@@ -12064,12 +12064,24 @@ RULES:
 
   app.post("/api/admin/investment-companies", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
     try {
-      const { developerProfiles } = await import("@shared/schema");
+      const { developerProductTypes, developerProfiles } = await import("@shared/schema");
       const payload = parseInvestmentCompanyPayload(req.body || {});
       const [existing] = await db.select({ id: developerProfiles.id }).from(developerProfiles)
         .where(eq(developerProfiles.slug, payload.slug)).limit(1);
       if (existing) return res.status(409).json({ error: "That slug is already in use" });
-      const [profile] = await db.insert(developerProfiles).values(payload as any).returning();
+      const profile = await db.transaction(async (tx) => {
+        const [created] = await tx.insert(developerProfiles).values(payload as any).returning();
+        await tx.insert(developerProductTypes).values({
+          developerProfileId: created.id,
+          name: "General",
+          minAcres: payload.minAcres,
+          maxAcres: payload.maxAcres,
+          minRentPsf: payload.minRentPsf,
+          minRentPerUnit: payload.minRentPerUnit,
+          isActive: true,
+        });
+        return created;
+      });
       return res.status(201).json({ profile: { ...profile, teamMemberCount: 0 } });
     } catch (error: any) {
       console.error("[admin investment companies POST] Error:", error);
@@ -12280,13 +12292,23 @@ RULES:
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
-      const { developerProfiles } = await import('@shared/schema');
+      const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import('@shared/schema');
       const [profile] = await db.select().from(developerProfiles).where(and(
         eq(developerProfiles.id, developerProfileId),
         eq(developerProfiles.isActive, true),
       )).limit(1);
       if (!profile) return res.status(404).json({ error: 'Investment Company profile not found' });
-      return res.json({ profile });
+      const [productTypes, countyLabels] = await Promise.all([
+        db.select().from(developerProductTypes).where(eq(developerProductTypes.developerProfileId, developerProfileId)).orderBy(developerProductTypes.createdAt),
+        db.select().from(developerCountyMarketLabels).where(eq(developerCountyMarketLabels.developerProfileId, developerProfileId)),
+      ]);
+      return res.json({
+        profile: {
+          ...profile,
+          productTypes,
+          countyMarketLabels: Object.fromEntries(countyLabels.map((label) => [label.county, label.marketLabel])),
+        },
+      });
     } catch (error: any) {
       console.error('[developer-profile/me] Error:', error);
       return res.status(500).json({ error: 'Failed to load company settings' });
@@ -12297,7 +12319,7 @@ RULES:
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
-      const { developerProfiles } = await import('@shared/schema');
+      const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import('@shared/schema');
       const body = req.body || {};
       const updates: Record<string, any> = {};
 
@@ -12311,16 +12333,20 @@ RULES:
       stringArray(body.targetStates, 'targetStates');
       stringArray(body.targetCounties, 'targetCounties');
 
+      if (!Array.isArray(body.productTypes) || body.productTypes.length === 0) {
+        throw new Error('At least one product type is required');
+      }
+
       if (body.rentMetric !== undefined) {
         if (!['psf', 'per_unit'].includes(body.rentMetric)) throw new Error('Invalid rent metric');
         updates.rentMetric = body.rentMetric;
       }
 
-      const decimalFields = ['minRentPsf', 'minRentPerUnit', 'minAcres', 'maxAcres', 'compSearchRadiusMiles'];
+      const decimalFields = ['compSearchRadiusMiles'];
       for (const field of decimalFields) {
         if (body[field] === undefined || body[field] === null || body[field] === '') {
-          if (field === 'minAcres' || field === 'compSearchRadiusMiles') {
-            throw new Error(field === 'minAcres' ? 'Minimum acreage is required' : 'Comparable search radius is required');
+          if (field === 'compSearchRadiusMiles') {
+            throw new Error('Comparable search radius is required');
           }
           if (body[field] !== undefined) updates[field] = null;
           continue;
@@ -12332,18 +12358,54 @@ RULES:
         updates[field] = String(value);
       }
 
-      if (body.acreageOverridesByProductType !== undefined) {
-        if (!body.acreageOverridesByProductType || typeof body.acreageOverridesByProductType !== 'object' || Array.isArray(body.acreageOverridesByProductType)) {
-          throw new Error('Acreage overrides must be a key-value object');
+      const productTypes = body.productTypes.map((raw: any, index: number) => {
+        const name = String(raw?.name ?? '').trim();
+        const minAcres = Number(raw?.minAcres);
+        const maxAcres = raw?.maxAcres === null || raw?.maxAcres === undefined || raw?.maxAcres === ''
+          ? null
+          : Number(raw.maxAcres);
+        const minRentPsf = raw?.minRentPsf === null || raw?.minRentPsf === undefined || raw?.minRentPsf === ''
+          ? null
+          : Number(raw.minRentPsf);
+        const minRentPerUnit = raw?.minRentPerUnit === null || raw?.minRentPerUnit === undefined || raw?.minRentPerUnit === ''
+          ? null
+          : Number(raw.minRentPerUnit);
+        const isActive = raw?.isActive !== false;
+        if (!name) throw new Error(`Product type ${index + 1} needs a name`);
+        if (!Number.isFinite(minAcres) || minAcres < 0) throw new Error(`${name}: minimum acreage must be a non-negative number`);
+        if (maxAcres !== null && (!Number.isFinite(maxAcres) || maxAcres < minAcres)) {
+          throw new Error(`${name}: maximum acreage must be greater than or equal to minimum acreage`);
         }
-        const overrides: Record<string, number> = {};
-        for (const [key, rawValue] of Object.entries(body.acreageOverridesByProductType)) {
-          const name = key.trim();
-          const value = Number(rawValue);
-          if (!name || !Number.isFinite(value) || value < 0) throw new Error('Acreage overrides must contain valid product types and numbers');
-          overrides[name] = value;
+        if (minRentPsf !== null && (!Number.isFinite(minRentPsf) || minRentPsf < 0)) {
+          throw new Error(`${name}: minimum $/SF must be a non-negative number`);
         }
-        updates.acreageOverridesByProductType = overrides;
+        if (minRentPerUnit !== null && (!Number.isFinite(minRentPerUnit) || minRentPerUnit < 0)) {
+          throw new Error(`${name}: minimum $/Unit must be a non-negative number`);
+        }
+        return {
+          name,
+          minAcres: String(minAcres),
+          maxAcres: maxAcres === null ? null : String(maxAcres),
+          minRentPsf: minRentPsf === null ? null : String(minRentPsf),
+          minRentPerUnit: minRentPerUnit === null ? null : String(minRentPerUnit),
+          isActive,
+        };
+      });
+      if (!productTypes.some((productType: any) => productType.isActive)) {
+        throw new Error('At least one active product type is required');
+      }
+      const normalizedNames = productTypes.map((productType: any) => productType.name.toLowerCase());
+      if (new Set(normalizedNames).size !== normalizedNames.length) {
+        throw new Error('Product type names must be unique');
+      }
+
+      const countyMarketLabels = body.countyMarketLabels;
+      if (countyMarketLabels !== undefined && (
+        !countyMarketLabels ||
+        typeof countyMarketLabels !== 'object' ||
+        Array.isArray(countyMarketLabels)
+      )) {
+        throw new Error('County market labels must be an object');
       }
 
       for (const field of ['qctOverridesRentMinimum', 'ddaOverridesRentMinimum', 'ozOverridesRentMinimum']) {
@@ -12355,30 +12417,74 @@ RULES:
 
       const [currentProfile] = await db.select({
         rentMetric: developerProfiles.rentMetric,
-        minRentPsf: developerProfiles.minRentPsf,
-        minRentPerUnit: developerProfiles.minRentPerUnit,
       }).from(developerProfiles).where(and(
         eq(developerProfiles.id, developerProfileId),
         eq(developerProfiles.isActive, true),
       )).limit(1);
       if (!currentProfile) return res.status(404).json({ error: 'Investment Company profile not found' });
       const effectiveMetric = updates.rentMetric ?? currentProfile.rentMetric;
-      const effectivePsf = updates.minRentPsf !== undefined ? updates.minRentPsf : currentProfile.minRentPsf;
-      const effectivePerUnit = updates.minRentPerUnit !== undefined ? updates.minRentPerUnit : currentProfile.minRentPerUnit;
-      if (effectiveMetric === 'psf' && (!effectivePsf || Number(effectivePsf) <= 0)) {
-        throw new Error('Minimum rent $/SF is required when $/SF is the primary metric');
+      if (effectiveMetric === 'psf' && productTypes.some((productType: any) => productType.isActive && !productType.minRentPsf)) {
+        throw new Error('Every active product type needs a minimum $/SF');
       }
-      if (effectiveMetric === 'per_unit' && (!effectivePerUnit || Number(effectivePerUnit) <= 0)) {
-        throw new Error('Minimum rent $/Unit is required when $/Unit is the primary metric');
+      if (effectiveMetric === 'per_unit' && productTypes.some((productType: any) => productType.isActive && !productType.minRentPerUnit)) {
+        throw new Error('Every active product type needs a minimum $/Unit');
       }
 
-      const [updated] = await db.update(developerProfiles)
-        .set({ ...updates, updatedAt: new Date() })
-        .where(and(
-          eq(developerProfiles.id, developerProfileId),
-          eq(developerProfiles.isActive, true),
-        ))
-        .returning();
+      // Keep the legacy columns synchronized during the migration window so
+      // admin lists and older records remain readable. Classification reads
+      // only developer_product_types.
+      const firstActive = productTypes.find((productType: any) => productType.isActive);
+      updates.minAcres = firstActive.minAcres;
+      updates.maxAcres = firstActive.maxAcres;
+      updates.minRentPsf = firstActive.minRentPsf;
+      updates.minRentPerUnit = firstActive.minRentPerUnit;
+      updates.acreageOverridesByProductType = {};
+
+      const updated = await db.transaction(async (tx) => {
+        const [saved] = await tx.update(developerProfiles)
+          .set({ ...updates, updatedAt: new Date() })
+          .where(and(
+            eq(developerProfiles.id, developerProfileId),
+            eq(developerProfiles.isActive, true),
+          ))
+          .returning();
+        if (!saved) return null;
+
+        await tx.delete(developerProductTypes)
+          .where(eq(developerProductTypes.developerProfileId, developerProfileId));
+        await tx.insert(developerProductTypes).values(productTypes.map((productType: any) => ({
+          developerProfileId,
+          ...productType,
+        })));
+
+        if (countyMarketLabels !== undefined) {
+          await tx.delete(developerCountyMarketLabels)
+            .where(eq(developerCountyMarketLabels.developerProfileId, developerProfileId));
+          const counties = new Set((updates.targetCounties || []).map((county: string) => county.toLowerCase()));
+          const labels = Object.entries(countyMarketLabels as Record<string, unknown>)
+            .map(([county, marketLabel]) => ({
+              county: county.trim(),
+              marketLabel: String(marketLabel ?? '').trim(),
+            }))
+            .filter(({ county, marketLabel }) => county && marketLabel && counties.has(county.toLowerCase()))
+            .map(({ county, marketLabel }) => ({
+              developerProfileId,
+              county,
+              marketLabel,
+            }));
+          if (labels.length) await tx.insert(developerCountyMarketLabels).values(labels);
+        }
+
+        const [savedProducts, savedLabels] = await Promise.all([
+          tx.select().from(developerProductTypes).where(eq(developerProductTypes.developerProfileId, developerProfileId)).orderBy(developerProductTypes.createdAt),
+          tx.select().from(developerCountyMarketLabels).where(eq(developerCountyMarketLabels.developerProfileId, developerProfileId)),
+        ]);
+        return {
+          ...saved,
+          productTypes: savedProducts,
+          countyMarketLabels: Object.fromEntries(savedLabels.map((label) => [label.county, label.marketLabel])),
+        };
+      });
       if (!updated) return res.status(404).json({ error: 'Investment Company profile not found' });
       return res.json({ profile: updated });
     } catch (error: any) {
@@ -13457,7 +13563,7 @@ RULES:
     try {
       const { developerProductTypes, developerProfiles, partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
       const { eq, and, isNotNull } = await import('drizzle-orm');
-      const { classifyDealForProfile } = await import('./developerClassificationService');
+      const { classifyDealForProfile, isDealInProfileMarket } = await import('./developerClassificationService');
       const { doesDealMatchDeveloper, partnerDeveloperToClassificationProfile, partnerDeveloperToClassificationProductTypes } = await import('./partnerDeveloperAutoSend');
 
       // Fetch all active developers
@@ -13489,7 +13595,11 @@ RULES:
 
       for (const deal of qualifying) {
         for (const { developer: dev, profile } of recipients) {
-          if (!doesDealMatchDeveloper(deal, dev)) continue;
+          if (profile) {
+            if (!deal.apex || !isDealInProfileMarket(deal, profile)) continue;
+          } else if (!doesDealMatchDeveloper(deal, dev)) {
+            continue;
+          }
 
           // Skip if already queued or sent
           const existing = await db

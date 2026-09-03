@@ -12,6 +12,14 @@ function numericValue(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+export function isDealInProfileMarket(deal: any, profile: DeveloperProfile): boolean {
+  const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase();
+  const county = normalize(deal?.county);
+  const state = normalize(deal?.state);
+  return (profile.targetCounties || []).some((target) => normalize(target) === county) ||
+    (profile.targetStates || []).some((target) => normalize(target) === state);
+}
+
 function hasDesignation(
   deal: any,
   booleanField: "isQct" | "isDda" | "isOz",
@@ -36,9 +44,7 @@ export function classifyDealForProfile(
   profile: DeveloperProfile,
   productTypes: DeveloperProductType[],
 ): DeveloperClassificationResult {
-  const countyMatch =
-    (profile.targetCounties || []).includes(deal?.county) ||
-    (profile.targetStates || []).includes(deal?.state);
+  const countyMatch = isDealInProfileMarket(deal, profile);
   const dealAcreage = numericValue(deal?.sizeAcres);
   const dealRent = profile.rentMetric === "psf"
     ? numericValue(deal?.topRentPSF)

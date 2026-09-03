@@ -29,15 +29,22 @@ type Profile = {
   targetStates: string[];
   targetCounties: string[];
   rentMetric: "psf" | "per_unit";
-  minRentPsf: string | null;
-  minRentPerUnit: string | null;
   compSearchRadiusMiles: string;
-  minAcres: string;
-  maxAcres: string | null;
-  acreageOverridesByProductType: Record<string, number> | null;
+  productTypes: ProductType[];
+  countyMarketLabels: Record<string, string>;
   qctOverridesRentMinimum: boolean;
   ddaOverridesRentMinimum: boolean;
   ozOverridesRentMinimum: boolean;
+};
+
+type ProductType = {
+  id?: string;
+  name: string;
+  minAcres: string;
+  maxAcres: string | null;
+  minRentPsf: string | null;
+  minRentPerUnit: string | null;
+  isActive: boolean;
 };
 
 type TeamMember = {
@@ -141,6 +148,74 @@ function NumberField({
   );
 }
 
+function CountyMarketEditor({
+  values,
+  labels,
+  onCountiesChange,
+  onLabelsChange,
+}: {
+  values: string[];
+  labels: Record<string, string>;
+  onCountiesChange: (values: string[]) => void;
+  onLabelsChange: (labels: Record<string, string>) => void;
+}) {
+  const groups = values.reduce<Record<string, string[]>>((result, county) => {
+    const market = labels[county]?.trim() || "Other markets";
+    (result[market] ||= []).push(county);
+    return result;
+  }, {});
+
+  const removeCounty = (county: string) => {
+    onCountiesChange(values.filter((value) => value !== county));
+    const nextLabels = { ...labels };
+    delete nextLabels[county];
+    onLabelsChange(nextLabels);
+  };
+
+  return (
+    <div className="space-y-3">
+      <TagEditor
+        label="Target counties"
+        values={values}
+        onChange={(counties) => {
+          onCountiesChange(counties);
+          onLabelsChange(Object.fromEntries(Object.entries(labels).filter(([county]) => counties.includes(county))));
+        }}
+        placeholder="e.g. Mecklenburg"
+      />
+      {values.length > 0 && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">County groups</p>
+          <div className="space-y-4">
+            {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([market, counties]) => (
+              <div key={market}>
+                <p className="mb-2 text-xs font-semibold text-slate-700">{market}</p>
+                <div className="space-y-2">
+                  {counties.map((county) => (
+                    <div key={county} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
+                      <span className="text-sm font-medium text-slate-800">{county}</span>
+                      <Input
+                        value={labels[county] || ""}
+                        onChange={(event) => onLabelsChange({ ...labels, [county]: event.target.value })}
+                        placeholder="Market label, e.g. CLT"
+                        aria-label={`${county} market label`}
+                        className="h-8 bg-white"
+                      />
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeCounty(county)} aria-label={`Remove ${county}`}>
+                        <Trash2 className="h-4 w-4 text-slate-400" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DeveloperCriteriaSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -167,11 +242,16 @@ export default function DeveloperCriteriaSettings() {
         ...profile,
         targetStates: profile.targetStates || [],
         targetCounties: profile.targetCounties || [],
-        acreageOverridesByProductType: profile.acreageOverridesByProductType || {},
-        minRentPsf: profile.minRentPsf || "",
-        minRentPerUnit: profile.minRentPerUnit || "",
+        productTypes: (profile.productTypes || []).map((productType) => ({
+          ...productType,
+          minAcres: productType.minAcres || "",
+          maxAcres: productType.maxAcres || "",
+          minRentPsf: productType.minRentPsf || "",
+          minRentPerUnit: productType.minRentPerUnit || "",
+          isActive: productType.isActive !== false,
+        })),
+        countyMarketLabels: profile.countyMarketLabels || {},
         compSearchRadiusMiles: profile.compSearchRadiusMiles || "3",
-        maxAcres: profile.maxAcres || "",
       });
     }
   }, [profileQuery.data]);
@@ -219,44 +299,73 @@ export default function DeveloperCriteriaSettings() {
 
   const save = () => {
     if (!form) return;
-    if (!form.minAcres || Number(form.minAcres) < 0) {
-      toast({ title: "Minimum acreage is required", variant: "destructive" });
+    if (!form.productTypes.length || !form.productTypes.some((productType) => productType.isActive)) {
+      toast({ title: "Add at least one active product type before saving", variant: "destructive" });
       return;
     }
     if (!form.compSearchRadiusMiles || Number(form.compSearchRadiusMiles) <= 0) {
       toast({ title: "Comparable search radius must be greater than zero", variant: "destructive" });
       return;
     }
-    if (form.rentMetric === "psf" && !form.minRentPsf) {
-      toast({ title: "Minimum $/SF is required for this rent metric", variant: "destructive" });
-      return;
-    }
-    if (form.rentMetric === "per_unit" && !form.minRentPerUnit) {
-      toast({ title: "Minimum $/Unit is required for this rent metric", variant: "destructive" });
-      return;
+    for (let index = 0; index < form.productTypes.length; index++) {
+      const productType = form.productTypes[index];
+      if (!productType.name.trim()) {
+        toast({ title: `Product type ${index + 1} needs a name`, variant: "destructive" });
+        return;
+      }
+      if (productType.minAcres === "" || Number(productType.minAcres) < 0) {
+        toast({ title: `${productType.name}: minimum acreage is required`, variant: "destructive" });
+        return;
+      }
+      if (productType.maxAcres && Number(productType.maxAcres) < Number(productType.minAcres)) {
+        toast({ title: `${productType.name}: maximum acreage must be at least the minimum`, variant: "destructive" });
+        return;
+      }
+      const rent = form.rentMetric === "psf" ? productType.minRentPsf : productType.minRentPerUnit;
+      if (productType.isActive && (!rent || Number(rent) <= 0)) {
+        toast({ title: `${productType.name}: minimum ${form.rentMetric === "psf" ? "$/SF" : "$/Unit"} is required`, variant: "destructive" });
+        return;
+      }
     }
     saveMutation.mutate({
       targetStates: form.targetStates,
       targetCounties: form.targetCounties,
       rentMetric: form.rentMetric,
-      minRentPsf: form.minRentPsf || null,
-      minRentPerUnit: form.minRentPerUnit || null,
       compSearchRadiusMiles: form.compSearchRadiusMiles,
-      minAcres: form.minAcres,
-      maxAcres: form.maxAcres || null,
-      acreageOverridesByProductType: form.acreageOverridesByProductType || {},
+      productTypes: form.productTypes.map(({ id: _id, ...productType }) => ({
+        ...productType,
+        name: productType.name.trim(),
+        maxAcres: productType.maxAcres || null,
+        minRentPsf: productType.minRentPsf || null,
+        minRentPerUnit: productType.minRentPerUnit || null,
+      })),
+      countyMarketLabels: form.countyMarketLabels,
       qctOverridesRentMinimum: form.qctOverridesRentMinimum,
       ddaOverridesRentMinimum: form.ddaOverridesRentMinimum,
       ozOverridesRentMinimum: form.ozOverridesRentMinimum,
     });
   };
 
-  const addAcreageOverride = () =>
-    update("acreageOverridesByProductType", {
-      ...(form?.acreageOverridesByProductType || {}),
-      "": 0,
-    });
-  const overrideEntries = Object.entries(form?.acreageOverridesByProductType || {});
+  const addProductType = () => {
+    if (!form) return;
+    update("productTypes", [
+      ...form.productTypes,
+      {
+        name: "",
+        minAcres: "",
+        maxAcres: "",
+        minRentPsf: "",
+        minRentPerUnit: "",
+        isActive: true,
+      },
+    ]);
+  };
+  const updateProductType = (index: number, patch: Partial<ProductType>) => {
+    if (!form) return;
+    update("productTypes", form.productTypes.map((productType, productIndex) =>
+      productIndex === index ? { ...productType, ...patch } : productType,
+    ));
+  };
 
   if (profileQuery.isLoading || !form) {
     return (
@@ -306,7 +415,12 @@ export default function DeveloperCriteriaSettings() {
             <CardContent className="space-y-6">
               <div className="grid gap-5 md:grid-cols-2">
                 <TagEditor label="Target states" values={form.targetStates} onChange={(value) => update("targetStates", value)} placeholder="e.g. North Carolina" />
-                <TagEditor label="Target counties" values={form.targetCounties} onChange={(value) => update("targetCounties", value)} placeholder="e.g. Mecklenburg" />
+                <CountyMarketEditor
+                  values={form.targetCounties}
+                  labels={form.countyMarketLabels}
+                  onCountiesChange={(value) => update("targetCounties", value)}
+                  onLabelsChange={(value) => update("countyMarketLabels", value)}
+                />
               </div>
 
               <div>
@@ -335,64 +449,65 @@ export default function DeveloperCriteriaSettings() {
 
               <div className="grid gap-5 md:grid-cols-2">
                 <NumberField
-                  label={isPsf ? "Minimum rent $/SF" : "Minimum rent $/Unit (Avg)"}
-                  value={isPsf ? form.minRentPsf || "" : form.minRentPerUnit || ""}
-                  onChange={(value) => update(isPsf ? "minRentPsf" : "minRentPerUnit", value)}
-                  placeholder={isPsf ? "e.g. 1.75" : "e.g. 1,400"}
-                  required
-                />
-                <NumberField
-                  label={isPsf ? "Secondary reference $/Unit (optional)" : "Secondary reference $/SF (optional)"}
-                  value={isPsf ? form.minRentPerUnit || "" : form.minRentPsf || ""}
-                  onChange={(value) => update(isPsf ? "minRentPerUnit" : "minRentPsf", value)}
-                  placeholder="Stored for reference only"
-                />
-                <NumberField
                   label="Comparable search radius (miles)"
                   value={form.compSearchRadiusMiles}
                   onChange={(value) => update("compSearchRadiusMiles", value)}
                   placeholder="3"
                   required
                 />
-                <NumberField label="Minimum acreage" value={form.minAcres} onChange={(value) => update("minAcres", value)} required />
-                <NumberField label="Maximum acreage (optional)" value={form.maxAcres || ""} onChange={(value) => update("maxAcres", value)} placeholder="No maximum" />
               </div>
 
               <div className="border-t border-slate-100 pt-5">
                 <div className="mb-3 flex items-center justify-between">
-                  <div><h3 className="font-semibold text-slate-900">Product-type acreage overrides</h3><p className="text-sm text-slate-500">Use a different minimum acreage for specific product types.</p></div>
-                  <Button type="button" variant="outline" size="sm" onClick={addAcreageOverride}><Plus className="mr-1 h-4 w-4" />Add override</Button>
+                  <div><h3 className="font-semibold text-slate-900">Product types</h3><p className="text-sm text-slate-500">A deal is marked Review when it clears the acreage and rent criteria for any active product type.</p></div>
+                  <Button type="button" variant="outline" size="sm" onClick={addProductType}><Plus className="mr-1 h-4 w-4" />Add product type</Button>
                 </div>
-                {overrideEntries.length === 0 ? (
-                  <p className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500">No overrides configured. The flat minimum applies to every product type.</p>
+                {form.productTypes.length === 0 ? (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    Add at least one active product type before saving.
+                  </div>
                 ) : (
-                  <div className="space-y-2">
-                    {overrideEntries.map(([key, value], index) => (
-                      <div key={`${key}-${index}`} className="flex gap-2">
-                        <Input
-                          value={key}
-                          placeholder="Product type, e.g. garden_style"
-                          onChange={(event) => {
-                            const next = { ...(form.acreageOverridesByProductType || {}) };
-                            delete next[key];
-                            next[event.target.value] = value;
-                            update("acreageOverridesByProductType", next);
-                          }}
-                        />
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          className="w-36"
-                          value={value}
-                          onChange={(event) => update("acreageOverridesByProductType", { ...(form.acreageOverridesByProductType || {}), [key]: Number(event.target.value) })}
-                          aria-label={`${key || "Product type"} minimum acres`}
-                        />
-                        <Button type="button" size="icon" variant="ghost" onClick={() => {
-                          const next = { ...(form.acreageOverridesByProductType || {}) };
-                          delete next[key];
-                          update("acreageOverridesByProductType", next);
-                        }} aria-label="Remove override"><Trash2 className="h-4 w-4 text-slate-400" /></Button>
+                  <div className="space-y-3">
+                    {form.productTypes.map((productType, index) => (
+                      <div key={productType.id || index} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_auto] lg:items-end">
+                          <div>
+                            <Label>Product type <span className="text-red-500">*</span></Label>
+                            <Input
+                              value={productType.name}
+                              onChange={(event) => updateProductType(index, { name: event.target.value })}
+                              placeholder="e.g. 3-Story Garden"
+                              className="mt-2 bg-white"
+                            />
+                          </div>
+                          <NumberField
+                            label="Min acres"
+                            value={productType.minAcres}
+                            onChange={(value) => updateProductType(index, { minAcres: value })}
+                            required
+                          />
+                          <NumberField
+                            label="Max acres"
+                            value={productType.maxAcres || ""}
+                            onChange={(value) => updateProductType(index, { maxAcres: value })}
+                            placeholder="No maximum"
+                          />
+                          <NumberField
+                            label={isPsf ? "Min rent $/SF" : "Min rent $/Unit"}
+                            value={isPsf ? productType.minRentPsf || "" : productType.minRentPerUnit || ""}
+                            onChange={(value) => updateProductType(index, isPsf ? { minRentPsf: value } : { minRentPerUnit: value })}
+                            required
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => update("productTypes", form.productTypes.filter((_, productIndex) => productIndex !== index))}
+                            aria-label={`Remove ${productType.name || "product type"}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-slate-400" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>

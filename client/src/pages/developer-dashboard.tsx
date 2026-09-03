@@ -47,6 +47,7 @@ type DealRecord = {
 type DeveloperDeal = {
   id: string;
   classification: "passed" | "review" | null;
+  matchedProductTypes: string[] | null;
   matchedAt: string | null;
   sentAt: string | null;
   greenFlaggedByDeveloper: boolean;
@@ -91,7 +92,16 @@ function DealStatus({ row }: { row: DeveloperDeal }) {
     );
   }
   if (row.classification === "review") {
-    return <Badge className="border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-100">Review</Badge>;
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge className="border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-100">Review</Badge>
+        {(row.matchedProductTypes || []).map((productType) => (
+          <Badge key={productType} variant="outline" className="border-slate-200 bg-white text-slate-600">
+            {productType}
+          </Badge>
+        ))}
+      </div>
+    );
   }
   return <Badge className="border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-100">Passed</Badge>;
 }

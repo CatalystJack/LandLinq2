@@ -3,7 +3,7 @@ import { developerProductTypes, developerProfiles, partnerDevelopers, partnerDev
 import type { DeveloperProductType, DeveloperProfile } from '../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { deals } from '../shared/schema';
-import { classifyDealForProfile } from './developerClassificationService';
+import { classifyDealForProfile, isDealInProfileMarket } from './developerClassificationService';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Auto-send engine: matches a newly-classified deal against every active
@@ -40,7 +40,11 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
 
     for (const { developer: dev, profile } of recipients) {
       try {
-        if (!doesDealMatchDeveloper(deal, dev)) continue;
+        if (profile) {
+          if (!deal.apex || !isDealInProfileMarket(deal, profile)) continue;
+        } else if (!doesDealMatchDeveloper(deal, dev)) {
+          continue;
+        }
         const productTypes = profile
           ? await db.select().from(developerProductTypes).where(and(
               eq(developerProductTypes.developerProfileId, profile.id),
@@ -167,21 +171,7 @@ export function partnerDeveloperToClassificationProductTypes(dev: any): Develope
 export function doesDealMatchDeveloper(deal: any, dev: any): boolean {
   // ── Apex gate — only apex-flagged deals may be sent to developers ──────────
   if (!deal.apex) return false;
-
-  // State (market)
-  if (dev.targetStates?.length) {
-    if (!deal.state || !dev.targetStates.includes(deal.state)) return false;
-  }
-
-  // MSA (market)
-  if (dev.targetMsas?.length) {
-    if (!deal.msaName || !dev.targetMsas.includes(deal.msaName)) return false;
-  }
-
-  // County (market)
-  if (dev.targetCounties?.length) {
-    if (!deal.county || !dev.targetCounties.includes(deal.county)) return false;
-  }
+  if (!doesDealMatchDeveloperMarket(deal, dev)) return false;
 
   // Acreage floor
   if (dev.minAcres && deal.sizeAcres) {
@@ -210,6 +200,18 @@ export function doesDealMatchDeveloper(deal: any, dev: any): boolean {
   }
 
   return true;
+}
+
+export function doesDealMatchDeveloperMarket(deal: any, dev: any): boolean {
+  const matches = (value: unknown, accepted: unknown) => {
+    if (!Array.isArray(accepted) || accepted.length === 0) return true;
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return Boolean(normalized) && accepted.some((entry) => String(entry).trim().toLowerCase() === normalized);
+  };
+
+  return matches(deal.state, dev.targetStates)
+    && matches(deal.msaName, dev.targetMsas)
+    && matches(deal.county, dev.targetCounties);
 }
 
 // ── Email builder ──────────────────────────────────────────────────────────
