@@ -385,15 +385,6 @@ export default function QuickDealAddition({ defaultOpen = false }: QuickDealAddi
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleProductTypeToggle = (type: string) => {
-    setFormData(prev => ({
-      ...prev,
-      productTypes: prev.productTypes.includes(type)
-        ? prev.productTypes.filter(t => t !== type)
-        : [...prev.productTypes, type]
-    }));
-  };
-
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -493,15 +484,6 @@ export default function QuickDealAddition({ defaultOpen = false }: QuickDealAddi
     setSelectedBrokerId(null);
     setIsOpen(false);
   };
-
-  const productTypeOptions = [
-    "Conventional Apartments",
-    "Active Adult",
-    "Affordable",
-    "BTR",
-    "Lot Development",
-    "Student Housing"
-  ];
 
   return (
     <Card className="mb-6 border border-slate-200 bg-white shadow-md hover:shadow-lg transition-shadow duration-200" data-testid="card-quick-deal-addition">
@@ -760,28 +742,6 @@ export default function QuickDealAddition({ defaultOpen = false }: QuickDealAddi
                     </div>
                   </div>
 
-                  {/* Product Types - Multiple Selection */}
-                  <div className="md:col-span-4">
-                    <label className="text-xs text-gray-600 mb-2 block">Development Types (select all that apply)</label>
-                    <div className="flex flex-wrap gap-3">
-                      {productTypeOptions.map((type) => (
-                        <div key={type} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`product-${type}`}
-                            checked={formData.productTypes.includes(type)}
-                            onCheckedChange={() => handleProductTypeToggle(type)}
-                            data-testid={`checkbox-product-${type.toLowerCase().replace(/[^a-z]/g, '-')}`}
-                          />
-                          <label 
-                            htmlFor={`product-${type}`} 
-                            className="text-sm text-gray-700 cursor-pointer"
-                          >
-                            {type}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               </div>
 

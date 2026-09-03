@@ -143,6 +143,14 @@ function classificationBadge(c: string) {
   return <span className="text-gray-400 text-[10px]">{c || "—"}</span>;
 }
 
+function contactStatus(contact: Contact) {
+  if (!contact.isActive) return { label: "Inactive", className: "bg-slate-100 text-slate-500 border-slate-200" };
+  const tags = (contact.crmTags || []).map(tag => tag.toLowerCase());
+  if (tags.some(tag => tag.includes("hot") || tag === "vip")) return { label: "Priority", className: "bg-[#e7f0ff] text-[#1554a3] border-[#b9d2f5]" };
+  if (tags.some(tag => tag.includes("follow") || tag === "warm")) return { label: "Follow-up", className: "bg-[#fff4dc] text-[#8a5b08] border-[#f2d394]" };
+  return { label: "Active", className: "bg-[#e5f6f2] text-[#167465] border-[#b8e5db]" };
+}
+
 export default function CRMPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -591,20 +599,25 @@ export default function CRMPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col min-h-[100dvh] bg-[#eef3f9]">
       <Navigation />
-      <div className="flex flex-1 overflow-hidden min-h-0 bg-[#f3f2ef]">
+      <div className="flex flex-1 overflow-hidden min-h-0 bg-[#eef3f9]">
       {/* LEFT: Contacts List */}
-      <div className={`flex flex-col ${selectedContact ? 'hidden' : 'w-full'} transition-all duration-200 border-r border-gray-200 bg-white`}>
+      <div className={`flex flex-col ${selectedContact ? 'hidden' : 'w-full'} transition-all duration-200 border-r border-[#d7e2ef] bg-[#f8fbff]`}>
 
         {/* Header */}
-        <div className="shrink-0 border-b border-gray-100 px-5 py-4 bg-white">
-          <div className="flex items-center justify-between mb-3">
+        <div className="shrink-0 border-b border-[#d7e2ef] px-5 py-5 bg-[#f8fbff]">
+          <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex items-center gap-2">
-              <Users size={18} className="text-[#07172A]" />
-              <h1 className="text-base font-semibold text-[#07172A]">CRM — Contacts</h1>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0b3159] text-[#b9dcff] shadow-sm">
+                <Users size={17} />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold tracking-[-0.02em] text-[#102b49]">Contacts</h1>
+                <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#7590ad]">Relationship directory</p>
+              </div>
               {pagination && (
-                <span className="text-xs text-gray-400 font-normal">
+                <span className="mt-1 rounded-full bg-[#e4edf8] px-2 py-1 text-[11px] font-semibold text-[#406384]">
                   {pagination.total.toLocaleString()} total
                 </span>
               )}
@@ -735,23 +748,23 @@ export default function CRMPage() {
 
           {/* Filters — Row 1: search + tags + sms */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[180px] max-w-[280px]">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <div className="relative flex-1 min-w-[220px] max-w-[360px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5f84aa]" />
               <Input
                 placeholder="Search name, email, phone..."
                 value={search}
                 onChange={e => { setSearch(e.target.value); setPage(1); }}
-                className="pl-8 h-7 text-xs"
+                className="pl-9 h-9 rounded-lg border-[#c9d9e9] bg-white text-xs shadow-[0_1px_2px_rgba(21,57,91,0.04)] placeholder:text-[#8aa0b8] focus:border-[#4a90e2] focus:ring-2 focus:ring-[#4a90e2]/20"
               />
             </div>
             {/* Custom tag filter with inline delete */}
             <div ref={tagDropdownRef} className="relative">
               <button
                 onClick={() => setTagDropdownOpen(v => !v)}
-                className={`h-7 px-2.5 flex items-center gap-1.5 rounded border text-xs w-[170px] justify-between transition-colors ${
+                className={`h-9 px-3 flex items-center gap-1.5 rounded-lg border text-xs w-[170px] justify-between transition-colors ${
                   tagFilter !== "all"
                     ? "border-violet-400 bg-violet-50 text-violet-800"
-                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    : "border-[#c9d9e9] bg-white text-[#45627f] hover:border-[#8ab1d8] hover:bg-[#f3f8fe]"
                 }`}
               >
                 <span className="truncate">{tagFilter === "all" ? "All tags" : tagFilter}</span>
@@ -904,37 +917,40 @@ export default function CRMPage() {
         )}
 
         {/* Table */}
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-xs border-collapse table-fixed">
-            <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
+        <div className="flex-1 overflow-auto px-3 pb-3 sm:px-5">
+          <table className="w-full min-w-[720px] text-xs border-separate border-spacing-y-1.5 table-fixed">
+            <thead className="sticky top-0 bg-[#f8fbff] z-10">
               <tr>
-                <th className="w-8 px-3 py-2 text-left shrink-0">
+                <th className="w-10 px-3 py-3 text-left shrink-0">
                   <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
                 </th>
-                <th className="w-[180px] max-w-[180px] px-3 py-2 text-left text-gray-500 font-medium">Name</th>
-                <th className="w-[200px] max-w-[200px] px-3 py-2 text-left text-gray-500 font-medium">Contact</th>
-                <th className="w-[130px] px-3 py-2 text-left text-gray-500 font-medium hidden md:table-cell">Brokerage</th>
-                <th className="w-[150px] px-3 py-2 text-left text-gray-500 font-medium hidden lg:table-cell">Tags</th>
-                <th className="w-[120px] px-3 py-2 text-left text-gray-500 font-medium hidden xl:table-cell">Assigned To</th>
-                <th className="w-16 px-3 py-2 text-center text-gray-500 font-medium">Deals</th>
-                <th className="w-[80px] px-3 py-2 text-left text-gray-500 font-medium hidden xl:table-cell">Added</th>
-                <th className="w-10 px-3 py-2"></th>
+                <th className="w-[210px] max-w-[210px] px-3 py-3 text-left text-[#66829e] font-semibold uppercase tracking-[0.1em] text-[10px]">Contact</th>
+                <th className="w-[220px] max-w-[220px] px-3 py-3 text-left text-[#66829e] font-semibold uppercase tracking-[0.1em] text-[10px]">Reach</th>
+                <th className="w-[150px] px-3 py-3 text-left text-[#66829e] font-semibold uppercase tracking-[0.1em] text-[10px] hidden md:table-cell">Organization</th>
+                <th className="w-[180px] px-3 py-3 text-left text-[#66829e] font-semibold uppercase tracking-[0.1em] text-[10px] hidden lg:table-cell">Signals</th>
+                <th className="w-[130px] px-3 py-3 text-left text-[#66829e] font-semibold uppercase tracking-[0.1em] text-[10px] hidden xl:table-cell">Owner</th>
+                <th className="w-16 px-3 py-3 text-center text-[#66829e] font-semibold uppercase tracking-[0.1em] text-[10px]">Deals</th>
+                <th className="w-[90px] px-3 py-3 text-left text-[#66829e] font-semibold uppercase tracking-[0.1em] text-[10px] hidden xl:table-cell">Added</th>
+                <th className="w-10 px-3 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {contactsQuery.isLoading ? (
                 Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td colSpan={8} className="px-3 py-3">
-                      <div className="h-3 bg-gray-100 rounded animate-pulse w-full" />
+                  <tr key={i}>
+                    <td colSpan={9} className="rounded-lg bg-white px-3 py-4 shadow-sm">
+                      <div className="h-3 bg-[#e4edf7] rounded animate-pulse w-full" />
                     </td>
                   </tr>
                 ))
               ) : contacts.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
-                    <Inbox size={32} className="mx-auto mb-2 opacity-30" />
-                    <p>No contacts found</p>
+                    <td colSpan={9} className="rounded-xl bg-white px-6 py-16 text-center text-[#7690aa] shadow-sm">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e7f0ff] text-[#3278c7]">
+                      <Inbox size={22} />
+                    </div>
+                    <p className="font-semibold text-[#284866]">No contacts found</p>
+                    <p className="mt-1 text-xs text-[#89a0b6]">Try widening your search or clearing a filter.</p>
                   </td>
                 </tr>
               ) : contacts.map(contact => {
@@ -943,31 +959,40 @@ export default function CRMPage() {
                 return (
                   <tr
                     key={contact.id}
-                    className={`border-b border-gray-100 cursor-pointer transition-colors ${
-                      isActive ? 'bg-blue-50 border-l-2 border-l-blue-500' : isSelected ? 'bg-indigo-50' : 'hover:bg-gray-50'
+                    className={`group cursor-pointer transition-all duration-150 ${
+                      isActive ? 'bg-[#e7f0ff] shadow-[inset_3px_0_0_#3278c7]' : isSelected ? 'bg-[#edf5ff]' : 'bg-white shadow-sm hover:bg-[#f4f9ff] hover:shadow-[0_3px_10px_rgba(28,79,126,0.08)]'
                     }`}
                     onClick={() => setSelectedContact(contact)}
                   >
-                    <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                    <td className="rounded-l-lg px-3 py-3" onClick={e => e.stopPropagation()}>
                       <Checkbox
                         checked={isSelected}
                         onCheckedChange={() => toggleOne(contact.id)}
                       />
                     </td>
-                    <td className="px-3 py-2 w-[180px] max-w-[180px]">
-                      <div className="font-medium text-gray-800 truncate">
+                    <td className="px-3 py-3 w-[210px] max-w-[210px]">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#dcecff] text-[11px] font-bold text-[#245c99] ring-1 ring-[#c4daf2]">
+                          {(contact.firstName?.[0] || "").toUpperCase()}{(contact.lastName?.[0] || "").toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                        <div className="font-semibold text-[#173654] truncate">
                         {contact.firstName} {contact.lastName}
+                        </div>
+                        <span className={`mt-1 inline-flex rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${contactStatus(contact).className}`}>
+                          {contactStatus(contact).label}
+                        </span>
+                        </div>
                       </div>
-                      {!contact.isActive && <span className="text-[10px] text-gray-400">Inactive</span>}
                     </td>
-                    <td className="px-3 py-2 text-gray-500 w-[200px] max-w-[200px]">
-                      {contact.email && <div className="flex items-center gap-1 truncate"><Mail size={10} className="shrink-0" /><span className="truncate">{contact.email}</span></div>}
-                      {contact.phone && <div className="flex items-center gap-1 text-gray-400"><Phone size={10} className="shrink-0" />{contact.phone}</div>}
+                    <td className="px-3 py-3 text-[#55718e] w-[220px] max-w-[220px]">
+                      {contact.email && <div className="flex items-center gap-1.5 truncate"><Mail size={11} className="shrink-0 text-[#78a1c8]" /><span className="truncate">{contact.email}</span></div>}
+                      {contact.phone && <div className="mt-1 flex items-center gap-1.5 text-[#89a1b8]"><Phone size={11} className="shrink-0 text-[#78a1c8]" />{contact.phone}</div>}
                     </td>
-                    <td className="px-3 py-2 text-gray-500 hidden md:table-cell max-w-[140px] truncate">
+                    <td className="px-3 py-3 text-[#55718e] hidden md:table-cell max-w-[150px] truncate">
                       {contact.brokerage || <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3 py-2 hidden lg:table-cell">
+                    <td className="px-3 py-3 hidden lg:table-cell">
                       <div className="flex flex-wrap gap-1">
                         {contact.smsOptIn && (
                           <span className="inline-flex items-center gap-0.5 bg-green-50 text-green-600 border border-green-200 rounded px-1 py-0.5 text-[10px]">
@@ -982,7 +1007,7 @@ export default function CRMPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-2 hidden xl:table-cell">
+                    <td className="px-3 py-3 hidden xl:table-cell">
                       {contact.assignedTo ? (
                         <div className="flex items-center gap-1 text-xs text-indigo-700">
                           <UserCheck size={11} className="shrink-0" />
@@ -992,16 +1017,16 @@ export default function CRMPage() {
                         <span className="text-gray-300 text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="px-3 py-3 text-center">
                       <span className={`font-semibold ${(contact.dealCount || 0) > 0 ? 'text-blue-600' : 'text-gray-300'}`}>
                         {contact.dealCount || 0}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-gray-400 hidden xl:table-cell whitespace-nowrap">
+                    <td className="px-3 py-3 text-[#8aa1b7] hidden xl:table-cell whitespace-nowrap">
                       {contact.createdAt ? new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '—'}
                     </td>
-                    <td className="px-3 py-2">
-                      <ChevronRight size={14} className={`text-gray-400 ${isActive ? 'text-blue-500' : ''}`} />
+                    <td className="rounded-r-lg px-3 py-3">
+                      <ChevronRight size={14} className={`text-[#a2b8cd] transition-transform group-hover:translate-x-0.5 ${isActive ? 'text-[#3278c7]' : ''}`} />
                     </td>
                   </tr>
                 );

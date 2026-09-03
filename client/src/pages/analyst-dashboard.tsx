@@ -105,15 +105,10 @@ interface DealWithBroker extends Omit<Deal, 'publicListings'> {
 const ALL_COLUMNS = [
   { key: 'id', label: 'ID', defaultVisible: true },
   { key: 'colStatus', label: 'Status', defaultVisible: true },
-  { key: 'colApex', label: 'Apex', defaultVisible: true },
-  { key: 'colApexNotes', label: 'Apex Notes', defaultVisible: true },
   { key: 'colPriority', label: 'Priority', defaultVisible: true },
-  { key: 'colNext', label: 'Next', defaultVisible: true },
-  { key: 'colStep', label: 'Step', defaultVisible: true },
   { key: 'propertyAddress', label: 'Property Address', defaultVisible: true },
   { key: 'name', label: 'Name', defaultVisible: true },
   { key: 'yieldOnCost', label: 'YOC', defaultVisible: true },
-  { key: 'automatedYoc', label: 'Auto YOC', defaultVisible: true },
   { key: 'irr', label: 'IRR', defaultVisible: true },
   { key: 'excelModel', label: 'Excel', defaultVisible: true },
   { key: 'reason', label: 'AI Reason', defaultVisible: true },
@@ -133,13 +128,6 @@ const ALL_COLUMNS = [
   { key: 'brokerDocs', label: 'Broker Docs', defaultVisible: false },
   { key: 'analystDocs', label: 'Analyst Docs', defaultVisible: false },
   { key: 'comps', label: 'Comps', defaultVisible: true },
-  { key: 'ncOnemap', label: 'NC Tax', defaultVisible: false },
-  { key: 'pop55', label: '55+ Pop', defaultVisible: false },
-  { key: 'income75k', label: '$75K+', defaultVisible: false },
-  { key: 'juniorAnalyst', label: 'Junior Analyst', defaultVisible: false },
-  { key: 'analyst', label: 'Analyst', defaultVisible: true },
-  { key: 'dev', label: 'Dev', defaultVisible: false },
-  { key: 'partner', label: 'Partner', defaultVisible: false },
   { key: 'price', label: 'Price', defaultVisible: true },
   { key: 'units', label: 'Units', defaultVisible: true },
   { key: 'maxUnitsZoning', label: 'Max Zoning Units', defaultVisible: true },
@@ -149,7 +137,6 @@ const ALL_COLUMNS = [
   { key: 'dua', label: 'DUA', defaultVisible: false },
   { key: 'zoning', label: 'Zoning', defaultVisible: false },
   { key: 'wetlandNotes', label: 'Wetland/Environmental Notes', defaultVisible: false },
-  { key: 'developerSummary', label: 'Developer Summary', defaultVisible: false },
   { key: 'entitlements', label: 'Entitlements', defaultVisible: false },
   { key: 'pricePerUnit', label: 'Price/Unit', defaultVisible: false },
   { key: 'sewer', label: 'Sewer', defaultVisible: false },
@@ -162,12 +149,12 @@ type ColumnKey = typeof ALL_COLUMNS[number]['key'];
 
 // Fixed columns always shown first, not user-reorderable
 const FIXED_COLUMN_KEYS: readonly ColumnKey[] = [
-  'id', 'colStatus', 'colApex', 'colApexNotes', 'colPriority', 'colNext', 'colStep', 'propertyAddress'
+  'id', 'colStatus', 'colPriority', 'propertyAddress'
 ] as const;
 
 // Reorderable columns — everything not in the fixed set
 const REORDERABLE_COLUMNS = ALL_COLUMNS.filter(c => !(FIXED_COLUMN_KEYS as readonly string[]).includes(c.key));
-type ReorderableColumnKey = Exclude<ColumnKey, 'id'|'colStatus'|'colApex'|'colApexNotes'|'colPriority'|'colNext'|'colStep'|'propertyAddress'>;
+type ReorderableColumnKey = Exclude<ColumnKey, 'id'|'colStatus'|'colPriority'|'propertyAddress'>;
 
 function getDefaultColumnOrder(): ReorderableColumnKey[] {
   try {
@@ -189,7 +176,8 @@ function getDefaultVisibleColumns(): Set<ColumnKey> {
     const saved = localStorage.getItem('deal-table-visible-columns');
     if (saved) {
       const parsed = JSON.parse(saved) as ColumnKey[];
-      return new Set(parsed);
+      const validKeys = new Set(ALL_COLUMNS.map(c => c.key));
+      return new Set(parsed.filter((key): key is ColumnKey => validKeys.has(key)));
     }
   } catch {}
   return new Set(ALL_COLUMNS.filter(c => c.defaultVisible).map(c => c.key));
@@ -628,10 +616,7 @@ export default function AnalystDashboard() {
     const STICKY_COLS = [
       { key: 'id', width: 40 },
       { key: 'colStatus', width: 50 },
-      { key: 'colApex', width: 45 },
       { key: 'colPriority', width: 55 },
-      { key: 'colNext', width: 90 },
-      { key: 'colStep', width: 100 },
     ] as const;
     const result: Record<string, number> = {};
     let left = 0;
@@ -1383,8 +1368,6 @@ export default function AnalystDashboard() {
   const debouncedMutationRefs = useRef<{ [key: string]: NodeJS.Timeout }>({});
   // Tracks which deal IDs have already had Auto YOC computed this session (avoids duplicate mutations)
   const autoYocProcessedRef = useRef<Set<string>>(new Set());
-  const [yocRefreshKey, setYocRefreshKey] = useState(0);
-  const [yocRefreshing, setYocRefreshing] = useState(false);
 
   // ─── Underwriting Presets (validated from actual analyst Excel models) ───
   // softCostPct: 15% for all types
@@ -2523,13 +2506,7 @@ export default function AnalystDashboard() {
         }
       }, idx * 600);
     });
-    // When a manual refresh fires, clear the spinner once all timeouts have had a chance to start
-    if (yocRefreshKey > 0 && pending.length > 0) {
-      setTimeout(() => setYocRefreshing(false), pending.length * 600 + 500);
-    } else if (yocRefreshKey > 0) {
-      setYocRefreshing(false);
-    }
-  }, [deals, yocRefreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [deals]); // eslint-disable-line react-hooks/exhaustive-deps
   // ─────────────────────────────────────────────────────────────────────────────
 
   // Full deal update mutation for complete row saves (resets editing state)
@@ -2681,33 +2658,6 @@ export default function AnalystDashboard() {
         description: error.message,
         variant: "destructive",
       });
-    },
-  });
-
-  const [qctOzRunning, setQctOzRunning] = useState(false);
-  const [qctOzResult, setQctOzResult] = useState<string | null>(null);
-
-  const backfillQctOzMutation = useMutation({
-    mutationFn: async () => {
-      setQctOzRunning(true);
-      setQctOzResult(null);
-      // Run sequentially to avoid database contention
-      const qctData = await apiRequest("POST", "/api/admin/backfill-qct-status", {}).then(r => r.json());
-      const ozData = await apiRequest("POST", "/api/admin/backfill-oz-status", {}).then(r => r.json());
-      return { qct: qctData, oz: ozData };
-    },
-    onSuccess: (data: any) => {
-      setQctOzRunning(false);
-      const msg = `QCT: ${data?.qct?.message || 'done'} | OZ: ${data?.oz?.message || 'done'}`;
-      setQctOzResult(msg);
-      queryClient.invalidateQueries({ queryKey: ['/api/deals'] });
-      setTimeout(() => setQctOzResult(null), 8000);
-    },
-    onError: (err: any) => {
-      setQctOzRunning(false);
-      const msg = err?.message ? `Backfill failed: ${err.message}` : 'Backfill failed — check console';
-      setQctOzResult(msg);
-      setTimeout(() => setQctOzResult(null), 8000);
     },
   });
 
@@ -5113,7 +5063,6 @@ export default function AnalystDashboard() {
     switch (key) {
       case 'name': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}><span>Name</span></th>;
       case 'yieldOnCost': return <th key={key} className={thBase} style={{display: vis?'':'none'}}>{sortBtn('YOC','yieldOnCost')}</th>;
-      case 'automatedYoc': return <th key={key} className={thBase} style={{display: vis?'':'none'}}>{sortBtn('Auto YOC','automatedYoc')}</th>;
       case 'irr': return <th key={key} className={`${thBase} min-w-[90px]`} style={{display: vis?'':'none'}}>{sortBtn('IRR','irr')}</th>;
       case 'excelModel': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}><span>Excel</span></th>;
       case 'reason': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}><span>Reason</span></th>;
@@ -5133,13 +5082,6 @@ export default function AnalystDashboard() {
       case 'brokerDocs': return <th key={key} className={`${thBase} ${expandedBrokerDocs.size>0?'w-[260px]':'w-[110px] max-w-[110px]'}`} style={{display: vis?'':'none'}}><span>Broker Docs</span></th>;
       case 'analystDocs': return <th key={key} className={`${thBase} ${expandedAnalystDocs.size>0?'w-[260px]':'w-[130px] max-w-[130px]'}`} style={{display: vis?'':'none'}}><span>Analyst Docs</span></th>;
       case 'comps': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}><span>Comps</span></th>;
-      case 'ncOnemap': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}><span>NC Tax</span></th>;
-      case 'pop55': return <th key={key} className={`${thBase} min-w-[60px]`} style={{display: vis?'':'none'}}><span>55+ Pop</span></th>;
-      case 'income75k': return <th key={key} className={`${thBase} min-w-[60px]`} style={{display: vis?'':'none'}}><span>$75K+</span></th>;
-      case 'juniorAnalyst': return null;
-      case 'analyst': return <th key={key} className={`${thBase} min-w-[45px]`} style={{display: vis?'':'none'}}><span>Analyst</span></th>;
-      case 'dev': return <th key={key} className={`${thBase} min-w-[35px]`} style={{display: vis?'':'none'}}><span>Dev</span></th>;
-      case 'partner': return <th key={key} className={`${thBase} min-w-[45px]`} style={{display: vis?'':'none'}}><span>Partner</span></th>;
       case 'price': return <th key={key} className={`${thBase} min-w-[100px]`} style={{display: vis?'':'none'}}>{sortBtn('Price','askingPrice')}</th>;
       case 'units': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{sortBtn('Units','unitCount')}</th>;
       case 'maxUnitsZoning': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}><span>Max Zoning</span></th>;
@@ -5149,7 +5091,6 @@ export default function AnalystDashboard() {
       case 'dua': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}><span>DUA</span></th>;
       case 'zoning': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}>{sortBtn('Zoning','zoning')}</th>;
       case 'wetlandNotes': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}><span>Wetland/Environmental Notes</span></th>;
-      case 'developerSummary': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}><span>Developer Summary</span></th>;
       case 'entitlements': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}>{sortBtn('Entitlements','hasEntitlements')}</th>;
       case 'pricePerUnit': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}><span>Price/Unit</span></th>;
       case 'sewer': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}><span>Sewer</span></th>;
@@ -5184,34 +5125,6 @@ export default function AnalystDashboard() {
               {d.yieldOnCost ? <span className="font-medium text-indigo-700">{d.yieldOnCost}</span> : <span className="text-gray-300 italic text-[11px]">+ add</span>}
             </div>
           )}
-        </td>
-      );
-      case 'automatedYoc': return (
-        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          {(() => {
-            const scalarPsf = parseFloat(d.avgRentPsf||d.topRentPsf||'0')||null;
-            const liveYoc = calculateYOCForProductTypes(d.productTypes||[],parseFloat(d.askingPrice||'0'),parseFloat(d.sizeAcres||'0'),Array.isArray(d.comparablesJson)?d.comparablesJson:[],d.targetProductTypes||[],(() => { const u = parseInt(d.unitCount?.toString()||d.estimatedUnits?.toString()||'0')||0; return u>0?u:undefined; })(),d.state||undefined,d.city||undefined,scalarPsf);
-            const displayYoc = liveYoc??d.automatedYoc;
-            if(!displayYoc) { if(d.productTypes?.length>0&&!parseFloat(d.sizeAcres||'0')) return <span className="text-amber-500 italic text-[11px]">no acres</span>; return <span className="text-gray-300 italic text-[11px]">—</span>; }
-            const BTR_KEYS = new Set(['btr-sfr-detached','btr-3-story-th','btr-th-2-3br']);
-            const resolvedKeys = resolveProductTypeKeys(d.productTypes||[],d.targetProductTypes||[]);
-            const allBTR = resolvedKeys.length>0&&resolvedKeys.every((k: string) => BTR_KEYS.has(k));
-            const hasStoredComps = (Array.isArray(d.comparablesJson)&&d.comparablesJson.length>0)||(scalarPsf&&scalarPsf>0);
-            const isPresetOnly = !allBTR&&!hasStoredComps&&typeof displayYoc==='string'&&(displayYoc as string).includes('preset')&&!(displayYoc as string).includes('/SF');
-            const breakdown = calculateYOCBreakdown(d);
-            return (
-              <div className="flex items-start gap-0.5">
-                <button className={`px-1 py-0.5 text-left flex-1 rounded transition-colors ${isPresetOnly?'hover:bg-red-50':'hover:bg-emerald-50'}`} title="View / edit YOC formula breakdown" onClick={() => { setYocBreakdownDeal(deal); setYocOverrides(deal.yocOverrides?(() => { try { return JSON.parse(deal.yocOverrides); } catch { return {}; } })():{}); }}>
-                  {(displayYoc as string).split(' | ').filter((part: string) => { const m = part.match(/([-\d.]+)%/); return !m||parseFloat(m[1])>=0; }).map((part: string, i: number) => { const isBest = part.startsWith('BEST:'); const isPartPreset = part.includes('preset')&&!part.includes('/SF'); return (<div key={i} className={`flex items-center gap-1 leading-snug ${isBest?'border-b border-red-200 pb-0.5 mb-0.5':''}`}><span className={`text-[11px] underline-offset-2 hover:underline ${isBest?isPartPreset?'font-bold text-red-700':'font-bold text-emerald-800':isPartPreset?'font-semibold text-red-600':`font-semibold ${part.includes('~')?'text-amber-600':'text-emerald-700'}`}`}>{part}</span></div>); })}
-                  {isPresetOnly && <div className="text-[10px] text-red-500 font-medium mt-0.5">⚠ no comps</div>}
-                </button>
-                <div className="flex flex-col gap-0.5">
-                  {breakdown && (<button title="Open in Underwriter" className="flex-shrink-0 p-0.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" onClick={(e) => { e.stopPropagation(); setLocation(`/underwriting?dealId=${deal.id}`); }}><ExternalLink size={11} /></button>)}
-                  {resolveProductTypeKeys(d.productTypes||[],d.targetProductTypes||[]).length>0 && (<button title="Download UW Excel" className="flex-shrink-0 p-0.5 rounded text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors" disabled={downloadingExcelDealId===deal.id} onClick={(e) => { e.stopPropagation(); downloadDealExcel(deal); }}>{downloadingExcelDealId===deal.id?<span className="text-[9px] text-emerald-500 animate-pulse">…</span>:<Download size={11} />}</button>)}
-                </div>
-              </div>
-            );
-          })()}
         </td>
       );
       case 'irr': return (
@@ -5416,100 +5329,6 @@ export default function AnalystDashboard() {
           })()}
         </td>
       );
-      case 'ncOnemap': return (
-        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          {deal.state?.toUpperCase()==='NC' ? (
-            <Button variant="outline" size="sm" className="h-7 px-3 text-xs border transition-colors bg-emerald-600 text-white hover:bg-white hover:text-emerald-700 border-emerald-600" onClick={() => setNcOneMapModal({dealId:deal.id,address:deal.address||'',city:deal.city||'',state:deal.state||'NC',zip:deal.zip||'',county:d.county||''})} data-testid={`button-nc-onemap-${deal.id}`}>NC Tax</Button>
-          ) : <span className="text-xs text-gray-400">NC only</span>}
-        </td>
-      );
-      case 'pop55': return (
-        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          <Collapsible>
-            <CollapsibleTrigger asChild><Button variant="outline" size="sm" className="w-full h-7 px-3 text-xs flex items-center justify-between gap-1 bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] transition-colors" data-testid={`button-toggle-population-${deal.id}`}><span>{d.population55Plus5Mile?(d.population55Plus5Mile as number).toLocaleString():'0'}</span><ChevronDown size={14} className="collapsible-icon" /></Button></CollapsibleTrigger>
-            <CollapsibleContent className="mt-2"><div className="bg-blue-50 border border-blue-200 rounded p-2">
-              {editingCell?.dealId===deal.id&&editingCell?.field==='population55Plus5Mile' ? (
-                <Input type="text" defaultValue={formatNumberWithCommas(cellEditValue)} onChange={(e) => { const n=parseNumberWithCommas(e.target.value); const f=formatNumberWithCommas(n); if(e.target.value!==f)e.target.value=f; cellEditValueRef.current=n; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-7 text-xs" placeholder="Population..." autoFocus />
-              ) : (
-                <div className={`text-xs font-medium cursor-pointer hover:bg-blue-100 p-1 rounded ${isFieldEmpty(d.population55Plus5Mile)?'text-gray-400':'text-blue-900'}`} onClick={() => startCellEdit(deal.id,'population55Plus5Mile',d.population55Plus5Mile?.toString()||'')} title="Click to edit 55+ population">55+ Pop: {d.population55Plus5Mile?(d.population55Plus5Mile as number).toLocaleString():'0'}</div>
-              )}
-              {(d.censusTotalPopulation||d.censusMedianIncome||d.censusMedianAge||d.censusVacancyRate||d.censusRenterRate)&&(<div className="mt-2 pt-2 border-t border-blue-200 text-xs text-gray-600"><div className="font-semibold text-gray-700 mb-1">Census Data:</div>{d.censusTotalPopulation&&<div>Pop: {Number(d.censusTotalPopulation).toLocaleString()}</div>}{d.censusMedianIncome&&<div>Med Income: ${Number(d.censusMedianIncome).toLocaleString()}</div>}{d.censusMedianAge&&<div>Med Age: {Number(d.censusMedianAge).toFixed(1)}</div>}{d.censusVacancyRate&&<div>Vacancy: {Number(d.censusVacancyRate).toFixed(1)}%</div>}{d.censusRenterRate&&<div>Renter: {Number(d.censusRenterRate).toFixed(1)}%</div>}</div>)}
-            </div></CollapsibleContent>
-          </Collapsible>
-        </td>
-      );
-      case 'income75k': return (
-        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          <Collapsible>
-            <CollapsibleTrigger asChild><Button variant="outline" size="sm" className="w-full h-7 px-3 text-xs flex items-center justify-between gap-1 bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] transition-colors" data-testid={`button-toggle-income-${deal.id}`}><span>$ {d.income75Plus55Plus?(d.income75Plus55Plus as number).toLocaleString():'0'}</span><ChevronDown size={14} className="collapsible-icon" /></Button></CollapsibleTrigger>
-            <CollapsibleContent className="mt-2"><div className="bg-blue-50 border border-blue-200 rounded p-2">
-              {editingCell?.dealId===deal.id&&editingCell?.field==='income75Plus55Plus' ? (
-                <Input type="text" defaultValue={formatNumberWithCommas(cellEditValue)} onChange={(e) => { const n=parseNumberWithCommas(e.target.value); const f=formatNumberWithCommas(n); if(e.target.value!==f)e.target.value=f; cellEditValueRef.current=n; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-7 text-xs" placeholder="Income..." autoFocus />
-              ) : (
-                <div className={`text-xs font-medium cursor-pointer hover:bg-blue-100 p-1 rounded ${isFieldEmpty(d.income75Plus55Plus)?'text-gray-400':'text-blue-900'}`} onClick={() => startCellEdit(deal.id,'income75Plus55Plus',d.income75Plus55Plus?.toString()||'')} title="Click to edit 75K+ income population">$75K+ Income: {d.income75Plus55Plus?(d.income75Plus55Plus as number).toLocaleString():'0'}</div>
-              )}
-            </div></CollapsibleContent>
-          </Collapsible>
-        </td>
-      );
-      case 'juniorAnalyst': return null;
-      case 'analyst': return (
-        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          {editingRow===deal.id ? (
-            <Select value={editData.assignedAnalyst||''} onValueChange={(value) => { const v=value==='none'?null:value; setEditData({...editData,assignedAnalyst:v}); debouncedSave(deal.id,'assignedAnalyst',v,false); }}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select analyst..." /></SelectTrigger>
-              <SelectContent><SelectItem value="none" className="text-gray-500 italic">Clear Selection</SelectItem>{analysts.map((a: string) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-            </Select>
-          ) : editingCell?.dealId===deal.id&&editingCell?.field==='assignedAnalyst' ? (
-            <Select value={cellEditValue} onValueChange={(value) => { const v=value==='none'?null:value; setCellEditValue(value); debouncedSave(editingCell.dealId,'assignedAnalyst',v,false); setEditingCell(null); setCellEditValue(''); }} open={true}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select analyst..." /></SelectTrigger>
-              <SelectContent><SelectItem value="none" className="text-gray-500 italic">Clear Selection</SelectItem>{analysts.map((a: string) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-            </Select>
-          ) : (
-            <div className={`whitespace-nowrap cursor-pointer hover:bg-gray-100 px-1 rounded ${isFieldEmpty(d.assignedAnalyst)?'text-gray-400 italic':''}`} onClick={() => startCellEdit(deal.id,'assignedAnalyst',d.assignedAnalyst)} title={isFieldEmpty(d.assignedAnalyst)?'Click to assign analyst':(d.assignedAnalyst||'')}>
-              {d.assignedAnalyst?getInitials(d.assignedAnalyst):<span className="text-gray-400 italic text-xs">-</span>}
-            </div>
-          )}
-        </td>
-      );
-      case 'dev': return (
-        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          {editingRow===deal.id ? (
-            <Select value={editData.developer||''} onValueChange={(value) => { const v=value==='none'?null:value; setEditData({...editData,developer:v}); debouncedSave(deal.id,'assignedDeveloper',v,false); }}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select developer..." /></SelectTrigger>
-              <SelectContent><SelectItem value="none" className="text-gray-500 italic">Clear Selection</SelectItem>{developers.map((dev: string) => <SelectItem key={dev} value={dev}>{dev}</SelectItem>)}</SelectContent>
-            </Select>
-          ) : editingCell?.dealId===deal.id&&editingCell?.field==='developer' ? (
-            <Select value={cellEditValue} onValueChange={(value) => { const v=value==='none'?null:value; setCellEditValue(value); debouncedSave(editingCell.dealId,'assignedDeveloper',v,false); setEditingCell(null); setCellEditValue(''); }} open={true}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select developer..." /></SelectTrigger>
-              <SelectContent><SelectItem value="none" className="text-gray-500 italic">Clear Selection</SelectItem>{developers.map((dev: string) => <SelectItem key={dev} value={dev}>{dev}</SelectItem>)}</SelectContent>
-            </Select>
-          ) : (
-            <div className={`cursor-pointer ${isFieldEmpty(d.assignedDeveloper)?'':'hover:bg-gray-100'}`} onClick={() => startCellEdit(deal.id,'developer',d.assignedDeveloper)} title={isFieldEmpty(d.assignedDeveloper)?'Click to assign developer':(d.assignedDeveloper||'')}>
-              {d.assignedDeveloper?getInitials(d.assignedDeveloper):<span className="text-gray-400 italic text-xs">-</span>}
-            </div>
-          )}
-        </td>
-      );
-      case 'partner': return (
-        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          {editingRow===deal.id ? (
-            <Select value={editData.partner||''} onValueChange={(value) => { const v=value==='none'?null:value; setEditData({...editData,partner:v}); debouncedSave(deal.id,'assignedPartner',v,false); }}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select partner..." /></SelectTrigger>
-              <SelectContent><SelectItem value="none" className="text-gray-500 italic">Clear Selection</SelectItem>{partners.map((p: string) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-            </Select>
-          ) : editingCell?.dealId===deal.id&&editingCell?.field==='partner' ? (
-            <Select value={cellEditValue} onValueChange={(value) => { const v=value==='none'?null:value; setCellEditValue(value); debouncedSave(editingCell.dealId,'assignedPartner',v,false); setEditingCell(null); setCellEditValue(''); }} open={true}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select partner..." /></SelectTrigger>
-              <SelectContent><SelectItem value="none" className="text-gray-500 italic">Clear Selection</SelectItem>{partners.map((p: string) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-            </Select>
-          ) : (
-            <div className={`cursor-pointer ${isFieldEmpty(d.assignedPartner)?'':'hover:bg-gray-100'}`} onClick={() => startCellEdit(deal.id,'partner',d.assignedPartner)} title={isFieldEmpty(d.assignedPartner)?'Click to assign partner':(d.assignedPartner||'')}>
-              {d.assignedPartner?getInitials(d.assignedPartner):<span className="text-gray-400 italic text-xs">-</span>}
-            </div>
-          )}
-        </td>
-      );
       case 'price': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           {editingCell?.dealId===deal.id&&editingCell?.field==='askingPrice' ? (
@@ -5600,18 +5419,6 @@ export default function AnalystDashboard() {
             <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] hover:scale-100 transform-gpu" onClick={() => setWetlandNotesModal({dealId:deal.id,address:deal.address||'Property',notes:d.wetlandNotes||'',isEditing:false})}><FileText size={12} />Notes</Button>
           ) : (
             <div className="text-gray-400 italic text-xs cursor-pointer px-1" onClick={() => { wetlandNotesEditRef.current=''; setWetlandNotesModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true}); }}>Click to add...</div>
-          )}
-        </td>
-      );
-      case 'developerSummary': return (
-        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          {editingCell?.dealId===deal.id&&editingCell?.field==='developerSummary' ? (
-            <Textarea defaultValue={cellEditValue} onChange={(e) => { cellEditValueRef.current=e.target.value; }} onBlur={saveCellEdit} onKeyDown={(e) => { if(e.key==='Escape')setEditingCell(null); }} className="min-h-[60px] text-xs w-[220px]" placeholder="Deal summary for developers..." autoFocus />
-          ) : (
-            <div className="flex flex-col gap-1">
-              <div className={`cursor-pointer whitespace-pre-wrap ${d.developerSummary?'hover:bg-gray-100':''}`} onClick={() => startCellEdit(deal.id,'developerSummary',d.developerSummary||'')} title={d.developerSummary||'Click to add a developer summary'}>{d.developerSummary?<span className="line-clamp-2">{d.developerSummary}</span>:<span className="text-gray-400 italic text-xs">Click to add...</span>}</div>
-              <button type="button" className="text-[10px] text-[#009BA7] hover:underline text-left disabled:opacity-50" disabled={draftSummaryMutation.isPending&&draftSummaryMutation.variables===deal.id} onClick={async(e) => { e.stopPropagation(); try{const draft=await draftSummaryMutation.mutateAsync(deal.id); startCellEdit(deal.id,'developerSummary',draft||'');}catch(err){console.error('Failed to draft AI summary:',err);} }}>{draftSummaryMutation.isPending&&draftSummaryMutation.variables===deal.id?'Drafting…':'✨ AI Draft'}</button>
-            </div>
           )}
         </td>
       );
@@ -5744,40 +5551,6 @@ export default function AnalystDashboard() {
                     <Download size={16} className="mr-2" />
                     {exportToExcelMutation.isPending ? 'Exporting...' : 'Export CSV'}
                   </Button>
-                </div>
-                <div className="hidden lg:block">
-                  <Button
-                    onClick={() => {
-                      autoYocProcessedRef.current.clear();
-                      setYocRefreshing(true);
-                      setYocRefreshKey(k => k + 1);
-                    }}
-                    disabled={yocRefreshing}
-                    variant="outline"
-                    className="font-bold uppercase tracking-wider border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200"
-                    title="Recalculate Auto YOC for all deals using the current formula rules — does not re-fetch Hello Data"
-                    data-testid="button-refresh-auto-yoc"
-                  >
-                    <RefreshCw size={16} className={`mr-2 ${yocRefreshing ? 'animate-spin' : ''}`} />
-                    {yocRefreshing ? 'Recalculating…' : 'Refresh Auto YOC'}
-                  </Button>
-                </div>
-                <div className="hidden lg:block relative">
-                  <Button
-                    onClick={() => backfillQctOzMutation.mutate()}
-                    disabled={qctOzRunning}
-                    variant="outline"
-                    className="font-bold uppercase tracking-wider border-purple-300 text-purple-600 hover:bg-purple-50 hover:text-purple-800 transition-all duration-200"
-                    title="Run QCT + OZ census tract lookup for all deals that are missing these values"
-                  >
-                    <RefreshCw size={16} className={`mr-2 ${qctOzRunning ? 'animate-spin' : ''}`} />
-                    {qctOzRunning ? 'Running…' : 'Run QCT + OZ'}
-                  </Button>
-                  {qctOzResult && (
-                    <div className="absolute top-full mt-1 right-0 bg-white border border-gray-200 rounded shadow-lg p-2 text-xs text-gray-600 z-50 max-w-xs whitespace-normal">
-                      {qctOzResult}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -6779,12 +6552,6 @@ export default function AnalystDashboard() {
                             <ArrowUpDown size={12} />
                           </button>
                         </th>
-                        <th className="text-center px-1 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[45px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colApex') ? '' : 'none', position: 'sticky', left: stickyLeft['colApex']}}>
-                          <span>Apex</span>
-                        </th>
-                        <th className="text-left px-2 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[140px] bg-gray-100" style={{display: isVisible('colApexNotes') ? '' : 'none'}}>
-                          <span>Apex Notes</span>
-                        </th>
                         <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[55px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colPriority') ? '' : 'none', position: 'sticky', left: stickyLeft['colPriority']}}>
                           <button
                             onClick={() => handleSort('priority')}
@@ -6793,12 +6560,6 @@ export default function AnalystDashboard() {
                             <span>Priority</span>
                             <ArrowUpDown size={12} />
                           </button>
-                        </th>
-                        <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[90px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colNext') ? '' : 'none', position: 'sticky', left: stickyLeft['colNext']}}>
-                          <span>Next</span>
-                        </th>
-                        <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[100px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colStep') ? '' : 'none', position: 'sticky', left: stickyLeft['colStep']}}>
-                          <span>Step</span>
                         </th>
                         <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[160px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('propertyAddress') ? '' : 'none', position: 'sticky', left: stickyLeft['propertyAddress']}}>
                           <button
@@ -6915,33 +6676,6 @@ export default function AnalystDashboard() {
                               onBlur={(e) => autoSaveField('new-deal-temp', 'nextSteps', e.target.value)}
                               className="h-8 text-xs"
                               placeholder="Next steps..."
-                            />
-                          </td>
-                          <td className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700">
-                            <Input
-                              value={editData.assignedAnalyst || ''}
-                              onChange={(e) => setEditData({...editData, assignedAnalyst: e.target.value})}
-                              onBlur={(e) => autoSaveField('new-deal-temp', 'assignedAnalyst', e.target.value)}
-                              className="h-8 text-xs"
-                              placeholder="Analyst name..."
-                            />
-                          </td>
-                          <td className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700">
-                            <Input
-                              value={editData.developer || ''}
-                              onChange={(e) => setEditData({...editData, developer: e.target.value})}
-                              onBlur={(e) => autoSaveField('new-deal-temp', 'assignedDeveloper', e.target.value)}
-                              className="h-8 text-xs"
-                              placeholder="Developer name..."
-                            />
-                          </td>
-                          <td className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700">
-                            <Input
-                              value={editData.partner || ''}
-                              onChange={(e) => setEditData({...editData, partner: e.target.value})}
-                              onBlur={(e) => autoSaveField('new-deal-temp', 'assignedPartner', e.target.value)}
-                              className="h-8 text-xs"
-                              placeholder="Partner name..."
                             />
                           </td>
                           <td className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700">
@@ -7506,55 +7240,6 @@ export default function AnalystDashboard() {
                             )}
                           </td>
                           
-                          {/* 2b. Apex Checkbox */}
-                          <td className="px-1 py-1 text-center border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colApex') ? '' : 'none', position: 'sticky', left: stickyLeft['colApex']}}>
-                            <input
-                              type="checkbox"
-                              checked={!!(optimisticUpdates[deal.id]?.apex !== undefined ? optimisticUpdates[deal.id].apex : deal.apex)}
-                              onChange={() => {
-                                const newVal = !(optimisticUpdates[deal.id]?.apex !== undefined ? optimisticUpdates[deal.id].apex : deal.apex);
-                                setOptimisticUpdates(prev => ({ ...prev, [deal.id]: { ...prev[deal.id], apex: newVal } }));
-                                cellUpdateMutation.mutate({ dealId: deal.id, apex: newVal });
-                              }}
-                              className="w-4 h-4 cursor-pointer accent-purple-600"
-                              title={deal.apex ? 'Apex deal — uncheck to remove' : 'Mark as Apex deal'}
-                            />
-                          </td>
-
-                          {/* 2c. Apex Notes - Popup like Analyst Notes */}
-                          <td className="px-1 py-1 border-r border-gray-200" style={{display: isVisible('colApexNotes') ? '' : 'none'}}>
-                            {(optimisticUpdates[deal.id]?.apexNotes !== undefined ? optimisticUpdates[deal.id].apexNotes : deal.apexNotes) ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] hover:scale-100 transform-gpu"
-                                onClick={() => setApexNotesModal({
-                                  dealId: deal.id,
-                                  address: deal.address || 'Property',
-                                  notes: (optimisticUpdates[deal.id]?.apexNotes !== undefined ? optimisticUpdates[deal.id].apexNotes : deal.apexNotes) || '',
-                                  isEditing: false
-                                })}
-                                data-testid={`button-view-apex-notes-${deal.id}`}
-                              >
-                                <FileText size={12} />
-                                Notes
-                              </Button>
-                            ) : (
-                              <div
-                                className="text-gray-400 italic text-xs cursor-pointer px-1"
-                                onClick={() => setApexNotesModal({
-                                  dealId: deal.id,
-                                  address: deal.address || 'Property',
-                                  notes: '',
-                                  isEditing: true
-                                })}
-                                data-testid={`button-add-apex-notes-${deal.id}`}
-                              >
-                                Click to add...
-                              </div>
-                            )}
-                          </td>
-
                           {/* 3. Priority Dropdown - Sticky after Classification */}
                           <td className="px-1 py-1 text-xs border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colPriority') ? '' : 'none', position: 'sticky', left: stickyLeft['colPriority']}}>
                             <Select 
@@ -7582,66 +7267,7 @@ export default function AnalystDashboard() {
                             </Select>
                           </td>
                           
-                          {/* 4. Next Assignee Dropdown - Sticky after Priority */}
-                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colNext') ? '' : 'none', position: 'sticky', left: stickyLeft['colNext']}}>
-                            <Select 
-                              value={deal.nextAssignee || ''} 
-                              onValueChange={(value) => {
-                                const newValue = value === 'none' ? null : value;
-                                setOptimisticUpdates(prev => ({
-                                  ...prev,
-                                  [deal.id]: { ...prev[deal.id], nextAssignee: newValue }
-                                }));
-                                cellUpdateMutation.mutate({ dealId: deal.id, nextAssignee: newValue });
-                              }}
-                            >
-                              <SelectTrigger className="h-7 text-xs w-[100px] px-1">
-                                <SelectValue placeholder="—" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none" className="text-gray-500 italic">Clear</SelectItem>
-                                <SelectItem value="AJ Klenk">AJ Klenk</SelectItem>
-                                <SelectItem value="Austin Blondell">Austin Blondell</SelectItem>
-                                <SelectItem value="Brian Ford">Brian Ford</SelectItem>
-                                <SelectItem value="Ian Wagoner">Ian Wagoner</SelectItem>
-                                <SelectItem value="Jack Berg">Jack Berg</SelectItem>
-                                <SelectItem value="John Bell">John Bell</SelectItem>
-                                <SelectItem value="Steve Hillebrand">Steve Hillebrand</SelectItem>
-                                <SelectItem value="Ted Hill">Ted Hill</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          
-                          {/* 5. Deal Step Dropdown - Sticky after Next */}
-                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colStep') ? '' : 'none', position: 'sticky', left: stickyLeft['colStep']}}>
-                            <Select 
-                              value={deal.dealStep || ''} 
-                              onValueChange={(value) => {
-                                const newValue = value === 'none' ? null : value;
-                                setOptimisticUpdates(prev => ({
-                                  ...prev,
-                                  [deal.id]: { ...prev[deal.id], dealStep: newValue }
-                                }));
-                                cellUpdateMutation.mutate({ dealId: deal.id, dealStep: newValue });
-                              }}
-                            >
-                              <SelectTrigger className="h-7 text-xs w-[120px] px-1">
-                                <SelectValue placeholder="—" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none" className="text-gray-500 italic">Clear</SelectItem>
-                                <SelectItem value="Initial Analysis">Initial Analysis</SelectItem>
-                                <SelectItem value="LOI">LOI</SelectItem>
-                                <SelectItem value="Initial UW">Initial UW</SelectItem>
-                                <SelectItem value="Full UW">Full UW</SelectItem>
-                                <SelectItem value="UW">UW</SelectItem>
-                                <SelectItem value="Call Broker/Owner">Call Broker/Owner</SelectItem>
-                                <SelectItem value="UW - Reviewing">UW - Reviewing</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          
-                          {/* 6. Property Address - Sticky after Step */}
+                          {/* 4. Property Address - Sticky after Priority */}
                           <td className="px-1 py-1 text-xs border-r border-gray-200 font-medium text-gray-900 bg-white z-10 shadow-lg" style={{display: isVisible('propertyAddress') ? '' : 'none', position: 'sticky', left: stickyLeft['propertyAddress'], maxWidth: '200px'}}>
                             {editingCell?.dealId === deal.id && editingCell?.field === 'address' ? (
                               <div className="flex items-center gap-1">
