@@ -1,6 +1,6 @@
 import { db } from './db';
-import { developerProfiles, partnerDevelopers, partnerDeveloperSends } from '../shared/schema';
-import type { DeveloperProfile } from '../shared/schema';
+import { developerProductTypes, developerProfiles, partnerDevelopers, partnerDeveloperSends } from '../shared/schema';
+import type { DeveloperProductType, DeveloperProfile } from '../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { deals } from '../shared/schema';
 import { classifyDealForProfile } from './developerClassificationService';
@@ -41,9 +41,16 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
     for (const { developer: dev, profile } of recipients) {
       try {
         if (!doesDealMatchDeveloper(deal, dev)) continue;
-        const classification = classifyDealForProfile(
+        const productTypes = profile
+          ? await db.select().from(developerProductTypes).where(and(
+              eq(developerProductTypes.developerProfileId, profile.id),
+              eq(developerProductTypes.isActive, true),
+            ))
+          : partnerDeveloperToClassificationProductTypes(dev);
+        const classificationResult = classifyDealForProfile(
           deal,
           profile || partnerDeveloperToClassificationProfile(dev),
+          productTypes,
         );
 
         // Check if a record already exists (pending or sent)
@@ -70,7 +77,8 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
             developerId: dev.id,
             developerProfileId: profile?.id || dev.developerProfileId || null,
             dealId: deal.id,
-            classification,
+            classification: classificationResult.classification,
+            matchedProductTypes: classificationResult.matchedProductTypes,
             address: deal.address,
             status: 'sent',
             sentAt: new Date(),
@@ -82,7 +90,8 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
             developerId: dev.id,
             developerProfileId: profile?.id || dev.developerProfileId || null,
             dealId: deal.id,
-            classification,
+            classification: classificationResult.classification,
+            matchedProductTypes: classificationResult.matchedProductTypes,
             address: deal.address,
             status: 'pending',
             sentAt: null,
@@ -134,6 +143,23 @@ export function partnerDeveloperToClassificationProfile(dev: any): DeveloperProf
     createdAt: dev.createdAt ?? null,
     updatedAt: dev.updatedAt ?? null,
   } as DeveloperProfile;
+}
+
+export function partnerDeveloperToClassificationProductTypes(dev: any): DeveloperProductType[] {
+  return [{
+    id: `legacy-${dev.id}`,
+    developerProfileId: dev.developerProfileId || dev.id,
+    name: Array.isArray(dev.productTypes) && dev.productTypes.length === 1
+      ? dev.productTypes[0]
+      : "General",
+    minAcres: String(dev.minAcres ?? 0),
+    maxAcres: dev.maxAcres == null ? null : String(dev.maxAcres),
+    minRentPsf: dev.minRentPsf == null ? null : String(dev.minRentPsf),
+    minRentPerUnit: dev.minRentPerUnit == null ? null : String(dev.minRentPerUnit),
+    isActive: true,
+    createdAt: null,
+    updatedAt: null,
+  }];
 }
 
 // ── Matching logic (mirrors the routing endpoint in routes.ts) ─────────────

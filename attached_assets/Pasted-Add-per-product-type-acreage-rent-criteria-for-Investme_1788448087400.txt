@@ -1,0 +1,59 @@
+Add per-product-type acreage/rent criteria for Investment Companies, replacing the 
+current flat single-threshold model. This is Phase 1 of 2 — schema and data migration 
+only. Do not touch classification logic or UI yet.
+
+TASK 1 — New table in shared/schema.ts
+
+export const developerProductTypes = pgTable("developer_product_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id, { onDelete: "cascade" }).notNull(),
+  name: varchar("name").notNull(),
+  minAcres: decimal("min_acres").notNull(),
+  maxAcres: decimal("max_acres"),
+  minRentPsf: decimal("min_rent_psf"),
+  minRentPerUnit: decimal("min_rent_per_unit"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("developer_product_types_profile_idx").on(table.developerProfileId),
+]);
+
+export const insertDeveloperProductTypeSchema = createInsertSchema(developerProductTypes).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type DeveloperProductType = typeof developerProductTypes.$inferSelect;
+
+TASK 2 — Add matched product types to partnerDeveloperSends
+Add a column: matchedProductTypes: text("matched_product_types").array()
+This will store which product type name(s) a deal matched for a given send (used 
+in Phase 2, but add the column now).
+
+TASK 3 — Add market label for county organization (display only, no logic impact)
+Add an optional way to group existing target counties under a label like "CLT" or 
+"RDU" for display purposes in the Settings UI later — either a marketLabel column 
+on a per-county basis (if counties are already stored in a way that supports per-row 
+metadata) or a small companion table mapping developerProfileId + county -> 
+marketLabel. This must never affect matching logic — every county behaves identically 
+regardless of which label it's grouped under. Choose whichever approach fits the 
+existing targetCounties storage shape with the least disruption, and report back 
+which approach was used.
+
+TASK 4 — Data migration: carry over existing flat criteria
+Run npm run db:push to create the new table/column. Then run a one-time migration 
+script: for every existing row in developerProfiles that has non-null minAcres or 
+minRentPsf/minRentPerUnit, create ONE developerProductTypes row named "General" for 
+that profile, copying over minAcres, maxAcres, minRentPsf, minRentPerUnit from the 
+old flat fields.
+
+TASK 5 — Verify before finishing
+After migration, query and confirm: every existing developerProfiles row now has 
+AT LEAST ONE corresponding developerProductTypes row. Report the count of profiles 
+migrated and the count of any profiles that had no data to migrate (these will need 
+a manually-defined product type before Phase 2 logic goes live, since every company 
+must have at least one active product type).
+
+Do NOT drop or modify the old minAcres/maxAcres/minRentPsf/minRentPerUnit/
+acreageOverridesByProductType columns on developerProfiles yet — leave them in place 
+as a safety net until Phase 2 is built and verified. Do not change 
+server/developerClassificationService.ts or any Settings/dashboard UI in this pass.

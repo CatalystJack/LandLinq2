@@ -13262,7 +13262,7 @@ RULES:
           return res.status(400).json({ error: 'Address and acreage columns are required' });
         }
 
-        const { developerProfiles, developerDealImports, partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
+        const { developerProfiles, developerProductTypes, developerDealImports, partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
         const [profile] = await db
           .select()
           .from(developerProfiles)
@@ -13274,6 +13274,13 @@ RULES:
         if (!profile) {
           return res.status(403).json({ error: 'Investment Company profile is inactive or unavailable' });
         }
+        const profileProductTypes = await db
+          .select()
+          .from(developerProductTypes)
+          .where(and(
+            eq(developerProductTypes.developerProfileId, developerProfileId),
+            eq(developerProductTypes.isActive, true),
+          ));
 
         const XLSX = await import('xlsx');
         const workbook = XLSX.read(req.file.buffer, { type: 'buffer', raw: true });
@@ -13378,7 +13385,7 @@ RULES:
               wasInserted = true;
             }
 
-            const classification = classifyDealForProfile(deal, profile);
+            const classificationResult = classifyDealForProfile(deal, profile, profileProductTypes);
             const [existingSend] = await db
               .select({ id: partnerDeveloperSends.id })
               .from(partnerDeveloperSends)
@@ -13392,7 +13399,8 @@ RULES:
               await db
                 .update(partnerDeveloperSends)
                 .set({
-                  classification,
+                  classification: classificationResult.classification,
+                  matchedProductTypes: classificationResult.matchedProductTypes,
                   address: deal.address,
                   matchedAt: new Date(),
                 })
@@ -13402,14 +13410,16 @@ RULES:
                 developerId: linkedRecipient?.id || developerProfileId,
                 developerProfileId,
                 dealId: deal.id,
-                classification,
+                classification: classificationResult.classification,
+                matchedProductTypes: classificationResult.matchedProductTypes,
                 address: deal.address,
                 status: 'sent',
                 matchedAt: new Date(),
               }).onConflictDoUpdate({
                 target: [partnerDeveloperSends.developerProfileId, partnerDeveloperSends.dealId],
                 set: {
-                  classification,
+                  classification: classificationResult.classification,
+                  matchedProductTypes: classificationResult.matchedProductTypes,
                   address: deal.address,
                   matchedAt: new Date(),
                 },
@@ -13445,10 +13455,10 @@ RULES:
   // POST /api/partner-developers/outbox/backfill — queue all existing classified deals
   app.post("/api/partner-developers/outbox/backfill", isAuthenticated, async (req, res) => {
     try {
-      const { developerProfiles, partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
+      const { developerProductTypes, developerProfiles, partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
       const { eq, and, isNotNull } = await import('drizzle-orm');
       const { classifyDealForProfile } = await import('./developerClassificationService');
-      const { doesDealMatchDeveloper, partnerDeveloperToClassificationProfile } = await import('./partnerDeveloperAutoSend');
+      const { doesDealMatchDeveloper, partnerDeveloperToClassificationProfile, partnerDeveloperToClassificationProductTypes } = await import('./partnerDeveloperAutoSend');
 
       // Fetch all active developers
       const recipients = await db
@@ -13495,15 +13505,23 @@ RULES:
 
           if (existing.length > 0) { skipped++; continue; }
 
-          const classification = classifyDealForProfile(
+          const productTypes = profile
+            ? await db.select().from(developerProductTypes).where(and(
+                eq(developerProductTypes.developerProfileId, profile.id),
+                eq(developerProductTypes.isActive, true),
+              ))
+            : partnerDeveloperToClassificationProductTypes(dev);
+          const classificationResult = classifyDealForProfile(
             deal,
             profile || partnerDeveloperToClassificationProfile(dev),
+            productTypes,
           );
           await db.insert(partnerDeveloperSends).values({
             developerId: dev.id,
             developerProfileId: profile?.id || dev.developerProfileId || null,
             dealId: deal.id,
-            classification,
+            classification: classificationResult.classification,
+            matchedProductTypes: classificationResult.matchedProductTypes,
             address: deal.address,
             status: 'pending',
             sentAt: null,

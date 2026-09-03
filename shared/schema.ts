@@ -65,6 +65,55 @@ export const developerProfiles = pgTable("developer_profiles", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const developerProductTypes = pgTable("developer_product_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id")
+    .references(() => developerProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  name: varchar("name").notNull(),
+  minAcres: decimal("min_acres").notNull(),
+  maxAcres: decimal("max_acres"),
+  minRentPsf: decimal("min_rent_psf"),
+  minRentPerUnit: decimal("min_rent_per_unit"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("developer_product_types_profile_idx").on(table.developerProfileId),
+]);
+
+export const insertDeveloperProductTypeSchema = createInsertSchema(developerProductTypes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type DeveloperProductType = typeof developerProductTypes.$inferSelect;
+export type InsertDeveloperProductType = z.infer<typeof insertDeveloperProductTypeSchema>;
+
+// Display-only grouping for the targetCounties array. Classification continues
+// to read developer_profiles.target_counties and never consults this table.
+export const developerCountyMarketLabels = pgTable("developer_county_market_labels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id")
+    .references(() => developerProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  county: varchar("county").notNull(),
+  marketLabel: varchar("market_label").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("developer_county_market_labels_profile_county_unique")
+    .on(table.developerProfileId, table.county),
+  index("developer_county_market_labels_profile_idx").on(table.developerProfileId),
+]);
+
+export const insertDeveloperCountyMarketLabelSchema = createInsertSchema(developerCountyMarketLabels).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type DeveloperCountyMarketLabel = typeof developerCountyMarketLabels.$inferSelect;
+
 // Shared HelloData comparable warehouse. Results are reusable across companies
 // when a later search is geographically covered by an unexpired cached search.
 export const marketCompCache = pgTable("market_comp_cache", {
@@ -3415,6 +3464,7 @@ export const partnerDeveloperSends = pgTable("partner_developer_sends", {
   dealId: varchar("deal_id").notNull(),
   sentAt: timestamp("sent_at"),
   classification: varchar("classification"),
+  matchedProductTypes: text("matched_product_types").array(),
   address: text("address"),
   // Queue status: 'pending' = queued for manual review, 'sent' = already emailed
   status: varchar("status").default("sent").notNull(),
