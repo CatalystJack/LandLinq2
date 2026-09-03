@@ -1,0 +1,47 @@
+Fix four authorization bugs found in server/routes.ts.
+
+TASK 1 — CRITICAL: Remove the backdoor clear-deals route
+POST /api/admin/clear-deals (~line 20361) has NO authentication middleware at all, 
+and is gated only by a hardcoded bearer token ('CLEAR_DEALS_2025') visible in source 
+control. This route TRUNCATEs the deals and communications tables entirely.
+
+Fix: Add isAuthenticated and requirePlatformAdmin middleware to this route, and 
+DELETE the hardcoded token check entirely — it provides no real security once proper 
+auth is in place and should never have been the only protection on a destructive 
+route. If this route is only ever meant for local/dev database resets, also add a 
+check that NODE_ENV !== 'production' and reject with 403 in production regardless 
+of who's calling it, as a second layer of protection against ever running this 
+against real data.
+
+TASK 2 — Lock down template/reason-seeding routes
+GET /api/admin/populate-templates (~line 20008) and 
+GET /api/admin/populate-rejection-reasons (~line 20054) are fully public with no 
+auth check, and both write to the database on a GET request.
+  - Add isAuthenticated and requirePlatformAdmin middleware to both
+  - Change both from GET to POST, since they perform writes — a GET request should 
+    never have side effects. Update any frontend code calling these routes to use 
+    POST instead.
+
+TASK 3 — Lock down broker-portal deal approval
+PATCH /api/admin/broker-portal/deals/:dealId/approve (~line 14377) has no role 
+check beyond isAuthenticated, despite approving deals for broker visibility and 
+triggering real outbound emails to brokers.
+  - Add the same admin check pattern already used elsewhere in this file: 
+    user?.email?.endsWith('@apexresi.com'), returning 403 if not met
+
+TASK 4 — Broader audit
+Search server/routes.ts for every route matching app.get/post/patch/delete("/api/admin/..." 
+that has ONLY isAuthenticated with no visible inline role/email check in the handler 
+body (there are approximately 15-20 such routes beyond the four fixed above, including 
+/api/admin/pending-approvals, /api/admin/stats, /api/admin/system-health, 
+/api/admin/platform-metrics, /api/admin/user-activity, /api/admin/clear-cache, and 
+others). Report back a full list categorized by: (a) read-only/low-risk (stats, 
+health checks — lower urgency but should still be admin-only since they expose 
+internal metrics), (b) mutating/destructive (cleanup, geocode-all-deals, etc — 
+higher urgency). Do not fix all of these yet — just report the categorized list so 
+we can decide priority and confirm none of these should remain accessible to non-admin 
+authenticated users (brokers, developer accounts).
+
+Verify after fixing Tasks 1-3: confirm a non-admin authenticated account (e.g. a 
+DEVELOPER-role or BROKER-role login) receives 403 on all four routes, and that an 
+@apexresi.com admin account still works correctly.

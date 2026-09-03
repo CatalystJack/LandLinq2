@@ -14376,6 +14376,11 @@ RULES:
   // PATCH: approve or revoke a deal for the broker portal (auto-emails on approval)
   app.patch('/api/admin/broker-portal/deals/:dealId/approve', isAuthenticated, async (req: any, res) => {
     try {
+      const userEmail = String(req.user?.email || "").trim().toLowerCase();
+      if (!userEmail.endsWith('@apexresi.com')) {
+        return res.status(403).json({ error: "Apex Resi administrator access required" });
+      }
+
       const { dealId } = req.params;
       const { approved } = req.body; // boolean
 
@@ -20004,8 +20009,8 @@ RULES:
     }
   });
 
-  // TEMPORARY: Populate comprehensive templates (GET endpoint for easy access)
-  app.get("/api/admin/populate-templates", async (req, res) => {
+  // TEMPORARY: Populate comprehensive templates
+  app.post("/api/admin/populate-templates", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const comprehensiveEmailTemplates = [
         { id: "default-welcome", name: "Broker Welcome Message", subject: "Welcome to LandLinq - Your Gateway to Fast Land Deals", content: `Hi {brokerName},\n\nWelcome to LandLinq! We're excited to have you as part of our broker network. Your account is active and ready for submissions.\n\n**🚀 How to Submit Deals (Multiple Ways)**\n📧 Email: catalyst@landlinq.ai\n📱 Text/SMS: (704) 610-1549  \n🌐 Web Portal: https://landlinq.ai/submit-deal\n\n**📋 What We Need (Minimum)**\n• Property address\n• Asking price\n• Acreage\n\n**🎯 What We're Buying**\n• Conventional Apartments - 200+ units, 4+ acres minimum\n• Active Adult Communities - 150+ units, 4+ acres minimum\n• Build-to-Rent - 70+ units, 5+ acres minimum\n• Lot Development - 50+ units, 6+ acres minimum\n\nReady to submit your first deal? Just send us the basics and we'll take it from there!\n\nCatalyst Acquisitions\nCatalyst Capital Partners`, type: "welcome" },
@@ -20051,7 +20056,7 @@ RULES:
 
 
   // ADMIN: Populate default rejection reasons
-  app.get("/api/admin/populate-rejection-reasons", async (req, res) => {
+  app.post("/api/admin/populate-rejection-reasons", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const defaultRejectionReasons = [
         // Property (6 reasons)
@@ -20357,13 +20362,12 @@ RULES:
     }
   });
 
-  // ADMIN: Clear all deals (production safe)
-  app.post("/api/admin/clear-deals", async (req, res) => {
+  // ADMIN: Clear all deals (development-only safety operation)
+  app.post("/api/admin/clear-deals", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
-      // Only allow with specific admin token
-      const adminToken = req.headers.authorization?.replace('Bearer ', '');
-      if (adminToken !== 'CLEAR_DEALS_2025') {
-        return res.status(403).json({ error: "Unauthorized" });
+      // Never permit this destructive reset against production data.
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({ error: "Deal clearing is disabled in production" });
       }
 
       // Clear deals safely with CASCADE
