@@ -1,0 +1,92 @@
+Build the automated email intake pipeline for deals@landlinq.ai. This reads inbound 
+forwarded deal emails, extracts the right information, routes each deal to the 
+correct Investment Company, creates a broker contact from the original lead source, 
+pulls rent comps, classifies the deal, and avoids duplicates — all automatically, 
+falling back to human review only when the system isn't confident.
+
+This reuses existing pieces already built but not yet connected end-to-end:
+aiEmailParser.ts (GPT-5 extraction), emailIntakeService.ts (PDF/OCR parsing and 
+deal-link fetching — already handles attachments and links like LoopNet/Crexi/CoStar, 
+do not duplicate this), geocodioService.ts (reverse geocoding), knownEmailDomains 
+(on developerProfiles), hellodataService.ts (comp warehouse), and 
+classifyDealForProfile() (classification engine). 
+EMAIL_SCRAPING_ENABLED = false in server/emailInboundService.ts currently — this 
+task turns it on, carefully, only after testing.
+
+TASK 1 — Read deals@landlinq.ai via Microsoft Graph
+Reuse the existing app-only Graph authentication (getAppOnlyGraphToken() in 
+server/microsoftAuth.ts, already built for sending from help@landlinq.ai). Poll 
+GET https://graph.microsoft.com/v1.0/users/deals@landlinq.ai/messages for new/unread 
+messages on a regular interval (every few minutes is fine).
+
+TASK 2 — Extract two distinct identities, not one
+Update the aiEmailParser.ts extraction to return two separate fields — these must 
+not be conflated:
+  routingSender: { email, domain } — whoever forwarded the email INTO 
+    deals@landlinq.ai (the most recent forward in the chain). Used only for routing.
+  originalLeadSource: { name, email, phone, company } — the broker or seller who 
+    originated the property information, typically the earliest message in the 
+    forward chain. Used only to create/match a broker contact.
+Verify against actual header/reply-chain structure, not just body-text guessing, 
+especially in multi-layer forwards with signature clutter.
+
+TASK 3 — Route by routing sender's domain, geography as fallback
+Check routingSender.domain against every developerProfile's knownEmailDomains. 
+Match found → route ONLY to that profile, skip geographic matching entirely. No 
+match → fall back to matching the extracted property's county/state against each 
+profile's targetCounties/targetStates. No domain match AND multiple geographic 
+matches → route to the existing manual emailIntakeQueue for human review (this 
+ambiguous case stays deferred, as previously decided — do not build resolution 
+logic for it yet).
+
+TASK 4 — Create/match the broker contact from the original lead source
+Using originalLeadSource, check for an existing broker/contact record (by email) 
+owned by the routed Investment Company or in the shared network. If found, link the 
+deal to that existing contact. If not found, create a new broker record scoped to 
+ownerDeveloperProfileId = the routed profile, populated from originalLeadSource's 
+extracted name/email/phone/company. If originalLeadSource couldn't be confidently 
+extracted, leave the deal without a linked broker contact rather than guessing.
+
+TASK 5 — Duplicate detection
+Before creating a new deal, check for an existing deal at the same or a very close 
+address (exact match, or within a small distance tolerance using the same haversine 
+approach already used in the comp warehouse). If a likely duplicate is found, update 
+the existing deal's record (e.g. refresh its data, note the new source) rather than 
+creating a second deal.
+
+TASK 6 — Confidence gate before auto-classifying
+Require overallConfidence above a reasonable threshold AND non-null county/state, 
+acreage, and at least one of rent/asking price before auto-creating a deal. Use 
+geocodioService.ts's reverseGeocode() as a fallback for coordinate-only emails. 
+On a confident, complete extraction that isn't a duplicate: create the deal, 
+proceed to Task 7. Low-confidence or incomplete → route to the existing 
+emailIntakeQueue for manual review, unchanged safety net.
+
+TASK 7 — Auto-pull comps before classifying
+Immediately after creating a new deal (Task 6), call the comp warehouse-first 
+lookup (checkCompWarehouse, then live HelloData on a miss, from 
+server/hellodataService.ts) using the deal's geocoded location, before running 
+classification. This ensures rent data exists at classification time rather than 
+the deal sitting with null rent fields.
+
+TASK 8 — Classify and file
+Fetch the routed profile's active developerProductTypes, run 
+classifyDealForProfile(deal, profile, productTypes), and create a 
+partnerDeveloperSends record with the resulting classification and 
+matchedProductTypes, scoped to the routed developerProfileId.
+
+TASK 9 — Turn on the switch, carefully
+Test against real fixtures first: a clean plain-text forward, a multi-layer forward 
+with signature clutter (to properly test the routing-sender vs. lead-source split), 
+a PDF-attachment-only email, a coordinates-only email, and the same deal forwarded 
+twice (to test duplicate detection). Once these all pass correctly, set 
+EMAIL_SCRAPING_ENABLED = true.
+
+No confirmation email is sent to the forwarder, and no junk-filtering pre-check is 
+applied — every email that arrives goes through the full pipeline described above.
+
+Verify: forward a test email (simulating an NRP employee forwarding a broker's 
+deal) to deals@landlinq.ai and confirm it lands in NRP's dashboard specifically, 
+with comps populated, classified correctly, and the broker's info correctly 
+attached as the contact — not NRP's own forwarding employee mistakenly saved as 
+the broker.

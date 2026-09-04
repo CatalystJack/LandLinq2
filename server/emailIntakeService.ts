@@ -80,7 +80,7 @@ export class EmailIntakeService {
   /**
    * Primary entry point — called by the /api/inbound-email webhook.
    */
-  static async processInboundEmail(rawBody: any, files?: Array<{ fieldname: string; originalname: string; mimetype: string; buffer: Buffer }>): Promise<{ intakeId: string } | null> {
+  static async processInboundEmail(rawBody: any, files?: Array<{ fieldname: string; originalname: string; mimetype: string; buffer: Buffer }>): Promise<{ intakeId: string; intakeIds: string[] } | null> {
     const email = await EmailIntakeService.extractEmailFields(rawBody, files);
     if (!email) return null;
 
@@ -123,14 +123,20 @@ export class EmailIntakeService {
 
     // Deduplication
     const crypto = await import('crypto');
-    const hashSource = `${email.from}|${email.subject || ''}|${(email.text || '').substring(0, 200)}`;
+    const hashSource = rawBody.graphMessageId
+      ? `graph:${String(rawBody.graphMessageId)}`
+      : `${email.from}|${email.subject || ''}|${(email.text || '').substring(0, 200)}`;
     const emailHash = crypto.createHash('sha256').update(hashSource).digest('hex');
 
     const existing = await db.select().from(emailIntakeQueue)
       .where(eq(emailIntakeQueue.emailHash, emailHash)).limit(1);
     if (existing.length > 0) {
       console.log(`⏭️ [INTAKE] Duplicate blocked`);
-      return { intakeId: existing[0].id };
+      const groupRows = existing[0].groupId
+        ? await db.select({ id: emailIntakeQueue.id }).from(emailIntakeQueue)
+            .where(eq(emailIntakeQueue.groupId, existing[0].groupId))
+        : [{ id: existing[0].id }];
+      return { intakeId: existing[0].id, intakeIds: groupRows.map(row => row.id) };
     }
 
     // Attachment text extraction + buffer collection for object storage upload
@@ -319,7 +325,58 @@ export class EmailIntakeService {
     }
 
     console.log(`✅ [INTAKE] Saved ${insertedRows.length} entr${insertedRows.length === 1 ? 'y' : 'ies'}: ${insertedRows.map(r => r.id).join(', ')}`);
-    return { intakeId: insertedRows[0].id };
+    return { intakeId: insertedRows[0].id, intakeIds: insertedRows.map(row => row.id) };
+  }
+
+  /**
+   * Provider adapter for the Microsoft Graph deals mailbox.
+   * A true result means the message is durably represented by either an
+   * automated deal outcome or a pending manual-review queue item.
+   */
+  static async processGraphMessage(message: {
+    id: string;
+    from: string;
+    to: string;
+    cc?: string;
+    replyTo?: string;
+    subject?: string;
+    text?: string;
+    html?: string;
+    attachments?: Array<{ filename: string; contentType: string; content: string }>;
+  }): Promise<boolean> {
+    const htmlAsText = String(message.html || '')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:p|div|li|tr|h[1-6])>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    const rawBody = {
+      graphMessageId: message.id,
+      from: message.from,
+      to: message.to || 'deals@landlinq.ai',
+      cc: message.cc || '',
+      subject: message.subject || '',
+      text: message.text || htmlAsText,
+      html: message.html || '',
+      replyTo: message.replyTo,
+      envelope: JSON.stringify({ to: ['deals@landlinq.ai'], from: message.from }),
+      attachments: message.attachments || [],
+    };
+    const queued = await EmailIntakeService.processInboundEmail(rawBody);
+    if (!queued) return false;
+    const { processAutomatedDealEmailIntake } = await import('./automatedDealEmailPipeline.js');
+    for (const intakeId of queued.intakeIds) {
+      const result = await processAutomatedDealEmailIntake(intakeId);
+      if (!result.handled) return false;
+    }
+    return true;
   }
 
   // ── Extract original sender from a forwarded email body ─────────────────

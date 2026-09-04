@@ -1003,6 +1003,17 @@ setTimeout(() => {
         console.error("❌ Failed to start developer weekly email scheduler:", error);
       }
 
+      // Poll deals@landlinq.ai through app-only Microsoft Graph. The poller
+      // marks a message read only after the intake is durably created/updated
+      // or placed in the existing manual-review queue.
+      try {
+        const { startDealsMailboxPoller } = await import('./graphDealsPoller');
+        startDealsMailboxPoller();
+        log("📬 Deals mailbox poller scheduled — checking every 3 minutes");
+      } catch (error: any) {
+        console.error("❌ Failed to start deals mailbox poller:", error);
+      }
+
       // Start the background job processor - async email/SMS processing to prevent webhook timeouts
       log("🔄 Attempting to start background job processor...");
       (async () => {

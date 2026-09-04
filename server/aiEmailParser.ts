@@ -27,6 +27,63 @@ export interface ParsedPropertyData {
   dealRoomUrl: string | null; // External deal room link requiring login/agreement
 }
 
+/** The person/address which delivered the message to our intake mailbox. */
+export interface RoutingSender {
+  name: string | null;
+  email: string | null;
+}
+
+/** The earliest identifiable author in a forwarded message chain. */
+export interface OriginalLeadSource {
+  name: string | null;
+  email: string | null;
+  phone?: string | null;
+  company?: string | null;
+  fromForwardedChain: boolean;
+}
+
+export interface EmailIntakeIdentities {
+  routingSender: RoutingSender;
+  originalLeadSource: OriginalLeadSource | null;
+}
+
+/**
+ * Parse the outer sender independently from the source of a forwarded lead.
+ * A nested forward has several `From:` headers; the last one is the oldest
+ * message and is therefore the lead source.  This deliberately does not use
+ * Reply-To, which is a routing instruction rather than provenance.
+ */
+export function parseForwardedChainIdentities(
+  routingSender: string | RoutingSender | null | undefined,
+  body: string | null | undefined,
+): EmailIntakeIdentities {
+  const parseMailbox = (value: string | null | undefined): RoutingSender => {
+    const input = String(value || '').trim();
+    const angle = /^(.*?)\s*<\s*([^<>\s@]+@[^<>\s@]+)\s*>/.exec(input);
+    const mailto = /^(.*?)\s*\[mailto:\s*([^\]\s@]+@[^\]\s@]+)\]/i.exec(input);
+    const plain = /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b/i.exec(input);
+    const match = angle || mailto;
+    return {
+      name: match?.[1].replace(/^from:\s*/i, '').replace(/["']/g, '').trim() || null,
+      email: (match?.[2] || plain?.[1] || '').trim().toLowerCase() || null,
+    };
+  };
+  const outer = typeof routingSender === 'string' ? parseMailbox(routingSender) : {
+    name: routingSender?.name?.trim() || null,
+    email: routingSender?.email?.trim().toLowerCase() || null,
+  };
+  const headers = Array.from(String(body || '').matchAll(
+    /(?:^|\n)\s*From:\s*(?:"?([^<\n"]*)"?\s*)?(?:<\s*)?([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})(?:\s*>|\s*\])?/gim,
+  ));
+  const oldest = headers.length ? headers[headers.length - 1] : null;
+  return {
+    routingSender: outer,
+    originalLeadSource: oldest
+      ? { name: oldest[1]?.replace(/["']/g, '').trim() || null, email: oldest[2].toLowerCase(), fromForwardedChain: true }
+      : null,
+  };
+}
+
 /**
  * Parse email/PDF text using OpenAI to extract property details
  * This replaces hundreds of lines of fragile regex patterns

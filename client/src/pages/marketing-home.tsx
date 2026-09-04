@@ -4,10 +4,8 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
-  CircleCheck,
   Menu,
   Search,
-  SlidersHorizontal,
   X,
 } from "lucide-react";
 
@@ -29,11 +27,15 @@ function Button({ children, href = "mailto:help@landlinq.ai", dark = false }: { 
 }
 
 const contactRows = [
-  ["SU", "System Unassigned", "system@catalystcp.com", "—", "3"],
-  ["AT", "Apex Tester", "apextest_1783361027143@example.com", "—", "0"],
-  ["JS", "Jane Smith", "jane@get.com", "Test Co", "0"],
-  ["DS", "Dean Smith", "dean.smith@mrk.com", "Newmark", "0"],
-  ["JS", "Jay Snover", "jsnover@legacycre.com", "Legacy Real Estate Advisors", "0"],
+  ["MC", "Maya Collins", "maya.collins@northline.example", "(704) 555-0182", "Northline Realty", "Known Broker · Multifamily · Charlotte", "AJ Klenk", "12", "Aug 28, 26"],
+  ["JR", "Julian Reyes", "julian@oakandstone.example", "(919) 555-0147", "Oak & Stone Capital", "Principal · Land Seller · Triangle", "Brian Ford", "8", "Aug 25, 26"],
+  ["SP", "Sophie Patel", "spatel@harborcre.example", "(843) 555-0119", "Harbor Commercial", "CRE Broker · Coastal · BTR", "AJ Klenk", "15", "Aug 21, 26"],
+  ["DM", "Derek Monroe", "dmonroe@piedmontadvisors.example", "(336) 555-0165", "Piedmont Advisors", "Known Broker · Affordable · Triad", "Brian Ford", "6", "Aug 18, 26"],
+  ["EW", "Elena Walsh", "elena@bluepeakland.example", "(615) 555-0133", "BluePeak Land Co.", "Landowner · Tennessee · Warm Lead", "AJ Klenk", "4", "Aug 14, 26"],
+  ["TB", "Trevor Brooks", "tbrooks@crescentpartners.example", "(980) 555-0196", "Crescent Partners", "CRE Broker · Active Adult · Charlotte", "Brian Ford", "10", "Aug 09, 26"],
+  ["NK", "Naomi Kim", "naomi@redwoodcommunities.example", "(984) 555-0128", "Redwood Communities", "Developer · Multifamily · Raleigh", "AJ Klenk", "7", "Aug 03, 26"],
+  ["CW", "Caleb Wright", "caleb@ironwoodre.example", "(864) 555-0174", "Ironwood Real Estate", "Known Broker · Greenville · Student", "Brian Ford", "9", "Jul 29, 26"],
+  ["AH", "Amelia Hart", "amelia@carolinalandgroup.example", "(910) 555-0151", "Carolina Land Group", "Land Broker · Wilmington · Priority", "AJ Klenk", "11", "Jul 24, 26"],
 ];
 
 function ContactDirectoryMockup() {
@@ -43,7 +45,7 @@ function ContactDirectoryMockup() {
       <div className="ll-contact-filters"><span className="ll-search-box">⌕&nbsp; Search name, email, phone...</span><span>All tags　›</span><span>+ Tag</span><span>All SMS　⌄</span><span>All States　⌄</span><span>All MSAs　⌄</span><span>All Counties　⌄</span><span>All Reps　⌄</span></div>
       <div className="ll-contact-table">
         <div className="ll-contact-head"><span>□</span><span>CONTACT</span><span>REACH</span><span>ORGANIZATION</span><span>SIGNALS</span><span>OWNER</span><span>DEALS</span><span>ADDED</span></div>
-        {contactRows.map(([initials, name, email, company, deals], i) => <div className={`ll-contact-row ll-contact-row-${i}`} key={name}><span>□</span><span className="ll-person"><i>{initials}</i><b>{name}<em>ACTIVE</em></b></span><span className="ll-reach">▧ {email}{i > 2 && <small>⌕ (704) 373-1800</small>}</span><span>{company}</span><span className="ll-signal">{i > 2 ? "AJ · Known Sophisticated　CRE Broker" : "—"}</span><span>{i > 2 ? "♧ AJ Klenk" : "—"}</span><span>{deals}</span><span>Apr 15, 26　›</span></div>)}
+        {contactRows.map(([initials, name, email, phone, company, tags, owner, deals, added], i) => <div className={`ll-contact-row ll-contact-row-${i}`} key={name}><span>□</span><span className="ll-person"><i>{initials}</i><b>{name}<em>ACTIVE</em></b></span><span className="ll-reach">▧ {email}<small>⌕ {phone}</small></span><span>{company}</span><span className="ll-signal">{tags}</span><span>♧ {owner}</span><span>{deals}</span><span>{added}　›</span></div>)}
       </div>
     </div>
   );
@@ -52,9 +54,9 @@ function ContactDirectoryMockup() {
 function ContactDetailMockup() {
   return (
     <div className="ll-app-frame ll-contact-detail">
-      <div className="ll-detail-nav"><b>▰ LandLinq</b><span>Deal Dashboard　 <i>CRM</i>　 Outreach Analytics　 Outreach Setup　 Data Hub　 Analytics</span><button>SIGN OUT</button></div>
-      <div className="ll-detail-hero"><small>‹ Back to contacts</small><div className="ll-detail-person"><i>SU</i><b>System<br /><small>Company / brokerage</small></b><b>Unassigned<br /><small>• Unassigned</small></b><span>✉ Email　　✎ Edit　 <strong> SAVE CHANGES </strong></span></div><div className="ll-detail-meta"><span>PHONE<br /><b>—</b></span><span>EMAIL<br /><b>system@catalystcp.com</b></span><span>COMPANY<br /><b>—</b></span><span>LAST CONTACTED<br /><b>—</b></span></div></div>
-      <div className="ll-detail-body"><aside><small>RECORD</small><b>Contact details</b>{[["NAME", "System Unassigned"], ["EMAIL", "system@catalystcp.com"], ["PHONE", "Phone number"], ["ACCOUNT / COMPANY", "No company assigned"], ["ASSIGNED TO", "Assign to team member..."], ["CONTACT TYPE", "Broker contact"], ["LEAD SOURCE", "—"], ["LAST CONTACTED", "—"]].map(([a, b]) => <label key={a}>{a}<strong>{b}</strong></label>)}</aside><main><div className="ll-detail-tabs"><b>Overview</b><span>Activity</span></div><div className="ll-detail-cards"><div><small>CREATED</small><b>Sep 4, 2026</b></div><div><small>TYPE</small><b>Broker contact</b></div><div><small>DEALS</small><b>3</b></div><div><small>CAMPAIGNS</small><b>0</b></div></div><div className="ll-detail-event"><i>♧</i><b>Contact created</b><small>Added via manual entry · 9/4/2026</small></div><div className="ll-detail-section"><small>ORGANIZATION</small><b>Tags</b><span>Add tag...　＋</span></div><div className="ll-detail-section"><small>OUTREACH</small><b>Campaigns</b><span>AJ - Unknown Sophisticated　 • Brian - Known Sophisticated　 • TEST - Drip Flow Validation</span></div></main></div>
+      <div className="ll-detail-nav"><b><img src="/assets/landlinq-white-logo.png" alt="LandLinq" /></b><span>Deal Dashboard　 <i>CRM</i>　 Outreach Analytics　 Outreach Setup　 Data Hub　 Analytics</span><button>SIGN OUT</button></div>
+      <div className="ll-detail-hero"><small>‹ Back to contacts</small><div className="ll-detail-person"><i>MC</i><b>Maya<br /><small>Senior Vice President</small></b><b>Collins<br /><small>• Northline Realty</small></b><span>✉ Email　　✎ Edit　 <strong>SAVE CHANGES</strong></span></div><div className="ll-detail-meta"><span>PHONE<br /><b>(704) 555-0182</b></span><span>EMAIL<br /><b>maya.collins@northline.example</b></span><span>COMPANY<br /><b>Northline Realty</b></span><span>LAST CONTACTED<br /><b>Aug 29, 2026</b></span></div></div>
+      <div className="ll-detail-body"><aside><small>RECORD</small><b>Contact details</b>{[["NAME", "Maya Collins"], ["EMAIL", "maya.collins@northline.example"], ["PHONE", "(704) 555-0182"], ["ACCOUNT / COMPANY", "Northline Realty"], ["ASSIGNED TO", "AJ Klenk"], ["CONTACT TYPE", "CRE broker"], ["LEAD SOURCE", "Broker referral"], ["LAST CONTACTED", "Aug 29, 2026"]].map(([a, b]) => <label key={a}>{a}<strong>{b}</strong></label>)}</aside><main><div className="ll-detail-tabs"><b>Overview</b><span>Activity</span><span>Deals</span><span>Notes</span></div><div className="ll-detail-cards"><div><small>CREATED</small><b>Feb 12, 2025</b></div><div><small>TYPE</small><b>Known broker</b></div><div><small>DEALS</small><b>12</b></div><div><small>CAMPAIGNS</small><b>3 active</b></div></div><div className="ll-detail-activity"><div className="ll-detail-event"><i>✉</i><b>Email opened</b><small>Providence Grove follow-up · Aug 29, 2026</small></div><div className="ll-detail-event"><i>＋</i><b>New deal received</b><small>Glenwood Commons · Aug 27, 2026</small></div><div className="ll-detail-event"><i>✓</i><b>Call completed</b><small>Discussed Charlotte pipeline · Aug 22, 2026</small></div></div><div className="ll-detail-section"><small>ORGANIZATION</small><b>Tags</b><span className="ll-detail-tags"><i>Known Broker</i><i>Multifamily</i><i>Charlotte MSA</i><i>Priority</i><i>Warm Relationship</i></span></div><div className="ll-detail-section"><small>OUTREACH</small><b>Campaigns</b><span>Charlotte Broker Nurture　 • Multifamily Deal Flow　 • Q3 Relationship Follow-up</span></div></main></div>
     </div>
   );
 }
@@ -64,28 +66,44 @@ function OutreachAnalyticsMockup() {
     <div className="ll-app-frame ll-outreach-analytics">
       <div className="ll-analytics-back">← Outreach Management <button>⟳ Refresh</button></div><h3>▱ Outreach Analytics</h3><p>Email send activity, sender health, and drip campaign status</p>
       <div className="ll-periods"><span>Today</span><span>7 Days</span><b>30 Days</b><span>YTD</span></div>
-      <div className="ll-metric-grid"><div><i>➤</i><small>EMAILS SENT</small><b className="ll-metric-number">0</b><em>0 failed · 0 contacts reached</em></div><div><i>⌁</i><small>CONTACTS REACHED</small><b className="ll-metric-number">0</b><em>Unique contacts emailed</em></div><div><i>ϟ</i><small>AVG STEPS / CONTACT</small><b>—</b><em>Email steps per enrolled contact</em></div><div><i>♧</i><small>IN DRIP SEQUENCES</small><b>178</b><em>0 due today</em></div></div>
-      <div className="ll-analytics-lower"><div className="ll-volume"><b>Daily Send Volume</b><span>ⓘ<br /><small>No send data for this period yet.</small></span><div className="ll-volume-bars"><i/><i/><i/><i/><i/><i/></div></div><div className="ll-drip"><b>◷ Drip Enrollment Status</b><span>◷ Pending <strong>178</strong></span><span>⌁ In Progress <strong>0</strong></span><span>✓ Completed <strong>0</strong></span><span>⊗ Failed <strong>0</strong></span><hr/><span>Due today <strong>0</strong></span><span>Due now <strong>178</strong></span></div></div>
+      <div className="ll-metric-grid"><div><i>➤</i><small>EMAILS SENT</small><b className="ll-metric-number">1,284</b><em>7 failed · 98.9% delivered</em></div><div><i>⌁</i><small>CONTACTS REACHED</small><b className="ll-metric-number">642</b><em>418 unique opens · 65.1%</em></div><div><i>ϟ</i><small>AVG STEPS / CONTACT</small><b>2.4</b><em>Across 11 active campaigns</em></div><div><i>♧</i><small>IN DRIP SEQUENCES</small><b>178</b><em>26 due today · 11 due now</em></div></div>
+      <div className="ll-analytics-lower"><div className="ll-volume"><b>Daily Send Volume <small>Last 7 days · 324 sent</small></b><span className="ll-volume-summary">Peak volume: Tuesday <strong>67 sends</strong></span><div className="ll-volume-bars"><i style={{height:"48%"}}/><i style={{height:"72%"}}/><i style={{height:"91%"}}/><i style={{height:"63%"}}/><i style={{height:"84%"}}/><i style={{height:"56%"}}/><i style={{height:"38%"}}/></div><div className="ll-volume-days"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></div><div className="ll-drip"><b>◷ Drip Enrollment Status</b><span>◷ Pending <strong>42</strong></span><span>⌁ In Progress <strong className="is-blue">96</strong></span><span>✓ Completed <strong className="is-green">824</strong></span><span>⊗ Failed <strong className="is-red">7</strong></span><hr/><span>Due today <strong>26</strong></span><span>Due now <strong>11</strong></span></div></div>
     </div>
   );
 }
 
 function DashboardMockup({ compact = false }: { compact?: boolean }) {
+  const [activeFilter, setActiveFilter] = useState("STATUS");
+  const columns = ["ID", "Status", "Priority", "Property Address", "Name", "YOC", "IBR", "Deal", "Type", "Analyst Notes", "Summary", "Dev Notes", "Broker Notes", "Top Rent/Unit", "Top Rent PSF", "OCC T."];
+  const rows = [
+    ["#84", "Review", "High", "1824 Glenwood Avenue|Raleigh, NC 27608", "Glenwood Commons", "7.8%", "8.4%", "Land", "Affordable", "Site plan received", "Strong infill opportunity", "Review density", "Seller expects Q4 close", "$1,845", "$2.18", "YES"],
+    ["#83", "Qualified", "High", "6400 Providence Road|Charlotte, NC 28226", "Providence Grove", "8.6%", "9.1%", "Land", "BTR", "Utilities confirmed", "High-growth submarket", "Advance to UW", "Best offers due Friday", "$2,120", "$2.34", "YES"],
+    ["#82", "Review", "Medium", "915 South Main Street|Greenville, SC 29601", "Reedy River Flats", "7.4%", "8.0%", "Land", "Conventional", "Traffic study pending", "Walkable downtown site", "Confirm access", "Broker shared survey", "$1,765", "$2.06", "YES"],
+    ["#81", "Qualified", "High", "3120 Hillsborough Road|Durham, NC 27705", "Bull City Landing", "9.0%", "9.5%", "Land", "Student", "Zoning verified", "Near university demand", "Model 280 units", "Clean title reported", "$1,980", "$2.41", "YES"],
+    ["#80", "Review", "Medium", "4475 New Bern Avenue|Raleigh, NC 27610", "Eastgate Residences", "7.1%", "7.9%", "Land", "Affordable", "QCT status confirmed", "Transit-oriented parcel", "Check tax credits", "Seller flexible on timing", "$1,690", "$1.98", "YES"],
+    ["#79", "Qualified", "Medium", "2280 Wendover Avenue|Greensboro, NC 27407", "Wendover Park", "8.3%", "8.8%", "Land", "Active Adult", "Demographics complete", "Strong 55+ population", "Begin concept plan", "Full package received", "$1,725", "$2.09", "YES"],
+    ["#78", "Review", "Low", "7600 Market Street|Wilmington, NC 28411", "Porters Neck Village", "7.0%", "7.6%", "Land", "BTR", "Wetlands report added", "Coastal growth corridor", "Review wetland area", "Pricing guidance received", "$1,860", "$2.22", "YES"],
+    ["#77", "Qualified", "High", "1350 Veterans Parkway|Murfreesboro, TN 37128", "Veterans Crossing", "8.8%", "9.3%", "Land", "Conventional", "Comp set refreshed", "Rapid household growth", "Schedule IC review", "Seller financing available", "$1,925", "$2.27", "YES"],
+    ["#76", "Review", "Medium", "2900 Western Boulevard|Raleigh, NC 27606", "Western Row", "7.6%", "8.2%", "Land", "Student", "Enrollment data added", "NC State demand driver", "Verify unit mix", "Broker uploaded OM", "$1,995", "$2.38", "YES"],
+    ["#75", "Qualified", "High", "5210 South Boulevard|Charlotte, NC 28217", "South End Exchange", "9.1%", "9.7%", "Land", "Conventional", "Transit access verified", "Prime infill location", "Prepare LOI terms", "Seller prefers certainty", "$2,180", "$2.46", "YES"],
+    ["#74", "Review", "Medium", "3801 Battleground Avenue|Greensboro, NC 27410", "Battleground Oaks", "7.9%", "8.3%", "Land", "Affordable", "AMI rents modeled", "Established retail node", "Confirm bond volume", "Phase I available", "$1,640", "$1.94", "YES"],
+    ["#73", "Qualified", "Low", "2045 Highway 70 East|New Bern, NC 28560", "Neuse River Landing", "8.1%", "8.6%", "Land", "Active Adult", "Flood maps reviewed", "Low basis opportunity", "Order market study", "Flexible closing window", "$1,575", "$1.87", "YES"],
+  ];
   return (
-    <div className={`ll-window ll-showcase-dashboard relative overflow-hidden rounded-[1.1rem] border border-white/15 bg-[#f6f8fa] text-[#183047] shadow-2xl ${compact ? "min-h-[280px]" : "min-h-[430px]"}`}>
-      <div className="flex h-10 items-center gap-2 border-b border-[#dbe3e9] bg-[#fff] px-4">
-        <span className="h-2.5 w-2.5 rounded-full bg-[#c5ced5]" /><span className="h-2.5 w-2.5 rounded-full bg-[#c5ced5]" /><span className="h-2.5 w-2.5 rounded-full bg-[#c5ced5]" />
-        <div className="ml-4 flex h-5 w-44 items-center rounded bg-[#f0f3f5] px-2 text-[8px] text-[#81909d]">app.landlinq.ai / deals</div>
+    <div className={`ll-window ll-analyst-real relative overflow-hidden rounded-[1.1rem] border border-white/15 bg-[#f7f9fa] text-[#182b3e] shadow-2xl ${compact ? "min-h-[280px]" : "min-h-[430px]"}`}>
+      <div className="ll-analyst-head">
+        <div><h3>Your Dashboard</h3><p>Review, analyze, and manage incoming land deals with AI-powered insights</p></div>
+        <div className="ll-analyst-actions"><button type="button">＋ &nbsp; ADD NEW DEAL</button><button type="button">⇩ &nbsp; EXPORT CSV</button></div>
       </div>
-      <div className="flex">
-        <aside className="hidden w-36 shrink-0 border-r border-[#dbe3e9] bg-[#fff] p-4 sm:block">
-          <div className="mb-8 flex items-center gap-2 text-[10px] font-bold text-[#183047]"><span className="h-4 w-4 rounded bg-primary" /> LandLinq</div>
-          {["Overview", "Deals", "Contacts", "Outreach", "Analytics"].map((item, i) => <div key={item} className={`mb-2 flex items-center gap-2 rounded px-2 py-2 text-[9px] ${i === 1 ? "bg-[#eaf0f4] font-semibold text-primary" : "text-[#7b8a96]"}`}><span className="h-2 w-2 rounded-sm border border-current" />{item}</div>)}
-        </aside>
-        <div className="min-w-0 flex-1 p-4 sm:p-6">
-           <div className="flex items-start justify-between"><div><div className="text-[9px] uppercase tracking-[0.16em] text-[#83919b]">Analyst Dashboard</div><div className="mt-1 text-lg font-semibold tracking-tight">Review, analyze, and manage incoming land deals</div></div><button className="rounded border border-[#d5dfe5] bg-white px-2 py-1 text-[9px] text-[#526574]"><SlidersHorizontal className="mr-1 inline h-3 w-3" /> Filter</button></div>
-          <div className="mt-5 grid grid-cols-3 gap-2"><div className="rounded border border-[#dce4e9] bg-white p-3"><div className="text-[8px] text-[#84929d]">Ready for review</div><div className="mt-1 text-xl font-semibold">18</div></div><div className="rounded border border-[#dce4e9] bg-white p-3"><div className="text-[8px] text-[#84929d]">Criteria matched</div><div className="mt-1 text-xl font-semibold">72%</div></div><div className="rounded border border-[#dce4e9] bg-white p-3"><div className="text-[8px] text-[#84929d]">Outreach queued</div><div className="mt-1 text-xl font-semibold">34</div></div></div>
-          <div className="mt-5 overflow-hidden rounded border border-[#dce4e9] bg-white"><div className="grid grid-cols-[1.5fr_1fr_0.8fr] border-b border-[#e5ebef] px-3 py-2 text-[8px] uppercase tracking-wider text-[#8896a0]"><span>Opportunity</span><span>Fit</span><span>Status</span></div>{[["North County parcel", "Strong", "Review"], ["Riverside infill", "Strong", "Outreach"], ["Oak Street holdings", "Needs review", "New"], ["Westlake acreage", "Strong", "Review"]].map(([name, fit, status]) => <div key={name} className="grid grid-cols-[1.5fr_1fr_0.8fr] items-center border-b border-[#eef2f4] px-3 py-3 text-[9px] last:border-0"><span className="font-medium">{name}</span><span className={fit === "Strong" ? "text-landlinq-blue" : "text-primary"}><CircleCheck className="mr-1 inline h-3 w-3" />{fit}</span><span className="text-[#6e7e89]">{status}</span></div>)}</div>
+      <div className="ll-analyst-workspace">
+        <div className="ll-analyst-toolbar">
+          <label className="ll-analyst-search"><Search /><input aria-label="Search deals" placeholder="Search deals, brokers, locations..." /></label>
+          <div className="ll-analyst-views"><button type="button" className="is-selected">▣ Table</button><button type="button">▤ Pipeline</button><button type="button">⌖ Map</button></div>
+          <button type="button" className="ll-analyst-columns">☷ &nbsp; COLUMNS <b>29/40</b></button>
+          {["STATUS", "PRIORITY", "TYPE", "NEXT", "STEP"].map((filter) => <button type="button" key={filter} onClick={() => setActiveFilter(filter)} className={`ll-analyst-filter ${activeFilter === filter ? "is-active" : ""}`}>{filter}⌄</button>)}
+        </div>
+        <div className="ll-analyst-table-scroll">
+          <table className="ll-analyst-table"><thead><tr>{columns.map((column) => <th key={column}>{column}{column !== "ID" && <small>↕</small>}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`} className={`ll-cell-${index}`}>{index === 1 ? <b className={`ll-status ll-status-dot ${cell === "Qualified" ? "is-green" : "is-yellow"}`} aria-label={cell} title={cell}><span className="sr-only">{cell}</span></b> : index === 8 ? <b className="ll-type">{cell}</b> : index === 9 ? <b className="ll-notes">{cell}</b> : cell.includes("|") ? cell.split("|").map((line, i) => <span key={line} className={i === 0 ? "ll-address" : "ll-subaddress"}>{line}</span>) : cell}</td>)}</tr>)}</tbody></table>
         </div>
       </div>
     </div>
@@ -93,70 +111,9 @@ function DashboardMockup({ compact = false }: { compact?: boolean }) {
 }
 
 function DealOpsMachine() {
-  const intakeRows = [
-    ["North County parcel", "82%", "Review"],
-    ["Riverside infill", "91%", "Outreach"],
-    ["Oak Street holdings", "64%", "New"],
-    ["Westlake acreage", "88%", "Review"],
-  ];
   return (
-    <div className="ll-machine" aria-label="Animated LandLinq workflow: opportunities are screened, routed to outreach, and moved through the pipeline">
-      <div className="ll-machine-chrome">
-        <span className="ll-chrome-mark" aria-hidden="true" />
-        <span className="ll-chrome-mark" aria-hidden="true" />
-        <span className="ll-chrome-mark" aria-hidden="true" />
-        <span className="ll-machine-url">app.landlinq.ai / command-center</span>
-        <span className="ml-auto hidden items-center gap-2 text-[8px] text-[#718394] sm:flex"><span className="ll-status-bar" /> Live workflow</span>
-      </div>
-      <div className="ll-machine-body">
-        <aside className="ll-machine-rail">
-          <div className="mb-7 flex items-center gap-2 text-[9px] font-bold"><span className="ll-rail-logo">L</span> LandLinq</div>
-          {["Overview", "Deals", "Contacts", "Outreach", "Pipeline"].map((item, index) => (
-            <div key={item} className={`ll-rail-item ${index === 1 ? "is-active" : ""}`}><span className="ll-rail-icon" />{item}</div>
-          ))}
-          <div className="mt-auto border-t border-[#e1e8ed] pt-4 text-[8px] text-[#8c9ba6]">Criteria engine<br /><span className="font-semibold text-[#3286C8]">Running</span></div>
-        </aside>
-        <div className="ll-machine-canvas">
-          <div className="flex items-start justify-between">
-            <div><div className="text-[8px] uppercase tracking-[0.18em] text-[#82909a]">Analyst Dashboard</div><div className="mt-1 text-base font-semibold tracking-tight text-[#183047] sm:text-xl">Review, analyze, and manage incoming land deals</div></div>
-            <div className="ll-machine-filter">Columns 29/40 <ChevronDown className="h-3 w-3" /></div>
-          </div>
-          <div className="ll-analyst-toolbar" aria-hidden="true"><span className="ll-analyst-search">Search deals, brokers, locations...</span><b>Table</b><span>Pipeline</span><span>Map</span><i>STATUS</i><i>PRIORITY</i><i>TYPE</i><i>APEX</i><i>NEXT</i><i>STEP</i></div>
-          <div className="ll-machine-stats">
-            <div><span>Ready for review</span><strong>18</strong><em className="ll-stat-up">+4 today</em></div>
-            <div><span>Criteria matched</span><strong>72%</strong><em>screening live</em></div>
-            <div><span>Outreach queued</span><strong>34</strong><em className="ll-stat-blue">12 sending</em></div>
-          </div>
-          <div className="ll-machine-stage">
-            <div className="ll-stage-head"><span>Opportunity</span><span>Fit score</span><span>Status</span></div>
-            {intakeRows.map(([name, fit, status], index) => (
-              <div key={name} className={`ll-stage-row ll-stage-row-${index}`}>
-                <span className="font-semibold text-[#183047]">{name}</span>
-                <span className="flex items-center gap-1 text-[#3286C8]"><span className="ll-fit-meter"><i style={{ width: fit }} /></span>{fit}</span>
-                <span className={`ll-stage-status ${status === "Outreach" ? "is-outreach" : ""}`}>{status}</span>
-              </div>
-            ))}
-            <div className="ll-routing-line" aria-hidden="true"><span>criteria match</span><i /></div>
-          </div>
-          <div className="ll-machine-lower">
-            <div className="ll-activity-feed">
-              <div className="ll-lower-label"><span>Activity stream</span><span className="ll-live-label">LIVE</span></div>
-              <div className="ll-feed-item"><span className="ll-feed-index">01</span><span><b>Riverside infill</b> moved to outreach</span><time>now</time></div>
-              <div className="ll-feed-item"><span className="ll-feed-index">02</span><span>Screened against <b>7 criteria</b></span><time>12s</time></div>
-              <div className="ll-feed-item"><span className="ll-feed-index">03</span><span>New lead received from <b>Inbound</b></span><time>28s</time></div>
-            </div>
-            <div className="ll-mini-pipeline">
-              <div className="ll-lower-label">Pipeline <span>today</span></div>
-              <div className="ll-pipeline-track"><i /><i /><i /><i /></div>
-              <div className="flex justify-between text-[7px] text-[#82909a]"><span>New 24</span><span>Review 18</span><span>Outreach 12</span><span>Qualified 7</span></div>
-              <div className="ll-pipeline-card"><span className="ll-pipeline-card-bar" /><span>County road parcel</span><b>Qualified</b></div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="ll-machine-callout ll-callout-screen"><span className="ll-callout-line" /><b>01</b><span>Screened against your criteria</span></div>
-      <div className="ll-machine-callout ll-callout-send"><span className="ll-callout-line" /><b>02</b><span>Outreach queued automatically</span></div>
-      <div className="ll-machine-callout ll-callout-move"><span className="ll-callout-line" /><b>03</b><span>Pipeline stays in motion</span></div>
+    <div className="ll-machine ll-machine-dashboard" aria-label="Animated recreation of the LandLinq Analyst Dashboard">
+      <DashboardMockup />
     </div>
   );
 }

@@ -2,10 +2,11 @@ import { Request, Response } from 'express';
 import * as XLSX from 'xlsx';
 // AI Service import will be added later
 import { storage } from './storage';
+import { EMAIL_SCRAPING_ENABLED } from './emailAutomationConfig';
 
 // ── KILL SWITCH ──────────────────────────────────────────────────────────────
-// Set to true to re-enable automatic deal creation from inbound emails.
-const EMAIL_SCRAPING_ENABLED = false;
+// Change EMAIL_SCRAPING_ENABLED in emailAutomationConfig.ts to stop all
+// automatic email ingestion, including the Microsoft Graph mailbox poller.
 // ─────────────────────────────────────────────────────────────────────────────
 import { sendNotificationEmail } from './emailService';
 import { getWebhooksByType } from './webhookConfig';

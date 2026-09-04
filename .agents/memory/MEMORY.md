@@ -24,3 +24,4 @@
 - [Company teammate provisioning](company-teammate-provisioning.md) — company users may view teammates and request additions, but only LandLinq/Apex staff may create or manage their accounts.
 - [Production fake-data cleanup](production-fake-data-cleanup.md) — delete seeded production data by exact owner/record identity in one transaction; never use broad text matching.
 - [Authenticated runtime smoke tests](authenticated-runtime-smoke-tests.md) — the production build can pass with an undefined JSX icon; data-driven authenticated pages need a browser runtime check.
+- [Microsoft deals mailbox](microsoft-deals-mailbox.md) — Graph intake must stay disabled until deals@landlinq.ai exists in the configured Microsoft tenant or its real mailbox identity is known.
