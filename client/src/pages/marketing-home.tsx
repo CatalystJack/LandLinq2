@@ -188,7 +188,7 @@ export default function MarketingHome() {
             <div className="flex flex-col items-center gap-10 lg:gap-12">
               <div className="max-w-5xl text-center">
                 <h1 className="ll-reveal text-balance text-5xl font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[4.5rem]">Your supercharged<br /><span className="text-white/45">acquisitions operating system.</span></h1>
-                <p className="ll-reveal ll-delay-2 mx-auto mt-6 max-w-lg text-lg leading-7 text-white/68">LandLinq opens the lead funnel wide, screens opportunities against your criteria, and keeps outreach moving — so lean teams can do more with less.</p>
+                <p className="ll-reveal ll-delay-2 mx-auto mt-6 max-w-lg text-lg leading-7 text-white/68">LandLinq opens the lead funnel wide, screens opportunities against your criteria, and keeps outreach moving, so lean teams can do more with less.</p>
                 <div className="ll-reveal ll-delay-3 mt-7 flex flex-wrap justify-center gap-3"><Button>Get in touch</Button><Link href="/login" className="inline-flex min-h-12 items-center rounded-full border border-white/30 px-5 text-sm font-semibold hover:border-white">Log In</Link></div>
               </div>
               <div className="ll-reveal ll-delay-2 relative w-full max-w-[1120px]">
