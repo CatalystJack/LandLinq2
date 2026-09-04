@@ -15,7 +15,7 @@ import { formatDateEST } from "@/utils/timezone";
 import Footer from "@/components/footer";
 import Navigation from "@/components/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { isPlatformAdminEmail } from "@shared/admin-auth";
+import { isPlatformAdminEmail, isSuperAdminEmail } from "@shared/admin-auth";
 
 interface User {
   id: string;
@@ -59,6 +59,7 @@ const STATES = [
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
+  const isCurrentUserSuperAdmin = isSuperAdminEmail(currentUser?.email);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState("all");
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -242,8 +243,10 @@ export default function UserManagement() {
                          `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
     
     let userRole = "team";
-    if (isPlatformAdminEmail(user.email)) {
+    if (isSuperAdminEmail(user.email)) {
       userRole = "super_admin";
+    } else if (isPlatformAdminEmail(user.email)) {
+      userRole = "admin";
     } else if (user.email.endsWith("@catalystcp.com")) {
       userRole = "analyst";
     } else {
@@ -255,13 +258,15 @@ export default function UserManagement() {
   });
 
   const getRoleFromEmail = (email: string) => {
-    if (isPlatformAdminEmail(email)) return "Super Admin";
+    if (isSuperAdminEmail(email)) return "Super Admin";
+    if (isPlatformAdminEmail(email)) return "Admin";
     if (email.endsWith("@catalystcp.com")) return "Catalyst Team";
     return "Broker";
   };
 
   const getRoleBadgeVariant = (email: string) => {
-    if (isPlatformAdminEmail(email)) return "destructive";
+    if (isSuperAdminEmail(email)) return "destructive";
+    if (isPlatformAdminEmail(email)) return "default";
     if (email.endsWith("@catalystcp.com")) return "default";
     return "secondary";
   };
@@ -322,14 +327,14 @@ export default function UserManagement() {
     
     console.log('🔐 [DELETE] Permission check:', {
       currentEmail,
-      matches: isPlatformAdminEmail(currentEmail)
+      matches: isSuperAdminEmail(currentEmail)
     });
     
-    if (!isPlatformAdminEmail(currentEmail)) {
-      console.error('❌ [DELETE] Permission denied - user is not a platform admin');
+    if (!isSuperAdminEmail(currentEmail)) {
+      console.error('❌ [DELETE] Permission denied - user is not a super admin');
       toast({
         title: "Permission Denied",
-        description: `Only platform administrators can delete users. You are logged in as: ${currentUser?.email || 'unknown'}`,
+        description: `Only super administrators can delete users. You are logged in as: ${currentUser?.email || 'unknown'}`,
         variant: "destructive",
         duration: 5000,
       });
@@ -420,18 +425,21 @@ export default function UserManagement() {
                       <SelectContent>
                         <SelectItem value="all">All Roles</SelectItem>
                         <SelectItem value="super_admin">Super Admin</SelectItem>
+                        <SelectItem value="admin">Admins</SelectItem>
                         <SelectItem value="analyst">Catalyst Team</SelectItem>
                         <SelectItem value="broker">Brokers</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="gap-2" data-testid="add-user-button">
-                        <Plus className="h-4 w-4" />
-                        Add User
-                      </Button>
-                    </DialogTrigger>
+                    {isCurrentUserSuperAdmin && (
+                      <DialogTrigger asChild>
+                        <Button className="gap-2" data-testid="add-user-button">
+                          <Plus className="h-4 w-4" />
+                          Add User
+                        </Button>
+                      </DialogTrigger>
+                    )}
                     <DialogContent className="sm:max-w-md">
                       <DialogHeader>
                         <DialogTitle>Add New User</DialogTitle>
@@ -571,10 +579,11 @@ export default function UserManagement() {
                       >
                         <div className="flex items-center space-x-4">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            isPlatformAdminEmail(user.email) ? "bg-red-500" :
+                            isSuperAdminEmail(user.email) ? "bg-red-500" :
+                            isPlatformAdminEmail(user.email) ? "bg-blue-500" :
                             user.email.endsWith("@catalystcp.com") ? "bg-blue-500" : "bg-gray-500"
                           }`}>
-                            {isPlatformAdminEmail(user.email) ? (
+                            {isSuperAdminEmail(user.email) ? (
                               <Crown className="h-5 w-5 text-white" />
                             ) : (
                               <Users className="h-5 w-5 text-white" />
@@ -625,21 +634,23 @@ export default function UserManagement() {
                             Active
                           </Badge>
                           <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="gap-1"
-                              onClick={() => setEditingUser({
-                                ...user,
-                                productTypes: user.productTypes || [],
-                                states: user.states || []
-                              })}
-                              data-testid={`edit-user-${user.id}`}
-                            >
-                              <Edit className="h-3 w-3" />
-                              Edit
-                            </Button>
-                            {!isPlatformAdminEmail(user.email) && (
+                            {isCurrentUserSuperAdmin && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => setEditingUser({
+                                  ...user,
+                                  productTypes: user.productTypes || [],
+                                  states: user.states || []
+                                })}
+                                data-testid={`edit-user-${user.id}`}
+                              >
+                                <Edit className="h-3 w-3" />
+                                Edit
+                              </Button>
+                            )}
+                            {isCurrentUserSuperAdmin && !isPlatformAdminEmail(user.email) && (
                               <Button 
                                 variant="outline" 
                                 size="sm" 
@@ -962,19 +973,35 @@ export default function UserManagement() {
                   <div className="border-t pt-4" />
 
                   {/* Role Definitions */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <Card className="border-2 border-red-200">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-2 mb-3">
                           <Crown className="h-5 w-5 text-red-500" />
                           <h3 className="font-semibold text-red-700">Super Admin</h3>
                         </div>
-                        <p className="text-sm text-gray-600 mb-3">Full system access and control</p>
+                        <p className="text-sm text-gray-600 mb-3">Full system access, including irreversible actions</p>
                         <ul className="text-sm text-gray-500 space-y-1">
                           <li>• User management</li>
                           <li>• System settings</li>
                           <li>• Security controls</li>
                           <li>• All analytics</li>
+                        </ul>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-2 border-indigo-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Shield className="h-5 w-5 text-indigo-500" />
+                          <h3 className="font-semibold text-indigo-700">Admin</h3>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">Standard platform administrator access</p>
+                        <ul className="text-sm text-gray-500 space-y-1">
+                          <li>• Deal management</li>
+                          <li>• Broker oversight</li>
+                          <li>• Analytics access</li>
+                          <li>• Team collaboration</li>
                         </ul>
                       </CardContent>
                     </Card>

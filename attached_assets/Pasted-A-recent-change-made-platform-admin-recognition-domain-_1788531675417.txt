@@ -1,0 +1,53 @@
+A recent change made platform-admin recognition domain-wide (any @apexresi.com or 
+@landlinq.ai email), which was correct for general admin/analyst actions. However, 
+several places specifically intended to be SUPER-ADMIN-ONLY (not just any platform- 
+domain account) were incorrectly wired to use the same broad isPlatformAdminEmail() 
+check instead of the narrower isSuperAdminEmail() check that already exists in 
+shared/admin-auth.ts. Only jack@apexresi.com and deals@landlinq.ai should pass these 
+specific checks — not every platform-domain account.
+
+TASK 1 — Fix the delete-user route
+server/routes.ts ~line 2995 (DELETE /api/users/:userId): change 
+if (!isPlatformAdminEmail(userEmail)) to if (!isSuperAdminEmail(userEmail)), so only 
+the two named super-admin addresses can delete user accounts, not every platform- 
+domain account. Keep the existing safeguard at line ~3004 that prevents deleting a 
+platform-admin account, unchanged.
+
+TASK 2 — Audit every variable explicitly named isSuperAdmin
+Search server/routes.ts for every occurrence of 
+const isSuperAdmin = isPlatformAdminEmail(...) — confirmed at approximately lines 
+15363, 15414, 15469, 15500, 15537, 15579, 15605, 15629, 15892, 15955, and 24903 (verify 
+the exact current line numbers, since the file may have shifted). For each one, 
+change isPlatformAdminEmail(...) to isSuperAdminEmail(...), since these are 
+semantically meant to gate super-admin-only actions, not general platform-admin 
+access.
+
+TASK 3 — Check for other sensitive actions beyond what's already named
+Beyond the isSuperAdmin-labeled variables, search for any other route performing a 
+genuinely irreversible or highly sensitive action (account deletion of any kind, 
+permanently removing data, changing another admin's permissions) that currently uses 
+isPlatformAdminEmail() but conceptually should be restricted to the two named 
+addresses. Report each one found before changing it, since this requires judgment 
+about what counts as "sensitive enough" rather than a mechanical text match.
+
+TASK 4 — Leave isAdmin and isAnalyst checks untouched
+Do NOT change any check using isPlatformAdminEmail() for variables named isAdmin, 
+isAnalyst, isAuthorized, or isLegacyAdmin — these are correctly and intentionally 
+domain-wide, matching the original intent that any @apexresi.com/@landlinq.ai 
+account should have standard admin/analyst access. Only the narrow super-admin-only 
+actions identified in Tasks 1-3 should change.
+
+TASK 5 — Update the memory note
+The existing .agents/memory/platform-admin-identity-policy.md currently states "All 
+recognized platform-domain accounts receive full SUPER_ADMIN permissions" — this is 
+now incorrect per this fix. Update it to reflect the corrected policy: platform- 
+domain accounts get standard admin/analyst access; only jack@apexresi.com and 
+deals@landlinq.ai get true super-admin actions (account deletion and other 
+irreversible actions identified in Task 3).
+
+TASK 6 — Verify
+Confirm a plain @apexresi.com or @landlinq.ai account (not one of the two named 
+addresses) can still access normal admin/analyst features, but gets a 403 when 
+attempting to delete a user account or any other action gated by isSuperAdminEmail. 
+Confirm jack@apexresi.com and deals@landlinq.ai can still perform all super-admin 
+actions correctly.

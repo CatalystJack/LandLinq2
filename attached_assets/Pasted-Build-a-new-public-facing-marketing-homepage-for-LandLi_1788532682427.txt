@@ -1,0 +1,103 @@
+Build a new public-facing marketing homepage for LandLinq at the root path "/", 
+replacing the current portal-chooser landing. Move the existing portal chooser to 
+/login and link to it from this page's "Log In" button. Everything behind login 
+stays exactly as it is — this is purely additive.
+
+CORE POSITIONING — this drives the whole page:
+"We supercharge your acquisitions team, so your team only focuses on the deals 
+with the highest probability of success."
+Every section should tie back to this: LandLinq removes the manual screening, 
+outreach, and tracking work so a small team can operate like a much larger one, 
+and spend their actual time only on the deals worth pursuing.
+
+BRANDING — use LandLinq's actual existing brand identity:
+  - Use the exact CSS custom properties already defined in client/src/index.css 
+    (--primary: hsl(210 100% 12%), a deep navy, and its variants) as the primary 
+    brand color throughout. Do not introduce new brand colors or hardcode 
+    different hex values.
+  - Use the existing logo assets already in the project for header/footer branding 
+    — confirm exact current file paths in attached_assets/ before using them. Do 
+    not generate a new logo.
+  - Match the existing font-family already defined in tailwind.config.ts / 
+    index.css rather than introducing a new typeface.
+  - Fine to run a darker, higher-contrast treatment of the existing navy for 
+    hero/CTA sections, but it must be built from that existing color, not a 
+    different hue.
+
+DESIGN DIRECTION: wonderful.ai for visual polish (bold oversized type, generous 
+whitespace, subtle motion), godirt.ai for content structure (problem → solution → 
+feature deep-dives → social proof → FAQ → final CTA) — same industry, directly 
+relevant reference. Colors come from LandLinq's own theme, not either reference site.
+
+CONTENT STRUCTURE:
+
+1. Header/nav: LandLinq logo, minimal nav (Platform, Who It's For, Company), 
+   "Log In" button linking to /login
+
+2. Hero:
+   Headline: "We supercharge your acquisitions team." (primary headline)
+   Subheadline: "So your team only focuses on the deals with the highest 
+   probability of success — while LandLinq handles the sourcing, screening, and 
+   outreach in the background."
+   Primary CTA: "Get in touch" (mailto:help@landlinq.ai)
+   Secondary CTA: "Log In"
+   Background in the existing dark navy primary, subtle gradient/motion accent
+
+3. Problem/solution section:
+   Headline: "Acquisitions teams spend most of their time on deals that were 
+   never going to work."
+   Sub: "LandLinq changes where your time goes."
+   4 value props with checkmark icons:
+     - Every lead automatically screened against your own acquisition criteria — 
+       no more manually checking rent, acreage, and county fit
+     - Outreach that runs itself, from your own connected email
+     - All your deals and contacts in one place, not scattered across inboxes 
+       and spreadsheets
+     - Your team spends its time on the deals that actually clear your bar
+
+4. Feature deep-dive sections (3-4, alternating layout), each closing on the time- 
+   back theme:
+   - Deal Dashboard — "Every deal arrives pre-screened against your own criteria, 
+     so your team opens their dashboard already knowing what's worth a second 
+     look."
+   - CRM & Outreach — "Campaigns run from your own connected email, reaching 
+     brokers without anyone on your team drafting or sending a single message by 
+     hand."
+   - Pipeline — "Track any opportunity through stages you define — real estate or 
+     otherwise — without a dedicated ops hire to maintain it."
+   - Analytics — "See deal volume, classification, and outreach performance in 
+     one view, without pulling it together yourself."
+
+5. "Who it's for": Real Estate Investment Companies vs. Sales Teams (any industry)
+
+6. FAQ accordion:
+   - What is LandLinq?
+   - Who is LandLinq for?
+   - How does deal classification work?
+   - Is my data private from other companies on the platform?
+   - Can I use LandLinq for outreach outside real estate?
+   - How much of the work does LandLinq actually take off my team? 
+     (Answer: LandLinq handles sourcing, screening, and outreach automatically, so 
+     your team spends its time only on the deals that clear your criteria — 
+     letting a small acquisitions team cover ground that used to take a much 
+     larger one.)
+
+7. Closing CTA banner, primary navy, high contrast: "See what a supercharged 
+   acquisitions team looks like." + "Get in touch" button + email capture field
+
+8. Footer: LandLinq logo, Platform/Company/Legal columns (reuse existing /privacy 
+   and /terms routes), social links if applicable
+
+TECHNICAL NOTES:
+  - New page: client/src/pages/marketing-home.tsx
+  - Route "/" to this component; move portal-chooser to /login
+  - Fully public, no auth check
+  - Do not touch existing admin/developer-portal pages or routing
+  - No fabricated customer names, logos, or testimonials
+  - Before writing styles, inspect client/src/index.css and tailwind.config.ts to 
+    confirm the exact current color variables and font stack, and report which 
+    ones are being used
+
+Verify: confirm /login still shows the portal chooser, confirm "/" is reachable 
+without login, confirm /privacy and /terms still work, and confirm the page 
+visually matches the app's existing navy brand color.

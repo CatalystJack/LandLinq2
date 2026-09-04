@@ -1,0 +1,74 @@
+Add an admin tool to manually create a deal (for real_estate profiles) or a pipeline 
+opportunity (for general_sales profiles) on behalf of a specific Investment Company. 
+This currently doesn't exist — the existing Quick Property Evaluation tool creates 
+deals with no connection to any Investment Company at all.
+
+TASK 1 — New admin page/dialog
+Add an "Add Deal / Opportunity" action to each company's card in 
+client/src/pages/admin-investment-companies.tsx (or a new dedicated page if that 
+fits the existing UI pattern better — match whatever's more consistent with how 
+other per-company admin actions are already presented, like "Manage" or "Initial 
+Login").
+
+Step 1 of the flow: company is already known (since this is launched from that 
+company's own card) — no company picker needed if launched this way. If built as a 
+separate standalone page instead, add a company search/select as step 1.
+
+Step 2: branch the form based on that company's profileType:
+
+  IF profileType === 'real_estate':
+    Show a deal-entry form: address, city, state, county, size (acres), product 
+    type (dropdown of THIS company's own active developerProductTypes — reuse 
+    whatever component already renders that list in the Settings page), rent 
+    (labeled per the company's rentMetric — $/SF or $/Unit), asking price (optional), 
+    QCT/DDA/OZ designation checkboxes if applicable.
+    
+    On submit:
+      1. Create a new deals row with source: 'admin_manual_entry' 
+         (add this value to the existing source field's accepted values if it's an 
+         enum/constrained field)
+      2. Fetch this company's active developerProductTypes
+      3. Run classifyDealForProfile(deal, profile, productTypes) — same function 
+         used everywhere else, no special-cased logic
+      4. Create a partnerDeveloperSends row with the resulting classification and 
+         matchedProductTypes, scoped to this company's developerProfileId
+      5. Show the resulting classification (Passed/Review) back to the admin 
+         immediately after submit, so they can confirm it worked correctly
+
+  IF profileType === 'general_sales':
+    Show a pipeline-opportunity form: contact (search/select from this company's 
+    own CRM contacts — reuse the existing contact-picker component from 
+    developer-pipeline.tsx, including the demo-contact exclusion already in place), 
+    stage (dropdown of this company's own pipelineStages), title, value, notes.
+    
+    On submit: create a pipelineOpportunities row via the same logic already used 
+    by POST /api/developer-profile/me/pipeline/opportunities — reuse that endpoint's 
+    validation (contact must belong to this company or the shared network, excluding 
+    demo contacts) rather than duplicating it.
+
+TASK 2 — Admin-specific endpoints
+Since these actions are performed BY an admin ON BEHALF OF a company (not by the 
+company's own logged-in user), these need new admin-scoped endpoints rather than 
+reusing the /api/developer-profile/me/* routes as-is (those resolve the profile from 
+the calling user's own session, which would be the admin, not the target company):
+
+  POST /api/admin/investment-companies/:profileId/deals — requirePlatformAdmin, 
+    accepts the deal-entry fields, creates the deal + classification + send exactly 
+    as described in Task 1. Verify :profileId refers to a profileType === 'real_estate' 
+    profile; reject with a clear error if called against a general_sales profile.
+    
+  POST /api/admin/investment-companies/:profileId/pipeline/opportunities — 
+    requirePlatformAdmin, same contact/stage validation as the self-service endpoint 
+    but scoped to :profileId instead of the caller's own session. Verify :profileId 
+    refers to a profileType === 'general_sales' profile; reject with a clear error 
+    if called against a real_estate profile.
+
+Also apply the existing requireActiveDeveloperProfile check to both new endpoints — 
+an admin should not be able to add a deal or opportunity to a deactivated company.
+
+TASK 3 — Verify
+Test both paths: manually add a deal for a real estate company and confirm it shows 
+up correctly classified in that company's own Deal Dashboard; manually add a pipeline 
+opportunity for a general sales seat and confirm it shows up correctly in that 
+company's own Pipeline view. Confirm attempting the wrong form type against the 
+wrong profileType is rejected with a clear error, not silently misclassified.

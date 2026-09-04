@@ -36,7 +36,7 @@ import {
   pipelineOpportunities,
 } from "@shared/schema";
 import { or, like, eq, desc, gte, lte, sql, and, count, inArray, isNull } from "drizzle-orm";
-import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail } from "./auth";
+import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
@@ -2811,8 +2811,10 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       let role = user?.role || user?.claims?.role || 'BROKER';
       if (userEmail === 'demo@catalystcp.com') {
         role = 'DEMO';
-      } else if (isPlatformAdminEmail(userEmail)) {
+      } else if (isSuperAdminEmail(userEmail)) {
         role = 'SUPER_ADMIN';
+      } else if (isPlatformAdminEmail(userEmail)) {
+        role = 'ADMIN';
       }
       
       res.json({ ...user, broker, isAnalyst, role });
@@ -2884,8 +2886,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const user = req.user;
       const userEmail = user?.email || user?.claims?.email || '';
       
-      if (!isPlatformAdminEmail(userEmail)) {
-        return res.status(401).json({ message: "Unauthorized - Platform admin access required" });
+      if (!isSuperAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Unauthorized - Super admin access required" });
       }
 
       const { email, firstName, lastName, password, role } = req.body;
@@ -2927,8 +2929,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const user = req.user;
       const userEmail = user?.email || user?.claims?.email || '';
       
-      if (!isPlatformAdminEmail(userEmail)) {
-        return res.status(401).json({ message: "Unauthorized - Platform admin access required" });
+      if (!isSuperAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Unauthorized - Super admin access required" });
       }
 
       const { userId } = req.params;
@@ -2992,9 +2994,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const user = req.user;
       const userEmail = (user?.email ?? user?.claims?.email ?? '').toLowerCase().trim();
       
-      if (!isPlatformAdminEmail(userEmail)) {
-        console.log('Delete user denied:', { userEmail, required: 'platform-admin domain' });
-        return res.status(401).json({ message: "Unauthorized - Platform admin access required" });
+      if (!isSuperAdminEmail(userEmail)) {
+        console.log('Delete user denied:', { userEmail, required: 'super-admin email' });
+        return res.status(403).json({ message: "Unauthorized - Super admin access required" });
       }
 
       const { userId } = req.params;
@@ -3465,6 +3467,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Only analysts can delete brokers." });
       }
+      if (!isSuperAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Access denied. Super admin privileges are required to delete brokers." });
+      }
 
       const brokerId = req.params.id;
       
@@ -3532,6 +3537,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Only analysts can merge brokers." });
+      }
+      if (!isSuperAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Access denied. Super admin privileges are required to merge brokers." });
       }
       
       const { sourceBrokerId, targetBrokerId } = req.body;
@@ -3604,6 +3612,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Only analysts can deduplicate brokers." });
       }
+      if (!isSuperAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Access denied. Super admin privileges are required to deduplicate brokers." });
+      }
       
       console.log(`🔗 [DEDUP] Auto-deduplication triggered by ${userEmail}`);
       
@@ -3650,6 +3661,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const isAnalyst = isPlatformAdminEmail(userEmail);
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Only analysts can deduplicate brokers." });
+      }
+      if (!isSuperAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Access denied. Super admin privileges are required to deduplicate brokers." });
       }
       console.log(`🔗 [EMAIL-DEDUP] Triggered by ${userEmail}`);
       const result = await storage.deduplicateByEmail();
@@ -12503,6 +12517,179 @@ RULES:
     return true;
   }
 
+  function adminRequestError(status: number, message: string) {
+    const error: any = new Error(message);
+    error.status = status;
+    return error;
+  }
+
+  async function createPipelineOpportunityForProfile(developerProfileId: string, body: any, database: any = db) {
+    const contactId = String(body?.contactId || "").trim();
+    const stageId = String(body?.stageId || "").trim();
+    if (!contactId || !stageId) throw adminRequestError(400, "Contact and stage are required");
+    const [contact] = await database.select({ id: brokers.id }).from(brokers).where(and(
+      eq(brokers.id, contactId),
+      or(eq(brokers.ownerDeveloperProfileId, developerProfileId), isNull(brokers.ownerDeveloperProfileId)),
+      isNonDemoBroker(),
+    )).limit(1);
+    if (!contact) throw adminRequestError(400, "Contact is not available to this Investment Company");
+    const [stage] = await database.select({ id: pipelineStages.id }).from(pipelineStages).where(and(
+      eq(pipelineStages.id, stageId),
+      eq(pipelineStages.developerProfileId, developerProfileId),
+      eq(pipelineStages.isActive, true),
+    )).limit(1);
+    if (!stage) throw adminRequestError(400, "Active pipeline stage not found");
+    const value = body?.value === undefined || body?.value === null || body?.value === ""
+      ? null
+      : Number(body.value);
+    if (value !== null && !Number.isFinite(value)) {
+      throw adminRequestError(400, "Opportunity value must be a valid number");
+    }
+    const [opportunity] = await database.insert(pipelineOpportunities).values({
+      developerProfileId,
+      contactId,
+      stageId,
+      title: String(body?.title || "").trim() || null,
+      value: value === null ? null : String(value),
+      notes: String(body?.notes || "").trim() || null,
+    }).returning();
+    return opportunity;
+  }
+
+  // Admin entry options are deliberately tenant-scoped by the path profile ID,
+  // rather than the administrator's own account.
+  app.get("/api/admin/investment-companies/:profileId/entry-options", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const { developerProductTypes } = await import("@shared/schema");
+      const [profile] = await db.select().from(developerProfiles).where(and(
+        eq(developerProfiles.id, req.params.profileId),
+        eq(developerProfiles.isActive, true),
+      )).limit(1);
+      if (!profile) return res.status(404).json({ error: "Active Investment Company profile not found" });
+
+      const profileBasics = {
+        id: profile.id,
+        companyName: profile.companyName,
+        profileType: profile.profileType,
+        rentMetric: profile.rentMetric,
+        qctOverridesRentMinimum: profile.qctOverridesRentMinimum,
+        ddaOverridesRentMinimum: profile.ddaOverridesRentMinimum,
+        ozOverridesRentMinimum: profile.ozOverridesRentMinimum,
+      };
+      if (profile.profileType === "real_estate") {
+        const productTypes = await db.select().from(developerProductTypes).where(and(
+          eq(developerProductTypes.developerProfileId, profile.id),
+          eq(developerProductTypes.isActive, true),
+        )).orderBy(developerProductTypes.createdAt);
+        return res.json({ profile: profileBasics, productTypes });
+      }
+      if (profile.profileType === "general_sales") {
+        const [contacts, stages] = await Promise.all([
+          db.select({
+            id: brokers.id, firstName: brokers.firstName, lastName: brokers.lastName,
+            email: brokers.email, phone: brokers.phone, brokerage: brokers.brokerage,
+            ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
+          }).from(brokers).where(and(
+            or(eq(brokers.ownerDeveloperProfileId, profile.id), isNull(brokers.ownerDeveloperProfileId)),
+            isNonDemoBroker(),
+          )).orderBy(desc(brokers.createdAt)),
+          db.select().from(pipelineStages).where(and(
+            eq(pipelineStages.developerProfileId, profile.id),
+            eq(pipelineStages.isActive, true),
+          )).orderBy(sql`${pipelineStages.sortOrder} ASC, ${pipelineStages.name} ASC`),
+        ]);
+        return res.json({ profile: profileBasics, contacts, stages });
+      }
+      return res.status(400).json({ error: "This Investment Company profile has an unsupported profile type" });
+    } catch (error: any) {
+      console.error("[admin investment company entry options] Error:", error);
+      return res.status(500).json({ error: "Failed to load manual entry options" });
+    }
+  });
+
+  app.post("/api/admin/investment-companies/:profileId/deals", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const { developerProductTypes } = await import("@shared/schema");
+      const { classifyDealForProfile } = await import("./developerClassificationService");
+      const body = req.body || {};
+      const address = String(body.address || "").trim();
+      const city = String(body.city || "").trim();
+      const state = String(body.state || "").trim().toUpperCase();
+      const county = String(body.county || "").trim();
+      const productTypeId = String(body.productTypeId || "").trim();
+      const sizeAcres = Number(body.sizeAcres);
+      const rent = Number(body.rent);
+      const askingPrice = body.askingPrice === undefined || body.askingPrice === null || body.askingPrice === ""
+        ? null : Number(body.askingPrice);
+      if (!address || !city || !state || !county || !productTypeId) {
+        return res.status(400).json({ error: "Address, city, state, county, and product type are required" });
+      }
+      if (!Number.isFinite(sizeAcres) || sizeAcres < 0) return res.status(400).json({ error: "Size in acres must be a valid non-negative number" });
+      if (!Number.isFinite(rent) || rent < 0) return res.status(400).json({ error: "Rent must be a valid non-negative number" });
+      if (askingPrice !== null && (!Number.isFinite(askingPrice) || askingPrice < 0)) {
+        return res.status(400).json({ error: "Asking price must be a valid non-negative number" });
+      }
+      for (const field of ["qctDesignation", "ddaDesignation", "opportunityZone"]) {
+        if (body[field] !== undefined && typeof body[field] !== "boolean") {
+          return res.status(400).json({ error: `${field} must be a boolean` });
+        }
+      }
+      if (!await requireActiveDeveloperProfile(req.params.profileId, res)) return;
+
+      const result = await db.transaction(async (tx) => {
+        const [profile] = await tx.select().from(developerProfiles).where(eq(developerProfiles.id, req.params.profileId)).limit(1);
+        if (!profile) throw adminRequestError(404, "Investment Company profile not found");
+        if (!profile.isActive) throw adminRequestError(403, "Investment Company profile is inactive or unavailable");
+        if (profile.profileType !== "real_estate") throw adminRequestError(400, "Manual deal entry is only available for real estate Investment Companies");
+        const productTypes = await tx.select().from(developerProductTypes).where(and(
+          eq(developerProductTypes.developerProfileId, profile.id),
+          eq(developerProductTypes.isActive, true),
+        ));
+        const selectedProductType = productTypes.find((productType) => productType.id === productTypeId);
+        if (!selectedProductType) throw adminRequestError(400, "Selected product type is not active for this Investment Company");
+        const dealValues: any = {
+          address, city, state, county, sizeAcres: String(sizeAcres), askingPrice: askingPrice === null ? null : String(askingPrice),
+          productTypes: [selectedProductType.name], submissionMethod: "admin_manual_entry", source: "admin_manual_entry",
+          status: "pending_review", isQct: body.qctDesignation === true, isDda: body.ddaDesignation === true, isOz: body.opportunityZone === true,
+        };
+        if (profile.rentMetric === "per_unit") dealValues.avgRentPerUnit = String(rent);
+        else dealValues.topRentPSF = String(rent);
+        const [deal] = await tx.insert(deals).values(dealValues).returning();
+        const classificationResult = classifyDealForProfile(deal, profile, productTypes);
+        const [send] = await tx.insert(partnerDeveloperSends).values({
+          developerId: profile.id, developerProfileId: profile.id, dealId: deal.id,
+          classification: classificationResult.classification, matchedProductTypes: classificationResult.matchedProductTypes,
+          address: deal.address, status: "sent", matchedAt: new Date(),
+        }).returning();
+        return { deal, send, classificationResult };
+      });
+      return res.status(201).json({
+        deal: result.deal, send: result.send, classification: result.classificationResult.classification,
+        matchedProductTypes: result.classificationResult.matchedProductTypes,
+      });
+    } catch (error: any) {
+      console.error("[admin investment company deal POST] Error:", error);
+      return res.status(error.status || 500).json({ error: error.message || "Failed to create manual deal" });
+    }
+  });
+
+  app.post("/api/admin/investment-companies/:profileId/pipeline/opportunities", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      if (!await requireActiveDeveloperProfile(req.params.profileId, res)) return;
+      const opportunity = await db.transaction(async (tx) => {
+        const [profile] = await tx.select().from(developerProfiles).where(eq(developerProfiles.id, req.params.profileId)).limit(1);
+        if (!profile) throw adminRequestError(404, "Investment Company profile not found");
+        if (!profile.isActive) throw adminRequestError(403, "Investment Company profile is inactive or unavailable");
+        if (profile.profileType !== "general_sales") throw adminRequestError(400, "Pipeline opportunities are only available for general sales Investment Companies");
+        return createPipelineOpportunityForProfile(profile.id, req.body || {}, tx);
+      });
+      return res.status(201).json({ opportunity });
+    } catch (error: any) {
+      console.error("[admin investment company pipeline opportunity POST] Error:", error);
+      return res.status(error.status || 500).json({ error: error.message || "Failed to create pipeline opportunity" });
+    }
+  });
+
   app.get("/api/developer-profile/me", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
@@ -13008,37 +13195,11 @@ RULES:
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
       if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
-      const contactId = String(req.body?.contactId || "").trim();
-      const stageId = String(req.body?.stageId || "").trim();
-      if (!contactId || !stageId) return res.status(400).json({ error: "Contact and stage are required" });
-      const [contact] = await db.select({ id: brokers.id }).from(brokers).where(and(
-        eq(brokers.id, contactId),
-        or(eq(brokers.ownerDeveloperProfileId, developerProfileId), isNull(brokers.ownerDeveloperProfileId)),
-        isNonDemoBroker(),
-      )).limit(1);
-      if (!contact) return res.status(400).json({ error: "Contact is not available to this Investment Company" });
-      const [stage] = await db.select({ id: pipelineStages.id }).from(pipelineStages).where(and(
-        eq(pipelineStages.id, stageId),
-        eq(pipelineStages.developerProfileId, developerProfileId),
-        eq(pipelineStages.isActive, true),
-      )).limit(1);
-      if (!stage) return res.status(400).json({ error: "Active pipeline stage not found" });
-      const value = req.body?.value === undefined || req.body?.value === null || req.body?.value === ""
-        ? null
-        : Number(req.body.value);
-      if (value !== null && !Number.isFinite(value)) return res.status(400).json({ error: "Opportunity value must be a valid number" });
-      const [opportunity] = await db.insert(pipelineOpportunities).values({
-        developerProfileId,
-        contactId,
-        stageId,
-        title: String(req.body?.title || "").trim() || null,
-        value: value === null ? null : String(value),
-        notes: String(req.body?.notes || "").trim() || null,
-      }).returning();
+      const opportunity = await createPipelineOpportunityForProfile(developerProfileId, req.body || {});
       return res.status(201).json({ opportunity });
     } catch (error: any) {
       console.error("[developer pipeline opportunities POST] Error:", error);
-      return res.status(500).json({ error: "Failed to create pipeline opportunity" });
+      return res.status(error.status || 500).json({ error: error.message || "Failed to create pipeline opportunity" });
     }
   });
 
@@ -15360,7 +15521,7 @@ RULES:
   app.get("/api/admin/system-health", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isPlatformAdminEmail(user?.email);
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15411,7 +15572,7 @@ RULES:
   app.get("/api/admin/platform-metrics", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isPlatformAdminEmail(user?.email);
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15466,7 +15627,7 @@ RULES:
   app.get("/api/admin/user-activity", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isPlatformAdminEmail(user?.email);
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15497,7 +15658,7 @@ RULES:
   app.get("/api/admin/system-alerts", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isPlatformAdminEmail(user?.email);
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15534,7 +15695,7 @@ RULES:
   app.get("/api/admin/user-stats", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isPlatformAdminEmail(user?.email);
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15543,7 +15704,8 @@ RULES:
       const allUsers = await db.select().from(users);
       
       // Count users by role (based on email domains)
-      const superAdmins = allUsers.filter(u => isPlatformAdminEmail(u.email)).length;
+      const superAdmins = allUsers.filter(u => isSuperAdminEmail(u.email)).length;
+      const admins = allUsers.filter(u => isPlatformAdminEmail(u.email) && !isSuperAdminEmail(u.email)).length;
       const analysts = 0;
       const brokers = allUsers.filter(u => u.email && !isPlatformAdminEmail(u.email)).length;
       
@@ -15559,6 +15721,7 @@ RULES:
 
       res.json({
         superAdmins,
+        admins,
         analysts,
         brokers,
         viewers: 0, // Not implemented yet
@@ -15576,7 +15739,7 @@ RULES:
   app.post("/api/admin/restart/:service", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isPlatformAdminEmail(user?.email);
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15602,7 +15765,7 @@ RULES:
   app.patch("/api/admin/alerts/:alertId/acknowledge", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isPlatformAdminEmail(user?.email);
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15626,7 +15789,7 @@ RULES:
   app.post("/api/admin/clear-cache", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isPlatformAdminEmail(user?.email);
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15889,7 +16052,7 @@ RULES:
   app.post("/api/admin/create-quality-snapshot", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isPlatformAdminEmail(user?.email);
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15952,7 +16115,7 @@ RULES:
   app.post("/api/admin/schedule-automated-reports", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isPlatformAdminEmail(user?.email);
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -16253,11 +16416,11 @@ RULES:
       }
       
       // Check if user has admin privileges
-      if (!user.email || !isPlatformAdminEmail(user.email)) {
+      if (!user.email || !isSuperAdminEmail(user.email)) {
         return res.status(403).json({ 
-          message: "Admin access required. Please contact support if you believe you should have access.", 
+          message: "Super admin access required. Please contact support if you believe you should have access.",
           code: "INSUFFICIENT_PRIVILEGES",
-          requiredRole: "admin"
+          requiredRole: "super_admin"
         });
       }
 
@@ -16342,11 +16505,11 @@ RULES:
       }
       
       // Check if user has admin privileges
-      if (!user.email || !isPlatformAdminEmail(user.email)) {
+      if (!user.email || !isSuperAdminEmail(user.email)) {
         return res.status(403).json({ 
-          message: "Admin access required. Please contact support if you believe you should have access.", 
+          message: "Super admin access required. Please contact support if you believe you should have access.",
           code: "INSUFFICIENT_PRIVILEGES",
-          requiredRole: "admin"
+          requiredRole: "super_admin"
         });
       }
 
@@ -16879,9 +17042,9 @@ RULES:
         return res.status(401).json({ message: "Authentication required", code: "NOT_AUTHENTICATED" });
       }
       
-      if (!user.email || !isPlatformAdminEmail(user.email)) {
+      if (!user.email || !isSuperAdminEmail(user.email)) {
         return res.status(403).json({ 
-          message: "Admin access required", 
+          message: "Super admin access required",
           code: "INSUFFICIENT_PRIVILEGES"
         });
       }
@@ -24390,9 +24553,9 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       
-      // Only allow recognized platform-admin domains to run cleanup.
-      if (!isPlatformAdminEmail(userEmail)) {
-        return res.status(403).json({ message: "Admin access required" });
+      // Only designated super administrators can run destructive cleanup.
+      if (!isSuperAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Super admin access required" });
       }
       
       // Delete demo deals - look for common demo patterns
@@ -24430,9 +24593,9 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       
-      // Only allow recognized platform-admin domains to run cleanup.
-      if (!isPlatformAdminEmail(userEmail)) {
-        return res.status(403).json({ message: "Admin access required" });
+      // Only designated super administrators can run destructive cleanup.
+      if (!isSuperAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Super admin access required" });
       }
       
       // Delete ALL deals for fresh start
@@ -24461,9 +24624,9 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       
-      // Only allow recognized platform-admin domains to run cleanup.
-      if (!isPlatformAdminEmail(userEmail)) {
-        return res.status(403).json({ message: "Admin access required" });
+      // Only designated super administrators can run destructive cleanup.
+      if (!isSuperAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Super admin access required" });
       }
       
       // Find and delete dedup entries where deal_id references a non-existent deal
@@ -24900,7 +25063,7 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       const isAnalyst = isPlatformAdminEmail(userEmail);
-      const isSuperAdmin = isPlatformAdminEmail(userEmail);
+      const isSuperAdmin = isSuperAdminEmail(userEmail);
       
       if (!isAnalyst && !isSuperAdmin) {
         console.log(`🚫 [SECURITY] Unauthorized access attempt to quick property evaluation by: ${userEmail}`);
@@ -26586,6 +26749,9 @@ RULES:
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
       }
+      if (!isSuperAdminEmail(user?.claims?.email || user?.email)) {
+        return res.status(403).json({ message: "Access denied. Super admin privileges are required to clear dry run logs." });
+      }
 
       // Delete outreach messages where metadata contains dryRun: true
       await db.execute(sql`
@@ -28164,6 +28330,9 @@ RULES:
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
+      }
+      if (!isSuperAdminEmail(user?.claims?.email || user?.email)) {
+        return res.status(403).json({ message: "Access denied. Super admin privileges are required to delete campaign steps." });
       }
 
       const { stepId } = req.params;
