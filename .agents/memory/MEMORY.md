@@ -18,3 +18,4 @@
 - [Outreach trigger-tag tenant boundary](outreach-trigger-tag-tenancy.md) — tag enrollment must bind campaign, template, sender, and broker to one developer profile; Catalyst uses only shared contacts.
 - [General Sales profile criteria](general-sales-profile-criteria.md) — General Sales profiles have no deal criteria; preserve harmless legacy DB defaults only for non-null compatibility.
 - [Sales pipeline boundary](sales-pipeline-boundary.md) — the generic opportunity pipeline is tenant-scoped and separate from real-estate deal classification; both profile types use it.
+- [Demo contact isolation](demo-contact-isolation.md) — demo-seeded brokers use the shared-contact shape but must never be returned to real Investment Company CRM or Pipeline queries.

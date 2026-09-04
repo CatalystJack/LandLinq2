@@ -63,6 +63,18 @@ const DEFAULT_PIPELINE_STAGES = [
   { name: "Won", sortOrder: 4 },
   { name: "Lost", sortOrder: 5 },
 ] as const;
+
+// Demo contacts are intentionally stored in the shared-contact shape so the
+// standalone demo can use the normal CRM APIs. Never expose them to real
+// Investment Company tenants.
+const isNonDemoBroker = () => sql`
+  NOT EXISTS (
+    SELECT 1
+    FROM users AS demo_owner
+    WHERE demo_owner.id = ${brokers.userId}
+      AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+  )
+`;
 // realDataService removed per user request
 // HelloDataService removed per user request
 import { emailService, sendNotificationEmail } from "./emailService";
@@ -12828,9 +12840,12 @@ RULES:
         ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
         createdAt: brokers.createdAt,
       }).from(brokers)
-        .where(or(
-          eq(brokers.ownerDeveloperProfileId, developerProfileId),
-          isNull(brokers.ownerDeveloperProfileId),
+        .where(and(
+          or(
+            eq(brokers.ownerDeveloperProfileId, developerProfileId),
+            isNull(brokers.ownerDeveloperProfileId),
+          ),
+          isNonDemoBroker(),
         ))
         .orderBy(desc(brokers.createdAt));
       return res.json({ contacts });
@@ -12984,6 +12999,7 @@ RULES:
         .innerJoin(brokers, and(
           eq(brokers.id, pipelineOpportunities.contactId),
           or(eq(brokers.ownerDeveloperProfileId, developerProfileId), isNull(brokers.ownerDeveloperProfileId)),
+          isNonDemoBroker(),
         ))
         .where(and(...conditions))
         .orderBy(orderBy);
@@ -13005,6 +13021,7 @@ RULES:
       const [contact] = await db.select({ id: brokers.id }).from(brokers).where(and(
         eq(brokers.id, contactId),
         or(eq(brokers.ownerDeveloperProfileId, developerProfileId), isNull(brokers.ownerDeveloperProfileId)),
+        isNonDemoBroker(),
       )).limit(1);
       if (!contact) return res.status(400).json({ error: "Contact is not available to this Investment Company" });
       const [stage] = await db.select({ id: pipelineStages.id }).from(pipelineStages).where(and(
@@ -13043,6 +13060,7 @@ RULES:
         const [contact] = await db.select({ id: brokers.id }).from(brokers).where(and(
           eq(brokers.id, contactId),
           or(eq(brokers.ownerDeveloperProfileId, developerProfileId), isNull(brokers.ownerDeveloperProfileId)),
+          isNonDemoBroker(),
         )).limit(1);
         if (!contact) return res.status(400).json({ error: "Contact is not available to this Investment Company" });
         updates.contactId = contactId;
