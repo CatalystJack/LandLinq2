@@ -34,8 +34,9 @@ import {
   offMarketImports,
   pipelineStages,
   pipelineOpportunities,
+  emailIntakeQueue,
 } from "@shared/schema";
-import { or, like, eq, desc, gte, lte, sql, and, count, inArray, isNull } from "drizzle-orm";
+import { or, like, ilike, eq, ne, desc, gte, lte, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
 import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
@@ -22518,6 +22519,174 @@ RULES:
     return res.status(410).json({ message: "The public demo has been retired" });
   });
 
+  // ── Sourcing audit API (platform administrators only) ──────────────────────
+  // This deliberately uses explicit projections rather than returning a deal
+  // or intake row wholesale; it makes the audit contract stable and prevents
+  // email content from leaking should these endpoints ever be broadened.
+  app.get('/api/admin/intake-audit/deals/:dealId', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+        return res.status(403).json({ message: 'Platform administrator access required.' });
+      }
+
+      const [intake] = await db.select().from(emailIntakeQueue)
+        .where(eq(emailIntakeQueue.dealId, req.params.dealId)).limit(1);
+      if (!intake) return res.json({ intake: null });
+
+      const [deal] = await db.select({
+        id: deals.id, address: deals.address, city: deals.city, state: deals.state,
+        zip: deals.zip, askingPrice: deals.askingPrice, sizeAcres: deals.sizeAcres,
+        unitCount: deals.unitCount, vintage: deals.vintage, zoning: deals.zoning,
+        propertyName: deals.propertyName, dealType: deals.dealType, county: deals.county,
+        brokerId: deals.brokerId, createdAt: deals.createdAt,
+      }).from(deals).where(eq(deals.id, req.params.dealId)).limit(1);
+
+      const normalizeValue = (value: unknown) => value == null ? null : String(value).trim().toLowerCase();
+      const valuesMatch = (source: unknown, final: unknown, numeric = false) => {
+        if (source == null || final == null) return source === final;
+        if (numeric) return Number(source) === Number(final);
+        return normalizeValue(source) === normalizeValue(final);
+      };
+      const comparisonFields = {
+        address: { intake: intake.parsedAddress, deal: deal?.address ?? null },
+        city: { intake: intake.parsedCity, deal: deal?.city ?? null },
+        state: { intake: intake.parsedState, deal: deal?.state ?? null },
+        zip: { intake: intake.parsedZip, deal: deal?.zip ?? null },
+        acres: { intake: intake.parsedAcres, deal: deal?.sizeAcres ?? null },
+        price: { intake: intake.parsedPrice, deal: deal?.askingPrice ?? null },
+        unitCount: { intake: intake.parsedUnitCount, deal: deal?.unitCount ?? null },
+        vintage: { intake: intake.parsedVintage, deal: deal?.vintage ?? null },
+        zoning: { intake: intake.parsedZoning, deal: deal?.zoning ?? null },
+        propertyName: { intake: intake.parsedPropertyName, deal: deal?.propertyName ?? null },
+      };
+      const numericComparisonFields = new Set(['acres', 'price', 'unitCount', 'vintage']);
+      const mismatchFlags = Object.fromEntries(Object.entries(comparisonFields).map(([field, values]) => [
+        field, values.intake != null && !valuesMatch(values.intake, values.deal, numericComparisonFields.has(field)),
+      ]));
+
+      let siblingDeals: Array<{ intakeId: string; dealId: string; groupIndex: number | null; address: string | null; status: string | null }> = [];
+      if (intake.groupId) {
+        const siblings = await db.select({
+          intakeId: emailIntakeQueue.id, dealId: emailIntakeQueue.dealId,
+          groupIndex: emailIntakeQueue.groupIndex,
+        }).from(emailIntakeQueue).where(and(
+          eq(emailIntakeQueue.groupId, intake.groupId),
+          ne(emailIntakeQueue.id, intake.id),
+          isNotNull(emailIntakeQueue.dealId),
+        ));
+        const siblingDealIds = siblings.map(sibling => sibling.dealId).filter((id): id is string => !!id);
+        const siblingDealRows = siblingDealIds.length
+          ? await db.select({ id: deals.id, address: deals.address, status: deals.status })
+            .from(deals).where(inArray(deals.id, siblingDealIds))
+          : [];
+        const siblingDealById = new Map(siblingDealRows.map(sibling => [sibling.id, sibling]));
+        siblingDeals = siblings.flatMap(sibling => {
+          const siblingDeal = sibling.dealId ? siblingDealById.get(sibling.dealId) : undefined;
+          return sibling.dealId && siblingDeal ? [{
+            intakeId: sibling.intakeId, dealId: sibling.dealId, groupIndex: sibling.groupIndex,
+            address: siblingDeal.address, status: siblingDeal.status,
+          }] : [];
+        });
+      }
+
+      return res.json({
+        intake,
+        deal: deal || null,
+        comparisons: Object.fromEntries(Object.entries(comparisonFields).map(([field, values]) => [
+          field, { extracted: values.intake, final: values.deal, mismatch: mismatchFlags[field] },
+        ])),
+        siblings: siblingDeals,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/admin/intake-audit', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+        return res.status(403).json({ message: 'Platform administrator access required.' });
+      }
+      const requestedStatus = typeof req.query.status === 'string' ? req.query.status : undefined;
+      if (requestedStatus && !['approved', 'pending', 'rejected'].includes(requestedStatus)) {
+        return res.status(400).json({ message: 'status must be approved, pending, or rejected' });
+      }
+      const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
+      const pageSize = Math.min(200, Math.max(1, Number.parseInt(String(req.query.pageSize || req.query.limit || '50'), 10) || 50));
+      const startDateValue = req.query.startDate || req.query.dateFrom;
+      const endDateValue = req.query.endDate || req.query.dateTo;
+      const startDate = startDateValue ? new Date(String(startDateValue)) : null;
+      const endDate = endDateValue ? new Date(String(endDateValue)) : null;
+      if ((startDate && Number.isNaN(startDate.getTime())) || (endDate && Number.isNaN(endDate.getTime()))) {
+        return res.status(400).json({ message: 'Invalid startDate or endDate' });
+      }
+      const search = String(req.query.q || req.query.search || req.query.query || '').trim();
+      const conditions = [
+        requestedStatus ? eq(emailIntakeQueue.status, requestedStatus) : undefined,
+        startDate ? gte(emailIntakeQueue.createdAt, startDate) : undefined,
+        endDate ? lte(emailIntakeQueue.createdAt, endDate) : undefined,
+        search ? or(
+          ilike(emailIntakeQueue.fromEmail, `%${search}%`),
+          ilike(emailIntakeQueue.parsedAddress, `%${search}%`),
+        ) : undefined,
+      ].filter(Boolean) as any[];
+      const where = conditions.length ? and(...conditions) : undefined;
+      const auditFields = {
+        id: emailIntakeQueue.id, fromEmail: emailIntakeQueue.fromEmail, fromName: emailIntakeQueue.fromName,
+        subject: emailIntakeQueue.subject, emailBody: emailIntakeQueue.emailBody, emailHtml: emailIntakeQueue.emailHtml,
+        attachmentCount: emailIntakeQueue.attachmentCount, attachmentNames: emailIntakeQueue.attachmentNames,
+        parsedDealType: emailIntakeQueue.parsedDealType, parsedPropertyName: emailIntakeQueue.parsedPropertyName,
+        parsedAddress: emailIntakeQueue.parsedAddress,
+        parsedCity: emailIntakeQueue.parsedCity, parsedState: emailIntakeQueue.parsedState,
+        parsedZip: emailIntakeQueue.parsedZip, parsedAcres: emailIntakeQueue.parsedAcres,
+        parsedPrice: emailIntakeQueue.parsedPrice, parsedUnitCount: emailIntakeQueue.parsedUnitCount,
+        parsedVintage: emailIntakeQueue.parsedVintage, parsedZoning: emailIntakeQueue.parsedZoning,
+        status: emailIntakeQueue.status, routingReason: emailIntakeQueue.routingReason,
+        dealId: emailIntakeQueue.dealId, groupId: emailIntakeQueue.groupId,
+        groupIndex: emailIntakeQueue.groupIndex, groupTotal: emailIntakeQueue.groupTotal,
+        overallConfidence: emailIntakeQueue.overallConfidence, reviewedAt: emailIntakeQueue.reviewedAt,
+        reviewNotes: emailIntakeQueue.reviewNotes, createdAt: emailIntakeQueue.createdAt,
+        finalAddress: deals.address, finalCity: deals.city, finalState: deals.state, finalZip: deals.zip,
+        finalAcres: deals.sizeAcres, finalPrice: deals.askingPrice, finalUnitCount: deals.unitCount,
+        finalVintage: deals.vintage, finalZoning: deals.zoning, finalPropertyName: deals.propertyName,
+      };
+      const [items, totalResult] = await Promise.all([
+        db.select(auditFields).from(emailIntakeQueue)
+          .leftJoin(deals, eq(emailIntakeQueue.dealId, deals.id)).where(where)
+          .orderBy(desc(emailIntakeQueue.createdAt)).limit(pageSize).offset((page - 1) * pageSize),
+        db.select({ count: count() }).from(emailIntakeQueue).where(where),
+      ]);
+      const normalize = (value: unknown) => value == null ? null : String(value).trim().toLowerCase();
+      const decorate = (item: any) => {
+        const fields = {
+          address: [item.parsedAddress, item.finalAddress],
+          city: [item.parsedCity, item.finalCity],
+          state: [item.parsedState, item.finalState],
+          zip: [item.parsedZip, item.finalZip],
+          acres: [item.parsedAcres, item.finalAcres],
+          price: [item.parsedPrice, item.finalPrice],
+          unitCount: [item.parsedUnitCount, item.finalUnitCount],
+          vintage: [item.parsedVintage, item.finalVintage],
+          zoning: [item.parsedZoning, item.finalZoning],
+          propertyName: [item.parsedPropertyName, item.finalPropertyName],
+        };
+        const comparisons = Object.fromEntries(Object.entries(fields).map(([field, [extracted, final]]) => [
+          field, {
+            extracted,
+            final,
+            mismatch: extracted != null && final != null && normalize(extracted) !== normalize(final),
+          },
+        ]));
+        return { ...item, confidence: item.overallConfidence, comparisons };
+      };
+      return res.json({ items: items.map(decorate), total: Number(totalResult[0]?.count || 0), page, limit: pageSize });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Email Intake Queue API ─────────────────────────────────────────────────
 
   // GET /api/email-intake?status=pending|approved|rejected
@@ -22532,7 +22701,11 @@ RULES:
         .where(eq(emailIntakeQueue.status, status as any))
         .orderBy(desc(emailIntakeQueue.createdAt))
         .limit(200);
-      return res.json(rows);
+      const user = req.user as any;
+      const isAdmin = isPlatformAdminEmail(user?.claims?.email || user?.email);
+      // Queue metadata remains available to authenticated users, but raw email
+      // content is restricted to platform administrators.
+      return res.json(isAdmin ? rows : rows.map(({ emailBody, emailHtml, ...row }) => row));
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }
@@ -22567,6 +22740,10 @@ RULES:
   // GET /api/email-intake/training-examples — MUST be before /:id to avoid route conflict
   app.get('/api/email-intake/training-examples', isAuthenticated, async (req, res) => {
     try {
+      const user = req.user as any;
+      if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+        return res.status(403).json({ message: 'Platform administrator access required.' });
+      }
       const { emailIntakeTrainingExamples } = await import('../shared/schema.js');
       const { desc } = await import('drizzle-orm');
       const rows = await db.select().from(emailIntakeTrainingExamples)
@@ -22588,6 +22765,11 @@ RULES:
         .where(eq(emailIntakeQueue.id, req.params.id))
         .limit(1);
       if (!row) return res.status(404).json({ message: 'Not found' });
+      const user = req.user as any;
+      if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+        const { emailBody, emailHtml, ...safeRow } = row;
+        return res.json(safeRow);
+      }
       return res.json(row);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });

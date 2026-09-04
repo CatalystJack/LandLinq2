@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { formatDateEST } from "@/utils/timezone";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 import { 
   ArrowLeft, 
   MapPin, 
@@ -53,10 +54,11 @@ export default function DealDetails() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [showIntakeBody, setShowIntakeBody] = useState(false);
   const shareToken = new URLSearchParams(window.location.search).get("token");
 
   // Fetch deal data - Allow public access for shared links
@@ -76,6 +78,24 @@ export default function DealDetails() {
     queryKey: ["/api/deals"],
     enabled: !!id && isAuthenticated, // Keep authentication requirement for deal navigation
     retry: 1,
+  });
+  const authenticatedEmail = String((user as any)?.claims?.email || (user as any)?.email || "");
+  const canAuditIntake = isPlatformAdminEmail(authenticatedEmail);
+  const { data: intakeAudit } = useQuery<{
+    intake?: Record<string, any>;
+    deal?: Record<string, any>;
+    comparisons?: Record<string, any> | Array<Record<string, any>>;
+    siblings?: Array<Record<string, any>>;
+  }>({
+    queryKey: ["/api/admin/intake-audit/deals", id],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/intake-audit/deals/${id}`, { credentials: "include" });
+      if (response.status === 404) return {};
+      if (!response.ok) throw new Error("Unable to load intake source");
+      return response.json();
+    },
+    enabled: !!id && isAuthenticated && canAuditIntake,
+    retry: false,
   });
 
   // Fetch original submission (email/SMS) - Only for authenticated users and non-form submissions
@@ -302,6 +322,13 @@ Best regards`;
     return productTypes.toString();
   };
 
+  const readableEmailBody = (body: unknown) => {
+    const source = String(body || "");
+    if (!source) return "No email body was retained.";
+    // Display inbound HTML as text only; never render untrusted email markup.
+    return new DOMParser().parseFromString(source, "text/html").body.textContent?.trim() || source;
+  };
+
   if (!isAuthenticated) {
     return (
       <>
@@ -460,6 +487,56 @@ Best regards`;
               </div>
             </div>
           </div>
+
+           {/* Source provenance is intentionally restricted to platform admins. */}
+           {canAuditIntake && intakeAudit?.intake && (() => {
+             const intake = intakeAudit.intake;
+             const comparisonEntries = Array.isArray(intakeAudit.comparisons)
+               ? intakeAudit.comparisons.map((entry: any) => [entry.field || entry.key || "Field", entry])
+               : Object.entries(intakeAudit.comparisons || {});
+             const attachments = intake.attachments || intake.attachmentNames || [];
+             const siblingDeals = intakeAudit.siblings || [];
+             return (
+               <Card className="mb-6 border-blue-200">
+                 <CardHeader>
+                   <CardTitle className="flex items-center gap-2">
+                     <Mail className="h-5 w-5" />
+                     How this deal was sourced
+                   </CardTitle>
+                 </CardHeader>
+                 <CardContent className="space-y-4">
+                   <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                     <div><span className="font-medium text-catalyst-gray-600">Sender:</span> {intake.fromEmail || intake.sender || "Not recorded"}</div>
+                     <div><span className="font-medium text-catalyst-gray-600">Subject:</span> {intake.subject || "No subject"}</div>
+                     <div><span className="font-medium text-catalyst-gray-600">Confidence:</span> {intake.overallConfidence ?? intake.confidence ?? "Not recorded"}</div>
+                     <div><span className="font-medium text-catalyst-gray-600">Routing reason:</span> {intake.routingReason || "Not recorded"}</div>
+                     <div className="sm:col-span-2"><span className="font-medium text-catalyst-gray-600">Attachments:</span> {Array.isArray(attachments) && attachments.length ? attachments.map((attachment: any) => typeof attachment === "string" ? attachment : attachment.name || attachment.filename).join(", ") : intake.attachmentCount ? `${intake.attachmentCount} attachment(s)` : "None"}</div>
+                   </div>
+                   {intake.reviewNotes && <div><p className="text-sm font-medium text-catalyst-gray-600">Review notes</p><p className="whitespace-pre-wrap">{intake.reviewNotes}</p></div>}
+                   <div>
+                     <Button variant="outline" size="sm" onClick={() => setShowIntakeBody(!showIntakeBody)}>
+                       {showIntakeBody ? "Hide full email" : "Show full email"}
+                     </Button>
+                     {showIntakeBody && <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-gray-50 p-3 font-sans text-sm text-catalyst-navy">{readableEmailBody(intake.emailHtml || intake.html || intake.emailBody || intake.rawText || intake.body)}</pre>}
+                   </div>
+                   <div>
+                     <p className="mb-2 text-sm font-medium text-catalyst-gray-600">Extracted vs. final values</p>
+                     {comparisonEntries.length ? <div className="overflow-x-auto rounded border"><table className="w-full min-w-[500px] text-sm"><thead className="bg-gray-50 text-left"><tr><th className="p-2">Field</th><th className="p-2">Extracted</th><th className="p-2">Final</th></tr></thead><tbody>{comparisonEntries.map(([field, raw]: any) => {
+                       const value = typeof raw === "object" && raw !== null ? raw : { extracted: raw };
+                       const extracted = value.extracted ?? value.parsed ?? value.intake ?? value.intakeValue ?? value.source;
+                       const finalValue = value.final ?? value.deal ?? value.dealValue ?? value.value ?? value.destination;
+                       const mismatch = value.mismatch === true || value.matches === false || (extracted !== undefined && finalValue !== undefined && String(extracted) !== String(finalValue));
+                       return <tr key={field} className={mismatch ? "border-t bg-amber-50 text-amber-950" : "border-t"}><td className="p-2 font-medium">{field}{mismatch && <Badge className="ml-2 bg-amber-200 text-amber-900">Mismatch</Badge>}</td><td className="p-2">{extracted === undefined || extracted === null ? "—" : String(extracted)}</td><td className="p-2">{finalValue === undefined || finalValue === null ? "—" : String(finalValue)}</td></tr>;
+                     })}</tbody></table></div> : <p className="text-sm text-catalyst-gray-600">No field comparison was recorded.</p>}
+                   </div>
+                   {intake.groupId && <div>
+                     <p className="mb-2 text-sm font-medium text-catalyst-gray-600">Part {intake.groupIndex || 1} of {intake.groupTotal || siblingDeals.length + 1} properties from this email</p>
+                     {siblingDeals.length > 0 && <div className="flex flex-wrap gap-2">{siblingDeals.map((sibling: any, index: number) => <Button key={sibling.dealId || index} variant="outline" size="sm" onClick={() => navigate(`/deals/${sibling.dealId}`)}>Part {sibling.groupIndex || index + 1}: {sibling.address || `Deal ${index + 1}`}</Button>)}</div>}
+                   </div>}
+                 </CardContent>
+               </Card>
+             );
+           })()}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Column */}

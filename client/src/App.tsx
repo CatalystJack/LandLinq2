@@ -54,6 +54,7 @@ const AffordableHousingScoring = lazy(() => import("@/pages/affordable-housing-s
 const DataHub = lazy(() => import("@/pages/data-hub"));
 const AnalystCommandCenter = lazy(() => import("@/pages/analyst-command-center"));
 const EmailIntakePage = lazy(() => import("@/pages/email-intake"));
+const IntakeAudit = lazy(() => import("@/pages/intake-audit"));
 const AnalystLogin = lazy(() => import("@/pages/analyst-login"));
 const AnalyticsPage = lazy(() => import("@/pages/analytics-page"));
 const ManualEmail = lazy(() => import("@/pages/manual-email"));
@@ -249,6 +250,8 @@ function Router() {
           <Route path="/api-keys" component={ApiKeysAdmin} />
           <Route path="/underwriting" component={Underwriting} />
           <Route path="/email-intake" component={EmailIntakePage} />
+          <Route path="/admin/intake-audit" component={IntakeAudit} />
+          <Route path="/deals/:id" component={DealDetails} />
           <Route path="/dashboard" component={() => {
             const userEmail = String((user as any)?.claims?.email || (user as any)?.email || '').toLowerCase();
             return isPlatformAdminEmail(userEmail) ? <ExecutiveDashboard /> : <AnalystDashboard />;

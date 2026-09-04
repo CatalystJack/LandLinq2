@@ -70,6 +70,7 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
                 { section: "Data & Insights" },
                 { name: "Data Warehouse", href: "/data-hub", description: "Market intelligence, deal data, and broker analytics" },
                 { name: "Analytics", href: "/analytics", description: "Performance metrics & charts" },
+                { name: "Intake Audit", href: "/admin/intake-audit", description: "Audit email sourcing and extraction outcomes" },
                 { section: "Deal Operations" },
                 { name: "People", href: "/user-management", description: "Manage users and brokers" },
                 { section: "CRM & Outreach" },

@@ -1,0 +1,44 @@
+Add an admin-visible audit trail showing exactly how any auto-created deal arrived 
+in the system, using the emailIntakeQueue table (which already stores this data — 
+original email content, extracted fields, confidence score, and the resulting 
+dealId — for every intake attempt, whether it was auto-approved, held for manual 
+review, or merged as a duplicate).
+
+TASK 1 — Add a "How this deal was sourced" section to the deal detail view
+Wherever a deal's full details are already viewable in the admin/analyst interface 
+(check the existing deal detail page/modal used in the master pipeline or analyst 
+dashboard), add a new section visible only to isPlatformAdminEmail() accounts:
+  - If this deal has NO linked emailIntakeQueue row: show nothing extra (it wasn't 
+    sourced via automated email intake — e.g. manually entered, bulk imported, or 
+    scraped from a public listing).
+  - If it DOES have a linked row: show the original email's fromEmail, fromName, 
+    subject, and full body (emailBody/emailHtml), the AI-extracted fields side by 
+    side with what the deal record actually ended up with (so a discrepancy is 
+    visible at a glance), the overallConfidence score, attachmentNames if any, the 
+    routing reason (sender_domain / county_state / etc. — surface whatever reason 
+    string the pipeline recorded), and the reviewNotes field (which already contains 
+    messages like "Automation: confident intake created" or "Automation held: 
+    [reason]").
+  - If groupId is set, also show "Part X of Y properties from this email" and link 
+    to the sibling deals from the same source email.
+
+TASK 2 — Add a searchable intake audit log page
+New admin-only page (or a tab on the existing master pipeline): a list of every 
+emailIntakeQueue row, filterable by status (approved / pending / rejected), date 
+range, and searchable by sender email or address. Each row links to its resulting 
+deal (if one exists) and shows the same summary fields as Task 1's detail section. 
+This lets an admin browse "everything the automated pipeline has touched recently" 
+rather than only inspecting one deal at a time.
+
+TASK 3 — Flag mismatches clearly
+For any intake row where the AI-extracted value differs from what ended up on the 
+final deal record (e.g. an analyst corrected something before approval, or the 
+automated pipeline's address-vs-coordinate cross-check from earlier work flagged a 
+mismatch), visually highlight that field in both Task 1's detail view and Task 2's 
+list view — this is exactly the kind of thing you want to be able to spot quickly 
+when checking whether something was a mistake.
+
+Verify: forward a test email through the automated pipeline, confirm the resulting 
+deal shows its full sourcing history in the detail view, confirm it also appears 
+correctly in the searchable audit log, and confirm a deal with no email-intake 
+origin (e.g. manually added via the admin tool) shows no sourcing section at all.

@@ -132,6 +132,8 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
   const [intake] = await db.select().from(emailIntakeQueue).where(eq(emailIntakeQueue.id, intakeId)).limit(1);
   if (!intake) throw new Error(`Email intake ${intakeId} was not found`);
   if (intake.status === 'approved' && intake.dealId) {
+    await db.update(emailIntakeQueue).set({ routingReason: 'already_processed' })
+      .where(eq(emailIntakeQueue.id, intake.id));
     return { outcome: 'duplicate', handled: true, dealId: intake.dealId, reason: 'already_processed' };
   }
   const identities = parseForwardedChainIdentities({ name: intake.fromName, email: intake.fromEmail }, intake.emailBody);
@@ -161,7 +163,9 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
   const profiles = await db.select().from(developerProfiles).where(eq(developerProfiles.isActive, true));
   const route = routeProfile(profiles as AutomationRouteProfile[], identities.routingSender, location.county, location.state);
   const manual = async (reason: string) => {
-    await db.update(emailIntakeQueue).set({ status: 'pending', reviewNotes: `Automation held: ${reason}` }).where(eq(emailIntakeQueue.id, intake.id));
+    await db.update(emailIntakeQueue).set({
+      status: 'pending', routingReason: reason, reviewNotes: `Automation held: ${reason}`,
+    }).where(eq(emailIntakeQueue.id, intake.id));
     return { outcome: 'manual' as const, handled: true as const, reason };
   };
   if (!route.profile) return manual(route.reason);
@@ -211,7 +215,11 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
       lastResubmittedAt: new Date(),
       ingestionNotes: `${duplicate.ingestionNotes || ''}\nResubmitted from intake ${intake.id}.`.trim(),
     }).where(eq(deals.id, duplicate.id));
-    await db.update(emailIntakeQueue).set({ status: 'approved', dealId: duplicate.id, reviewedAt: new Date(), reviewNotes: 'Automation: duplicate submission merged.' }).where(eq(emailIntakeQueue.id, intake.id));
+    await db.update(emailIntakeQueue).set({
+      status: 'approved', dealId: duplicate.id, reviewedAt: new Date(),
+      routingReason: 'duplicate_address_or_coordinates',
+      reviewNotes: 'Automation: duplicate submission merged.',
+    }).where(eq(emailIntakeQueue.id, intake.id));
     return { outcome: 'duplicate', handled: true, dealId: duplicate.id, reason: 'duplicate_address_or_coordinates' };
   }
   let deal = intake.dealId
@@ -248,6 +256,9 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
     developerId: profile.id, developerProfileId: profile.id, dealId: deal.id, address: deal.address,
     classification: classification.classification, matchedProductTypes: classification.matchedProductTypes, status: 'pending',
   }).onConflictDoUpdate({ target: [partnerDeveloperSends.developerProfileId, partnerDeveloperSends.dealId], set: { classification: classification.classification, matchedProductTypes: classification.matchedProductTypes, matchedAt: new Date() } });
-  await db.update(emailIntakeQueue).set({ status: 'approved', dealId: deal.id, reviewedAt: new Date(), reviewNotes: 'Automation: confident intake created.' }).where(eq(emailIntakeQueue.id, intake.id));
+  await db.update(emailIntakeQueue).set({
+    status: 'approved', dealId: deal.id, reviewedAt: new Date(), routingReason: route.reason,
+    reviewNotes: 'Automation: confident intake created.',
+  }).where(eq(emailIntakeQueue.id, intake.id));
   return { outcome: 'created', handled: true, dealId: deal.id, reason: route.reason };
 }

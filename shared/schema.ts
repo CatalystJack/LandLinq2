@@ -3591,6 +3591,9 @@ export const emailIntakeQueue = pgTable("email_intake_queue", {
 
   // Review
   status: varchar("status").default("pending"),
+  // Durable explanation of the latest automated routing decision. Older rows
+  // predate this column and intentionally remain null.
+  routingReason: varchar("routing_reason"),
   dealId: varchar("deal_id").references(() => deals.id),
   reviewedAt: timestamp("reviewed_at"),
   reviewedBy: varchar("reviewed_by"),
