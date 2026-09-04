@@ -20,3 +20,4 @@
 - [Sales pipeline boundary](sales-pipeline-boundary.md) — the generic opportunity pipeline is tenant-scoped and separate from real-estate deal classification; both profile types use it.
 - [Demo contact isolation](demo-contact-isolation.md) — demo-seeded brokers use the shared-contact shape but must never be returned to real Investment Company CRM or Pipeline queries.
 - [Company removal policy](company-removal-policy.md) — admin “deletion” deactivates the company and blocks all linked sessions/logins while preserving tenant history for reactivation.
+- [Platform admin identity policy](platform-admin-identity-policy.md) — domain-level admin and named super-admin recognition must use centralized helpers; never duplicate email literals in authorization gates.

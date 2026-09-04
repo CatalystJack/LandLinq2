@@ -36,7 +36,7 @@ import {
   pipelineOpportunities,
 } from "@shared/schema";
 import { or, like, eq, desc, gte, lte, sql, and, count, inArray, isNull } from "drizzle-orm";
-import { setupAuth, isAuthenticated, hashPassword } from "./auth";
+import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
@@ -2149,7 +2149,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     try {
       // SECURITY CHECK 1: Admin authentication
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com') || user?.email === 'jack@apexresi.com';
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         console.warn(`🚨 SECURITY: Unauthorized test endpoint access attempt by ${user?.email || 'unknown'}`);
@@ -2804,19 +2804,17 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       
       // Check if user is an analyst (any email ending in apexresi.com)
       const userEmail = user?.claims?.email || user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       // Determine the correct role based on email domain (Dec 11, 2025)
-      // This ensures @apexresi.com users are always treated as analysts, not brokers
+      // Platform-admin domains are always treated as internal users, not brokers.
       let role = user?.role || user?.claims?.role || 'BROKER';
-      if (userEmail.toLowerCase().endsWith('@apexresi.com')) {
+      if (isSuperAdminEmail(userEmail)) {
         role = 'SUPER_ADMIN';
       } else if (userEmail === 'demo@catalystcp.com') {
         role = 'DEMO';
-      } else if (userEmail === 'jack@apexresi.com') {
-        role = 'SUPER_ADMIN';
-      } else if (userEmail.endsWith('@apexresi.com')) {
-        role = 'ANALYST';
+      } else if (isPlatformAdminEmail(userEmail)) {
+        role = 'ADMIN';
       }
       
       res.json({ ...user, broker, isAnalyst, role });
@@ -2830,7 +2828,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.get('/api/team-members', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -2853,8 +2851,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const user = req.user;
       const userEmail = user?.email || user?.claims?.email || '';
       
-      // Only super admin (jack@apexresi.com) can access user management
-      if (userEmail !== 'jack@apexresi.com') {
+      // Only configured super-admin identities can access user management.
+      if (!isSuperAdminEmail(userEmail)) {
         return res.status(401).json({ message: "Unauthorized - Super admin access required" });
       }
 
@@ -2890,7 +2888,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const userEmail = user?.email || user?.claims?.email || '';
       
       // Only super admin can create users
-      if (userEmail !== 'jack@apexresi.com') {
+      if (!isSuperAdminEmail(userEmail)) {
         return res.status(401).json({ message: "Unauthorized - Super admin access required" });
       }
 
@@ -2934,7 +2932,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const userEmail = user?.email || user?.claims?.email || '';
       
       // Only super admin can update users
-      if (userEmail !== 'jack@apexresi.com') {
+      if (!isSuperAdminEmail(userEmail)) {
         return res.status(401).json({ message: "Unauthorized - Super admin access required" });
       }
 
@@ -3000,8 +2998,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const userEmail = (user?.email ?? user?.claims?.email ?? '').toLowerCase().trim();
       
       // Only super admin can delete users (case-insensitive)
-      if (userEmail !== 'jack@apexresi.com') {
-        console.log('Delete user denied:', { userEmail, required: 'jack@apexresi.com' });
+      if (!isSuperAdminEmail(userEmail)) {
+        console.log('Delete user denied:', { userEmail, required: 'configured super-admin identity' });
         return res.status(401).json({ message: "Unauthorized - Super admin access required" });
       }
 
@@ -3009,7 +3007,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
       // Prevent deleting the super admin account (case-insensitive)
       const targetUser = await storage.getUser(userId);
-      if ((targetUser?.email ?? '').toLowerCase().trim() === 'jack@apexresi.com') {
+      if (isSuperAdminEmail(targetUser?.email)) {
         return res.status(400).json({ message: "Cannot delete super admin account" });
       }
 
@@ -3064,7 +3062,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const userEmail = user?.email || user?.claims?.email || '';
       
       // Check admin permissions
-      const isAdmin = userEmail.endsWith('@apexresi.com') || userEmail === 'jack@apexresi.com';
+      const isAdmin = isPlatformAdminEmail(userEmail);
       
       if (!isAdmin) {
         return res.status(403).json({ error: 'Admin access required to reset circuit breakers' });
@@ -3091,7 +3089,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const userEmail = user?.email || user?.claims?.email || '';
       
       // Check admin permissions
-      const isAdmin = userEmail.endsWith('@apexresi.com') || userEmail === 'jack@apexresi.com';
+      const isAdmin = isPlatformAdminEmail(userEmail);
       
       if (!isAdmin) {
         return res.status(403).json({ error: 'Admin access required to test services' });
@@ -3468,7 +3466,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     try {
       const user = req.user as any;
       const userEmail = user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Only analysts can delete brokers." });
@@ -3536,7 +3534,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     try {
       const user = req.user as any;
       const userEmail = user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Only analysts can merge brokers." });
@@ -3574,7 +3572,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     try {
       const user = req.user as any;
       const userEmail = user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Only analysts can view duplicate brokers." });
@@ -3607,7 +3605,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     try {
       const user = req.user as any;
       const userEmail = user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Only analysts can deduplicate brokers." });
@@ -3655,7 +3653,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     try {
       const user = req.user as any;
       const userEmail = user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Only analysts can deduplicate brokers." });
       }
@@ -5022,7 +5020,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     let startTime = Date.now();
     try {
       const user = req.user;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -5095,7 +5093,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.post('/api/teams/configure', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
-      const isAdmin = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Access denied. Admin privileges required." });
@@ -5130,7 +5128,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.post('/api/teams/test', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
-      const isAdmin = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Access denied. Admin privileges required." });
@@ -5188,7 +5186,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.post('/api/notifications/daily-digest/test', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
-      const isAdmin = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Access denied. Admin privileges required." });
@@ -5212,7 +5210,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.get("/api/command-center/status", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -5257,7 +5255,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.get("/api/command-center/communications", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -5292,7 +5290,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.post("/api/command-center/route-deal", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -6804,7 +6802,7 @@ Provide your analysis in this exact JSON format:
       const userEmail = (req as any).user?.claims?.email;
       
       // Only allow analysts to view audit logs
-      if (!userEmail?.endsWith('@apexresi.com')) {
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
       }
 
@@ -7554,7 +7552,7 @@ Provide your analysis in this exact JSON format:
   app.get("/api/deals/flagged", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -7644,7 +7642,7 @@ Provide your analysis in this exact JSON format:
   app.get("/api/deals/flagging-stats", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -8357,9 +8355,8 @@ Provide your analysis in this exact JSON format:
       console.log(`🕐 Timestamp: ${new Date().toISOString()}`);
       
       // Strict analyst email validation - must end with approved domains
-      const approvedDomains = ['@apexresi.com'];
       const normalizedEmail = user?.email?.toLowerCase();
-      const isAnalyst = normalizedEmail && approvedDomains.some((domain: string) => normalizedEmail.endsWith(domain));
+      const isAnalyst = isPlatformAdminEmail(normalizedEmail);
       
       if (!isAnalyst) {
         console.warn(`⚠️ [RERUN-ANALYSIS] ❌ ACCESS DENIED for user: ${user?.email} (not an approved analyst)`);
@@ -8789,7 +8786,7 @@ Provide your analysis in this exact JSON format:
     try {
       // SECURITY: Ensure only admin users can run this (strict domain check)
       const userEmail = (req.user as any)?.email?.toLowerCase();
-      const isAdmin = userEmail?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(userEmail);
       
       if (!isAdmin) {
         console.log(`🚫 [DEMOGRAPHICS-BACKFILL] Unauthorized access attempt by ${userEmail}`);
@@ -8906,7 +8903,7 @@ Provide your analysis in this exact JSON format:
   app.post("/api/admin/backfill-census", isAuthenticated, async (req, res) => {
     try {
       const userEmail = (req.user as any)?.email?.toLowerCase();
-      const isAdmin = userEmail?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(userEmail);
       
       if (!isAdmin) {
         console.log(`🚫 [CENSUS-BACKFILL] Unauthorized access attempt by ${userEmail}`);
@@ -9297,7 +9294,7 @@ Provide your analysis in this exact JSON format:
     try {
       // SECURITY: Ensure only admin users can run this
       const userEmail = (req.user as any)?.email?.toLowerCase();
-      const isAdmin = userEmail?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(userEmail);
       
       if (!isAdmin) {
         console.log(`🚫 [COMM-BACKFILL] Unauthorized access attempt by ${userEmail}`);
@@ -10040,7 +10037,7 @@ Provide your analysis in this exact JSON format:
     try {
       const { id } = req.params;
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ error: "Access denied" });
@@ -10093,7 +10090,7 @@ Provide your analysis in this exact JSON format:
     try {
       const { id } = req.params;
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ error: "Access denied" });
@@ -10138,7 +10135,7 @@ Provide your analysis in this exact JSON format:
     try {
       const { dealIds } = req.body;
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ error: "Access denied" });
@@ -10219,7 +10216,7 @@ Provide your analysis in this exact JSON format:
   app.get("/api/public-listings/stats", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ error: "Access denied" });
@@ -10260,7 +10257,7 @@ Provide your analysis in this exact JSON format:
   app.get("/api/public-listings/searches", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ error: "Access denied" });
@@ -10670,7 +10667,7 @@ RULES:
   app.get("/api/analytics", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -10760,7 +10757,7 @@ RULES:
   app.get("/api/analytics/dashboard", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -11323,7 +11320,7 @@ RULES:
   app.get("/api/admin/pending-approvals", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      if (!user?.email?.endsWith('@apexresi.com')) {
+      if (!isPlatformAdminEmail(user?.email)) {
         return res.status(403).json({ message: "Admin access required" });
       }
       const rows = await db.execute(
@@ -11344,7 +11341,7 @@ RULES:
   app.post("/api/admin/approve-broker/:brokerId", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      if (!user?.email?.endsWith('@apexresi.com')) {
+      if (!isPlatformAdminEmail(user?.email)) {
         return res.status(403).json({ message: "Admin access required" });
       }
       const { brokerId } = req.params;
@@ -11405,7 +11402,7 @@ RULES:
   app.post("/api/admin/reject-broker/:brokerId", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -11638,7 +11635,7 @@ RULES:
 
   function requirePlatformAdmin(req: any, res: any, next: any) {
     const email = String(req.user?.email || req.user?.claims?.email || "").trim().toLowerCase();
-    if (!email.endsWith("@apexresi.com")) {
+    if (!isPlatformAdminEmail(email)) {
       return res.status(403).json({ error: "Apex Resi administrator access required" });
     }
     next();
@@ -11653,7 +11650,7 @@ RULES:
   async function getListingReviewScope(req: any, res: any): Promise<ListingReviewScope | null> {
     const email = String(req.user?.email || req.user?.claims?.email || "").trim().toLowerCase();
     const userId = String(req.user?.id || req.user?.claims?.sub || "").trim();
-    if (email.endsWith("@apexresi.com")) {
+    if (isPlatformAdminEmail(email)) {
       return { isPlatformAdmin: true, userId, assignedProfileIds: [] };
     }
     if (String(req.user?.role || "").toUpperCase() !== "ANALYST" || !userId) {
@@ -15020,7 +15017,7 @@ RULES:
   app.patch('/api/admin/broker-portal/deals/:dealId/approve', isAuthenticated, async (req: any, res) => {
     try {
       const userEmail = String(req.user?.email || "").trim().toLowerCase();
-      if (!userEmail.endsWith('@apexresi.com')) {
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ error: "Apex Resi administrator access required" });
       }
 
@@ -15348,7 +15345,7 @@ RULES:
   app.get("/api/admin/stats", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -15369,7 +15366,7 @@ RULES:
   app.get("/api/admin/system-health", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = user?.email === 'jack@apexresi.com';
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15420,7 +15417,7 @@ RULES:
   app.get("/api/admin/platform-metrics", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = user?.email === 'jack@apexresi.com';
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15475,7 +15472,7 @@ RULES:
   app.get("/api/admin/user-activity", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = user?.email === 'jack@apexresi.com';
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15506,7 +15503,7 @@ RULES:
   app.get("/api/admin/system-alerts", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = user?.email === 'jack@apexresi.com';
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15543,7 +15540,7 @@ RULES:
   app.get("/api/admin/user-stats", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = user?.email === 'jack@apexresi.com';
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15552,9 +15549,9 @@ RULES:
       const allUsers = await db.select().from(users);
       
       // Count users by role (based on email domains)
-      const superAdmins = allUsers.filter(u => u.email === 'jack@apexresi.com').length;
-      const analysts = allUsers.filter(u => u.email && u.email.endsWith('@apexresi.com') && u.email !== 'jack@apexresi.com').length;
-      const brokers = allUsers.filter(u => u.email && !u.email.endsWith('@apexresi.com')).length;
+      const superAdmins = allUsers.filter(u => isSuperAdminEmail(u.email)).length;
+      const analysts = allUsers.filter(u => isPlatformAdminEmail(u.email) && !isSuperAdminEmail(u.email)).length;
+      const brokers = allUsers.filter(u => u.email && !isPlatformAdminEmail(u.email)).length;
       
       // Mock time-based stats
       const oneDay = 24 * 60 * 60 * 1000;
@@ -15585,7 +15582,7 @@ RULES:
   app.post("/api/admin/restart/:service", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = user?.email === 'jack@apexresi.com';
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15611,7 +15608,7 @@ RULES:
   app.patch("/api/admin/alerts/:alertId/acknowledge", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = user?.email === 'jack@apexresi.com';
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15635,7 +15632,7 @@ RULES:
   app.post("/api/admin/clear-cache", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = user?.email === 'jack@apexresi.com';
+      const isSuperAdmin = isSuperAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15663,7 +15660,7 @@ RULES:
   app.get("/api/admin/data-quality-report", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -15683,7 +15680,7 @@ RULES:
   app.get("/api/admin/data-quality-metrics", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -15727,7 +15724,7 @@ RULES:
   app.get("/api/admin/data-quality-alerts", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -15761,7 +15758,7 @@ RULES:
   app.post("/api/admin/data-quality-alerts/:id/resolve", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -15785,7 +15782,7 @@ RULES:
   app.get("/api/admin/source-health", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -15814,7 +15811,7 @@ RULES:
   app.get("/api/admin/data-quality-snapshots", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -15856,7 +15853,7 @@ RULES:
   app.get("/api/admin/deal-validation-history/:dealId", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -15898,7 +15895,7 @@ RULES:
   app.post("/api/admin/create-quality-snapshot", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = user?.email === 'jack@apexresi.com' || user?.email === 'aj@landlinq.ai';
+      const isSuperAdmin = isSuperAdminEmail(user?.email) || user?.email === 'aj@landlinq.ai';
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15921,7 +15918,7 @@ RULES:
   app.get("/api/admin/quality-assurance-report", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -15941,7 +15938,7 @@ RULES:
   app.get("/api/admin/trend-analysis-report", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -15961,7 +15958,7 @@ RULES:
   app.post("/api/admin/schedule-automated-reports", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = user?.email === 'jack@apexresi.com' || user?.email === 'aj@landlinq.ai';
+      const isSuperAdmin = isSuperAdminEmail(user?.email) || user?.email === 'aj@landlinq.ai';
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15986,7 +15983,7 @@ RULES:
   app.get("/api/brand-settings", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -16004,7 +16001,7 @@ RULES:
   app.post("/api/brand-settings", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -16033,7 +16030,7 @@ RULES:
   app.put("/api/brand-settings/:id", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com');
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
@@ -16067,7 +16064,7 @@ RULES:
       }
       
       // Check if user has admin privileges
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required. Please contact support if you believe you should have access.", 
           code: "INSUFFICIENT_PRIVILEGES",
@@ -16095,7 +16092,7 @@ RULES:
       }
       
       // Check if user has admin privileges
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required. Please contact support if you believe you should have access.", 
           code: "INSUFFICIENT_PRIVILEGES",
@@ -16126,7 +16123,7 @@ RULES:
       }
       
       // Check if user has admin privileges
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required. Please contact support if you believe you should have access.", 
           code: "INSUFFICIENT_PRIVILEGES",
@@ -16170,7 +16167,7 @@ RULES:
       }
       
       // Check if user has admin privileges
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required. Please contact support if you believe you should have access.", 
           code: "INSUFFICIENT_PRIVILEGES",
@@ -16214,7 +16211,7 @@ RULES:
       }
       
       // Check if user has admin privileges
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required. Please contact support if you believe you should have access.", 
           code: "INSUFFICIENT_PRIVILEGES",
@@ -16262,7 +16259,7 @@ RULES:
       }
       
       // Check if user has admin privileges
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required. Please contact support if you believe you should have access.", 
           code: "INSUFFICIENT_PRIVILEGES",
@@ -16303,7 +16300,7 @@ RULES:
       }
       
       // Check if user has admin privileges
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required. Please contact support if you believe you should have access.", 
           code: "INSUFFICIENT_PRIVILEGES",
@@ -16351,7 +16348,7 @@ RULES:
       }
       
       // Check if user has admin privileges
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required. Please contact support if you believe you should have access.", 
           code: "INSUFFICIENT_PRIVILEGES",
@@ -16392,7 +16389,7 @@ RULES:
       }
       
       // Check admin privileges
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required", 
           code: "INSUFFICIENT_PRIVILEGES"
@@ -16576,7 +16573,7 @@ RULES:
       
       // Check admin privileges
       const userEmail = user.email || user.claims?.email || '';
-      if (!userEmail.endsWith('@apexresi.com')) {
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ 
           message: "Admin access required", 
           code: "INSUFFICIENT_PRIVILEGES"
@@ -16773,7 +16770,7 @@ RULES:
         return res.status(401).json({ message: "Authentication required", code: "NOT_AUTHENTICATED" });
       }
       
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required", 
           code: "INSUFFICIENT_PRIVILEGES"
@@ -16798,7 +16795,7 @@ RULES:
         return res.status(401).json({ message: "Authentication required", code: "NOT_AUTHENTICATED" });
       }
       
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required", 
           code: "INSUFFICIENT_PRIVILEGES"
@@ -16845,7 +16842,7 @@ RULES:
         return res.status(401).json({ message: "Authentication required", code: "NOT_AUTHENTICATED" });
       }
       
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required", 
           code: "INSUFFICIENT_PRIVILEGES"
@@ -16888,7 +16885,7 @@ RULES:
         return res.status(401).json({ message: "Authentication required", code: "NOT_AUTHENTICATED" });
       }
       
-      if (!user.email || !user.email.endsWith('@apexresi.com')) {
+      if (!user.email || !isPlatformAdminEmail(user.email)) {
         return res.status(403).json({ 
           message: "Admin access required", 
           code: "INSUFFICIENT_PRIVILEGES"
@@ -16938,7 +16935,7 @@ RULES:
       
       // Check if user is a Catalyst analyst
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -17343,7 +17340,7 @@ RULES:
   app.post("/api/deals/:dealId/geocode-city-level", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -17432,7 +17429,7 @@ RULES:
     try {
       // Check if user is a Catalyst analyst
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -17557,7 +17554,7 @@ RULES:
       // FIX (Dec 15, 2025): Check both user.email and user.claims.email for OIDC auth compatibility
       const user = req.user as any;
       const userEmail = user?.claims?.email || user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       console.log(`📋 [QUICK-DEAL] Auth check - User email: ${userEmail}, isAnalyst: ${isAnalyst}`);
       
@@ -17994,7 +17991,7 @@ RULES:
       // Check if user is a Catalyst analyst or super admin
       const user = req.user as any;
       const userEmail = user?.email || user?.claims?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com') || userEmail === 'jack@apexresi.com';
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Admin/analyst privileges required." });
@@ -18210,7 +18207,7 @@ RULES:
     try {
       // Check if user is a Catalyst analyst
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18327,7 +18324,7 @@ RULES:
     try {
       // Check if user is a Catalyst analyst
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18385,7 +18382,7 @@ RULES:
     try {
       // Check if user is a Catalyst analyst
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18487,7 +18484,7 @@ RULES:
       // Check if user is a Catalyst analyst
       const user = req.user as any;
       const userEmail = user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18565,7 +18562,7 @@ RULES:
   app.get("/api/analyst/review-queue/:reviewId", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = user?.email?.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18625,7 +18622,7 @@ RULES:
   app.post("/api/analyst/review-queue/:reviewId/assign", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = user?.email?.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18682,7 +18679,7 @@ RULES:
   app.patch("/api/analyst/review-queue/:reviewId/status", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = user?.email?.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18766,7 +18763,7 @@ RULES:
   app.post("/api/analyst/review-queue/:reviewId/corrections", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = user?.email?.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18827,7 +18824,7 @@ RULES:
   app.post("/api/analyst/review-queue/:reviewId/escalate", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = user?.email?.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18887,7 +18884,7 @@ RULES:
   app.get("/api/analyst/review-queue/stats", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = user?.email?.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18906,7 +18903,7 @@ RULES:
   app.get("/api/analyst/workload/stats", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = user?.email?.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18926,7 +18923,7 @@ RULES:
   app.post("/api/analyst/workload/auto-assign", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = user?.email?.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -18950,7 +18947,7 @@ RULES:
   app.post("/api/analyst/review-queue/bulk", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = user?.email?.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -19158,7 +19155,7 @@ RULES:
   app.post("/api/upload-external-image", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com') || user?.email === 'jack@apexresi.com';
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ error: "Admin access required" });
@@ -19293,7 +19290,7 @@ RULES:
     try {
       // Check admin permissions
       const user = req.user as any;
-      const isAdmin = user?.email?.endsWith('@apexresi.com') || user?.email === 'jack@apexresi.com';
+      const isAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isAdmin) {
         return res.status(403).json({ error: "Admin access required to upload logo" });
@@ -19710,8 +19707,8 @@ RULES:
     try {
       const userEmail = (req.user as any)?.email || '';
       
-      // Only allow @apexresi.com emails to access this
-      if (!userEmail.endsWith('@apexresi.com')) {
+      // Only allow recognized platform-admin domains to access this.
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -20016,7 +20013,7 @@ RULES:
     try {
       const user = req.user as any;
       const userEmail = user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -20081,7 +20078,7 @@ RULES:
     try {
       const user = req.user as any;
       const userEmail = user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -20121,7 +20118,7 @@ RULES:
     try {
       const user = req.user as any;
       const userEmail = user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -20160,8 +20157,8 @@ RULES:
       const userEmail = user?.email?.toLowerCase();
       const userRole = user?.userRole;
       
-      // Only allow SUPER_ADMIN, ADMIN, and jack@apexresi.com
-      const isAuthorized = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || userEmail === 'jack@apexresi.com';
+      // Only allow persisted admin roles and configured super-admin identities.
+      const isAuthorized = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || isSuperAdminEmail(userEmail);
       
       if (!isAuthorized) {
         return res.status(403).json({ success: false, message: 'Unauthorized - Admin access required' });
@@ -20417,7 +20414,7 @@ RULES:
     try {
       const user = req.user as any;
       const userEmail = user?.email || '';
-      const isAuthorized = userEmail.endsWith('@apexresi.com') || userEmail === 'jack@apexresi.com';
+      const isAuthorized = isPlatformAdminEmail(userEmail);
       
       if (!isAuthorized) {
         return res.status(403).json({ message: "Access denied. Admin privileges required." });
@@ -20479,8 +20476,8 @@ RULES:
       const user = req.user;
       const userEmail = user?.email || '';
       
-      // Only allow jack@apexresi.com to trigger this
-      if (userEmail !== 'jack@apexresi.com') {
+      // Only allow configured super-admin identities to trigger this.
+      if (!isSuperAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Unauthorized - Super admin access required" });
       }
 
@@ -20606,7 +20603,7 @@ RULES:
       const userEmail = user?.email || '';
       
       // Only allow super admin
-      if (userEmail !== 'jack@apexresi.com') {
+      if (!isSuperAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Unauthorized - Super admin access required" });
       }
 
@@ -21418,7 +21415,7 @@ RULES:
   app.get("/api/market-comparables/:dealId", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -21459,7 +21456,7 @@ RULES:
   app.post("/api/land-discovery", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -21509,7 +21506,7 @@ RULES:
   app.get("/api/rezoning-analysis/:dealId", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -21582,7 +21579,7 @@ RULES:
   app.post("/api/property-search", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -21626,7 +21623,7 @@ RULES:
   app.get("/api/similar-opportunities/:dealId", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -21699,7 +21696,7 @@ RULES:
   app.post("/api/opportunity-analysis", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -21726,7 +21723,7 @@ RULES:
   app.get("/api/risk-assessment/:dealId", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -24342,8 +24339,8 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       
-      // Only allow @apexresi.com emails to test
-      if (!userEmail.endsWith('@apexresi.com')) {
+      // Only allow recognized platform-admin domains to test.
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Admin access required" });
       }
       
@@ -24402,8 +24399,8 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       
-      // Only allow @apexresi.com emails to run cleanup
-      if (!userEmail.endsWith('@apexresi.com')) {
+      // Only allow recognized platform-admin domains to run cleanup.
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Admin access required" });
       }
       
@@ -24442,8 +24439,8 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       
-      // Only allow @apexresi.com emails to run cleanup
-      if (!userEmail.endsWith('@apexresi.com')) {
+      // Only allow recognized platform-admin domains to run cleanup.
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Admin access required" });
       }
       
@@ -24473,8 +24470,8 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       
-      // Only allow @apexresi.com emails to run cleanup
-      if (!userEmail.endsWith('@apexresi.com')) {
+      // Only allow recognized platform-admin domains to run cleanup.
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Admin access required" });
       }
       
@@ -24514,7 +24511,7 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       
-      if (!userEmail.endsWith('@apexresi.com')) {
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Admin access required" });
       }
       
@@ -24555,7 +24552,7 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       
-      if (!userEmail.endsWith('@apexresi.com')) {
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Admin access required" });
       }
       
@@ -24618,7 +24615,7 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       
-      if (!userEmail.endsWith('@apexresi.com')) {
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Admin access required" });
       }
       
@@ -24673,7 +24670,7 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       
-      if (!userEmail.endsWith('@apexresi.com')) {
+      if (!isPlatformAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Admin access required" });
       }
       
@@ -24911,8 +24908,8 @@ RULES:
       // SECURITY: Only analysts and super admins can use quick property evaluation
       const user = req.user as any;
       const userEmail = user?.email || '';
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
-      const isSuperAdmin = userEmail === 'jack@apexresi.com';
+      const isAnalyst = isPlatformAdminEmail(userEmail);
+      const isSuperAdmin = isSuperAdminEmail(userEmail);
       
       if (!isAnalyst && !isSuperAdmin) {
         console.log(`🚫 [SECURITY] Unauthorized access attempt to quick property evaluation by: ${userEmail}`);
@@ -25227,7 +25224,7 @@ RULES:
   app.get("/api/deals/flagged", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -25317,7 +25314,7 @@ RULES:
   app.get("/api/deals/:id/warnings", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -25378,7 +25375,7 @@ RULES:
   app.post("/api/deals/:id/flag", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -25423,7 +25420,7 @@ RULES:
   app.patch("/api/deals/:id/review", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -25505,7 +25502,7 @@ RULES:
   app.post("/api/analyst/deals/bulk-review", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -25595,7 +25592,7 @@ RULES:
   app.get("/api/deals/flagging-stats", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -26491,7 +26488,7 @@ RULES:
   app.patch('/api/outreach/master-toggle', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -26530,7 +26527,7 @@ RULES:
   app.patch('/api/outreach/dry-run-mode', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -26593,7 +26590,7 @@ RULES:
   app.delete('/api/outreach/dry-run-logs', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -26634,7 +26631,7 @@ RULES:
   app.post('/api/outreach/campaigns', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -26690,7 +26687,7 @@ RULES:
   app.patch('/api/outreach/campaigns/:campaignId', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -26754,7 +26751,7 @@ RULES:
   app.post('/api/outreach/run', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -26890,7 +26887,7 @@ RULES:
   app.post('/api/outreach/campaigns/:campaignId/archive', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -26974,7 +26971,7 @@ RULES:
   app.post('/api/outreach/scheduler/trigger', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -27002,7 +26999,7 @@ RULES:
   app.post('/api/outreach/scheduler/start', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -27028,7 +27025,7 @@ RULES:
   app.post('/api/outreach/scheduler/stop', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -27721,7 +27718,7 @@ RULES:
   app.post('/api/outreach/senders', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -27758,7 +27755,7 @@ RULES:
     try {
       const user = req.user as any;
       const userEmail = (user?.claims?.email || user?.email || '').toLowerCase();
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       // Also allow registered outreach senders to update their own settings
       let isOutreachSender = false;
@@ -27869,7 +27866,7 @@ RULES:
     try {
       const user = req.user as any;
       const userEmail = (user?.claims?.email || user?.email || '').toLowerCase();
-      const isAnalyst = userEmail.endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(userEmail);
       
       console.log(`📝 [SIGNATURE-SAVE] Request received:`, {
         senderId: req.params.senderId,
@@ -27954,7 +27951,7 @@ RULES:
   app.get('/api/outreach/senders/:senderId/campaign-steps', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -28017,7 +28014,7 @@ RULES:
   app.post('/api/outreach/senders/:senderId/campaign-steps', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -28095,7 +28092,7 @@ RULES:
   app.patch('/api/outreach/campaign-steps/:stepId', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -28172,7 +28169,7 @@ RULES:
   app.delete('/api/outreach/campaign-steps/:stepId', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -28245,7 +28242,7 @@ RULES:
   app.post('/api/outreach/senders/:senderId/campaign-steps/reorder', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -28280,7 +28277,7 @@ RULES:
     try {
       const user = req.user as any;
       const userEmail = user?.claims?.email || user?.email || '';
-      const isAuthorized = userEmail.endsWith('@apexresi.com') || userEmail === 'jack@apexresi.com';
+      const isAuthorized = isPlatformAdminEmail(userEmail);
       
       if (!isAuthorized) {
         return res.status(403).json({ message: "Access denied. Admin privileges required." });
@@ -28820,7 +28817,7 @@ RULES:
   app.post('/api/outreach/senders/:senderId/connect-outlook', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       const isDeveloper = String(user?.role || '').toUpperCase() === 'DEVELOPER' && !!user?.developerProfileId;
       
       if (!isAnalyst && !isDeveloper) {
@@ -29081,7 +29078,7 @@ RULES:
       
       // Check role first, then fallback to email patterns for legacy compatibility
       const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
-      const isLegacyAdmin = userEmail.endsWith('@apexresi.com');
+      const isLegacyAdmin = isPlatformAdminEmail(userEmail);
       
       if (!isAdmin && !isLegacyAdmin) {
         return res.status(403).json({ error: 'Access denied - ADMIN or SUPER_ADMIN role required' });
@@ -29105,7 +29102,7 @@ RULES:
       
       // Check role first, then fallback to email patterns for legacy compatibility
       const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
-      const isLegacyAdmin = userEmail.endsWith('@apexresi.com');
+      const isLegacyAdmin = isPlatformAdminEmail(userEmail);
       
       if (!isAdmin && !isLegacyAdmin) {
         return res.status(403).json({ error: 'Access denied - ADMIN or SUPER_ADMIN role required' });
@@ -29206,7 +29203,7 @@ RULES:
       
       // Admin only
       const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
-      const isLegacyAdmin = userEmail.endsWith('@apexresi.com');
+      const isLegacyAdmin = isPlatformAdminEmail(userEmail);
       
       if (!isAdmin && !isLegacyAdmin) {
         return res.status(403).json({ error: 'Access denied - ADMIN privileges required' });
@@ -29419,7 +29416,7 @@ RULES:
   app.get('/api/executive/stats', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = (user?.claims?.email || user?.email || '').endsWith('@apexresi.com');
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
       
       if (!isAnalyst) {
         return res.status(403).json({ error: 'Access denied - Analyst access required' });

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 type PipelineStatus = "passed" | "review" | "pursuing" | "not_sent";
 
@@ -106,7 +107,7 @@ function StatusBadge({ status }: { status: PipelineStatus }) {
 export default function MasterPipeline() {
   const { user, isAuthenticated } = useAuth();
   const email = String((user as any)?.claims?.email || (user as any)?.email || "").toLowerCase();
-  const isPlatformAdmin = isAuthenticated && email.endsWith("@apexresi.com");
+  const isPlatformAdmin = isAuthenticated && isPlatformAdminEmail(email);
   const [filters, setFilters] = useState(initialFilters);
 
   const queryKey = useMemo(() => {
@@ -146,7 +147,7 @@ export default function MasterPipeline() {
         <Navigation />
         <main className="mx-auto max-w-xl px-6 py-24 text-center">
           <Building2 className="mx-auto mb-4 h-12 w-12 text-slate-300" />
-          <h1 className="text-2xl font-bold text-slate-900">Apex Resi administrators only</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Platform administrators only</h1>
           <p className="mt-2 text-slate-500">This view is restricted to authenticated platform administrators.</p>
         </main>
       </div>

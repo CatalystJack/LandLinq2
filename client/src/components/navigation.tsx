@@ -5,6 +5,7 @@ import { Menu, X, ChevronDown } from "lucide-react";
 import { useState, useMemo, memo } from "react";
 import { AuthModal } from "@/components/auth-modal";
 import { preloadRoute } from "@/lib/route-preload";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +34,7 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
   // Memoized user email to prevent object reference changes
   // FIX (Dec 15, 2025): Support both OIDC auth (user.claims.email) and traditional auth (user.email)
   const userEmail = useMemo(() => (user as any)?.claims?.email || (user as any)?.email || '', [user]);
-  const isApexUser = userEmail.toLowerCase().endsWith('@apexresi.com');
+  const isPlatformAdmin = isPlatformAdminEmail(userEmail);
   
   // Categorized navigation for dropdown menus
   const { landlinqNav, publicNav } = useMemo(() => {
@@ -60,7 +61,7 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
       case UserRole.SUPER_ADMIN:
       case UserRole.ADMIN:
         landlinq.push(
-          ...(isApexUser
+          ...(isPlatformAdmin
             ? [
                 { section: "Platform" },
                 { name: "Platform Overview", href: "/dashboard", description: "Parent view across all Investment Companies and developers" },
@@ -147,7 +148,7 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
       landlinqNav: landlinq,
       publicNav: publicItems,
     };
-  }, [userRole, isAuthenticated, userEmail, isApexUser]);
+  }, [userRole, isAuthenticated, userEmail, isPlatformAdmin]);
   
   // Combined navigation for mobile menu
   const navigation = useMemo(() => {
@@ -164,7 +165,7 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
     landlinqNav.forEach((item: any) => {
       if (item.section) {
         currentSection = {
-          name: item.section === "Platform" && isApexUser ? "Apex Platform" : item.section,
+            name: item.section === "Platform" && isPlatformAdmin ? "Platform" : item.section,
           items: [],
         };
         sections.push(currentSection);
@@ -173,7 +174,7 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
 
       if (!currentSection) {
         currentSection = {
-          name: isApexUser ? "Apex Platform" : "LandLinq",
+          name: isPlatformAdmin ? "Platform" : "LandLinq",
           items: [],
         };
         sections.push(currentSection);
@@ -183,7 +184,7 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
     });
 
     return sections.filter((section) => section.items.length > 0);
-  }, [landlinqNav, isAuthenticated, isApexUser]);
+  }, [landlinqNav, isAuthenticated, isPlatformAdmin]);
 
   return (
     <nav className="relative border-b border-slate-800 sticky top-0 z-50 shadow-lg" style={{ backgroundColor: '#081729' }}>
@@ -283,8 +284,8 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
               );
             })}
             
-            {/* Authenticated non-Apex navigation - direct tabs across the header */}
-            {isAuthenticated && !isApexUser && landlinqNav.length > 0 && (
+            {/* Authenticated non-platform navigation - direct tabs across the header */}
+            {isAuthenticated && !isPlatformAdmin && landlinqNav.length > 0 && (
               <div className="flex max-w-[calc(100vw-250px)] items-center gap-0.5 overflow-x-auto lg:gap-1">
                 {landlinqNav
                   .filter((item: any) => !item.section)
@@ -314,8 +315,8 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
               </div>
             )}
 
-            {/* Authenticated Apex navigation - one dropdown tab per section */}
-            {isAuthenticated && isApexUser && navigationSections.length > 0 && (
+            {/* Authenticated platform navigation - one dropdown tab per section */}
+            {isAuthenticated && isPlatformAdmin && navigationSections.length > 0 && (
               <div className="flex items-center gap-0.5 lg:gap-1">
                 {navigationSections.map((section) => {
                   const hasActiveItem = section.items.some((item) => location === item.href);

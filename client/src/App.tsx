@@ -10,6 +10,7 @@ import { useScrollToTop } from "@/hooks/useScrollToTop";
 import ErrorBoundary from "@/components/error-boundary";
 import { Loader2 } from "lucide-react";
 import { ClassificationProgress } from "@/components/ClassificationProgress";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 // ============================================
 // CODE SPLITTING OPTIMIZATION - Jan 5, 2026
@@ -132,7 +133,7 @@ function Router() {
   if (
     isAuthenticated &&
     user &&
-    authenticatedEmail.endsWith("@apexresi.com") &&
+    isPlatformAdminEmail(authenticatedEmail) &&
     ["/admin/investment-companies", "/admin/master-pipeline"].includes(window.location.pathname)
   ) {
     return (
@@ -249,7 +250,7 @@ function Router() {
           <Route path="/email-intake" component={EmailIntakePage} />
           <Route path="/dashboard" component={() => {
             const userEmail = String((user as any)?.claims?.email || (user as any)?.email || '').toLowerCase();
-            return userEmail.endsWith('@apexresi.com') ? <ExecutiveDashboard /> : <AnalystDashboard />;
+            return isPlatformAdminEmail(userEmail) ? <ExecutiveDashboard /> : <AnalystDashboard />;
           }} />
           <Route path="/dashboard-v2" component={AnalystDashboardV2} />
           <Route path="/" component={AuthPage} />

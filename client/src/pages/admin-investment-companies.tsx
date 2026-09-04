@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Building2, Edit3, KeyRound, Loader2, LockKeyhole, Mail, Plus, RotateCcw, Trash2, Upload, Users, X } from "lucide-react";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 type ProductType = {
   id?: string;
@@ -187,7 +188,7 @@ export default function AdminInvestmentCompanies() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const email = String((user as any)?.claims?.email || (user as any)?.email || "").toLowerCase();
-  const isPlatformAdmin = isAuthenticated && email.endsWith("@apexresi.com");
+  const isPlatformAdmin = isAuthenticated && isPlatformAdminEmail(email);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<InvestmentCompany | null>(null);
   const [form, setForm] = useState<CompanyForm>(blankForm);
@@ -387,7 +388,7 @@ export default function AdminInvestmentCompanies() {
     loginMutation.mutate();
   };
 
-  if (!isPlatformAdmin) return <div className="min-h-screen bg-slate-50"><Navigation /><div className="mx-auto flex max-w-xl flex-col items-center px-6 py-24 text-center"><LockKeyhole className="mb-4 h-12 w-12 text-slate-300" /><h1 className="text-2xl font-bold text-slate-900">Apex Resi administrators only</h1><p className="mt-2 text-slate-500">This page is restricted to authenticated @apexresi.com accounts.</p></div></div>;
+  if (!isPlatformAdmin) return <div className="min-h-screen bg-slate-50"><Navigation /><div className="mx-auto flex max-w-xl flex-col items-center px-6 py-24 text-center"><LockKeyhole className="mb-4 h-12 w-12 text-slate-300" /><h1 className="text-2xl font-bold text-slate-900">Platform administrators only</h1><p className="mt-2 text-slate-500">This page is restricted to authenticated platform administrator accounts.</p></div></div>;
 
   return <div className="min-h-screen bg-slate-50">
     <Navigation />

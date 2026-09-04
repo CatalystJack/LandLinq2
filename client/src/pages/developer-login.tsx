@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 type DeveloperBranding = {
   companyName: string;
@@ -75,8 +76,8 @@ export default function DeveloperLogin() {
       return response.json();
     },
     onSuccess: async (userData) => {
-      const isApexPlatformUser = String(userData?.email || "").toLowerCase().endsWith("@apexresi.com");
-      if (isApexPlatformUser) {
+      const isPlatformAdmin = isPlatformAdminEmail(userData?.email);
+      if (isPlatformAdmin) {
         queryClient.setQueryData(["/api/user"], userData);
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
         window.location.href = "/dashboard";

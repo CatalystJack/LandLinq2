@@ -15,6 +15,7 @@ import { formatDateEST } from "@/utils/timezone";
 import Footer from "@/components/footer";
 import Navigation from "@/components/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { isPlatformAdminEmail, isSuperAdminEmail } from "@shared/admin-auth";
 
 interface User {
   id: string;
@@ -241,8 +242,10 @@ export default function UserManagement() {
                          `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
     
     let userRole = "team";
-    if (user.email.endsWith("@catalystcp.com")) {
-      userRole = user.email === "jack@catalystcp.com" ? "super_admin" : "analyst";
+    if (isSuperAdminEmail(user.email)) {
+      userRole = "super_admin";
+    } else if (user.email.endsWith("@catalystcp.com") || isPlatformAdminEmail(user.email)) {
+      userRole = "analyst";
     } else {
       userRole = "broker";
     }
@@ -252,13 +255,13 @@ export default function UserManagement() {
   });
 
   const getRoleFromEmail = (email: string) => {
-    if (email === "jack@catalystcp.com") return "Super Admin";
+    if (isSuperAdminEmail(email)) return "Super Admin";
     if (email.endsWith("@catalystcp.com")) return "Catalyst Team";
     return "Broker";
   };
 
   const getRoleBadgeVariant = (email: string) => {
-    if (email === "jack@catalystcp.com") return "destructive";
+    if (isSuperAdminEmail(email)) return "destructive";
     if (email.endsWith("@catalystcp.com")) return "default";
     return "secondary";
   };
@@ -316,19 +319,17 @@ export default function UserManagement() {
 
     // Check if logged-in user is super admin (case-insensitive)
     const currentEmail = currentUser?.email ? String(currentUser.email).toLowerCase().trim() : '';
-    const superAdminEmail = 'jack@catalystcp.com';
     
     console.log('🔐 [DELETE] Permission check:', {
       currentEmail,
-      superAdminEmail,
-      matches: currentEmail === superAdminEmail
+      matches: isSuperAdminEmail(currentEmail)
     });
     
-    if (currentEmail !== superAdminEmail) {
+    if (!isSuperAdminEmail(currentEmail)) {
       console.error('❌ [DELETE] Permission denied - user is not super admin');
       toast({
         title: "Permission Denied",
-        description: `Only super admin (${superAdminEmail}) can delete users. You are logged in as: ${currentUser?.email || 'unknown'}`,
+        description: `Only designated super administrators can delete users. You are logged in as: ${currentUser?.email || 'unknown'}`,
         variant: "destructive",
         duration: 5000,
       });
@@ -336,7 +337,7 @@ export default function UserManagement() {
     }
     
     // Prevent deleting the super admin account (case-insensitive)
-    if (userEmail ? String(userEmail).toLowerCase().trim() === superAdminEmail : false) {
+    if (isSuperAdminEmail(userEmail)) {
       console.error('❌ [DELETE] Cannot delete super admin account');
       toast({
         title: "Error",
@@ -570,10 +571,10 @@ export default function UserManagement() {
                       >
                         <div className="flex items-center space-x-4">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            user.email === "jack@catalystcp.com" ? "bg-red-500" :
+                            isSuperAdminEmail(user.email) ? "bg-red-500" :
                             user.email.endsWith("@catalystcp.com") ? "bg-blue-500" : "bg-gray-500"
                           }`}>
-                            {user.email === "jack@catalystcp.com" ? (
+                            {isSuperAdminEmail(user.email) ? (
                               <Crown className="h-5 w-5 text-white" />
                             ) : (
                               <Users className="h-5 w-5 text-white" />
@@ -638,7 +639,7 @@ export default function UserManagement() {
                               <Edit className="h-3 w-3" />
                               Edit
                             </Button>
-                            {user.email !== "jack@catalystcp.com" && (
+                            {!isSuperAdminEmail(user.email) && (
                               <Button 
                                 variant="outline" 
                                 size="sm" 

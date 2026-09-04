@@ -1,0 +1,55 @@
+Expand platform-admin recognition to include the @landlinq.ai domain alongside 
+@apexresi.com, and add deals@landlinq.ai as an additional super-admin address 
+alongside jack@apexresi.com. Given there are ~170 places in server/routes.ts 
+currently checking @apexresi.com directly, this must go through ONE shared helper 
+function rather than editing each check individually — so any future domain change 
+is a one-line edit, not another codebase-wide hunt.
+
+TASK 1 — Create shared helper functions
+Add to server/auth.ts (or wherever isPlatformAdmin currently lives):
+
+export function isPlatformAdminEmail(email?: string | null): boolean {
+  const normalized = (email || '').toLowerCase().trim();
+  return normalized.endsWith('@apexresi.com') || normalized.endsWith('@landlinq.ai');
+}
+
+export function isSuperAdminEmail(email?: string | null): boolean {
+  const normalized = (email || '').toLowerCase().trim();
+  return normalized === 'jack@apexresi.com' || normalized === 'deals@landlinq.ai';
+}
+
+TASK 2 — Update the shared middleware
+Update requirePlatformAdmin (server/routes.ts ~line 11473) to call 
+isPlatformAdminEmail(req.user?.email) instead of its current inline 
+.endsWith('@apexresi.com') check. This alone should fix every route already using 
+this shared middleware without touching each one individually.
+
+TASK 3 — Replace inline checks with the shared helper
+Search server/routes.ts for every inline occurrence of 
+userEmail.endsWith('@apexresi.com') or similar direct domain checks that do NOT go 
+through requirePlatformAdmin middleware (these are the routes that check permissions 
+inline within the handler body, as found in the earlier @apexresi.com migration 
+work). Replace each with a call to isPlatformAdminEmail(userEmail) instead of adding 
+a second endsWith condition inline — centralize through the helper, don't duplicate 
+the OR condition at each site.
+
+TASK 4 — Replace the person-specific super-admin checks
+Find every occurrence of userEmail === 'jack@apexresi.com' (the person-specific 
+gate controlling user management, account deletion, etc. — confirmed at multiple 
+locations in server/routes.ts from the earlier migration work) and replace with 
+isSuperAdminEmail(userEmail).
+
+TASK 5 — Report before finishing
+Report a count of how many inline checks were converted in Task 3, and how many 
+person-specific checks were converted in Task 4, so we can confirm nothing was 
+missed. Do NOT touch the demo account check (demo@catalystcp.com) or any 
+notification-recipient email lists — those are unrelated to admin authorization and 
+should stay exactly as they are, per the existing preserved-legacy-references policy 
+already documented in .agents/memory/.
+
+TASK 6 — Verify
+Confirm an account with a @landlinq.ai email (not @apexresi.com) can access every 
+platform-admin feature a @apexresi.com account can. Confirm deals@landlinq.ai 
+specifically has the same super-admin access as jack@apexresi.com (user management, 
+account deletion). Confirm a plain @landlinq.ai email that isn't deals@landlinq.ai 
+does NOT get super-admin access, only regular platform-admin access.

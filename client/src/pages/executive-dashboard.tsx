@@ -37,6 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import Navigation from "@/components/navigation";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 interface ExecutiveStats {
   deals: {
@@ -327,7 +328,7 @@ export default function ExecutiveDashboard() {
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
   const email = String((user as any)?.claims?.email || (user as any)?.email || "").toLowerCase();
-  const isPlatformAdmin = isAuthenticated && email.endsWith("@apexresi.com");
+  const isPlatformAdmin = isAuthenticated && isPlatformAdminEmail(email);
   const [newKeyword, setNewKeyword] = useState('');
   const [newExcludedDomain, setNewExcludedDomain] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -437,7 +438,7 @@ export default function ExecutiveDashboard() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-[#081729]" data-testid="text-dashboard-title">
-               {isPlatformAdmin ? "Apex Platform Dashboard" : "Executive Dashboard"}
+               {isPlatformAdmin ? "Platform Dashboard" : "Executive Dashboard"}
             </h1>
             <p className="text-gray-500 mt-1">
               {isPlatformAdmin

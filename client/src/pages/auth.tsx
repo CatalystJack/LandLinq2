@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Eye, EyeOff } from "lucide-react";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 export default function AuthPage() {
   const [location, setLocation] = useLocation();
@@ -26,7 +27,7 @@ export default function AuthPage() {
   const authenticatedDeveloperHome = (user as any)?.developerProfile?.profileType === "general_sales"
     ? "/developer/crm"
     : "/developer/dashboard";
-  const redirectUrl = authenticatedEmail.endsWith("@apexresi.com")
+  const redirectUrl = isPlatformAdminEmail(authenticatedEmail)
     ? "/dashboard"
     : authenticatedRole === "DEVELOPER"
       ? authenticatedDeveloperHome
@@ -73,13 +74,13 @@ export default function AuthPage() {
         title: "Login successful",
         description: "You've successfully logged in.",
       });
-      // Apex users always enter the LandLinq/Apex parent platform. This takes
+      // Platform administrators always enter the parent platform. This takes
       // priority over a stale or user-supplied redirect destination.
-      const isApexPlatformUser = String(authenticatedUser?.email || "").toLowerCase().endsWith("@apexresi.com");
+      const isPlatformAdmin = isPlatformAdminEmail(authenticatedUser?.email);
       const developerHome = authenticatedUser?.developerProfile?.profileType === "general_sales"
         ? "/developer/crm"
         : "/developer/dashboard";
-      const redirectPath = isApexPlatformUser
+      const redirectPath = isPlatformAdmin
         ? "/dashboard"
         : String(authenticatedUser?.role || "").toUpperCase() === "DEVELOPER"
         ? developerHome

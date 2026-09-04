@@ -11,6 +11,9 @@ import { User as SelectUser, developerProfiles } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 import { db } from "./db";
 import { and, eq, sql } from "drizzle-orm";
+import { isPlatformAdminEmail, isSuperAdminEmail } from "@shared/admin-auth";
+
+export { isPlatformAdminEmail, isSuperAdminEmail };
 
 declare global {
   namespace Express {
@@ -45,6 +48,12 @@ function safeStringEqual(left: string, right: string) {
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
+function platformRoleForEmail(email: string | null | undefined, fallbackRole: string) {
+  if (isSuperAdminEmail(email)) return "SUPER_ADMIN";
+  if (isPlatformAdminEmail(email)) return "ADMIN";
+  return fallbackRole;
+}
+
 export function setupAuth(app: Express) {
   const PostgresSessionStore = connectPg(session);
   const sessionStore = new PostgresSessionStore({ 
@@ -58,8 +67,6 @@ export function setupAuth(app: Express) {
   const isSecure = isProduction;
   
   // Enhanced session configuration for financial platform security
-  const isPlatformAdmin = (email?: string) => email?.endsWith('@apexresi.com');
-  
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "catalyst-secret-key-2024",
     resave: false,
@@ -90,7 +97,7 @@ export function setupAuth(app: Express) {
       
       // Different timeouts for team vs external users
       const user = req.user as any;
-       const maxIdleTime = isPlatformAdmin(user?.email) ? 8 * 60 * 60 * 1000 : 4 * 60 * 60 * 1000; // 8hrs vs 4hrs
+       const maxIdleTime = isPlatformAdminEmail(user?.email) ? 8 * 60 * 60 * 1000 : 4 * 60 * 60 * 1000; // 8hrs vs 4hrs
       
       if (req.session.lastActivity) {
         const timeSinceActivity = Date.now() - new Date(req.session.lastActivity).getTime();
@@ -157,19 +164,19 @@ export function setupAuth(app: Express) {
         const bootstrapPassword = process.env.APEX_ADMIN_BOOTSTRAP_PASSWORD;
         if (
           !user &&
-          normalizedEmail === "jack@apexresi.com" &&
+          isSuperAdminEmail(normalizedEmail) &&
           bootstrapPassword &&
           safeStringEqual(password, bootstrapPassword)
         ) {
           user = await storage.createUser({
             email: normalizedEmail,
             password: await hashPassword(password),
-            firstName: "Jack",
-            lastName: "Apex",
+            firstName: normalizedEmail === "deals@landlinq.ai" ? "Deals" : "Jack",
+            lastName: normalizedEmail === "deals@landlinq.ai" ? "LandLinq" : "Apex",
             role: "SUPER_ADMIN",
             mustResetPassword: false,
           });
-          console.log(`✅ [AUTH] Initial Apex admin account provisioned`);
+          console.log(`✅ [AUTH] Initial platform super-admin account provisioned`);
         }
         
         if (!user) {
@@ -194,7 +201,9 @@ export function setupAuth(app: Express) {
         }
         
         console.log(`✅ [AUTH] Regular user login successful: ${normalizedEmail}`);
-        return done(null, isPlatformAdmin(normalizedEmail) ? { ...user, role: 'SUPER_ADMIN' } : user);
+        return done(null, isPlatformAdminEmail(normalizedEmail)
+          ? { ...user, role: platformRoleForEmail(normalizedEmail, user.role || "ADMIN") }
+          : user);
       } catch (error) {
         console.error(`💥 [AUTH] Authentication error:`, error);
         return done(error);
@@ -313,7 +322,9 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
-      done(null, user && isPlatformAdmin(user.email) ? { ...user, role: 'SUPER_ADMIN' } : user);
+      done(null, user && isPlatformAdminEmail(user.email)
+        ? { ...user, role: platformRoleForEmail(user.email, user.role || "ADMIN") }
+        : user);
     } catch (error) {
       done(error);
     }
@@ -453,8 +464,8 @@ export function setupAuth(app: Express) {
           return req.login(user, (loginErr) => {
             if (loginErr) return next(loginErr);
             console.log('✅ LOGIN SUCCESS (main) - User logged in:', user.email);
-            const role = isPlatformAdmin(user.email)
-              ? 'SUPER_ADMIN'
+            const role = isPlatformAdminEmail(user.email)
+              ? platformRoleForEmail(user.email, user.role || "ADMIN")
               : isDeveloper
                 ? 'DEVELOPER'
               : (user.email?.endsWith('@catalystcp.com') || user.email?.endsWith('@landlinq.ai')
@@ -541,7 +552,7 @@ export function setupAuth(app: Express) {
       // Successful authentication
       console.log('✅ [GOOGLE AUTH] Successful login, redirecting to launchpad');
       const email = String((req.user as any)?.email || '').toLowerCase();
-      res.redirect(email.endsWith('@apexresi.com') ? '/dashboard' : '/launchpad');
+      res.redirect(isPlatformAdminEmail(email) ? '/dashboard' : '/launchpad');
     }
   );
 
@@ -556,7 +567,7 @@ export function setupAuth(app: Express) {
       // Successful authentication
       console.log('✅ [MICROSOFT AUTH] Successful login, redirecting to launchpad');
       const email = String((req.user as any)?.email || '').toLowerCase();
-      res.redirect(email.endsWith('@apexresi.com') ? '/dashboard' : '/launchpad');
+      res.redirect(isPlatformAdminEmail(email) ? '/dashboard' : '/launchpad');
     }
   );
 
@@ -586,8 +597,8 @@ export function setupAuth(app: Express) {
       // CRITICAL FIX (Dec 15, 2025): Determine correct role based on email domain
       // This ensures @catalystcp.com users get analyst navigation, not broker navigation
       let role = user?.role || 'BROKER';
-      if (isPlatformAdmin(userEmail)) {
-        role = 'SUPER_ADMIN';
+      if (isPlatformAdminEmail(userEmail)) {
+        role = platformRoleForEmail(userEmail, "ADMIN");
       } else if (String(user?.role || '').toUpperCase() === 'DEVELOPER') {
         role = 'DEVELOPER';
       } else if (userEmail === 'demo@catalystcp.com') {
@@ -734,7 +745,7 @@ export function setupAuth(app: Express) {
   app.get("/api/sessions/active", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      if (!isPlatformAdmin(user?.email)) {
+      if (!isPlatformAdminEmail(user?.email)) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -767,7 +778,7 @@ export function setupAuth(app: Express) {
       const { sessionId } = req.body;
       
       // Only team members can terminate other sessions
-      if (!isPlatformAdmin(user?.email)) {
+      if (!isPlatformAdminEmail(user?.email)) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -791,11 +802,11 @@ export function setupAuth(app: Express) {
     const user = req.user as any;
     res.json({
       user: user.email,
-      isPlatformAdmin: isPlatformAdmin(user?.email),
+      isPlatformAdmin: isPlatformAdminEmail(user?.email),
       lastActivity: req.session.lastActivity,
       maxAge: req.session.cookie.maxAge,
       expires: new Date(Date.now() + (req.session.cookie.maxAge || 0)),
-      idleTimeout: isPlatformAdmin(user?.email) ? '2 hours' : '30 minutes'
+      idleTimeout: isPlatformAdminEmail(user?.email) ? '2 hours' : '30 minutes'
     });
   });
 }
