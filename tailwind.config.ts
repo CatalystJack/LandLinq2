@@ -56,6 +56,8 @@ export default {
         },
         'catalyst-navy': "var(--catalyst-navy)",
         'catalyst-blue': "var(--catalyst-blue)",
+        'landlinq-sky': "var(--landlinq-sky)",
+        'landlinq-blue': "var(--landlinq-blue)",
         'catalyst-gold': "var(--catalyst-gold)",
         'catalyst-gray': {
           50: "var(--catalyst-gray-50)",
