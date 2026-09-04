@@ -323,29 +323,6 @@ export default function AuthPage() {
                         {loginMutation.isPending ? "Signing in..." : "Sign In"}
                       </Button>
 
-                      {/* Try Demo Button */}
-                      <button
-                        type="button"
-                        data-testid="button-demo-login"
-                        onClick={async () => {
-                          try {
-                            const res = await fetch('/api/demo-login', {
-                              method: 'POST',
-                              credentials: 'include',
-                            });
-                            if (!res.ok) throw new Error('Demo login failed');
-                            await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-                            await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-                            setLocation('/dashboard');
-                          } catch {
-                            toast({ title: 'Demo unavailable', description: 'Could not start the demo. Please try again.', variant: 'destructive' });
-                          }
-                        }}
-                        className="hidden w-full h-12 flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded text-sm font-medium text-gray-600 hover:border-[#4A90E2] hover:text-[#4A90E2] hover:bg-blue-50 transition-all duration-200"
-                      >
-                        <span className="text-base">🚀</span> Try Live Demo — no account needed
-                      </button>
-
                       {/* OAuth Divider */}
                       <div className="relative my-6 hidden">
                         <div className="absolute inset-0 flex items-center">

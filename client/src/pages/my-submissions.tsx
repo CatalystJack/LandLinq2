@@ -30,7 +30,7 @@ export default function MySubmissions() {
   const [editingDeal, setEditingDeal] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<any>({});
   
-  // Query broker deals using API - Use demo endpoint if not authenticated
+  // Broker submissions are private and must never fall back to production demo data.
   const {
     data: deals = [],
     isLoading,
@@ -38,7 +38,8 @@ export default function MySubmissions() {
     error,
     refetch: refetchDeals
   } = useQuery<Deal[]>({
-    queryKey: isAuthenticated ? ["/api/broker/deals"] : ["/api/demo/broker/deals"],
+    queryKey: ["/api/broker/deals"],
+    enabled: isAuthenticated && !authLoading,
     retry: 1,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

@@ -1119,3 +1119,103 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 [data-signature-editor] p {
   margin: revert;
 }
+
+/* LandLinq public homepage */
+.ll-grid {
+  background-image: linear-gradient(hsl(var(--primary-foreground) / 0.08) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary-foreground) / 0.08) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: linear-gradient(to bottom, black, transparent 75%);
+}
+
+.ll-reveal {
+  animation: ll-fade-up 800ms cubic-bezier(.2,.7,.2,1) both;
+}
+
+.ll-delay-1 { animation-delay: 100ms; }
+.ll-delay-2 { animation-delay: 180ms; }
+.ll-delay-3 { animation-delay: 260ms; }
+
+.ll-panel-dark,
+.ll-panel-navy,
+.ll-panel-paper,
+.ll-panel-outline {
+  border-radius: 1.25rem;
+  padding: 2rem;
+}
+
+.ll-panel-dark {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.ll-panel-navy {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.ll-panel-paper {
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 42%, white);
+}
+
+.ll-panel-outline {
+  border: 1px solid var(--border);
+  background: var(--background);
+}
+
+.ll-window {
+  transform: perspective(1400px) rotateY(-4deg) rotateX(2deg);
+  transform-origin: center right;
+  transition: transform 500ms cubic-bezier(.2,.7,.2,1), box-shadow 500ms ease;
+}
+
+.ll-window:hover {
+  transform: perspective(1400px) rotateY(-1deg) rotateX(0) translateY(-6px);
+}
+
+.ll-product-float {
+  animation: ll-product-float 6s ease-in-out infinite;
+}
+
+.ll-scroll-reveal {
+  opacity: 0;
+  transform: translateY(36px);
+  filter: blur(8px);
+  transition: opacity 750ms ease, transform 850ms cubic-bezier(.2,.7,.2,1), filter 750ms ease;
+}
+
+.ll-scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+@keyframes ll-fade-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ll-product-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@media (max-width: 768px) {
+  .ll-window { transform: none; }
+  .ll-panel-dark,
+  .ll-panel-navy,
+  .ll-panel-paper,
+  .ll-panel-outline { padding: 1.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ll-reveal,
+  .ll-product-float { animation: none; }
+  .ll-scroll-reveal {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+  .ll-window { transform: none; }
+}

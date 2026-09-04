@@ -75,6 +75,98 @@ const isNonDemoBroker = () => sql`
       AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
   )
 `;
+
+async function purgeLegacyDemoData(): Promise<void> {
+  const demoUserIds = ["20974d7b-e103-4fc7-b42f-7a13d41041fb"];
+  const demoBrokerIds = [
+    "9480ab4e-3aa2-4e9f-a88d-fdd15fa8bdaf",
+    "38902097-09ab-4d09-b8bd-2fe217af2f5f",
+    "2f5fac9b-ac83-4d01-b331-958a371d001f",
+    "4c729032-1c4f-4b48-ab8e-ab2cba540f92",
+    "892b7f40-4822-4f70-bdb0-537fd6c3c111",
+    "3a872eff-8044-4a1d-952f-28672c50a7fc",
+    "fdfc0476-1821-4426-8331-2b59af96bbcb",
+    "a9c87968-5a84-40e9-84b3-26109237f8bd",
+    "feb236fc-6ae8-4d8b-959f-2a54ad1dd2f1",
+    "bd2a9938-6d0f-488f-b19f-431a5d253c9f",
+  ];
+  const fakeDealIds = [
+    "5443c001-7346-46ff-aafc-94efde8a7fd3",
+    "448c111f-6ae1-43f2-863e-f8be295124dd",
+    "4ccd266c-bebc-4431-aa85-179f3f59caf6",
+    "f8cc8a3f-649b-462a-af27-34c496e976e9",
+    "ec60e279-4bae-4305-8f3a-333c86853066",
+    "088ee4ab-4b6c-410e-ac05-ffdafb22ae30",
+    "2315695e-754f-4b1e-aab3-fc27c668a1ba",
+    "b12fe021-238f-4564-ba10-8ab6c8aa10c0",
+    "4ee5e5a7-1345-4afe-9cbf-782232fcc3a8",
+  ];
+  const demoCampaignIds = [
+    "079affce-a77c-47e6-9bb5-021ee6bc4e7c",
+    "ca51e798-291f-4129-bc37-81ef2ebf72b2",
+    "42c5cd60-bb57-4944-a4fc-59b56a592b7a",
+    "ccdd74a4-2d3e-44dc-87cd-80e6b0d36407",
+  ];
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const runs = await client.query(
+      "DELETE FROM outreach_runs WHERE campaign_id = ANY($1::varchar[])",
+      [demoCampaignIds],
+    );
+    const campaigns = await client.query(
+      "DELETE FROM outreach_campaigns WHERE id = ANY($1::varchar[])",
+      [demoCampaignIds],
+    );
+    await client.query(
+      `DELETE FROM ai_deal_analysis
+       WHERE deal_id IN (
+         SELECT id FROM deals
+         WHERE broker_id = ANY($1::varchar[]) OR id = ANY($2::varchar[])
+       )`,
+      [demoBrokerIds, fakeDealIds],
+    );
+    await client.query(
+      `DELETE FROM site_evaluations
+       WHERE deal_id IN (
+         SELECT id FROM deals
+         WHERE broker_id = ANY($1::varchar[]) OR id = ANY($2::varchar[])
+       )`,
+      [demoBrokerIds, fakeDealIds],
+    );
+    const dealsResult = await client.query(
+      "DELETE FROM deals WHERE broker_id = ANY($1::varchar[]) OR id = ANY($2::varchar[])",
+      [demoBrokerIds, fakeDealIds],
+    );
+    const brokersResult = await client.query(
+      "DELETE FROM brokers WHERE id = ANY($1::varchar[])",
+      [demoBrokerIds],
+    );
+    await client.query(
+      "DELETE FROM password_reset_tokens WHERE LOWER(email) = 'demo@catalystcp.com'",
+    );
+    const usersResult = await client.query(
+      "DELETE FROM users WHERE id = ANY($1::varchar[])",
+      [demoUserIds],
+    );
+    await client.query("COMMIT");
+
+    if (usersResult.rowCount || brokersResult.rowCount || dealsResult.rowCount || campaigns.rowCount) {
+      console.log(
+        `[PRODUCTION-CLEANUP] Removed fake data: ${usersResult.rowCount} demo user, ` +
+        `${brokersResult.rowCount} demo brokers, ${dealsResult.rowCount} demo/test deals, ` +
+        `${campaigns.rowCount} demo campaigns, ${runs.rowCount} demo campaign runs`
+      );
+    }
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("[PRODUCTION-CLEANUP] Fake-data purge failed:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 // realDataService removed per user request
 // HelloDataService removed per user request
 import { emailService, sendNotificationEmail } from "./emailService";
@@ -1860,6 +1952,10 @@ const emailTemplates = {
 // Use landLinqSMSTemplates from smsService.ts which pulls from businessSettings
 
 export async function registerRoutes(app: Express, existingServer?: Server): Promise<Server> {
+  if (process.env.NODE_ENV === "production") {
+    await purgeLegacyDemoData();
+  }
+
   // Health check endpoint (no rate limiting)
   app.head('/api', (req, res) => {
     res.status(200).end();
@@ -2749,43 +2845,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
   });
 
-  // ── Demo login (public — no password required) ──────────────────────────
-  app.post("/api/demo-login", async (req: any, res: any, next: any) => {
-    try {
-      const DEMO_EMAIL = "demo@catalystcp.com";
-      let user = await storage.getUserByEmail(DEMO_EMAIL);
-      if (!user) {
-        // Auto-seed demo data on first use in any environment (dev, prod, etc.)
-        console.log("[DEMO] Demo user not found — auto-seeding demo data…");
-        const { ensureDemoData } = await import("./demo-seed");
-        const { pool } = await import("./db");
-        const client = await pool.connect();
-        try {
-          await ensureDemoData(client);
-        } finally {
-          client.release();
-        }
-        user = await storage.getUserByEmail(DEMO_EMAIL);
-        if (!user) {
-          return res.status(500).json({ message: "Demo seed failed — user still not found" });
-        }
-        console.log("[DEMO] Auto-seed complete, logging in as demo user");
-      }
-      // Use req.login so Passport's serializer stores just user.id in the session
-      req.login(user, (err: any) => {
-        if (err) return next(err);
-        res.json({
-          id: user!.id,
-          email: user!.email,
-          role: user!.role,
-          firstName: user!.firstName,
-          lastName: user!.lastName,
-        });
-      });
-    } catch (error) {
-      console.error("Demo login error:", error);
-      res.status(500).json({ message: "Demo login failed" });
-    }
+  app.post("/api/demo-login", (_req, res) => {
+    return res.status(410).json({ message: "The public demo has been retired" });
   });
 
   // Email webhook removed - using /api/webhooks/email instead
@@ -12927,78 +12988,11 @@ RULES:
   });
 
   app.post("/api/developer-profile/me/team", isAuthenticated, async (req: any, res) => {
-    try {
-      const developerProfileId = getDeveloperProfileId(req, res);
-      if (!developerProfileId) return;
-      const { developerProfiles } = await import('@shared/schema');
-      const { name, email } = req.body || {};
-      const normalizedEmail = String(email || '').trim().toLowerCase();
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!name || !normalizedEmail || !emailRegex.test(normalizedEmail)) {
-        return res.status(400).json({ error: 'Name and a valid email are required' });
-      }
-      const [profile] = await db.select({
-        companyName: developerProfiles.companyName,
-        slug: developerProfiles.slug,
-      }).from(developerProfiles).where(and(
-        eq(developerProfiles.id, developerProfileId),
-        eq(developerProfiles.isActive, true),
-      )).limit(1);
-      if (!profile) return res.status(404).json({ error: 'Investment Company profile not found' });
-      if (await storage.getUserByEmail(normalizedEmail)) {
-        return res.status(409).json({ error: 'An account with this email already exists' });
-      }
-
-      const nameParts = String(name).trim().split(/\s+/);
-      const firstName = nameParts.shift() || '';
-      const lastName = nameParts.join(' ') || null;
-      const temporaryPassword = randomBytes(12).toString('base64url');
-      const newUser = await storage.createUser({
-        email: normalizedEmail,
-        password: await hashPassword(temporaryPassword),
-        firstName,
-        lastName,
-        role: 'DEVELOPER',
-        developerProfileId,
-        mustResetPassword: true,
-      } as any);
-
-      const baseUrl = (
-        process.env.BASE_URL ||
-        (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : '') ||
-        'https://landlinq.ai'
-      ).replace(/\/$/, '');
-      const loginPath = `/developer/${encodeURIComponent(profile.slug)}/login`;
-      const loginUrl = `${baseUrl}${loginPath}`;
-      const safeName = escapeEmailHtml(firstName);
-      const safeCompany = escapeEmailHtml(profile.companyName);
-      const safeEmail = escapeEmailHtml(normalizedEmail);
-      const emailSent = await sendNotificationEmail({
-        to: normalizedEmail,
-        subject: `Your ${profile.companyName} Investment Company portal access`,
-        type: 'developer-team-invite',
-        priority: 'high',
-        text: `Hi ${firstName},\n\nYou've been invited to the ${profile.companyName} Investment Company portal.\nLogin: ${normalizedEmail}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be asked to set a new password after signing in.`,
-        html: `<p>Hi ${safeName},</p><p>You've been invited to the <strong>${safeCompany}</strong> Investment Company portal.</p><p><strong>Login:</strong> ${safeEmail}<br><strong>Temporary password:</strong> ${escapeEmailHtml(temporaryPassword)}</p><p>Open <a href="${loginUrl}">${loginUrl}</a> to sign in. You will be asked to set a new password after signing in.</p>`,
-      }).catch((error: any) => {
-        console.error('[developer-team-invite] Email failed:', error);
-        return false;
-      });
-
-      return res.status(201).json({
-        member: {
-          id: newUser.id,
-          email: newUser.email,
-          firstName: newUser.firstName,
-          lastName: newUser.lastName,
-          createdAt: newUser.createdAt,
-        },
-        emailSent,
-      });
-    } catch (error: any) {
-      console.error('[developer-profile/me/team POST] Error:', error);
-      return res.status(500).json({ error: 'Failed to add team member' });
-    }
+    const developerProfileId = getDeveloperProfileId(req, res);
+    if (!developerProfileId) return;
+    return res.status(403).json({
+      error: 'Company users cannot create accounts. Request a teammate addition from LandLinq/Apex.',
+    });
   });
 
   app.get("/api/developer-profile/me/contacts", isAuthenticated, async (req: any, res) => {
@@ -22516,31 +22510,12 @@ RULES:
   });
 
 
-  // DEMO ENDPOINTS - No authentication required for demo purposes (MUST BE BEFORE catch-all)
-  
-  // Demo broker deals endpoint
-  app.get("/api/demo/broker/deals", async (req, res) => {
-    try {
-      // Get deals from the first broker in the database for demo
-      const allDeals = await storage.getAllDealsWithBrokers();
-      // Filter to get a reasonable subset for demo
-      const demoDeals = allDeals.slice(0, 10);
-      res.json(demoDeals);
-    } catch (error) {
-      console.error("Error fetching demo broker deals:", error);
-      res.status(500).json({ message: "Failed to fetch demo broker deals" });
-    }
+  app.get("/api/demo/broker/deals", (_req, res) => {
+    return res.status(410).json({ message: "The public demo has been retired" });
   });
 
-  // Demo analyst deals endpoint
-  app.get("/api/demo/analyst/deals", async (req, res) => {
-    try {
-      const deals = await storage.getAllDealsWithBrokers();
-      res.json(deals);
-    } catch (error) {
-      console.error("Error fetching demo analyst deals:", error);
-      res.status(500).json({ message: "Failed to fetch demo analyst deals" });
-    }
+  app.get("/api/demo/analyst/deals", (_req, res) => {
+    return res.status(410).json({ message: "The public demo has been retired" });
   });
 
   // ── Email Intake Queue API ─────────────────────────────────────────────────

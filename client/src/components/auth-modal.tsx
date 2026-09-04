@@ -3,7 +3,6 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Rocket } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -49,26 +48,6 @@ export function AuthModal({ isOpen, onClose, defaultMode = 'login' }: AuthModalP
       setTimeout(() => { setMode('login'); }, 200);
     }
   };
-
-  const demoLoginMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch('/api/demo-login', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Demo login failed');
-      return response.json();
-    },
-    onSuccess: (userData) => {
-      queryClient.setQueryData(["/api/user"], userData);
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      onClose();
-      setTimeout(() => { window.location.href = '/dashboard'; }, 100);
-    },
-    onError: () => {
-      toast({ title: "Demo unavailable", description: "Could not start the demo. Please try again.", variant: "destructive" });
-    },
-  });
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
@@ -224,24 +203,6 @@ export function AuthModal({ isOpen, onClose, defaultMode = 'login' }: AuthModalP
               data-testid="button-login-submit"
             >
               {loginMutation.isPending ? "Signing in…" : "Sign In"}
-            </Button>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-400">or</span>
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full border-[#4A90E2] text-[#4A90E2] hover:bg-[#4A90E2] hover:text-white transition-colors gap-2"
-              onClick={() => demoLoginMutation.mutate()}
-              disabled={demoLoginMutation.isPending}
-            >
-              <Rocket size={15} />
-              {demoLoginMutation.isPending ? "Loading demo…" : "Try Live Demo — no account needed"}
             </Button>
           </form>
         ) : (

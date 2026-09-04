@@ -5,7 +5,6 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
-  Mail,
   Plus,
   Save,
   Settings2,
@@ -20,7 +19,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type Profile = {
   companyName: string;
@@ -223,9 +221,6 @@ export default function DeveloperCriteriaSettings() {
   const [form, setForm] = useState<Profile | null>(null);
   const [overridesOpen, setOverridesOpen] = useState(true);
   const [teamOpen, setTeamOpen] = useState(true);
-  const [memberOpen, setMemberOpen] = useState(false);
-  const [memberName, setMemberName] = useState("");
-  const [memberEmail, setMemberEmail] = useState("");
 
   const profileQuery = useQuery<{ profile: Profile }>({
     queryKey: ["/api/developer-profile/me"],
@@ -271,28 +266,6 @@ export default function DeveloperCriteriaSettings() {
       toast({ title: "Settings saved", description: "Your company criteria are up to date." });
     },
     onError: (error: Error) => toast({ title: "Could not save settings", description: error.message, variant: "destructive" }),
-  });
-
-  const addMemberMutation = useMutation({
-    mutationFn: () =>
-      jsonRequest("/api/developer-profile/me/team", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: memberName, email: memberEmail }),
-      }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/team"] });
-      setMemberOpen(false);
-      setMemberName("");
-      setMemberEmail("");
-      toast({
-        title: "Team member added",
-        description: data.emailSent === false
-          ? "The account was created, but the invitation email could not be sent."
-          : "An invitation with a temporary password was sent.",
-      });
-    },
-    onError: (error: Error) => toast({ title: "Could not add team member", description: error.message, variant: "destructive" }),
   });
 
   const update = <K extends keyof Profile>(key: K, value: Profile[K]) =>
@@ -546,12 +519,16 @@ export default function DeveloperCriteriaSettings() {
           <Card className="border-slate-200 shadow-sm">
             <CardHeader className="cursor-pointer" onClick={() => setTeamOpen((open) => !open)}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3"><div className="rounded-lg bg-slate-100 p-2 text-slate-600"><Users className="h-5 w-5" /></div><div><CardTitle>Team</CardTitle><CardDescription>Everyone on your company profile can manage these settings.</CardDescription></div></div>
+                <div className="flex items-center gap-3"><div className="rounded-lg bg-slate-100 p-2 text-slate-600"><Users className="h-5 w-5" /></div><div><CardTitle>Team</CardTitle><CardDescription>LandLinq/Apex approves and creates all company accounts.</CardDescription></div></div>
                 {teamOpen ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
               </div>
             </CardHeader>
             {teamOpen && <CardContent className="border-t border-slate-100 pt-5">
-              <div className="mb-4 flex justify-end"><Button onClick={() => setMemberOpen(true)} style={{ backgroundColor: primaryColor }} className="text-white"><Plus className="mr-2 h-4 w-4" />Add Team Member</Button></div>
+              <div className="mb-4 flex justify-end">
+                <Button asChild style={{ backgroundColor: primaryColor }} className="text-white">
+                  <a href="mailto:help@landlinq.ai?subject=Team%20member%20addition%20request&body=Requested%20teammate%20name%3A%0ARequested%20teammate%20email%3A%0AReason%20for%20access%3A%0A%0APlease%20review%20and%20approve%20this%20addition.">Request Team Member</a>
+                </Button>
+              </div>
               {teamQuery.isLoading ? <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div> : (teamQuery.data?.team || []).length === 0 ? (
                 <p className="rounded-lg bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">No team members found.</p>
               ) : (
@@ -567,22 +544,6 @@ export default function DeveloperCriteriaSettings() {
         </div>
       </main>
 
-      <Dialog open={memberOpen} onOpenChange={setMemberOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Add team member</DialogTitle><DialogDescription>A new developer account will receive a temporary password and must set a new password at first sign-in.</DialogDescription></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div><Label htmlFor="member-name">Name</Label><Input id="member-name" value={memberName} onChange={(event) => setMemberName(event.target.value)} placeholder="Alex Morgan" className="mt-2" /></div>
-            <div><Label htmlFor="member-email">Email</Label><Input id="member-email" type="email" value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} placeholder="alex@company.com" className="mt-2" /></div>
-            <div className="flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-500"><Mail className="mt-0.5 h-4 w-4 shrink-0" />The invitation includes the company login path and temporary credentials.</div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMemberOpen(false)}>Cancel</Button>
-            <Button onClick={() => addMemberMutation.mutate()} disabled={!memberName.trim() || !memberEmail.trim() || addMemberMutation.isPending} style={{ backgroundColor: primaryColor }} className="text-white">
-              {addMemberMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create account
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
