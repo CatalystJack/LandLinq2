@@ -49,8 +49,7 @@ function safeStringEqual(left: string, right: string) {
 }
 
 function platformRoleForEmail(email: string | null | undefined, fallbackRole: string) {
-  if (isSuperAdminEmail(email)) return "SUPER_ADMIN";
-  if (isPlatformAdminEmail(email)) return "ADMIN";
+  if (isPlatformAdminEmail(email)) return "SUPER_ADMIN";
   return fallbackRole;
 }
 

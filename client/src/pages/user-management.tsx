@@ -15,7 +15,7 @@ import { formatDateEST } from "@/utils/timezone";
 import Footer from "@/components/footer";
 import Navigation from "@/components/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { isPlatformAdminEmail, isSuperAdminEmail } from "@shared/admin-auth";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 interface User {
   id: string;
@@ -242,9 +242,9 @@ export default function UserManagement() {
                          `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
     
     let userRole = "team";
-    if (isSuperAdminEmail(user.email)) {
+    if (isPlatformAdminEmail(user.email)) {
       userRole = "super_admin";
-    } else if (user.email.endsWith("@catalystcp.com") || isPlatformAdminEmail(user.email)) {
+    } else if (user.email.endsWith("@catalystcp.com")) {
       userRole = "analyst";
     } else {
       userRole = "broker";
@@ -255,13 +255,13 @@ export default function UserManagement() {
   });
 
   const getRoleFromEmail = (email: string) => {
-    if (isSuperAdminEmail(email)) return "Super Admin";
+    if (isPlatformAdminEmail(email)) return "Super Admin";
     if (email.endsWith("@catalystcp.com")) return "Catalyst Team";
     return "Broker";
   };
 
   const getRoleBadgeVariant = (email: string) => {
-    if (isSuperAdminEmail(email)) return "destructive";
+    if (isPlatformAdminEmail(email)) return "destructive";
     if (email.endsWith("@catalystcp.com")) return "default";
     return "secondary";
   };
@@ -322,26 +322,26 @@ export default function UserManagement() {
     
     console.log('🔐 [DELETE] Permission check:', {
       currentEmail,
-      matches: isSuperAdminEmail(currentEmail)
+      matches: isPlatformAdminEmail(currentEmail)
     });
     
-    if (!isSuperAdminEmail(currentEmail)) {
-      console.error('❌ [DELETE] Permission denied - user is not super admin');
+    if (!isPlatformAdminEmail(currentEmail)) {
+      console.error('❌ [DELETE] Permission denied - user is not a platform admin');
       toast({
         title: "Permission Denied",
-        description: `Only designated super administrators can delete users. You are logged in as: ${currentUser?.email || 'unknown'}`,
+        description: `Only platform administrators can delete users. You are logged in as: ${currentUser?.email || 'unknown'}`,
         variant: "destructive",
         duration: 5000,
       });
       return;
     }
     
-    // Prevent deleting the super admin account (case-insensitive)
-    if (isSuperAdminEmail(userEmail)) {
-      console.error('❌ [DELETE] Cannot delete super admin account');
+    // Platform-domain accounts are protected from deletion.
+    if (isPlatformAdminEmail(userEmail)) {
+      console.error('❌ [DELETE] Cannot delete platform admin account');
       toast({
         title: "Error",
-        description: "Cannot delete the super admin account",
+        description: "Cannot delete a platform admin account",
         variant: "destructive",
       });
       return;
@@ -571,10 +571,10 @@ export default function UserManagement() {
                       >
                         <div className="flex items-center space-x-4">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            isSuperAdminEmail(user.email) ? "bg-red-500" :
+                            isPlatformAdminEmail(user.email) ? "bg-red-500" :
                             user.email.endsWith("@catalystcp.com") ? "bg-blue-500" : "bg-gray-500"
                           }`}>
-                            {isSuperAdminEmail(user.email) ? (
+                            {isPlatformAdminEmail(user.email) ? (
                               <Crown className="h-5 w-5 text-white" />
                             ) : (
                               <Users className="h-5 w-5 text-white" />
@@ -639,7 +639,7 @@ export default function UserManagement() {
                               <Edit className="h-3 w-3" />
                               Edit
                             </Button>
-                            {!isSuperAdminEmail(user.email) && (
+                            {!isPlatformAdminEmail(user.email) && (
                               <Button 
                                 variant="outline" 
                                 size="sm" 

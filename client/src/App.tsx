@@ -462,7 +462,7 @@ function Router() {
       <Route path="/admin/data-quality" component={() => {
         if (isAuthenticated && user) {
           const userEmail = (user as any)?.claims?.email || (user as any)?.email || '';
-          if (userEmail.endsWith('@catalystcp.com') || userEmail.endsWith('@landlinq.ai')) {
+          if (userEmail.endsWith('@catalystcp.com') || isPlatformAdminEmail(userEmail)) {
             return <DataQualityDashboard />;
           } else {
             window.location.href = '/dashboard';
@@ -477,7 +477,7 @@ function Router() {
           // Check role first, then fallback to email for legacy compatibility
           const isAdmin = userRole === UserRole.SUPER_ADMIN || userRole === UserRole.ADMIN;
           const userEmail = (user as any)?.claims?.email || (user as any)?.email || '';
-          const isLegacyAdmin = userEmail.endsWith('@catalystcp.com') || userEmail.endsWith('@landlinq.ai');
+          const isLegacyAdmin = userEmail.endsWith('@catalystcp.com') || isPlatformAdminEmail(userEmail);
           
           if (isAdmin || isLegacyAdmin) {
             return <ApiMonitoring />;
@@ -492,7 +492,7 @@ function Router() {
       <Route path="/user-management" component={() => {
         if (isAuthenticated && user) {
           const userEmail = (user as any)?.claims?.email || (user as any)?.email || '';
-          if (userEmail.endsWith('@catalystcp.com')) {
+          if (isPlatformAdminEmail(userEmail)) {
             return <UserManagement />;
           } else {
             window.location.href = '/dashboard';

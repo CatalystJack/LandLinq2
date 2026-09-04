@@ -36,7 +36,7 @@ import {
   pipelineOpportunities,
 } from "@shared/schema";
 import { or, like, eq, desc, gte, lte, sql, and, count, inArray, isNull } from "drizzle-orm";
-import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
+import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail } from "./auth";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
@@ -2809,12 +2809,10 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       // Determine the correct role based on email domain (Dec 11, 2025)
       // Platform-admin domains are always treated as internal users, not brokers.
       let role = user?.role || user?.claims?.role || 'BROKER';
-      if (isSuperAdminEmail(userEmail)) {
-        role = 'SUPER_ADMIN';
-      } else if (userEmail === 'demo@catalystcp.com') {
+      if (userEmail === 'demo@catalystcp.com') {
         role = 'DEMO';
       } else if (isPlatformAdminEmail(userEmail)) {
-        role = 'ADMIN';
+        role = 'SUPER_ADMIN';
       }
       
       res.json({ ...user, broker, isAnalyst, role });
@@ -2851,9 +2849,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const user = req.user;
       const userEmail = user?.email || user?.claims?.email || '';
       
-      // Only configured super-admin identities can access user management.
-      if (!isSuperAdminEmail(userEmail)) {
-        return res.status(401).json({ message: "Unauthorized - Super admin access required" });
+      if (!isPlatformAdminEmail(userEmail)) {
+        return res.status(401).json({ message: "Unauthorized - Platform admin access required" });
       }
 
       const users = await storage.getAllUsers();
@@ -2887,9 +2884,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const user = req.user;
       const userEmail = user?.email || user?.claims?.email || '';
       
-      // Only super admin can create users
-      if (!isSuperAdminEmail(userEmail)) {
-        return res.status(401).json({ message: "Unauthorized - Super admin access required" });
+      if (!isPlatformAdminEmail(userEmail)) {
+        return res.status(401).json({ message: "Unauthorized - Platform admin access required" });
       }
 
       const { email, firstName, lastName, password, role } = req.body;
@@ -2931,9 +2927,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const user = req.user;
       const userEmail = user?.email || user?.claims?.email || '';
       
-      // Only super admin can update users
-      if (!isSuperAdminEmail(userEmail)) {
-        return res.status(401).json({ message: "Unauthorized - Super admin access required" });
+      if (!isPlatformAdminEmail(userEmail)) {
+        return res.status(401).json({ message: "Unauthorized - Platform admin access required" });
       }
 
       const { userId } = req.params;
@@ -2997,18 +2992,17 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const user = req.user;
       const userEmail = (user?.email ?? user?.claims?.email ?? '').toLowerCase().trim();
       
-      // Only super admin can delete users (case-insensitive)
-      if (!isSuperAdminEmail(userEmail)) {
-        console.log('Delete user denied:', { userEmail, required: 'configured super-admin identity' });
-        return res.status(401).json({ message: "Unauthorized - Super admin access required" });
+      if (!isPlatformAdminEmail(userEmail)) {
+        console.log('Delete user denied:', { userEmail, required: 'platform-admin domain' });
+        return res.status(401).json({ message: "Unauthorized - Platform admin access required" });
       }
 
       const { userId } = req.params;
 
-      // Prevent deleting the super admin account (case-insensitive)
+      // Platform-domain accounts retain administrative access and cannot be deleted here.
       const targetUser = await storage.getUser(userId);
-      if (isSuperAdminEmail(targetUser?.email)) {
-        return res.status(400).json({ message: "Cannot delete super admin account" });
+      if (isPlatformAdminEmail(targetUser?.email)) {
+        return res.status(400).json({ message: "Cannot delete platform admin account" });
       }
 
       console.log('Deleting user:', { userId, targetEmail: targetUser?.email, deletedBy: userEmail });
@@ -15366,7 +15360,7 @@ RULES:
   app.get("/api/admin/system-health", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isSuperAdminEmail(user?.email);
+      const isSuperAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15417,7 +15411,7 @@ RULES:
   app.get("/api/admin/platform-metrics", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isSuperAdminEmail(user?.email);
+      const isSuperAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15472,7 +15466,7 @@ RULES:
   app.get("/api/admin/user-activity", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isSuperAdminEmail(user?.email);
+      const isSuperAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15503,7 +15497,7 @@ RULES:
   app.get("/api/admin/system-alerts", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isSuperAdminEmail(user?.email);
+      const isSuperAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15540,7 +15534,7 @@ RULES:
   app.get("/api/admin/user-stats", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isSuperAdminEmail(user?.email);
+      const isSuperAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15549,8 +15543,8 @@ RULES:
       const allUsers = await db.select().from(users);
       
       // Count users by role (based on email domains)
-      const superAdmins = allUsers.filter(u => isSuperAdminEmail(u.email)).length;
-      const analysts = allUsers.filter(u => isPlatformAdminEmail(u.email) && !isSuperAdminEmail(u.email)).length;
+      const superAdmins = allUsers.filter(u => isPlatformAdminEmail(u.email)).length;
+      const analysts = 0;
       const brokers = allUsers.filter(u => u.email && !isPlatformAdminEmail(u.email)).length;
       
       // Mock time-based stats
@@ -15582,7 +15576,7 @@ RULES:
   app.post("/api/admin/restart/:service", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isSuperAdminEmail(user?.email);
+      const isSuperAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15608,7 +15602,7 @@ RULES:
   app.patch("/api/admin/alerts/:alertId/acknowledge", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isSuperAdminEmail(user?.email);
+      const isSuperAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15632,7 +15626,7 @@ RULES:
   app.post("/api/admin/clear-cache", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isSuperAdminEmail(user?.email);
+      const isSuperAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15895,7 +15889,7 @@ RULES:
   app.post("/api/admin/create-quality-snapshot", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isSuperAdminEmail(user?.email) || user?.email === 'aj@landlinq.ai';
+      const isSuperAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -15958,7 +15952,7 @@ RULES:
   app.post("/api/admin/schedule-automated-reports", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isSuperAdmin = isSuperAdminEmail(user?.email) || user?.email === 'aj@landlinq.ai';
+      const isSuperAdmin = isPlatformAdminEmail(user?.email);
       
       if (!isSuperAdmin) {
         return res.status(403).json({ message: "Super admin access required" });
@@ -20157,8 +20151,7 @@ RULES:
       const userEmail = user?.email?.toLowerCase();
       const userRole = user?.userRole;
       
-      // Only allow persisted admin roles and configured super-admin identities.
-      const isAuthorized = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || isSuperAdminEmail(userEmail);
+      const isAuthorized = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || isPlatformAdminEmail(userEmail);
       
       if (!isAuthorized) {
         return res.status(403).json({ success: false, message: 'Unauthorized - Admin access required' });
@@ -20277,9 +20270,9 @@ RULES:
       const userRole = user?.role || '';
       const userEmail = user?.email || '';
       
-      // Allow SUPER_ADMIN, ADMIN, and ANALYST roles to send test emails
+      // Platform-domain users retain access even if a legacy session carries a stale role.
       const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'ANALYST'];
-      const isAuthorized = allowedRoles.includes(userRole);
+      const isAuthorized = isPlatformAdminEmail(userEmail) || allowedRoles.includes(userRole);
       
       console.log('🧪 Test email request:', { userEmail, userRole, isAuthorized });
       
@@ -20476,9 +20469,8 @@ RULES:
       const user = req.user;
       const userEmail = user?.email || '';
       
-      // Only allow configured super-admin identities to trigger this.
-      if (!isSuperAdminEmail(userEmail)) {
-        return res.status(403).json({ message: "Unauthorized - Super admin access required" });
+      if (!isPlatformAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Unauthorized - Platform admin access required" });
       }
 
       const businessSettings = await storage.getBusinessSettings();
@@ -20602,9 +20594,8 @@ RULES:
       const user = req.user;
       const userEmail = user?.email || '';
       
-      // Only allow super admin
-      if (!isSuperAdminEmail(userEmail)) {
-        return res.status(403).json({ message: "Unauthorized - Super admin access required" });
+      if (!isPlatformAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Unauthorized - Platform admin access required" });
       }
 
       const { emailTemplates, smsTemplates, mergeMode } = req.body;
@@ -24909,7 +24900,7 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       const isAnalyst = isPlatformAdminEmail(userEmail);
-      const isSuperAdmin = isSuperAdminEmail(userEmail);
+      const isSuperAdmin = isPlatformAdminEmail(userEmail);
       
       if (!isAnalyst && !isSuperAdmin) {
         console.log(`🚫 [SECURITY] Unauthorized access attempt to quick property evaluation by: ${userEmail}`);

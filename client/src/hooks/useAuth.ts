@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { queryClient } from "../lib/queryClient";
-import { isPlatformAdminEmail, isSuperAdminEmail } from "@shared/admin-auth";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 // User role types matching backend (for system access control)
 export enum UserRole {
@@ -132,7 +132,7 @@ async function determineUserRole(user: any): Promise<UserRole | null> {
   // Platform-admin accounts always use the parent platform view,
   // regardless of a stale database role value.
   if (isPlatformAdminEmail(user.email)) {
-    return isSuperAdminEmail(user.email) ? UserRole.SUPER_ADMIN : UserRole.ADMIN;
+    return UserRole.SUPER_ADMIN;
   }
   
   // Check if user has explicit role from backend

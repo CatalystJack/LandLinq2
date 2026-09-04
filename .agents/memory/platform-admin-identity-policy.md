@@ -1,10 +1,10 @@
 ---
 name: Platform admin identity policy
-description: Centralized authorization rules for platform-admin domains and named super-admin accounts.
+description: Centralized authorization rules for platform-admin domains and bootstrap identities.
 ---
 
-All platform-admin domain checks and named super-admin identity checks must go through the shared authorization helpers. Ordinary platform-domain accounts receive ADMIN access; only configured named identities receive SUPER_ADMIN.
+All recognized platform-domain accounts receive full SUPER_ADMIN permissions. Authorization checks must go through the shared platform helper; the named-account helper is identity-only and must not restrict permissions.
 
-**Why:** Duplicated email/domain checks had diverged across routes and clients, making domain additions incomplete and accidentally granting every platform-domain account the highest role.
+**Why:** The user explicitly requires Apex and LandLinq platform admins to have every backend permission. Centralization prevents individual routes from accidentally granting less access.
 
-**How to apply:** Use the platform helper for parent-platform access and the super-admin helper for user management, account deletion, and other person-specific gates. Keep demo identities and notification recipients separate.
+**How to apply:** Use the platform helper for all admin and super-admin permission gates, including user management and account deletion. Use the named-account helper only for bootstrap identity handling. Keep demo identities and notification recipients separate.
