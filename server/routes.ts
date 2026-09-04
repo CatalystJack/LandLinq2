@@ -12348,6 +12348,7 @@ RULES:
       const [profile] = await db.select().from(developerProfiles)
         .where(eq(developerProfiles.id, req.params.profileId)).limit(1);
       if (!profile) return res.status(404).json({ error: "Investment Company profile not found" });
+      if (!profile.isActive) return res.status(409).json({ error: "Reactivate this company before creating team logins" });
       if (await storage.getUserByEmail(normalizedEmail)) {
         return res.status(409).json({ error: "An account with this email already exists" });
       }
@@ -12373,6 +12374,7 @@ RULES:
       const [profile] = await db.select().from(developerProfiles)
         .where(eq(developerProfiles.id, req.params.profileId)).limit(1);
       if (!profile) return res.status(404).json({ error: "Investment Company profile not found" });
+      if (!profile.isActive) return res.status(409).json({ error: "Reactivate this company before creating team logins" });
 
       const invited: any[] = [];
       const failed: Array<{ email: string; reason: string }> = [];

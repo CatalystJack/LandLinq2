@@ -19,3 +19,4 @@
 - [General Sales profile criteria](general-sales-profile-criteria.md) — General Sales profiles have no deal criteria; preserve harmless legacy DB defaults only for non-null compatibility.
 - [Sales pipeline boundary](sales-pipeline-boundary.md) — the generic opportunity pipeline is tenant-scoped and separate from real-estate deal classification; both profile types use it.
 - [Demo contact isolation](demo-contact-isolation.md) — demo-seeded brokers use the shared-contact shape but must never be returned to real Investment Company CRM or Pipeline queries.
+- [Company removal policy](company-removal-policy.md) — admin “deletion” deactivates the company and blocks all linked sessions/logins while preserving tenant history for reactivation.

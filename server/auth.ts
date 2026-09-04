@@ -176,6 +176,17 @@ export function setupAuth(app: Express) {
           console.log(`❌ [AUTH] User not found: ${normalizedEmail}`);
           return done(null, false, { message: "Invalid email or password" });
         }
+
+        if (String(user.role || "").toUpperCase() === "DEVELOPER" && user.developerProfileId) {
+          const [profile] = await db.select({ isActive: developerProfiles.isActive })
+            .from(developerProfiles)
+            .where(eq(developerProfiles.id, user.developerProfileId))
+            .limit(1);
+          if (!profile?.isActive) {
+            console.log(`⛔ [AUTH] Inactive company login blocked: ${normalizedEmail}`);
+            return done(null, false, { message: "This company portal is inactive. Contact your administrator." });
+          }
+        }
         
         if (!(await comparePasswords(password, user.password))) {
           console.log(`❌ [AUTH] Invalid password for user: ${normalizedEmail}`);
@@ -807,9 +818,27 @@ const DEMO_ALLOWED_PATHS = [
   '/api/sessions',
 ];
 
-export function isAuthenticated(req: any, res: any, next: any) {
+export async function isAuthenticated(req: any, res: any, next: any) {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Unauthorized" });
+  }
+  const authenticatedUser = req.user as any;
+  if (String(authenticatedUser?.role || "").toUpperCase() === "DEVELOPER" && authenticatedUser?.developerProfileId) {
+    try {
+      const [profile] = await db.select({ isActive: developerProfiles.isActive })
+        .from(developerProfiles)
+        .where(eq(developerProfiles.id, authenticatedUser.developerProfileId))
+        .limit(1);
+      if (!profile?.isActive) {
+        return req.logout(() => res.status(403).json({
+          message: "This company portal is inactive. Contact your administrator.",
+          companyInactive: true,
+        }));
+      }
+    } catch (error) {
+      console.error("[AUTH] Could not verify developer company status:", error);
+      return res.status(503).json({ message: "Unable to verify company access" });
+    }
   }
   // Demo sandbox: block access to all internal endpoints
   const email = (req.user?.claims?.email || req.user?.email || '').toLowerCase();

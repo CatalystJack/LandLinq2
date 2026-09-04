@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 export interface DealForMap {
   id: string;
@@ -58,6 +59,17 @@ export function DealOverviewMap({ deals, onDealClick }: DealOverviewMapProps) {
       !isNaN(parseFloat(String(d.longitude)))
   );
   const missingCount = deals.length - dealsWithCoords.length;
+  const mapDataSignature = JSON.stringify(dealsWithCoords.map((deal) => [
+    deal.id,
+    deal.latitude,
+    deal.longitude,
+    deal.classification,
+    deal.address,
+    deal.city,
+    deal.state,
+    deal.dealNumber,
+    deal.unitCount,
+  ]));
 
   const countBy = (keys: string[]) =>
     deals.filter(d => keys.includes(d.classification || "")).length;
@@ -74,19 +86,15 @@ export function DealOverviewMap({ deals, onDealClick }: DealOverviewMapProps) {
 
   useEffect(() => {
     if (!mapContainerRef.current || dealsWithCoords.length === 0) return;
+    let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+    const container = mapContainerRef.current;
 
     // Dynamically import Leaflet so it never conflicts with React bundling
     import("leaflet").then((LeafletModule) => {
+      if (cancelled || !container.isConnected) return;
       const L = LeafletModule.default;
-
-      // Import Leaflet CSS only once
-      if (!document.getElementById("leaflet-css")) {
-        const link = document.createElement("link");
-        link.id = "leaflet-css";
-        link.rel = "stylesheet";
-        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-        document.head.appendChild(link);
-      }
 
       // Destroy previous map instance before re-creating
       if (mapRef.current) {
@@ -94,9 +102,7 @@ export function DealOverviewMap({ deals, onDealClick }: DealOverviewMapProps) {
         mapRef.current = null;
       }
 
-      if (!mapContainerRef.current) return;
-
-      const map = L.map(mapContainerRef.current, { zoomControl: true });
+      const map = L.map(container, { zoomControl: true });
       mapRef.current = map;
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -152,26 +158,35 @@ export function DealOverviewMap({ deals, onDealClick }: DealOverviewMapProps) {
         latLngs.push([lat, lng]);
       });
 
-      // Force Leaflet to recalculate container size after the browser has painted
-      setTimeout(() => {
-        if (mapRef.current) {
-          mapRef.current.invalidateSize();
-          if (latLngs.length === 1) {
-            mapRef.current.setView(latLngs[0], 10);
-          } else if (latLngs.length > 1) {
-            mapRef.current.fitBounds(L.latLngBounds(latLngs), { padding: [50, 50], maxZoom: 12 });
-          }
+      const resizeAndFit = () => {
+        if (cancelled || mapRef.current !== map || container.clientWidth === 0 || container.clientHeight === 0) return;
+        map.invalidateSize({ pan: false });
+        if (latLngs.length === 1) {
+          map.setView(latLngs[0], 10);
+        } else if (latLngs.length > 1) {
+          map.fitBounds(L.latLngBounds(latLngs), { padding: [50, 50], maxZoom: 12 });
         }
-      }, 100);
+      };
+      const scheduleResize = () => {
+        requestAnimationFrame(() => requestAnimationFrame(resizeAndFit));
+      };
+
+      resizeObserver = new ResizeObserver(scheduleResize);
+      resizeObserver.observe(container);
+      scheduleResize();
+      settleTimer = setTimeout(resizeAndFit, 250);
     });
 
     return () => {
+      cancelled = true;
+      resizeObserver?.disconnect();
+      if (settleTimer) clearTimeout(settleTimer);
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
       }
     };
-  }, [dealsWithCoords.length]);
+  }, [mapDataSignature]);
 
   return (
     <div className="space-y-3">
@@ -222,8 +237,8 @@ export function DealOverviewMap({ deals, onDealClick }: DealOverviewMapProps) {
       ) : (
         <div
           ref={mapContainerRef}
-          className="rounded-lg overflow-hidden border border-gray-200"
-          style={{ height: 520 }}
+          className="min-h-[520px] w-full rounded-lg overflow-hidden border border-gray-200"
+          style={{ height: 520, width: "100%" }}
         />
       )}
 
