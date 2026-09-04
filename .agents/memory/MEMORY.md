@@ -23,3 +23,4 @@
 - [Platform admin identity policy](platform-admin-identity-policy.md) — domain-level admin and named super-admin recognition must use centralized helpers; never duplicate email literals in authorization gates.
 - [Company teammate provisioning](company-teammate-provisioning.md) — company users may view teammates and request additions, but only LandLinq/Apex staff may create or manage their accounts.
 - [Production fake-data cleanup](production-fake-data-cleanup.md) — delete seeded production data by exact owner/record identity in one transaction; never use broad text matching.
+- [Authenticated runtime smoke tests](authenticated-runtime-smoke-tests.md) — the production build can pass with an undefined JSX icon; data-driven authenticated pages need a browser runtime check.

@@ -21,7 +21,7 @@ import {
   Search, Users, Tag, Mail, Phone, MapPin, Building2, MessageSquare,
   Calendar, ChevronRight, ChevronLeft, X, Plus, Send, FileText, TrendingUp,
   CheckCircle, XCircle, Clock, AlertCircle, MoreHorizontal, RefreshCw,
-  MessageCircle, Filter, Inbox, Upload, Megaphone, Trash2, Settings2, Loader2, AlertTriangle, Pencil, Save, ChevronDown
+  MessageCircle, Filter, Inbox, Upload, Megaphone, Trash2, Settings2, Loader2, AlertTriangle, Pencil, Save, ChevronDown, UserCheck
 } from "lucide-react";
 
 interface Contact {
