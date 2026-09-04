@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "wouter";
 import {
   ArrowRight,
@@ -34,7 +34,7 @@ function Button({ children, href = "mailto:help@landlinq.ai", dark = false }: { 
 
 function DashboardMockup({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={`ll-window relative overflow-hidden rounded-[1.1rem] border border-white/15 bg-[#f6f8fa] text-[#183047] shadow-2xl ${compact ? "min-h-[280px]" : "min-h-[430px]"}`}>
+    <div className={`ll-window ll-showcase-dashboard relative overflow-hidden rounded-[1.1rem] border border-white/15 bg-[#f6f8fa] text-[#183047] shadow-2xl ${compact ? "min-h-[280px]" : "min-h-[430px]"}`}>
       <div className="flex h-10 items-center gap-2 border-b border-[#dbe3e9] bg-[#fff] px-4">
         <span className="h-2.5 w-2.5 rounded-full bg-[#c5ced5]" /><span className="h-2.5 w-2.5 rounded-full bg-[#c5ced5]" /><span className="h-2.5 w-2.5 rounded-full bg-[#c5ced5]" />
         <div className="ml-4 flex h-5 w-44 items-center rounded bg-[#f0f3f5] px-2 text-[8px] text-[#81909d]">app.landlinq.ai / deals</div>
@@ -45,11 +45,80 @@ function DashboardMockup({ compact = false }: { compact?: boolean }) {
           {["Overview", "Deals", "Contacts", "Outreach", "Analytics"].map((item, i) => <div key={item} className={`mb-2 flex items-center gap-2 rounded px-2 py-2 text-[9px] ${i === 1 ? "bg-[#eaf0f4] font-semibold text-primary" : "text-[#7b8a96]"}`}><span className="h-2 w-2 rounded-sm border border-current" />{item}</div>)}
         </aside>
         <div className="min-w-0 flex-1 p-4 sm:p-6">
-          <div className="flex items-start justify-between"><div><div className="text-[9px] uppercase tracking-[0.16em] text-[#83919b]">Deal dashboard</div><div className="mt-1 text-lg font-semibold tracking-tight">Opportunities</div></div><button className="rounded border border-[#d5dfe5] bg-white px-2 py-1 text-[9px] text-[#526574]"><SlidersHorizontal className="mr-1 inline h-3 w-3" /> Filter</button></div>
+           <div className="flex items-start justify-between"><div><div className="text-[9px] uppercase tracking-[0.16em] text-[#83919b]">Analyst Dashboard</div><div className="mt-1 text-lg font-semibold tracking-tight">Review, analyze, and manage incoming land deals</div></div><button className="rounded border border-[#d5dfe5] bg-white px-2 py-1 text-[9px] text-[#526574]"><SlidersHorizontal className="mr-1 inline h-3 w-3" /> Filter</button></div>
           <div className="mt-5 grid grid-cols-3 gap-2"><div className="rounded border border-[#dce4e9] bg-white p-3"><div className="text-[8px] text-[#84929d]">Ready for review</div><div className="mt-1 text-xl font-semibold">18</div></div><div className="rounded border border-[#dce4e9] bg-white p-3"><div className="text-[8px] text-[#84929d]">Criteria matched</div><div className="mt-1 text-xl font-semibold">72%</div></div><div className="rounded border border-[#dce4e9] bg-white p-3"><div className="text-[8px] text-[#84929d]">Outreach queued</div><div className="mt-1 text-xl font-semibold">34</div></div></div>
           <div className="mt-5 overflow-hidden rounded border border-[#dce4e9] bg-white"><div className="grid grid-cols-[1.5fr_1fr_0.8fr] border-b border-[#e5ebef] px-3 py-2 text-[8px] uppercase tracking-wider text-[#8896a0]"><span>Opportunity</span><span>Fit</span><span>Status</span></div>{[["North County parcel", "Strong", "Review"], ["Riverside infill", "Strong", "Outreach"], ["Oak Street holdings", "Needs review", "New"], ["Westlake acreage", "Strong", "Review"]].map(([name, fit, status]) => <div key={name} className="grid grid-cols-[1.5fr_1fr_0.8fr] items-center border-b border-[#eef2f4] px-3 py-3 text-[9px] last:border-0"><span className="font-medium">{name}</span><span className={fit === "Strong" ? "text-landlinq-blue" : "text-primary"}><CircleCheck className="mr-1 inline h-3 w-3" />{fit}</span><span className="text-[#6e7e89]">{status}</span></div>)}</div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DealOpsMachine() {
+  const intakeRows = [
+    ["North County parcel", "82%", "Review"],
+    ["Riverside infill", "91%", "Outreach"],
+    ["Oak Street holdings", "64%", "New"],
+    ["Westlake acreage", "88%", "Review"],
+  ];
+  return (
+    <div className="ll-machine" aria-label="Animated LandLinq workflow: opportunities are screened, routed to outreach, and moved through the pipeline">
+      <div className="ll-machine-chrome">
+        <span className="ll-chrome-mark" aria-hidden="true" />
+        <span className="ll-chrome-mark" aria-hidden="true" />
+        <span className="ll-chrome-mark" aria-hidden="true" />
+        <span className="ll-machine-url">app.landlinq.ai / command-center</span>
+        <span className="ml-auto hidden items-center gap-2 text-[8px] text-[#718394] sm:flex"><span className="ll-status-bar" /> Live workflow</span>
+      </div>
+      <div className="ll-machine-body">
+        <aside className="ll-machine-rail">
+          <div className="mb-7 flex items-center gap-2 text-[9px] font-bold"><span className="ll-rail-logo">L</span> LandLinq</div>
+          {["Overview", "Deals", "Contacts", "Outreach", "Pipeline"].map((item, index) => (
+            <div key={item} className={`ll-rail-item ${index === 1 ? "is-active" : ""}`}><span className="ll-rail-icon" />{item}</div>
+          ))}
+          <div className="mt-auto border-t border-[#e1e8ed] pt-4 text-[8px] text-[#8c9ba6]">Criteria engine<br /><span className="font-semibold text-[#3286C8]">Running</span></div>
+        </aside>
+        <div className="ll-machine-canvas">
+          <div className="flex items-start justify-between">
+            <div><div className="text-[8px] uppercase tracking-[0.18em] text-[#82909a]">Analyst Dashboard</div><div className="mt-1 text-base font-semibold tracking-tight text-[#183047] sm:text-xl">Review, analyze, and manage incoming land deals</div></div>
+            <div className="ll-machine-filter">Columns 29/40 <ChevronDown className="h-3 w-3" /></div>
+          </div>
+          <div className="ll-analyst-toolbar" aria-hidden="true"><span className="ll-analyst-search">Search deals, brokers, locations...</span><b>Table</b><span>Pipeline</span><span>Map</span><i>STATUS</i><i>PRIORITY</i><i>TYPE</i><i>APEX</i><i>NEXT</i><i>STEP</i></div>
+          <div className="ll-machine-stats">
+            <div><span>Ready for review</span><strong>18</strong><em className="ll-stat-up">+4 today</em></div>
+            <div><span>Criteria matched</span><strong>72%</strong><em>screening live</em></div>
+            <div><span>Outreach queued</span><strong>34</strong><em className="ll-stat-blue">12 sending</em></div>
+          </div>
+          <div className="ll-machine-stage">
+            <div className="ll-stage-head"><span>Opportunity</span><span>Fit score</span><span>Status</span></div>
+            {intakeRows.map(([name, fit, status], index) => (
+              <div key={name} className={`ll-stage-row ll-stage-row-${index}`}>
+                <span className="font-semibold text-[#183047]">{name}</span>
+                <span className="flex items-center gap-1 text-[#3286C8]"><span className="ll-fit-meter"><i style={{ width: fit }} /></span>{fit}</span>
+                <span className={`ll-stage-status ${status === "Outreach" ? "is-outreach" : ""}`}>{status}</span>
+              </div>
+            ))}
+            <div className="ll-routing-line" aria-hidden="true"><span>criteria match</span><i /></div>
+          </div>
+          <div className="ll-machine-lower">
+            <div className="ll-activity-feed">
+              <div className="ll-lower-label"><span>Activity stream</span><span className="ll-live-label">LIVE</span></div>
+              <div className="ll-feed-item"><span className="ll-feed-index">01</span><span><b>Riverside infill</b> moved to outreach</span><time>now</time></div>
+              <div className="ll-feed-item"><span className="ll-feed-index">02</span><span>Screened against <b>7 criteria</b></span><time>12s</time></div>
+              <div className="ll-feed-item"><span className="ll-feed-index">03</span><span>New lead received from <b>Inbound</b></span><time>28s</time></div>
+            </div>
+            <div className="ll-mini-pipeline">
+              <div className="ll-lower-label">Pipeline <span>today</span></div>
+              <div className="ll-pipeline-track"><i /><i /><i /><i /></div>
+              <div className="flex justify-between text-[7px] text-[#82909a]"><span>New 24</span><span>Review 18</span><span>Outreach 12</span><span>Qualified 7</span></div>
+              <div className="ll-pipeline-card"><span className="ll-pipeline-card-bar" /><span>County road parcel</span><b>Qualified</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="ll-machine-callout ll-callout-screen"><span className="ll-callout-line" /><b>01</b><span>Screened against your criteria</span></div>
+      <div className="ll-machine-callout ll-callout-send"><span className="ll-callout-line" /><b>02</b><span>Outreach queued automatically</span></div>
+      <div className="ll-machine-callout ll-callout-move"><span className="ll-callout-line" /><b>03</b><span>Pipeline stays in motion</span></div>
     </div>
   );
 }
@@ -65,7 +134,19 @@ function PipelineMockup() {
 
 function FlowDiagram() {
   const nodes = [["01", "Lead sources", "Inbound opportunities"], ["02", "Your criteria", "Rent, acreage, county fit"], ["03", "LandLinq", "Screen · organize · activate"], ["04", "Your team", "Review the right deals"]];
-  return <div className="mt-12 grid gap-2 md:grid-cols-4">{nodes.map(([num, title, body], i) => <div key={num} className="relative"><div className={`h-full rounded-xl border p-5 ${i === 2 ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}><div className="mb-8 flex items-center justify-between text-[10px] font-semibold tracking-[0.18em] opacity-55"><span>{num}</span>{i < 3 && <ArrowRight className="hidden h-4 w-4 md:block" />}</div><div className="text-sm font-semibold">{title}</div><div className={`mt-2 text-xs leading-5 ${i === 2 ? "text-white/65" : "text-muted-foreground"}`}>{body}</div></div></div>)}</div>;
+  return <div className="ll-flow mt-12 grid gap-2 md:grid-cols-4" aria-label="LandLinq operating workflow">
+    {nodes.map(([num, title, body], i) => <div key={num} className={`ll-flow-node ll-flow-node-${i} relative`} style={{ "--flow-delay": `${i * 1.15}s` } as CSSProperties}>
+      <div className={`ll-flow-card h-full rounded-xl border p-5 ${i === 2 ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>
+        <div className="mb-8 flex items-center justify-between text-[10px] font-semibold tracking-[0.18em] opacity-55"><span>{num}</span>{i < 3 && <ArrowRight className="ll-flow-arrow hidden h-4 w-4 md:block" />}</div>
+        <div className="text-sm font-semibold">{title}</div>
+        <div className={`mt-2 text-xs leading-5 ${i === 2 ? "text-white/65" : "text-muted-foreground"}`}>{body}</div>
+        {i === 2 && <div className="ll-screening-console" aria-hidden="true"><div><span>SCREEN</span><b>7 criteria</b></div><i /><div><span>ORGANIZE</span><b>18 ready</b></div><i /><div><span>ACTIVATE</span><b>12 queued</b></div></div>}
+        {i === 0 && <div className="ll-flow-signal" aria-hidden="true"><span /><span /><span /></div>}
+        {i === 3 && <div className="ll-team-inbox" aria-hidden="true"><span>QUEUE</span><b>Ready for review</b></div>}
+      </div>
+      {i < 3 && <div className="ll-flow-transfer" aria-hidden="true"><span /></div>}
+    </div>)}
+  </div>;
 }
 
 export default function MarketingHome() {
@@ -102,13 +183,23 @@ export default function MarketingHome() {
       </header>
 
       <main>
-        <section className="relative bg-primary px-5 pb-16 pt-32 text-primary-foreground sm:px-8 sm:pb-24 sm:pt-40 lg:px-10">
+        <section className="relative bg-primary px-5 pb-16 pt-28 text-primary-foreground sm:px-8 sm:pb-24 sm:pt-32 lg:px-10">
           <div className="ll-grid absolute inset-0 opacity-20" /><div className="relative mx-auto max-w-7xl">
-            <div className="grid items-end gap-14 lg:grid-cols-[0.8fr_1.2fr] lg:gap-10"><div className="max-w-2xl"><h1 className="ll-reveal text-balance text-5xl font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[5.6rem]">Your supercharged<br /><span className="text-white/45">acquisitions operating system.</span></h1><p className="ll-reveal ll-delay-2 mt-8 max-w-lg text-lg leading-8 text-white/68">LandLinq opens the lead funnel wide, screens opportunities against your criteria, and keeps outreach moving — so lean teams can do more with less.</p><div className="ll-reveal ll-delay-3 mt-9 flex flex-wrap gap-3"><Button>Get in touch</Button><Link href="/login" className="inline-flex min-h-12 items-center rounded-full border border-white/30 px-5 text-sm font-semibold hover:border-white">Log In</Link></div></div><div className="ll-reveal ll-delay-2 ll-product-float relative lg:translate-y-10"><div className="absolute -inset-5 rounded-[1.5rem] bg-white/5 blur-2xl" /><DashboardMockup /></div></div>
+            <div className="flex flex-col items-center gap-10 lg:gap-12">
+              <div className="max-w-5xl text-center">
+                <h1 className="ll-reveal text-balance text-5xl font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[4.5rem]">Your supercharged<br /><span className="text-white/45">acquisitions operating system.</span></h1>
+                <p className="ll-reveal ll-delay-2 mx-auto mt-6 max-w-lg text-lg leading-7 text-white/68">LandLinq opens the lead funnel wide, screens opportunities against your criteria, and keeps outreach moving — so lean teams can do more with less.</p>
+                <div className="ll-reveal ll-delay-3 mt-7 flex flex-wrap justify-center gap-3"><Button>Get in touch</Button><Link href="/login" className="inline-flex min-h-12 items-center rounded-full border border-white/30 px-5 text-sm font-semibold hover:border-white">Log In</Link></div>
+              </div>
+              <div className="ll-reveal ll-delay-2 relative w-full max-w-[1120px]">
+                <div className="absolute -inset-5 rounded-[1.5rem] bg-white/5 blur-2xl" />
+                <DealOpsMachine />
+              </div>
+            </div>
           </div>
         </section>
 
-        <section data-reveal className="ll-scroll-reveal bg-muted/40 px-5 py-24 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-7xl"><div className="max-w-3xl"><h2 className="text-4xl font-semibold leading-[1.02] tracking-[-0.05em] sm:text-6xl">Your funnel is wide.<br />Your attention should not be.</h2><p className="mt-7 max-w-xl text-lg leading-8 text-muted-foreground">Manual screening, one-off follow-up, and disconnected deal notes make good opportunities easy to miss. LandLinq gives every lead a path forward.</p></div><FlowDiagram /></div></section>
+         <section id="workflow" data-reveal className="ll-scroll-reveal bg-muted/40 px-5 py-24 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-7xl"><div className="max-w-3xl"><h2 className="text-4xl font-semibold leading-[1.02] tracking-[-0.05em] sm:text-6xl">Your funnel is wide.<br />Your attention should not be.</h2><p className="mt-7 max-w-xl text-lg leading-8 text-muted-foreground">Manual screening, one-off follow-up, and disconnected deal notes make good opportunities easy to miss. LandLinq gives every lead a path forward.</p></div><FlowDiagram /></div></section>
 
         <section id="platform" data-reveal className="ll-scroll-reveal bg-background px-5 py-24 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-7xl"><div className="mb-20 flex flex-col justify-between gap-6 lg:flex-row lg:items-end"><div><h2 className="max-w-2xl text-4xl font-semibold leading-[1.02] tracking-[-0.05em] sm:text-6xl">The work moves.<br />Your team moves up.</h2></div><p className="max-w-sm text-base leading-7 text-muted-foreground">One connected workflow for sourcing, screening, outreach, and the decisions that follow.</p></div>
           <div className="grid gap-8 lg:grid-cols-12"><div className="ll-panel-dark lg:col-span-7"><div className="mb-10 flex items-start justify-between"><div><div className="text-[10px] uppercase tracking-[0.2em] text-white/45">01 / Deal intelligence</div><h3 className="mt-3 text-3xl font-semibold tracking-tight">Deal Dashboard</h3></div><FileSearch className="h-7 w-7 text-white/55" /></div><p className="max-w-md text-base leading-7 text-white/65">Every deal arrives pre-screened against your own criteria, so your team knows what is worth a second look.</p><div className="mt-10"><DashboardMockup compact /></div></div><div className="flex flex-col gap-8 lg:col-span-5"><div className="ll-panel-paper flex-1"><Mail className="mb-8 h-7 w-7 text-primary" /><div className="text-[10px] uppercase tracking-[0.2em] text-primary">02 / Connected action</div><h3 className="mt-3 text-3xl font-semibold tracking-tight">CRM & Outreach</h3><p className="mt-5 text-base leading-7 text-muted-foreground">Campaigns run from your own connected email, reaching brokers without anyone drafting or sending each message by hand.</p><OutreachMockup /></div><div className="ll-panel-navy"><div className="flex items-start justify-between"><div><div className="text-[10px] uppercase tracking-[0.2em] text-white/45">03 / Operational clarity</div><h3 className="mt-3 text-3xl font-semibold tracking-tight">Pipeline</h3></div><Network className="h-7 w-7 text-white/55" /></div><p className="mt-6 text-base leading-7 text-white/65">Track opportunities through stages you define without a dedicated ops hire to maintain it.</p><PipelineMockup /></div></div></div>

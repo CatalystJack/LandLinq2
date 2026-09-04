@@ -80,7 +80,6 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
             : [
                 { name: "Deal Dashboard", href: "/dashboard", description: "Review and manage incoming deals" },
                 { name: "CRM", href: "/crm", description: "Contact management & campaign outreach" },
-                { name: "People", href: "/user-management", description: "Manage users and brokers" },
                 { name: "Outreach Analytics", href: "/outreach-analytics", description: "Emails sent, open rates & sender health" },
                 { name: "Outreach Setup", href: "/outreach-onboarding", description: "Configure senders & campaigns" },
                 { name: "Data Hub", href: "/data-hub", description: "Market intelligence, deal data, and broker analytics" },

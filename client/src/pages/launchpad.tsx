@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 import { 
   LayoutDashboard, 
   MessageSquare, 
@@ -62,6 +63,7 @@ interface PipelineStats {
 export default function Launchpad() {
   const { user } = useAuth();
   const userEmail = (user as any)?.claims?.email || (user as any)?.email || '';
+  const isPlatformAdmin = isPlatformAdminEmail(userEmail);
   const firstName = userEmail.split('@')[0].split('.')[0];
   const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
 
@@ -110,14 +112,14 @@ export default function Launchpad() {
       color: "bg-green-600",
       category: 'internal'
     },
-    {
+    ...(isPlatformAdmin ? [{
       name: "People",
       description: "Manage users and brokers",
       icon: Users,
       href: "/user-management",
       color: "bg-purple-600",
-      category: 'internal'
-    },
+      category: 'internal' as const
+    }] : []),
     {
       name: "CRM",
       description: "Contacts, deals & outreach pipeline",

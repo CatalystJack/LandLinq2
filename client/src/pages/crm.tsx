@@ -97,7 +97,9 @@ async function fetchJson(url: string): Promise<unknown> {
 
 function normalizeContactsResponse(value: unknown): ContactsResponse {
   const payload = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const rawContacts = asArray<Record<string, unknown>>(payload.contacts);
+  const rawContacts = asArray<unknown>(payload.contacts).filter(
+    (contact): contact is Record<string, unknown> => Boolean(contact) && typeof contact === "object",
+  );
   const rawPagination = payload.pagination && typeof payload.pagination === "object"
     ? payload.pagination as Record<string, unknown>
     : undefined;
@@ -128,6 +130,28 @@ function normalizeContactsResponse(value: unknown): ContactsResponse {
   };
 }
 
+function normalizeActivityResponse(value: unknown): ActivityData {
+  const payload = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const rawBroker = payload.broker && typeof payload.broker === "object"
+    ? payload.broker as Record<string, unknown>
+    : {};
+
+  return {
+    broker: {
+      ...rawBroker,
+      id: String(rawBroker.id || ""),
+      firstName: String(rawBroker.firstName || ""),
+      lastName: String(rawBroker.lastName || ""),
+      crmTags: asStringArray(rawBroker.crmTags),
+      marketsCovered: asStringArray(rawBroker.marketsCovered),
+      dealCount: Number.isFinite(Number(rawBroker.dealCount)) ? Number(rawBroker.dealCount) : 0,
+    } as Contact,
+    deals: asArray(payload.deals),
+    communications: asArray(payload.communications),
+    enrollments: asArray(payload.enrollments),
+  };
+}
+
 const TAG_COLORS: Record<string, string> = {
   "hot-lead": "bg-red-100 text-red-700 border-red-200",
   "warm": "bg-orange-100 text-orange-700 border-orange-200",
@@ -153,7 +177,7 @@ function classificationBadge(c: string) {
 
 function contactStatus(contact: Contact) {
   if (!contact.isActive) return { label: "Inactive", className: "bg-slate-100 text-slate-500 border-slate-200" };
-  const tags = (contact.crmTags || []).map(tag => tag.toLowerCase());
+  const tags = asStringArray(contact.crmTags).map(tag => tag.toLowerCase());
   if (tags.some(tag => tag.includes("hot") || tag === "vip")) return { label: "Priority", className: "bg-[#e7f0ff] text-[#1554a3] border-[#b9d2f5]" };
   if (tags.some(tag => tag.includes("follow") || tag === "warm")) return { label: "Follow-up", className: "bg-[#fff4dc] text-[#8a5b08] border-[#f2d394]" };
   return { label: "Active", className: "bg-[#e5f6f2] text-[#167465] border-[#b8e5db]" };
@@ -291,7 +315,7 @@ export default function CRMPage() {
         const text = await res.text().catch(() => res.statusText);
         throw new Error(`${res.status}: ${text}`);
       }
-      return res.json();
+      return res.json().then(normalizeActivityResponse);
     },
     enabled: !!selectedContact,
   });
