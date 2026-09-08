@@ -52,9 +52,7 @@ Welcome to LandLinq! We're excited to have you as part of our broker network. Yo
 
 **🚀 How to Submit Deals (Multiple Ways)**
 📧 Email: catalyst@landlinq.ai
-📱 Text/SMS: (704) 610-1549  
 🌐 Web Portal: https://landlinq.ai/submit-deal
-📞 Phone: (704) 610-1549
 
 **📋 What We Need (Minimum)**
 • Property address
@@ -123,7 +121,7 @@ ${vars.classification === 'green' ?
   `🔴 NOT A MATCH: This property doesn't align with our current acquisition criteria. Details in separate notification.` : 
   'Our AI analysis is enriching property details. Classification and team assignment coming shortly.'}
 
-**Questions?** Reply to this email or text (704) 610-1549.
+**Questions?** Reply to this email.
 
 ${vars.classification === 'green' ? 'Exciting opportunity - talk soon!' : 'Thank you for the submission!'}
 
@@ -162,7 +160,6 @@ We value the partnership and want to see your next submission.
 
 You can email, text, or visit our website to submit deals:
 E: catalyst@landlinq.ai
-P: (704) 610-1549
 W: https://landlinq.ai/submit-deal
 
 Talk soon,
@@ -204,7 +201,6 @@ We value our broker relationships and want to see more opportunities from you. E
 
 **Submit Your Next Deal:**
 📧 Email: catalyst@landlinq.ai
-📱 Text: (704) 610-1549  
 🌐 Web: https://landlinq.ai/submit-deal
 
 Thank you for thinking of us,
@@ -251,8 +247,7 @@ We move FAST on deals we like, and we like this one! Expect quick decisions and 
 
 **Direct Contact:**
 📧 ${vars.analystEmail} 
-📱 (704) 610-1549
-(Feel free to call or text anytime)
+(Reply to this email anytime)
 
 Thank you for bringing us this excellent opportunity!
 
@@ -290,8 +285,6 @@ ${vars.analystName} will contact you directly within the next 24 hours to fast-t
 
 **Direct Contact:**
 📧 ${vars.analystEmail}
-📱 (704) 610-1549
-
 Excited about this upgrade and looking forward to moving quickly!
 
 ${vars.analystName}
@@ -308,7 +301,7 @@ Thanks for submitting ${vars.address}! We're excited to review this opportunity.
 To complete our AI analysis and get you a quick decision, we need one more piece of information:
 • Property size (acres)
 
-You can reply to this email or text us at (704) 610-1549 with the acreage.
+You can reply to this email with the acreage.
 
 Thanks for your submission!
 Catalyst Acquisitions`
@@ -323,7 +316,7 @@ Thanks for submitting ${vars.address}! We're excited to review this opportunity.
 To complete our AI analysis and get you a quick decision, we need one more piece of information:
 • Asking price
 
-You can reply to this email or text us at (704) 610-1549 with the price.
+You can reply to this email with the price.
 
 Thanks for your submission!
 Catalyst Acquisitions`
@@ -339,7 +332,7 @@ To complete our AI analysis and get you a quick decision, we need two more piece
 • Property size (acres)
 • Asking price
 
-You can reply to this email or text us at (704) 610-1549 with both details.
+You can reply to this email with both details.
 
 Thanks for your submission!
 Catalyst Acquisitions`
@@ -354,7 +347,7 @@ Thanks for reaching out! We received your deal submission, but we need the prope
 To complete our review, please provide:
 • Full property address (street, city, state)
 
-You can reply to this email or text us at (704) 610-1549 with the address.
+You can reply to this email with the address.
 
 Thanks for your submission!
 Catalyst Acquisitions`
@@ -371,7 +364,7 @@ To complete our review, please provide:
 • Property size (acres)
 • Asking price
 
-You can reply to this email or text us at (704) 610-1549 with these details.
+You can reply to this email with these details.
 
 Example format: "123 Main St, Charlotte NC, 5.2 acres, $2.5M"
 
@@ -388,7 +381,7 @@ Thanks for submitting your deal! We want to make sure we have the correct detail
 Could you please confirm the following information:
 ${vars.missingFields}
 
-You can reply to this email or text us at (704) 610-1549 to verify these details.
+You can reply to this email to verify these details.
 
 This helps us provide the most accurate evaluation of your property.
 
@@ -405,7 +398,7 @@ ${vars.missingFields}
 
 Once we have these details, our AI can provide an immediate classification and next steps.
 
-You can reply to this email or text us at (704) 610-1549.
+You can reply to this email.
 
 If you'd prefer not to receive these reminders, just let us know.
 
@@ -438,7 +431,6 @@ We're actively acquiring in these product types:
 
 Have something that might work? Send us the basics:
 📧 Email: catalyst@landlinq.ai
-📱 Text: (704) 610-1549  
 🌐 Web: https://landlinq.ai/submit-deal
 
 Just need: Address, asking price, and acreage to get started!
@@ -563,7 +555,7 @@ Strong demand for quality land deals in our target markets. Fast decisions and c
 **Recently Approved:**
 Several high-quality deals from broker partners like you!
 
-**Submit Deals:** catalyst@landlinq.ai or (704) 610-1549
+**Submit Deals:** catalyst@landlinq.ai
 **Questions:** ${vars.analystEmail}
 
 Thank you for being a valued member of our broker network.
@@ -643,7 +635,6 @@ We value the partnership and want to see your next submission.
 
 Submit your next deal:
 📧 catalyst@landlinq.ai
-📱 (704) 610-1549  
 🌐 landlinq.ai/submit-deal
 
 -Catalyst Acquisitions`,
@@ -664,8 +655,6 @@ Keep them coming!
 Text more deals anytime.
 
 📧 catalyst@landlinq.ai
-📱 (704) 610-1549
-
 -Catalyst Acquisitions`,
 
   dealApprovedGreen: (vars: TemplateVariables) =>
@@ -797,7 +786,7 @@ Reply STOP to unsubscribe`,
     `📅 Meeting reminder: Tomorrow for ${vars.address}. Need to reschedule? Call ${vars.supportPhone}. -${vars.analystName}`,
 
   marketAlert: (vars: TemplateVariables) =>
-    `🔥 MARKET ALERT: High demand for quality land deals! Submit yours: catalyst@landlinq.ai or (704) 610-1549. Fast decisions! -Catalyst Acquisitions`,
+    `🔥 MARKET ALERT: High demand for quality land deals! Submit yours: catalyst@landlinq.ai. Fast decisions! -Catalyst Acquisitions`,
 
   paymentProcessed: (vars: TemplateVariables) =>
     `💰 Commission processed for ${vars.address}! Payment arriving in 3-5 days. Details in email. Thanks! -Catalyst Acquisitions`,
@@ -807,18 +796,30 @@ Reply STOP to unsubscribe`,
 };
 
 // Template utility functions
+function sanitizeLandLinqOutput(value: string): string {
+  return value
+    .replace(/catalyst@landlinq\.ai/gi, 'help@landlinq.ai')
+    .replace(/deals@catalyst\.landlinq\.ai/gi, 'deals@landlinq.ai')
+    .replace(/catalyst\.landlinq\.ai/gi, 'landlinq.ai')
+    .replace(/Catalyst Capital Partners/gi, 'LandLinq')
+    .replace(/Catalyst Acquisitions/gi, 'LandLinq Team')
+    .replace(/Catalyst Acquisition Team/gi, 'LandLinq Team')
+    .replace(/\bCatalyst Team\b/gi, 'LandLinq Team')
+    .replace(/\bCatalyst\b/g, 'LandLinq');
+}
+
 export function getEmailTemplate(type: keyof typeof emailTemplates, vars: TemplateVariables) {
   const template = emailTemplates[type];
   
   return {
     subject: typeof template.subject === 'function' ? template.subject(vars) : template.subject,
-    body: template.body(vars)
+    body: sanitizeLandLinqOutput(template.body(vars))
   };
 }
 
 export function getSMSTemplate(type: keyof typeof smsTemplates, vars: TemplateVariables) {
   const template = smsTemplates[type];
-  return template(vars);
+  return sanitizeLandLinqOutput(template(vars));
 }
 
 // Helper function to get complete team info based on deal classification

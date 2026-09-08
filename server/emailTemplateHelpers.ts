@@ -92,7 +92,7 @@ export function createEmailTemplate(content: string, options: {
     ${showFooter ? `
     <div class="landlinq-footer">
       <p style="margin: 0; font-size: 14px; color: #666;">
-        © 2025 LandLinq. | <a href="mailto:{{contactEmail}}" style="color: #4A90E2; text-decoration: none;">{{contactEmail}}</a> | {{contactPhone}} | <a href="{{websiteUrl}}" style="color: #4A90E2; text-decoration: none;">{{websiteUrl}}</a>
+         © 2025 LandLinq. | <a href="mailto:{{contactEmail}}" style="color: #4A90E2; text-decoration: none;">{{contactEmail}}</a> | <a href="{{websiteUrl}}" style="color: #4A90E2; text-decoration: none;">{{websiteUrl}}</a>
       </p>
     </div>
     ` : ''}
@@ -127,7 +127,7 @@ The LandLinq Team`,
       <p><strong>Property:</strong> {{address}}<br>
       <strong>Status:</strong> Under Review</p>
       
-      <p>Someone from the Catalyst Acquisition Team will respond within 24 hours.</p>
+       <p>Someone from the LandLinq team will respond within 24 hours.</p>
       
       <div style="text-align: center; margin: 25px 0;">
         <a href="{{websiteUrl}}/broker-dashboard" class="landlinq-button" style="background: #4A90E2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 500; display: inline-block;">View Your Broker Dashboard</a>

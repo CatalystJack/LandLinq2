@@ -48,7 +48,7 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
         { name: "About", href: "/about", description: "Learn about our platform" },
         { name: "Process", href: "/process", description: "Our deal evaluation process" },
         { name: "Criteria", href: "/criteria", description: "What we look for in deals" },
-        { name: "Blogs", href: "https://www.catalystcp.com/blogs/", description: "Read our blog posts", external: true },
+        { name: "Blogs", href: "https://landlinq.ai/blog", description: "Read our blog posts", external: true },
         { name: "Developers", href: "/developer-network", description: "Register your buy box criteria" },
         { name: "Brokers", href: "/broker-network", description: "Join our partner broker program" },
         { name: "Submit a Deal", href: "/submit-deal", description: "Submit a land deal" }

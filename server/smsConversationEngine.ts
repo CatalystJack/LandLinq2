@@ -70,7 +70,7 @@ export class SMSConversationEngine {
         const { TemplateService } = await import('./templateService');
         const template = await TemplateService.getSMSTemplate('sms_unsubscribe', {
           companyName: 'LandLinq',
-          supportEmail: 'catalyst@landlinq.ai'
+           supportEmail: 'help@landlinq.ai'
         });
         
         if (template) {
@@ -81,7 +81,7 @@ export class SMSConversationEngine {
       }
       
       // Fallback message (should not be reached if template exists)
-      const fallbackMessage = "You have been unsubscribed from LandLinq SMS messages. You will no longer receive text alerts. To re-subscribe, text START. Questions? Email catalyst@landlinq.ai";
+      const fallbackMessage = "You have been unsubscribed from LandLinq SMS messages. You will no longer receive text alerts. To re-subscribe, text START. Questions? Email help@landlinq.ai";
       return { message: fallbackMessage, skipConfirmation, success: true, metadata: { type: 'opt-out' } };
     }
     
@@ -1066,9 +1066,9 @@ We're currently developing in these markets but still very interested! We often 
       propertyAddress: address, // Backup for alternate templates
       dealId: dealId,
       classification: classification.replace('_', ' ').toUpperCase(),
-      analystName: 'Catalyst Team',
+      analystName: 'LandLinq Team',
       brokerName: `${broker.firstName || ''} ${broker.lastName || ''}`.trim() || 'there',
-      companyName: 'Catalyst Capital Partners',
+      companyName: 'LandLinq',
       rejectionReason: smsRejectionReason, // Shortened for SMS
       declineReason: smsRejectionReason, // Shortened for SMS
       marketFeedback: smsRejectionReason // Shortened for SMS

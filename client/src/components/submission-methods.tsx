@@ -97,11 +97,11 @@ export default function SubmissionMethods() {
                 <div className="w-full bg-gray-50 rounded-lg p-4 mb-4">
                   <p className="text-xs text-gray-500 mb-2 font-medium">Send to:</p>
                   <a 
-                    href="mailto:deals@catalyst.landlinq.ai" 
+                    href="mailto:deals@landlinq.ai"
                     className="text-lg font-bold text-[#4A90E2] hover:text-[#081729] transition-colors break-all" 
                     data-testid="text-email-address"
                   >
-                    deals@catalyst.landlinq.ai
+                    deals@landlinq.ai
                   </a>
                 </div>
               </CardContent>

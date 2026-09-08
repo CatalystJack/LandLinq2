@@ -41,7 +41,7 @@ export default function Projects() {
       image: camdenExchangeImage
     },
     {
-      name: "Catalyst QOZ Biltmore Village",
+      name: "QOZ Biltmore Village",
       location: "Asheville, NC",
       cost: "$78M",
       units: 281,
@@ -210,8 +210,8 @@ export default function Projects() {
     <div className="min-h-screen bg-background">
       <SEO 
         title="Projects - LandLinq"
-        description="Explore Catalyst Capital Partners' real estate portfolio. $1.3B+ in active development across the Carolinas. Featured projects include Camden Exchange, Mason, and Catalyst QOZ Biltmore Village."
-        keywords="catalyst projects, multifamily development, carolina real estate projects, lot development, active adult communities"
+        description="Explore LandLinq's real estate portfolio. $1.3B+ in active development across the Carolinas. Featured projects include Camden Exchange, Mason, and QOZ Biltmore Village."
+        keywords="LandLinq projects, multifamily development, carolina real estate projects, lot development, active adult communities"
         url="https://landlinq.ai/projects"
       />
       <Navigation />

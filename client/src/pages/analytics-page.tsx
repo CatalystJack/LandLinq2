@@ -114,7 +114,7 @@ export default function AnalyticsPage() {
           <div className="text-center">
             <Shield className="h-16 w-16 text-catalyst-gray-400 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-catalyst-gray-900 mb-4">Access Restricted</h1>
-            <p className="text-catalyst-gray-600">Analytics are only accessible to Catalyst Capital Partners team members.</p>
+            <p className="text-catalyst-gray-600">Analytics are only accessible to LandLinq team members.</p>
           </div>
         </div>
         <Footer />

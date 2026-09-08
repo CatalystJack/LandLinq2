@@ -255,7 +255,7 @@ export class SMSInboundService {
                 // Send confirmation SMS
                 try {
                   const { sendSMS } = await import('./smsService');
-                  const confirmMessage = `Thanks! Updated ${incompleteDeal.address} with ${Object.keys(updateData).join(', ')}. Continuing analysis! -Catalyst`;
+                  const confirmMessage = `Thanks! Updated ${incompleteDeal.address} with ${Object.keys(updateData).join(', ')}. Continuing analysis! -LandLinq`;
                   await sendSMS({
                     to: smsData.From,
                     message: confirmMessage,
@@ -459,7 +459,7 @@ export class SMSInboundService {
             address: displayAddress
           });
           
-          const receiptMessage = receiptTemplate || `Received: ${displayAddress}!\n\nUnder review. Decision in 24hrs.\n\n-Catalyst`;
+          const receiptMessage = receiptTemplate || `Received: ${displayAddress}!\n\nUnder review. Decision in 24hrs.\n\n-LandLinq`;
           
           const receiptResult = await sendSMS({
             to: smsData.From,

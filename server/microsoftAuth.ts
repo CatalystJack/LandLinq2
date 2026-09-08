@@ -78,10 +78,13 @@ export interface MicrosoftSendOptions {
 /**
  * Refresh a Microsoft OAuth access token using a refresh token.
  */
-export async function refreshMicrosoftToken(refreshToken: string): Promise<MicrosoftTokens> {
+export async function refreshMicrosoftToken(
+  refreshToken: string,
+  authority?: string,
+): Promise<MicrosoftTokens> {
   const clientId     = process.env.MICROSOFT_CLIENT_ID;
   const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
-  const tenantId     = process.env.MICROSOFT_TENANT_ID || 'common';
+  const tenantId     = authority || process.env.MICROSOFT_TENANT_ID || 'common';
 
   if (!clientId || !clientSecret) {
     throw new Error('MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET not configured');
@@ -328,6 +331,7 @@ export async function sendDripEmailViaMicrosoft(enrollment: {
   id: string;
   contact_email: string;
   sender_id: string;
+  developer_profile_id?: string | null;
   microsoft_access_token: string;
   microsoft_refresh_token: string | null;
   microsoft_token_expiry: Date | string | null;
@@ -343,7 +347,10 @@ export async function sendDripEmailViaMicrosoft(enrollment: {
 
   if (needsRefresh && enrollment.microsoft_refresh_token) {
     try {
-      const newTokens = await refreshMicrosoftToken(enrollment.microsoft_refresh_token);
+      const newTokens = await refreshMicrosoftToken(
+        enrollment.microsoft_refresh_token,
+        enrollment.developer_profile_id ? 'organizations' : undefined,
+      );
       accessToken = newTokens.accessToken;
 
       await db.execute(sql`

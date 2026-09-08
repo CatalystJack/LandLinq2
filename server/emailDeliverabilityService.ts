@@ -93,7 +93,7 @@ export class EmailDeliverabilityService {
               <div class="signature-name">LandLinq Acquisition Team</div>
               <div class="signature-title">Real Estate Deal Processing</div>
               <p style="margin: 10px 0 0 0; font-size: 14px; color: #64748b;">
-                📧 catalyst@landlinq.ai | 📱 (704) 610-1549 | 🌐 landlinq.ai
+                deals@landlinq.ai | landlinq.ai
               </p>
             </div>
           </div>
@@ -131,7 +131,7 @@ export class EmailDeliverabilityService {
   static getSpamPreventionChecklist(): string[] {
     return [
       "✅ Professional sender name: 'LandLinq Deal Processing'",
-      "✅ Consistent from address: catalyst@landlinq.ai",
+      "✅ Consistent from address: deals@landlinq.ai",
       "✅ Authentication headers and organization info",
       "✅ Unsubscribe link in every email",
       "✅ Professional HTML design with proper structure",

@@ -434,6 +434,7 @@ export async function processDripEnrollments(): Promise<void> {
           e.target_state,
           t.name as template_name,
           s.name as sender_name, s.email as sender_email,
+          s.developer_profile_id,
           s.microsoft_access_token, s.microsoft_refresh_token, s.microsoft_token_expiry,
           s.signature_html, s.daily_limit_override,
           ROW_NUMBER() OVER (PARTITION BY e.sender_id ORDER BY e.next_send_at ASC) AS rn
@@ -543,7 +544,7 @@ export async function processDripEnrollments(): Promise<void> {
         const brokerName = `${enrollment.contact_first_name || ''} ${enrollment.contact_last_name || ''}`.trim() || 'there';
         
         let emailContent = currentStep.content || '';
-        let emailSubject = currentStep.subject || 'Hello from Catalyst Capital Partners';
+        let emailSubject = currentStep.subject || 'Hello from LandLinq';
         
         // Replace personalization tokens
         emailContent = emailContent
@@ -1410,7 +1411,8 @@ export async function processOutlookBouncedEmails(): Promise<void> {
 
     // Get all senders that have a live Microsoft token
     const sendersResult = await db.execute(sql`
-      SELECT id, name, email, microsoft_access_token, microsoft_refresh_token, microsoft_token_expiry
+      SELECT id, name, email, developer_profile_id,
+             microsoft_access_token, microsoft_refresh_token, microsoft_token_expiry
       FROM outreach_senders
       WHERE microsoft_access_token IS NOT NULL
         AND microsoft_access_token != ''
@@ -1427,7 +1429,10 @@ export async function processOutlookBouncedEmails(): Promise<void> {
         if (expiry && expiry <= new Date(Date.now() + 5 * 60 * 1000) && sender.microsoft_refresh_token) {
           try {
             const { refreshMicrosoftToken } = await import('../microsoftAuth');
-            const newTokens = await refreshMicrosoftToken(sender.microsoft_refresh_token);
+            const newTokens = await refreshMicrosoftToken(
+              sender.microsoft_refresh_token,
+              sender.developer_profile_id ? 'organizations' : undefined,
+            );
             accessToken = newTokens.accessToken;
             await db.execute(sql`
               UPDATE outreach_senders

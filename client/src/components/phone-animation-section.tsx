@@ -15,7 +15,7 @@ export default function PhoneAnimationSection() {
   const steps = [
     {
       title: "Send an Email",
-      description: "Forward property details to deals@catalyst.landlinq.ai",
+      description: "Forward property details to deals@landlinq.ai",
       icon: Mail,
       color: "bg-blue-500"
     },
@@ -101,7 +101,7 @@ export default function PhoneAnimationSection() {
                           </div>
                           <div className="ml-3">
                             <div className="font-semibold text-sm">New Deal</div>
-                            <div className="text-xs text-gray-500">To: deals@catalyst...</div>
+                            <div className="text-xs text-gray-500">To: deals@landlinq.ai</div>
                           </div>
                         </div>
                         <div className="text-xs text-gray-700 leading-relaxed">

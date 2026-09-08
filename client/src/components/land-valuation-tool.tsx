@@ -157,7 +157,7 @@ export default function LandValuationTool() {
     }, 2000);
   };
 
-  const handleSubmitToCatalyst = () => {
+  const handleSubmitToLandLinq = () => {
     toast({
       title: "Redirecting to Deal Submission",
       description: "Pre-filling your property details for deeper analysis..."
@@ -410,12 +410,12 @@ export default function LandValuationTool() {
               {/* Action Buttons */}
               <div className="flex gap-4">
                 <Button 
-                  onClick={handleSubmitToCatalyst}
+                  onClick={handleSubmitToLandLinq}
                   className="flex-1 bg-catalyst-gold hover:bg-catalyst-gold/90 text-catalyst-navy font-semibold"
                   data-testid="button-submit-deal"
                 >
                   <TrendingUp className="h-4 w-4 mr-2" />
-                  Submit Deal to Catalyst for Deeper Analysis
+                  Submit Deal to LandLinq for Deeper Analysis
                 </Button>
                 <Button 
                   onClick={resetTool}

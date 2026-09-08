@@ -57,7 +57,6 @@ export class EmailWorkaround {
        • Fill in property details
     
     2. TEXT MESSAGE (Fast)
-       • Text: (704) 610-1549
        • Format: DEAL [Address] [Acres] [Price] [Type]
        • Example: "DEAL 123 Main St, Charlotte NC, 5 acres, $500000, Apartments"
     

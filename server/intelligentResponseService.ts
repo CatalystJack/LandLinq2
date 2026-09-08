@@ -142,7 +142,7 @@ export class IntelligentResponseService {
       console.error('❌ Error generating intelligent response:', error);
       return {
         shouldProcessDeal: false,
-        responseMessage: 'Sorry, we encountered an error. Please call (704) 610-1549 for assistance.',
+        responseMessage: 'Sorry, we encountered an error. Please reply to this message for assistance.',
         responseType: 'profile_missing',
         missingInfo: []
       };
@@ -176,7 +176,7 @@ export class IntelligentResponseService {
       'Once we have your profile information, you can submit property details for instant AI analysis.\n\n' +
       'Thank you!\n' +
       'The LandLinq Team\n' +
-      '(704) 610-1549';
+      '';
     
     return greeting + instruction;
   }
@@ -294,7 +294,7 @@ export class IntelligentResponseService {
     }
     
     message += 'Our team will review your submission and get back to you soon!\n\n';
-    message += 'The LandLinq Team\n(704) 610-1549';
+    message += 'The LandLinq Team';
     
     return message;
   }

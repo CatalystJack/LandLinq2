@@ -1,6 +1,6 @@
 # Overview
 
-This full-stack land acquisition platform for Catalyst Capital Partners automates and streamlines the land deal submission and evaluation process. It features a web interface for deal submission, an analyst dashboard for review, and AI-powered deal analysis against specific acquisition criteria extracted from PDF specifications. The platform automatically classifies deals (high priority, potential, or clear no) and automates team assignments. It also includes a recurring monthly broker outreach system for automated email/SMS campaigns. The project aims to enhance efficiency, consistency, and market engagement in land acquisition, boosting deal flow and investment opportunities.
+This full-stack LandLinq land acquisition platform automates and streamlines the land deal submission and evaluation process. It features a web interface for deal submission, an analyst dashboard for review, and AI-powered deal analysis against specific acquisition criteria extracted from PDF specifications. The platform automatically classifies deals (high priority, potential, or clear no) and automates team assignments. It also includes a recurring monthly broker outreach system for automated email/SMS campaigns. The project aims to enhance efficiency, consistency, and market engagement in land acquisition, boosting deal flow and investment opportunities.
 
 # User Preferences
 
@@ -23,6 +23,7 @@ Preferred communication style: Simple, everyday language.
 - Branding colors and contact info must come from `businessSettings` - no hardcoded branding constants allowed
 - **EXCEPTION - Email Logo**: The "CATALYST - Powered By LandLinq™" logo is HARDCODED to ALL emails (`/attached_assets/Add%20a%20heading%20copy_1762196498512.png`) per explicit user requirement. This overrides the dynamic logo system.
 - **SendGrid Dynamic Templates Toggle System**: Each email template has a per-template toggle switch in Outreach Management for choosing between Outreach Tab (database) and SendGrid Dynamic Templates. Toggle OFF removes `sendgridTemplateId` field entirely (uses Outreach Tab), toggle ON sets it to empty string and reveals the template ID input field (uses SendGrid when ID is provided). Auto-routing logic: if `sendgridTemplateId` exists (not null/undefined) → use SendGrid; otherwise → use Outreach Tab. SMS templates remain exclusively on Outreach Tab. The `templateSource` field is deprecated but kept for backward compatibility.
+- **Company phone is not public**: Do not display the company phone number in emails, website UI, or message templates. Keep the underlying Twilio sender configuration internal so SMS transport continues to work.
 
 **CRITICAL SYSTEM RULE: PROFILE COMPLETION**
 - **Profile is complete with ONE contact method (email OR phone)** - name and markets are OPTIONAL

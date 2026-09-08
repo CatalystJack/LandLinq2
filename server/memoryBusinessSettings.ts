@@ -1,7 +1,7 @@
 // In-memory business settings storage
 import { BusinessSettings } from "@shared/schema";
 
-// HARDCODED: Default business settings with Catalyst:LandLinq logo for all emails
+// Default business settings with LandLinq branding for all emails
 const defaultBusinessSettings: BusinessSettings = {
   id: "default-settings",
   isActive: true,
@@ -14,7 +14,7 @@ const defaultBusinessSettings: BusinessSettings = {
       id: "1",
       name: "Welcome - New Broker Registration",
       subject: "Welcome to {{companyName}} - Your Land Deal Pipeline Starts Here!",
-      content: "Dear {{brokerName}},\n\nWelcome to LandLinq! We're excited to have you join our land acquisition network. Here's how to get started:\n\nSubmission Methods:\n- Email: catalyst@landlinq.ai\n- SMS: (704) 610-1549\n- Web: https://landlinq.ai/submit-deal",
+      content: "Dear {{brokerName}},\n\nWelcome to LandLinq! We're excited to have you join our land acquisition network. Here's how to get started:\n\nSubmission Methods:\n- Email: deals@landlinq.ai\n- Web: https://landlinq.ai/submit-deal",
       html: `<div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb; padding: 20px;">
         <div style="text-align: center; background-color: #ffffff; padding: 20px 20px 5px 20px; margin-bottom: 0; border-radius: 8px 8px 0 0;">
           <img src="{{logoUrl}}" alt="{{companyName}}" style="max-height: 100px; width: auto; display: block; margin: 0 auto;" />
@@ -26,8 +26,7 @@ const defaultBusinessSettings: BusinessSettings = {
           <div style="background-color: #fef3c7; border-left: 4px solid #d4af37; padding: 20px; margin: 0 0 25px 0; border-radius: 4px;">
             <p style="color: #92400e; margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">Submission Methods:</p>
             <p style="color: #92400e; margin: 0; font-size: 14px; line-height: 1.8;">
-              Email: <a href="mailto:catalyst@landlinq.ai" style="color: #92400e;">catalyst@landlinq.ai</a><br>
-              SMS: <a href="tel:7046101549" style="color: #92400e;">(704) 610-1549</a><br>
+              Email: <a href="mailto:deals@landlinq.ai" style="color: #92400e;">deals@landlinq.ai</a><br>
               Web: <a href="https://landlinq.ai/submit-deal" style="color: #92400e;">https://landlinq.ai/submit-deal</a>
             </p>
           </div>
@@ -51,7 +50,7 @@ const defaultBusinessSettings: BusinessSettings = {
       id: "2", 
       name: "Deal Submission Confirmation",
       subject: "Property Received: {{propertyAddress}}",
-      content: "Hi {{brokerName}},\n\nYour LandLinq™ property submission has been received!\n\nProperty: {{propertyAddress}}\nStatus: Under Review\n\nThe Catalyst Acquisition Team will respond within 24 hours with your unique site classification.",
+      content: "Hi {{brokerName}},\n\nYour LandLinq™ property submission has been received!\n\nProperty: {{propertyAddress}}\nStatus: Under Review\n\nThe LandLinq team will respond within 24 hours with your unique site classification.",
       html: `<div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb; padding: 20px;">
         <!-- Header with Logo -->
         <div style="text-align: center; background-color: #ffffff; padding: 20px 20px 5px 20px; margin-bottom: 0; border-radius: 8px 8px 0 0;">
@@ -75,7 +74,7 @@ const defaultBusinessSettings: BusinessSettings = {
           </p>
           
           <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
-            The Catalyst Acquisition Team will respond within 24 hours with your unique site classification.
+            The LandLinq team will respond within 24 hours with your unique site classification.
           </p>
           
           <div style="text-align: center; margin: 30px 0;">
@@ -389,7 +388,7 @@ const defaultBusinessSettings: BusinessSettings = {
       id: "8",
       name: "Monthly Broker Outreach Email",
       subject: "🏡 Still Looking for Your Perfect Deal!",
-      content: "Hi {{brokerName}},\n\nHope you're having a great month! We wanted to check in and see if you have any exciting land deals that might be a good fit for {{companyName}}.\n\nWe're actively acquiring in these product types:\n• Conventional Apartments (10+ acres)\n• Active Adult Communities (15+ acres)\n• Build-to-Rent (5+ acres)\n• Lot Development (10+ acres)\n\n🎯 What makes a great {{companyName}} deal:\n✓ Proper zoning or entitlements in place\n✓ Strong local rental market fundamentals\n✓ Clear title and development-ready sites\n✓ Competitive pricing for the submarket\n\n💰 Quick decisions and competitive offers\n🚀 No lengthy approval processes\n📞 Direct access to our acquisition team\n\nHave something that might work? Send us the basics:\n📧 Email: catalyst@landlinq.ai\n📱 Text: (704) 610-1549\n🌐 Web: https://landlinq.ai/submit-deal\n\nJust need: Address, asking price, and acreage to get started!\n\nThanks for being part of the {{companyName}} network,\n{{analystName}}\n{{companyName}} Team\n\n---\nTo unsubscribe from monthly updates, reply with \"UNSUBSCRIBE\"",
+      content: "Hi {{brokerName}},\n\nHope you're having a great month! We wanted to check in and see if you have any exciting land deals that might be a good fit for {{companyName}}.\n\nWe're actively acquiring in these product types:\n• Conventional Apartments (10+ acres)\n• Active Adult Communities (15+ acres)\n• Build-to-Rent (5+ acres)\n• Lot Development (10+ acres)\n\n🎯 What makes a great {{companyName}} deal:\n✓ Proper zoning or entitlements in place\n✓ Strong local rental market fundamentals\n✓ Clear title and development-ready sites\n✓ Competitive pricing for the submarket\n\n💰 Quick decisions and competitive offers\n🚀 No lengthy approval processes\n📞 Direct access to our acquisition team\n\nHave something that might work? Send us the basics:\n📧 Email: deals@landlinq.ai\n🌐 Web: https://landlinq.ai/submit-deal\n\nJust need: Address, asking price, and acreage to get started!\n\nThanks for being part of the {{companyName}} network,\n{{analystName}}\n{{companyName}} Team\n\n---\nTo unsubscribe from monthly updates, reply with \"UNSUBSCRIBE\"",
       html: `<div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f9fafb; padding: 20px;">
         <div style="text-align: center; background-color: #ffffff; border-bottom: 3px solid #d4af37; padding: 20px 20px 10px 20px; margin-bottom: 30px; border-radius: 8px 8px 0 0;">
           <img src="{{logoUrl}}" alt="{{companyName}}" style="max-height: 60px; width: auto; margin: 0 auto 10px auto; display: block;" />
@@ -422,8 +421,7 @@ const defaultBusinessSettings: BusinessSettings = {
           </p>
           <p style="color: #374151; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">Have something that might work? Send us the basics:</p>
           <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.8;">
-            📧 Email: <a href="mailto:catalyst@landlinq.ai" style="color: #d4af37;">catalyst@landlinq.ai</a><br>
-            📱 Text: <a href="tel:7046101549" style="color: #d4af37;">(704) 610-1549</a><br>
+            📧 Email: <a href="mailto:deals@landlinq.ai" style="color: #d4af37;">deals@landlinq.ai</a><br>
             🌐 Web: <a href="https://landlinq.ai/submit-deal" style="color: #d4af37;">https://landlinq.ai/submit-deal</a>
           </p>
           <p style="color: #6b7280; margin: 0 0 25px 0; font-size: 14px; font-style: italic;">Just need: Address, asking price, and acreage to get started!</p>
@@ -676,7 +674,7 @@ const defaultBusinessSettings: BusinessSettings = {
         
         <div style="background: #1f2937; color: white; padding: 20px; text-align: center;">
           <p style="margin: 0; font-size: 14px;">
-            {{companyName}} - Catalyst Capital Partners<br>
+            {{companyName}} - LandLinq<br>
             <a href="mailto:{{supportEmail}}" style="color: #4A90E2;">{{supportEmail}}</a> | 
             <a href="tel:{{supportPhone}}" style="color: #4A90E2;">{{supportPhone}}</a>
           </p>
@@ -726,7 +724,7 @@ const defaultBusinessSettings: BusinessSettings = {
         
         <div style="background: #1f2937; color: white; padding: 20px; text-align: center;">
           <p style="margin: 0; font-size: 14px;">
-            {{companyName}} - Catalyst Capital Partners<br>
+            {{companyName}} - LandLinq<br>
             <a href="mailto:{{supportEmail}}" style="color: #4A90E2;">{{supportEmail}}</a> | 
             <a href="tel:{{supportPhone}}" style="color: #4A90E2;">{{supportPhone}}</a>
           </p>
@@ -742,7 +740,7 @@ const defaultBusinessSettings: BusinessSettings = {
     {
       id: "1",
       name: "Registration Welcome SMS",
-      content: "Welcome to {{companyName}}, {{brokerName}}! Ready to submit deals? Text property details to this number or email catalyst@landlinq.ai. We respond within 2 hours. - {{companyName}} Team",
+      content: "Welcome to {{companyName}}, {{brokerName}}! Ready to submit deals? Text property details to this number or email deals@landlinq.ai. We respond within 2 hours. - {{companyName}} Team",
       event: "broker_registered"
     },
 
@@ -830,7 +828,7 @@ const defaultBusinessSettings: BusinessSettings = {
     {
       id: "12",
       name: "Password Reset SMS",
-      content: "🔐 LandLinq Password Reset: Click to reset your password: {{resetUrl}} (expires in 1 hour). Didn't request this? Contact (704) 610-1549. -LandLinq Security",
+      content: "🔐 LandLinq Password Reset: Click to reset your password: {{resetUrl}} (expires in 1 hour). Didn't request this? Reply to this email for support. -LandLinq Security",
       event: "password_reset"
     },
 
@@ -846,7 +844,7 @@ const defaultBusinessSettings: BusinessSettings = {
     {
       id: "13",
       name: "Not Understanding SMS",
-      content: "Not understanding. Please email catalyst@landlinq.ai for further help. Our team will respond quickly! -LandLinq",
+      content: "Not understanding. Please email help@landlinq.ai for further help. Our team will respond quickly! -LandLinq",
       event: "sms_not_understanding"
     }
   ],
@@ -856,17 +854,17 @@ const defaultBusinessSettings: BusinessSettings = {
   dealAssignments: [],
 
   // Global Business Brand
-  primaryColor: "#081729",        // Catalyst Navy
-  secondaryColor: "#4A90E2",      // Catalyst Blue
-  tertiaryColor: "#d4af37",       // Catalyst Gold
+   primaryColor: "#081729",        // LandLinq Navy
+   secondaryColor: "#4A90E2",      // LandLinq Blue
+   tertiaryColor: "#d4af37",       // LandLinq Gold
   backgroundColor: "#FDFFFF",     // Clean white background
   textColor: "#081729",           // Navy text
   fontFamily: "Inter, sans-serif", // Modern, clean font
   fontSize: "16px",               // Standard readable size
-  logoUrl: "/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png", // Catalyst:LandLinq logo from Object Storage
+   logoUrl: "/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png", // LandLinq logo from Object Storage
   companyName: "LandLinq",        // Company name
-  supportEmail: "catalyst@landlinq.ai", // Support contact - actual email used
-  supportPhone: "(704) 610-1549", // Support phone - updated to standardized number
+   supportEmail: "help@landlinq.ai", // Public support contact
+  supportPhone: "", // Phone is intentionally not displayed in public branding
   emailSignature: null,
   tagline: "Professional Land Acquisition Platform",
   buttonStyle: "rounded",

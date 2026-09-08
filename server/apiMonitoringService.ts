@@ -509,7 +509,7 @@ export class ApiMonitoringService {
 
   <div class="section" style="background: #f9fafb;">
     <p><em>This automated report is generated daily by the LandLinq API Monitoring System.</em></p>
-    <p><em>For questions, contact: catalyst@landlinq.ai</em></p>
+    <p><em>For questions, contact: help@landlinq.ai</em></p>
   </div>
 </body>
 </html>
@@ -546,7 +546,7 @@ ${issuesCount === 0 ? '- All APIs are healthy and up to date!' : ''}
 
 ---
 This automated report is generated daily by the LandLinq API Monitoring System.
-For questions, contact: catalyst@landlinq.ai
+For questions, contact: help@landlinq.ai
     `;
 
     return { subject, html, text };

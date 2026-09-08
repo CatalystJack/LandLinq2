@@ -315,7 +315,7 @@ export function LIHTCScoreModal({ dealId, isOpen, onClose, onRefresh }: LIHTCSco
 
     const titleX = MARGIN + (logoWidth > 0 ? logoWidth + 4 : 0);
     text('NC QAP 2026 — LIHTC Site Suitability Score Report', titleX, 14, { color: WHITE, size: 11, bold: true });
-    text('Catalyst Capital Partners  ·  Powered by LandLinq', titleX, 20, { color: [160,170,185], size: 7.5 });
+    text('LandLinq', titleX, 20, { color: [160,170,185], size: 7.5 });
     text(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), PAGE_W - MARGIN, 14, { align: 'right', color: [160,170,185], size: 8 });
 
     let y = 36;

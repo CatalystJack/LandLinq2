@@ -52,10 +52,10 @@ export const REQUIRED_ENV_VARS = {
   },
   
   TWILIO_PHONE_NUMBER: {
-    description: 'Twilio phone number for SMS (704) 610-1549',
+    description: 'Twilio phone number for SMS (kept internal and never displayed publicly)',
     required: true,
     production: true,
-    example: '+17046101549'
+    example: 'configured Twilio sender number'
   },
   
   // Property Data APIs

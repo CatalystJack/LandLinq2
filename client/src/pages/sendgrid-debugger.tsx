@@ -115,7 +115,7 @@ export default function SendGridDebugger() {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <strong>How to use:</strong> Send a test email with PDF attachment to <code className="bg-slate-200 px-2 py-1 rounded">deals@catalyst.landlinq.ai</code>. 
+            <strong>How to use:</strong> Send a test email with PDF attachment to <code className="bg-slate-200 px-2 py-1 rounded">deals@landlinq.ai</code>.
             The webhook payload will appear below within seconds. Check if SendGrid is sending Raw MIME format or Multipart format.
           </AlertDescription>
         </Alert>

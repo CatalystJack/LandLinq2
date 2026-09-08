@@ -221,7 +221,7 @@ john.broker@realty.com
                   <div>
                     <p className="font-semibold">Microsoft 365 Forwarding</p>
                     <p className="text-sm text-gray-600">
-                      Set up email rule to forward catalyst@landlinq.ai → deals@inbound.landlinq.ai
+                      Set up email rule to forward deals@landlinq.ai → deals@inbound.landlinq.ai
                     </p>
                     <p className="text-xs text-blue-600 mt-1">⚡ 10 minute setup</p>
                   </div>

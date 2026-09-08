@@ -203,7 +203,7 @@ export class EmailIntakeService {
 
     // Loop prevention
     const fromLower = email.from.toLowerCase();
-    if (['@landlinq.ai', 'catalyst.landlinq.ai'].some(d => fromLower.includes(d))) {
+    if (['@landlinq.ai'].some(d => fromLower.includes(d))) {
       console.log(`🔄 [INTAKE] Blocked — loop prevention`);
       return null;
     }
@@ -225,11 +225,7 @@ export class EmailIntakeService {
       ccField.includes('deals@landlinq.ai') ||
       ccField.includes('deal@landlinq.ai') ||
       envelopeTo.includes('deals@landlinq.ai') ||
-      envelopeTo.includes('deal@landlinq.ai') ||
-      toField.includes('deals@catalyst.landlinq.ai') ||
-      toField.includes('deal@catalyst.landlinq.ai') ||
-      envelopeTo.includes('deals@catalyst.landlinq.ai') ||
-      envelopeTo.includes('deal@catalyst.landlinq.ai');
+      envelopeTo.includes('deal@landlinq.ai');
 
     if (!validRecipient) {
       console.log(`📧 [INTAKE] Ignored — not addressed to deal(s)@landlinq.ai`);

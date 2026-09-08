@@ -30,7 +30,7 @@ export class FollowUpService {
     COOLDOWN_HOURS: 24, // Minimum hours between follow-ups
     REMINDER_HOURS: 48, // Hours to wait before sending reminder
     MAX_FOLLOW_UP_ATTEMPTS: 3, // Escalate after this many attempts
-    SUPPORT_PHONE: "(704) 610-1549"
+    SUPPORT_PHONE: ""
   };
 
   /**
@@ -58,7 +58,7 @@ export class FollowUpService {
       COOLDOWN_HOURS: 24,
       REMINDER_HOURS: 48,
       MAX_FOLLOW_UP_ATTEMPTS: 3,
-      SUPPORT_PHONE: "(704) 610-1549"
+      SUPPORT_PHONE: ""
     };
     console.log('🔄 FollowUpService reset to production defaults');
   }
@@ -323,7 +323,7 @@ export class FollowUpService {
       }
       
       // Get analyst information for the deal
-      let analystName = 'Catalyst Team';
+       let analystName = 'LandLinq Team';
       if (deal.assignedAnalyst) {
         try {
           const analyst = await storage.getUser(deal.assignedAnalyst);
@@ -340,7 +340,7 @@ export class FollowUpService {
       }
       
       // Get company branding from business settings
-      let companyName = 'Catalyst Capital Partners';
+       let companyName = 'LandLinq';
       try {
         const businessSettings = await storage.getBusinessSettings();
         if (businessSettings && businessSettings.companyName) {

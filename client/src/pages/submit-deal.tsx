@@ -265,11 +265,11 @@ export default function SubmitDeal() {
                   Send deal details to
                 </p>
                 <a 
-                  href="mailto:deals@catalyst.landlinq.ai" 
+                  href="mailto:deals@landlinq.ai"
                   className="text-lg font-semibold text-[#4A90E2] hover:text-[#081729] transition-colors" 
                   data-testid="text-email-address"
                 >
-                  deals@catalyst.landlinq.ai
+                  deals@landlinq.ai
                 </a>
               </CardContent>
             </Card>

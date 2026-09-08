@@ -3172,7 +3172,7 @@ export class UnifiedDealPipeline {
       const brokerName = broker.firstName || 'there';
       
       // Get analyst information for the deal (matches followUpService.ts)
-      let analystName = 'Catalyst Team';
+      let analystName = 'LandLinq Team';
       if (deal.assignedAnalyst) {
         try {
           const analyst = await storage.getUser(deal.assignedAnalyst);

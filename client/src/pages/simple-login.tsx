@@ -32,7 +32,7 @@ export default function SimpleLogin() {
                 Login
               </Button>
               <div className="text-center text-sm text-muted-foreground">
-                <p>For Catalyst Capital Partners team members</p>
+                <p>For LandLinq team members</p>
                 <p className="mt-2">Use your @catalystcp.com email to access analyst features</p>
               </div>
             </CardContent>

@@ -518,7 +518,7 @@ export class DatabaseStorage implements IStorage {
             userId: null,
             targetMarkets: [],
             productTypes: [],
-            companyName: 'Catalyst Capital Partners',
+            companyName: 'LandLinq',
             prefersSms: false,
             smsOptInStatus: 'opted_out'
           }).returning();
@@ -2823,7 +2823,8 @@ export class DatabaseStorage implements IStorage {
         logoUrl: updates.logoUrl !== undefined ? updates.logoUrl : settings.logoUrl,
         companyName: updates.companyName || settings.companyName,
         supportEmail: updates.supportEmail || settings.supportEmail,
-        supportPhone: updates.supportPhone || settings.supportPhone,
+        // Company phone is intentionally not published in branding or messages.
+        supportPhone: '',
         // Add missing branding fields
         emailSignature: updates.emailSignature || settings.emailSignature,
         tagline: updates.tagline || settings.tagline,
@@ -2860,7 +2861,7 @@ export class DatabaseStorage implements IStorage {
           name: 'High Priority - Pursuing Deal',
           event: 'status_pursuing',
           subject: 'HIGH PRIORITY: {{address}} - Moving Forward!',
-          content: 'Dear {{brokerName}},\n\nExcellent news! Your property at {{address}} has been classified as HIGH PRIORITY and we\'re moving forward immediately.\n\nWhy we\'re excited:\n• Perfect market fit\n• Ideal development potential\n• Strong financial projections\n• Meets all our acquisition criteria\n\nImmediate next steps:\n• Site visit scheduled within 3 business days\n• Direct contact from our acquisitions team within 2 hours\n• Preliminary offer expected within 5-7 business days\n\nTalk soon!\n\nThe Catalyst Acquisitions Team',
+          content: 'Dear {{brokerName}},\n\nExcellent news! Your property at {{address}} has been classified as HIGH PRIORITY and we\'re moving forward immediately.\n\nWhy we\'re excited:\n• Perfect market fit\n• Ideal development potential\n• Strong financial projections\n• Meets all our acquisition criteria\n\nImmediate next steps:\n• Site visit scheduled within 3 business days\n• Direct contact from our acquisitions team within 2 hours\n• Preliminary offer expected within 5-7 business days\n\nTalk soon!\n\nThe LandLinq Team',
         },
       ];
 

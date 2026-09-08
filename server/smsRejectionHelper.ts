@@ -25,7 +25,7 @@ export class SMSRejectionHelper {
     }
 
     // PATTERN 2: Outside target MSAs
-    if (reason.includes('not within catalyst\'s target acquisition markets') || 
+    if (reason.includes('not within LandLinq\'s target acquisition markets') ||
         reason.includes('outside target msa')) {
       const countyMatch = fullReason.match(/located in ([^(]+)/i);
       if (countyMatch) {
@@ -99,7 +99,7 @@ export class SMSRejectionHelper {
   static test() {
     const testCases = [
       "Property size is 2.50 acres (verified via Regrid API), below the 4-acre minimum threshold. If parcels can be assembled to increase acreage, please resubmit the deal.",
-      "Property located in Loudoun County, VA (Washington-Arlington-Alexandria, DC-VA-MD-WV) is not within Catalyst's target acquisition markets. We are currently only acquiring in specific MSAs for Active Adult, BTR/Conventional Apartments, and Lot Development projects.",
+      "Property located in Loudoun County, VA (Washington-Arlington-Alexandria, DC-VA-MD-WV) is not within LandLinq's target acquisition markets. We are currently only acquiring in specific MSAs for Active Adult, BTR/Conventional Apartments, and Lot Development projects.",
       "No qualifying comparables found within search radius.",
       "Unable to geocode address - requires manual review",
       "Property not found in HelloData - no qualifying comparables available"

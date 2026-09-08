@@ -355,7 +355,7 @@ export default function EmailTemplateSystem({ dealData, brokerData, onSendEmail 
                 <div className="space-y-2 text-sm">
                   <div className="flex">
                     <span className="font-medium text-gray-600 w-16">From:</span>
-                    <a href="mailto:catalyst@landlinq.ai" className="text-gray-900 hover:text-catalyst-navy transition-colors" data-testid="text-from-email">catalyst@landlinq.ai</a>
+                    <a href="mailto:help@landlinq.ai" className="text-gray-900 hover:text-catalyst-navy transition-colors" data-testid="text-from-email">help@landlinq.ai</a>
                   </div>
                   <div className="flex">
                     <span className="font-medium text-gray-600 w-16">To:</span>

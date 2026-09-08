@@ -213,8 +213,8 @@ export default function OutreachManagement() {
     logoUrl: '',
     companyName: 'LandLinq',
     tagline: 'Professional Land Acquisition Platform',
-    supportEmail: 'catalyst@landlinq.ai',
-    supportPhone: '(704) 610-1549',
+    supportEmail: 'help@landlinq.ai',
+    supportPhone: '',
     primaryColor: '#081729',
     secondaryColor: '#4A90E2',
     tertiaryColor: '#d4af37',
@@ -223,7 +223,7 @@ export default function OutreachManagement() {
     fontSize: '14px',
     buttonStyle: 'rounded',
     emailWidth: '600px',
-    emailSignature: `Best regards,\nLandLinq Team\nCatalyst Capital Partners\n\n📧 catalyst@landlinq.ai | 📱 (704) 610-1549\n🌐 https://landlinq.ai`
+    emailSignature: `Best regards,\nLandLinq Team\n\nhelp@landlinq.ai\nhttps://landlinq.ai`
   });
 
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
@@ -2407,7 +2407,7 @@ export default function OutreachManagement() {
                       <Input
                         id="support-email"
                         type="email"
-                        placeholder="catalyst@landlinq.ai"
+                         placeholder="help@landlinq.ai"
                         value={brandingSettings.supportEmail}
                         onChange={(e) => updateBrandingSetting('supportEmail', e.target.value)}
                         data-testid="support-email-input"
@@ -2419,7 +2419,7 @@ export default function OutreachManagement() {
                       <Input
                         id="support-phone"
                         type="tel"
-                        placeholder="(704) 610-1549"
+                         placeholder="No phone displayed"
                         value={brandingSettings.supportPhone}
                         onChange={(e) => updateBrandingSetting('supportPhone', e.target.value)}
                         data-testid="support-phone-input"
@@ -2532,7 +2532,7 @@ export default function OutreachManagement() {
                     <Textarea
                       id="email-signature"
                       rows={4}
-                      placeholder="Best regards,\nLandLinq Team\nCatalyst Capital Partners\n\n📧 catalyst@landlinq.ai | 📱 (704) 610-1549\n🌐 https://landlinq.ai"
+                      placeholder="Best regards,\nLandLinq Team\n\nhelp@landlinq.ai\nhttps://landlinq.ai"
                       value={brandingSettings.emailSignature}
                       onChange={(e) => updateBrandingSetting('emailSignature', e.target.value)}
                       className="font-mono text-sm"

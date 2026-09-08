@@ -1,0 +1,36 @@
+Fix the Microsoft OAuth connection flow so users from OTHER organizations (NRP, 
+Pulte, Kolter, etc.) can connect their own Microsoft 365 accounts for outreach. 
+The Azure App Registration has now been configured as multi-tenant (Multiple Entra 
+ID tenants, Allow all tenants) — this code change makes the application side match.
+
+TASK 1 — Use 'organizations' instead of our specific tenant ID for the authorize URL
+In server/routes.ts (~line 29519), the OAuth authorize URL currently uses our own 
+tenantId directly:
+  https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize
+Change this to use 'organizations' instead of tenantId:
+  https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize
+This matches the Azure app's new multi-tenant configuration and allows any real 
+work/school Microsoft account from any company to sign in (personal accounts 
+remain excluded, consistent with the "Multiple Entra ID tenants" setting chosen, 
+not "+ Personal Microsoft accounts").
+
+TASK 2 — Update both token exchange call sites to match
+There are two other places using the same pattern that must be updated to stay 
+consistent with the authorize step:
+  server/routes.ts ~line 29238: https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token
+  server/routes.ts ~line 29590: https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token
+Confirm which of these are part of the developer-initiated outreach connection flow 
+(vs. the app-only client-credentials flow used for help@landlinq.ai system emails, 
+which should NOT change) before editing — only update the ones tied to the 
+delegated per-user OAuth connection flow. If unsure which is which, report back 
+each call site's surrounding context before changing anything.
+
+TASK 3 — Verify with a real external test
+Since the Azure multi-tenant setting is now confirmed live, this can be tested for 
+real: attempt to connect a Microsoft account from a different organization/tenant 
+than our own through the outreach "Connect your email" flow, and confirm the sign-in 
+succeeds and the account connects properly, rather than being rejected.
+
+Do not change anything related to the app-only (client-credentials) authentication 
+used for sending system emails from help@landlinq.ai — that's a separate, unrelated 
+flow and must continue working exactly as it does today.

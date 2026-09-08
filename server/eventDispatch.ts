@@ -151,10 +151,10 @@ export class EventDispatchService {
         : settings.smsTemplates;
       
       // Enhance payload with business brand data
-      // ⚠️ HARDCODED LOGO: Use Catalyst:LandLinq branding for ALL emails (per user requirement)
+      // Use the LandLinq logo consistently for all emails.
       const currentDomain = process.env.REPLIT_DOMAINS 
         ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-        : 'https://catalyst.landlinq.ai';
+        : 'https://landlinq.ai';
       
       // Served from Object Storage to reduce deployment size
       const hardcodedLogoUrl = `${currentDomain}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
@@ -163,19 +163,19 @@ export class EventDispatchService {
         ...payload,
         // Map propertyAddress to address for SMS template compatibility
         address: payload.propertyAddress || '',
-        companyName: settings.companyName || 'LandLinq - Catalyst Capital Partners',
-        supportEmail: settings.supportEmail || 'deals@catalyst.landlinq.ai',
-        supportPhone: settings.supportPhone || '(704) 610-1549',
+        companyName: settings.companyName || 'LandLinq',
+        supportEmail: settings.supportEmail || 'help@landlinq.ai',
+        supportPhone: settings.supportPhone || '',
         analystName: payload.analystName || 'Austin Blondell',
         date: payload.date || new Date().toLocaleDateString(),
         // Add branding and dashboard variables
         brandColor: settings.primaryColor || '#4A90E2',
         brandColorDark: '#081729',
-        // ⚠️ HARDCODED: Always use Catalyst:LandLinq logo (DO NOT use settings.logoUrl)
+        // Always use the LandLinq logo rather than tenant-uploaded branding.
         logoUrl: hardcodedLogoUrl,
         dashboardUrl: 'https://landlinq.ai/dashboard',
-        contactPhone: settings.supportPhone || '(704) 610-1549',
-        contactEmail: settings.supportEmail || 'deals@catalyst.landlinq.ai',
+        contactPhone: settings.supportPhone || '',
+        contactEmail: settings.supportEmail || 'help@landlinq.ai',
         websiteUrl: 'https://landlinq.ai'
       };
       
@@ -263,7 +263,7 @@ export class EventDispatchService {
           <!-- Header with Logo -->
           <tr>
             <td style="padding: 40px 40px 30px 40px; text-align: center; background-color: #ffffff;">
-              ${enhancedPayload.logoUrl ? `<img src="${enhancedPayload.logoUrl}" alt="${enhancedPayload.companyName || 'Catalyst Acquisitions'}" style="max-width: 280px; height: auto; display: block; margin: 0 auto;" />` : `<h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #081729;">${enhancedPayload.companyName || 'Catalyst Acquisitions'}</h1>`}
+              ${enhancedPayload.logoUrl ? `<img src="${enhancedPayload.logoUrl}" alt="${enhancedPayload.companyName || 'LandLinq'}" style="max-width: 280px; height: auto; display: block; margin: 0 auto;" />` : `<h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #081729;">${enhancedPayload.companyName || 'LandLinq'}</h1>`}
             </td>
           </tr>
           
@@ -286,14 +286,13 @@ export class EventDispatchService {
                 <tr>
                   <td style="text-align: center;">
                     <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #333;">Let's Build What's Next, Together!</p>
-                    <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: #081729;">Catalyst</p>
-                    <p style="margin: 0 0 20px 0; font-size: 12px; color: #666;">Powered By LandLinq™</p>
+                    <p style="margin: 0 0 20px 0; font-size: 14px; font-weight: 700; color: #081729;">LandLinq</p>
                   </td>
                 </tr>
                 <tr>
                   <td style="text-align: center; padding-top: 20px; border-top: 1px solid #e8e8e8;">
                     <p style="margin: 0 0 12px 0; font-size: 12px; color: #666; line-height: 1.6;">
-                      © 2025 LandLinq™ | <a href="mailto:${enhancedPayload.contactEmail}" style="color: #4A90E2; text-decoration: none;">${enhancedPayload.contactEmail}</a> | <a href="tel:${enhancedPayload.contactPhone?.replace(/\D/g, '')}" style="color: #4A90E2; text-decoration: none;">${enhancedPayload.contactPhone}</a> | <a href="https://landlinq.ai" style="color: #4A90E2; text-decoration: none;">landlinq.ai</a>
+                       © 2025 LandLinq™ | <a href="mailto:${enhancedPayload.contactEmail}" style="color: #4A90E2; text-decoration: none;">${enhancedPayload.contactEmail}</a> | <a href="https://landlinq.ai" style="color: #4A90E2; text-decoration: none;">landlinq.ai</a>
                     </p>
                   </td>
                 </tr>
@@ -589,7 +588,7 @@ export const emailTemplates = {
   }),
   dealRejected: (brokerName: string) => ({
     subject: "Deal Update",
-    message: `Hi ${brokerName},\n\nThank you for thinking of Catalyst...`
+    message: `Hi ${brokerName},\n\nThank you for thinking of LandLinq...`
   }),
 };
 

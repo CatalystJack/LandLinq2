@@ -714,7 +714,7 @@ function ManualSubmitModal({ open, onClose, onSuccess }: {
             <PlusCircle className="w-4 h-4 text-blue-600" /> Manually Submit an Email
           </DialogTitle>
           <p className="text-xs text-gray-500 mt-1">
-            Paste any deal email here and the AI will parse it instantly — same as if it was forwarded to deals@catalyst.landlinq.ai.
+            Paste any deal email here and the AI will parse it instantly — same as if it was forwarded to deals@landlinq.ai.
           </p>
         </DialogHeader>
 
@@ -908,7 +908,7 @@ export default function EmailIntakePage() {
           <div>
             <h1 className="text-xl font-semibold text-gray-900">Email Intake Queue</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              Emails to <span className="font-mono text-xs bg-gray-100 px-1 rounded">deals@catalyst.landlinq.ai</span> are AI-parsed here. Approve to create a deal. Every approval auto-trains the AI.
+            Emails to <span className="font-mono text-xs bg-gray-100 px-1 rounded">deals@landlinq.ai</span> are AI-parsed here. Approve to create a deal. Every approval auto-trains the AI.
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -970,7 +970,7 @@ export default function EmailIntakePage() {
                   <Mail className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="text-sm font-medium">No {tab} emails.</p>
                   {tab === "pending" && (
-                    <p className="text-xs mt-1">Broker emails sent to deals@catalyst.landlinq.ai will appear here.</p>
+                    <p className="text-xs mt-1">Broker emails sent to deals@landlinq.ai will appear here.</p>
                   )}
                 </div>
               ) : (

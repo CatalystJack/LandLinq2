@@ -256,7 +256,7 @@ class OpenAIService {
         messages: [
           {
             role: "system",
-            content: "You are a professional real estate acquisition manager at Catalyst Capital Partners. Write clear, courteous communications that maintain broker relationships."
+            content: "You are a professional real estate acquisition manager at LandLinq. Write clear, courteous communications that maintain broker relationships."
           },
           {
             role: "user",
@@ -282,15 +282,15 @@ class OpenAIService {
       const templates = {
         green: {
           subject: `Great Opportunity - ${propertyAddress}`,
-          message: `Hi ${brokerName},\n\nThank you for submitting the property at ${propertyAddress}. This looks like a promising opportunity that aligns with our investment criteria.\n\nWe'd like to move forward with the next steps. Please expect a call from our team within 24 hours to discuss details.\n\nBest regards,\nCatalyst Capital Partners`
+          message: `Hi ${brokerName},\n\nThank you for submitting the property at ${propertyAddress}. This looks like a promising opportunity that aligns with our investment criteria.\n\nWe'd like to move forward with the next steps. Please expect a call from our team within 24 hours to discuss details.\n\nBest regards,\nLandLinq`
         },
         yellow: {
           subject: `Property Review - ${propertyAddress}`,
-          message: `Hi ${brokerName},\n\nThank you for the property submission at ${propertyAddress}. We're reviewing the details and may need some additional information.\n\nOur team will reach out within 48 hours with any questions or next steps.\n\nBest regards,\nCatalyst Capital Partners`
+          message: `Hi ${brokerName},\n\nThank you for the property submission at ${propertyAddress}. We're reviewing the details and may need some additional information.\n\nOur team will reach out within 48 hours with any questions or next steps.\n\nBest regards,\nLandLinq`
         },
         red: {
           subject: `Property Submission - ${propertyAddress}`,
-          message: `Hi ${brokerName},\n\nThank you for thinking of Catalyst Capital Partners for the property at ${propertyAddress}. While this particular opportunity doesn't align with our current investment focus, we appreciate you reaching out.\n\nPlease continue to send us deals that match our criteria. We value our partnership with you.\n\nBest regards,\nCatalyst Capital Partners`
+          message: `Hi ${brokerName},\n\nThank you for thinking of LandLinq for the property at ${propertyAddress}. While this particular opportunity doesn't align with our current investment focus, we appreciate you reaching out.\n\nPlease continue to send us deals that match our criteria. We value our partnership with you.\n\nBest regards,\nLandLinq`
         }
       };
       

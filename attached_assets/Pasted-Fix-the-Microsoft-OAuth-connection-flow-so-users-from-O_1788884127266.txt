@@ -1,0 +1,35 @@
+Fix the Microsoft OAuth connection flow so users from OTHER organizations (NRP, 
+Pulte, Kolter, etc.) can connect their own Microsoft 365 accounts for outreach — 
+currently this is hard-locked to only accept sign-ins from our own tenant.
+
+TASK 1 — Use 'organizations' instead of our specific tenant ID for the authorize URL
+In server/routes.ts (~line 29385), the OAuth authorize URL currently uses our own 
+MICROSOFT_TENANT_ID directly:
+  https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize
+Change this specifically for the developer-initiated connection flow (isDeveloper 
+branch) to use 'organizations' instead of tenantId:
+  https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize
+This allows any real work/school Microsoft account from any company to sign in, 
+while still excluding personal @outlook.com/@hotmail.com accounts (appropriate 
+since these are business email connections). If Catalyst's own internal team 
+connections (non-developer) should also work this way for consistency, apply the 
+same change to that branch too — flag this as a question if unsure whether internal 
+connections should stay tenant-specific or also open up to 'organizations'.
+
+TASK 2 — Confirm the token exchange step also uses the matching endpoint
+Check the OAuth callback/token-exchange code (~line 29405 onward) for any place 
+that also constructs a login.microsoftonline.com URL using our specific tenantId — 
+this must match whatever was used in the authorize step (organizations), or the 
+token exchange will fail for external users even if the initial sign-in succeeded.
+
+TASK 3 — Report the required Azure Portal change
+This code change alone is not sufficient — the Azure App Registration itself must 
+also be configured as multi-tenant ("Accounts in any organizational directory") in 
+the Azure Portal, under this app's Authentication settings. This is not something 
+you can change in code; report this clearly as a manual step required in Azure, 
+separate from the code fix.
+
+Verify: this can't be fully tested without the Azure Portal setting also being 
+changed, so after the code change, clearly state that end-to-end testing (having 
+someone from an actual different organization attempt to connect their account) 
+requires that manual Azure step to be completed first.

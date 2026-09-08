@@ -48,8 +48,7 @@ export default function TemplateEditor() {
         <div style="text-align: center; margin-top: ${footerSpacing}px; padding: 20px; font-size: ${signatureSize}px; color: ${signatureColor}; font-weight: ${signatureBold ? 'bold' : 'normal'}; line-height: 1.6;">
           <p style="margin: 0 0 8px 0;">© 2025 LandLinq</p>
           <p style="margin: 0 0 8px 0;">
-            <a href="mailto:catalyst@landlinq.ai" style="color: #d4af37; text-decoration: none;">catalyst@landlinq.ai</a> | 
-            <a href="tel:7046101549" style="color: #d4af37; text-decoration: none;">(704) 610-1549</a>
+            <a href="mailto:help@landlinq.ai" style="color: #d4af37; text-decoration: none;">help@landlinq.ai</a>
           </p>
         </div>
       </div>

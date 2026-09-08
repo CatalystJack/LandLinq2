@@ -180,7 +180,7 @@ export function generateWeeklyReportEmail(data: WeeklyReportData): {
     </div>
 
     <div class="footer">
-      <p>© ${new Date().getFullYear()} Catalyst Capital Partners • Automated Weekly Report</p>
+      <p>© ${new Date().getFullYear()} LandLinq • Automated Weekly Report</p>
     </div>
   </div>
 </body>
@@ -234,7 +234,7 @@ ${data.upcomingActions.length === 0 ?
 }
 
 ---
-© ${new Date().getFullYear()} Catalyst Capital Partners
+© ${new Date().getFullYear()} LandLinq
 Automated Weekly Report
   `;
 

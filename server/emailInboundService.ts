@@ -238,31 +238,31 @@ export class EmailInboundService {
       const { sendGridDebugger } = await import('./sendgridDebugger.js');
       sendGridDebugger.capturePayload(req.headers as Record<string, string>, req.body);
 
-      // FILTER: Only process emails sent to deals@catalyst.landlinq.ai as deals
+      // FILTER: Only process emails sent to deals@landlinq.ai as deals
       // CRITICAL FIX (Dec 2, 2025): Use includes() instead of strict equality
-      // Email "To" field may include display name like "LandLinq <deals@catalyst.landlinq.ai>"
+      // Email "To" field may include display name like "LandLinq <deals@landlinq.ai>"
       const toAddress = (emailData.to || '').toLowerCase();
-      const isDealSubmission = toAddress.includes('deals@catalyst.landlinq.ai');
+      const isDealSubmission = toAddress.includes('deals@landlinq.ai');
       
       if (!isDealSubmission) {
-        console.log(`📧 Email sent to ${emailData.to} - not processing as deal (only deals@catalyst.landlinq.ai emails are treated as deals)`);
+        console.log(`📧 Email sent to ${emailData.to} - not processing as deal (only deals@landlinq.ai emails are treated as deals)`);
         return res.status(200).json({ 
           message: 'Email received but not processed as deal', 
-          reason: 'Only emails to deals@catalyst.landlinq.ai are processed as deals',
+          reason: 'Only emails to deals@landlinq.ai are processed as deals',
           to: emailData.to
         });
       }
 
-      console.log(`📧 Email confirmed sent to deals@catalyst.landlinq.ai - processing as deal`);
+      console.log(`📧 Email confirmed sent to deals@landlinq.ai - processing as deal`);
 
       // EMAIL LOOP DETECTION: Block emails FROM our own automated addresses
       // This prevents infinite loops where confirmation emails get re-submitted
       const fromAddress = emailData.from.toLowerCase();
       const ourDomains = [
-        'catalyst@landlinq.ai',
+        'help@landlinq.ai',
         'noreply@landlinq.ai',
         '@landlinq.ai',
-        'catalyst.landlinq.ai'
+        'landlinq.ai'
       ];
       
       const isFromOurSystem = ourDomains.some(domain => fromAddress.includes(domain));
@@ -2042,7 +2042,7 @@ Example: If the email says "I have a property" but doesn't specify address, pric
           const cleanedText = EmailInboundService.decodeHtmlEntities(rawTextOriginal);
           
           return {
-            to: parsed.to?.text || 'catalyst@landlinq.ai',
+            to: parsed.to?.text || 'deals@landlinq.ai',
             from: parsed.from?.text || 'unknown@sender.com',
             subject: EmailInboundService.decodeHtmlEntities(parsed.subject || 'Deal Submission'),
             rawText: rawTextOriginal, // ORIGINAL unmodified for audit
@@ -2124,7 +2124,7 @@ Example: If the email says "I have a property" but doesn't specify address, pric
       console.log('📧 [SENDGRID-PARSE] Using text content:', cleanedText.length > 0 ? `"${cleanedText.substring(0, 200)}"` : 'EMPTY');
       
       return {
-        to: body.to || 'catalyst@landlinq.ai',
+        to: body.to || 'deals@landlinq.ai',
         from: body.from || 'unknown@sender.com',
         subject: EmailInboundService.decodeHtmlEntities(body.subject || 'Deal Submission'),
         rawText: rawTextOriginal, // ORIGINAL unmodified for audit
@@ -3822,13 +3822,13 @@ Example: If the email says "I have a property" but doesn't specify address, pric
         dealValue: deal.askingPrice ? `$${deal.askingPrice.toLocaleString()}` : 'To be determined',
         brokerEmail: emailData.from,
         analystName: 'Austin Blondell',
-        companyName: 'LandLinq - Catalyst Capital Partners',
+        companyName: 'LandLinq',
         brandColor: '#4A90E2',
         brandColorDark: '#081729',
         logoUrl: 'https://landlinq.ai/logo.png',
         dashboardUrl: 'https://landlinq.ai/dashboard',
-        contactPhone: '(704) 610-1549',
-        contactEmail: 'deals@catalyst.landlinq.ai',
+        contactPhone: '',
+        contactEmail: 'help@landlinq.ai',
         websiteUrl: 'https://landlinq.ai'
       });
       
@@ -3878,13 +3878,13 @@ Example: If the email says "I have a property" but doesn't specify address, pric
         brokerEmail: emailData.from,
         analystName: 'Austin Blondell',
         fieldsResolved: fieldsResolved.join(', '),
-        companyName: 'LandLinq - Catalyst Capital Partners',
+        companyName: 'LandLinq',
         brandColor: '#4A90E2',
         brandColorDark: '#081729',
         logoUrl: 'https://landlinq.ai/logo.png',
         dashboardUrl: 'https://landlinq.ai/dashboard',
-        contactPhone: '(704) 610-1549',
-        contactEmail: 'deals@catalyst.landlinq.ai',
+        contactPhone: '',
+        contactEmail: 'help@landlinq.ai',
         websiteUrl: 'https://landlinq.ai'
       });
       
@@ -3903,7 +3903,7 @@ Example: If the email says "I have a property" but doesn't specify address, pric
               <p><strong>Deal ID:</strong> ${deal.id}</p>
               <p><strong>Property:</strong> ${deal.address || 'Pending'}</p>
               <p>Our team will review this information and get back to you shortly.</p>
-              <p>Best regards,<br/>Catalyst Capital Partners</p>
+              <p>Best regards,<br/>LandLinq</p>
             </div>
           `,
           type: 'status_update',
@@ -3929,8 +3929,8 @@ Example: If the email says "I have a property" but doesn't specify address, pric
       const template = await TemplateService.getEmailTemplate('Info Missing', {
         brokerName: contactName,
         brokerEmail: emailData.from,
-        contactEmail: 'catalyst@landlinq.ai',
-        supportEmail: 'catalyst@landlinq.ai'
+        contactEmail: 'help@landlinq.ai',
+        supportEmail: 'help@landlinq.ai'
       });
       
       if (template) {
@@ -4103,7 +4103,7 @@ Example: If the email says "I have a property" but doesn't specify address, pric
               </div>
               <div style="padding: 30px; background: #fff;">
                 <h2>Manual Processing Required</h2>
-                <p>An email was received at <a href="mailto:catalyst@landlinq.ai">catalyst@landlinq.ai</a> but could not be automatically parsed into a deal.</p>
+                <p>An email was received at <a href="mailto:deals@landlinq.ai">deals@landlinq.ai</a> but could not be automatically parsed into a deal.</p>
                 
                 <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
                   <h3 style="margin: 0 0 10px 0;">Email Details:</h3>
@@ -4163,13 +4163,13 @@ Example: If the email says "I have a property" but doesn't specify address, pric
         brokerName: deal.contactName || 'Unknown Broker',
         receivedDate: new Date().toLocaleString(),
         date: new Date().toLocaleDateString(),
-        companyName: 'LandLinq - Catalyst Capital Partners',
+        companyName: 'LandLinq',
         brandColor: '#4A90E2',
         brandColorDark: '#081729',
         logoUrl: 'https://landlinq.ai/logo.png',
         dashboardUrl: 'https://landlinq.ai/dashboard',
         analystName: 'Austin Blondell',
-        contactPhone: '(704) 610-1549',
+        contactPhone: '',
         websiteUrl: 'https://landlinq.ai'
       });
       

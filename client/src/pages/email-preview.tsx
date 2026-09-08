@@ -35,7 +35,7 @@ export default function EmailPreview() {
                 <p style={{ margin: '5px 0', color: '#374151' }}><strong>Property:</strong> 1600 Camden Road, Charlotte, NC 28203</p>
                 <p style={{ margin: '5px 0', color: '#374151' }}><strong>Status:</strong> Under Review</p>
               </div>
-              <p style={textStyle}>Someone from the Catalyst Acquisition Team will respond within 24 hours.</p>
+              <p style={textStyle}>Someone from the LandLinq team will respond within 24 hours.</p>
             </EmailContent>
           </EmailTemplate>
         </TemplateCard>
@@ -105,8 +105,7 @@ export default function EmailPreview() {
               <div style={{ backgroundColor: '#fef3c7', borderLeft: '4px solid #d4af37', padding: '20px', margin: '0 0 25px 0', borderRadius: '4px' }}>
                 <p style={{ color: '#92400e', margin: '0 0 10px 0', fontSize: '14px', fontWeight: 'bold' }}>Submission Methods:</p>
                 <p style={{ color: '#92400e', margin: 0, fontSize: '14px', lineHeight: 1.8 }}>
-                  Email: catalyst@landlinq.ai<br />
-                  SMS: (704) 610-1549<br />
+                  Email: help@landlinq.ai<br />
                   Web: landlinq.ai/submit-deal
                 </p>
               </div>

@@ -8,12 +8,170 @@ import type { EmailNotification } from './types';
 import { TemplateService, renderBrandedEmail } from './templateService';
 import { apiCallTracker } from './apiCallTracker.js';
 import { storage } from './storage';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 import { getAppOnlyGraphToken } from './microsoftAuth';
 import sgMail from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
 
 export const PUBLIC_TRANSACTIONAL_EMAIL = 'help@landlinq.ai';
 export const PUBLIC_TRANSACTIONAL_NAME = 'LandLinq Support';
+// These GoDaddy-managed mailboxes resolve through Microsoft 365
+// (autodiscover.outlook.com / ppe-hosted.com), so use Exchange Online SMTP
+// submission rather than GoDaddy Professional Email's smtpout endpoint.
+const GODADDY_SMTP_HOST = process.env.GODADDY_SMTP_HOST || 'smtp.office365.com';
+const GODADDY_SMTP_PORT = Number(process.env.GODADDY_SMTP_PORT || 587);
+const EMAIL_LOGO_CID = 'landlinq-email-logo@landlinq.ai';
+const EMAIL_LOGO_PATH = path.join(process.cwd(), 'server/public/assets/landlinq-email-logo.png');
+let emailLogoBufferPromise: Promise<Buffer | null> | undefined;
+const EMAIL_EMOJI_PATTERN = /[\p{Emoji_Presentation}\p{Emoji_Modifier}]|\p{Extended_Pictographic}\uFE0F/gu;
+const COMPANY_PHONE_PATTERN = /(?:tel:\+?1?[\s.-]*)?\(?704\)?[\s.-]*610[\s.-]*1549/gi;
+
+function stripEmailEmojis(value: string): string {
+  return value
+    .replace(EMAIL_EMOJI_PATTERN, '')
+    .replace(/\u200D|\uFE0F/gu, '');
+}
+
+function stripCompanyPhone(value: string): string {
+  return value
+    .replace(/<a\b[^>]*href=["']tel:[^"']*704[^"']*["'][^>]*>[\s\S]*?<\/a>/gi, '')
+    .replace(COMPANY_PHONE_PATTERN, '')
+    .replace(/(?:phone|tel|call|text|sms)\s*:?\s*(?=(?:<br\s*\/?>|<\/p>|<\/div>|\||•|\n|$))/gi, '')
+    .replace(/[ \t]{2,}/g, ' ');
+}
+
+function stripLegacyCatalystBranding(value: string): string {
+  return value
+    .replace(/catalyst@landlinq\.ai/gi, 'help@landlinq.ai')
+    .replace(/deals@catalyst\.landlinq\.ai/gi, 'deals@landlinq.ai')
+    .replace(/catalyst\.landlinq\.ai/gi, 'landlinq.ai')
+    .replace(/Catalyst Capital Partners/gi, 'LandLinq')
+    .replace(/Catalyst Acquisitions/gi, 'LandLinq Team')
+    .replace(/Catalyst Acquisition Team/gi, 'LandLinq Team')
+    .replace(/\bCatalyst Team\b/gi, 'LandLinq Team')
+    .replace(/\bCatalyst Security Team\b/gi, 'LandLinq Security Team')
+    .replace(/\bCatalyst\b/g, 'LandLinq');
+}
+
+const GODADDY_MAILBOXES: Record<string, { passwordEnv: string; defaultName: string }> = {
+  'help@landlinq.ai': {
+    passwordEnv: 'HELP_EMAIL_PASSWORD',
+    defaultName: PUBLIC_TRANSACTIONAL_NAME,
+  },
+  'deals@landlinq.ai': {
+    passwordEnv: 'DEALS_EMAIL_PASSWORD',
+    defaultName: 'LandLinq Deals',
+  },
+};
+
+function getGoDaddyMailbox(email: string) {
+  return GODADDY_MAILBOXES[email.trim().toLowerCase()];
+}
+
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function getEmailLogoBuffer(): Promise<Buffer | null> {
+  if (!emailLogoBufferPromise) {
+    emailLogoBufferPromise = readFile(EMAIL_LOGO_PATH).catch((error) => {
+      console.error(`❌ [EMAIL-LOGO] Could not load inline logo from ${EMAIL_LOGO_PATH}:`, error);
+      return null;
+    });
+  }
+  return emailLogoBufferPromise;
+}
+
+function inlineEmailLogo(html: string): string {
+  // Replace the old environment-specific/object-storage logo URL with a CID
+  // image. CID images are included in the message and render in Outlook/Gmail
+  // without requiring the client to fetch a Replit preview URL.
+  return html.replace(
+    /(<img\b[^>]*?\bsrc=["'])[^"']*(?:api\/assets\/|landlinq-email-logo\.png)[^"']*(["'][^>]*>)/gi,
+    `$1cid:${EMAIL_LOGO_CID}$2`,
+  );
+}
+
+async function sendGoDaddyEmail(
+  notification: EmailNotification,
+  senderEmail: string,
+  senderName: string,
+  htmlBody: string,
+): Promise<boolean> {
+  const mailbox = getGoDaddyMailbox(senderEmail);
+  if (!mailbox) return false;
+
+  const password = process.env[mailbox.passwordEnv];
+  if (!password) {
+    console.error(`❌ [GODADDY-SMTP] Missing ${mailbox.passwordEnv}; refusing to use another transport for ${senderEmail}`);
+    return false;
+  }
+
+  const startTime = Date.now();
+  try {
+    const logoBuffer = await getEmailLogoBuffer();
+    const emailHtml = stripLegacyCatalystBranding(logoBuffer ? inlineEmailLogo(htmlBody) : htmlBody);
+
+    const transporter = nodemailer.createTransport({
+      host: GODADDY_SMTP_HOST,
+      port: GODADDY_SMTP_PORT,
+      secure: GODADDY_SMTP_PORT === 465,
+      requireTLS: GODADDY_SMTP_PORT === 587,
+      auth: {
+        user: senderEmail,
+        pass: password,
+      },
+      connectionTimeout: 30_000,
+      greetingTimeout: 30_000,
+      socketTimeout: 30_000,
+    });
+
+    const result = await transporter.sendMail({
+      from: `${senderName || mailbox.defaultName} <${senderEmail}>`,
+      to: notification.to,
+      replyTo: senderEmail,
+       subject: stripLegacyCatalystBranding(notification.subject),
+       text: stripLegacyCatalystBranding(notification.text || htmlToPlainText(emailHtml)),
+      html: emailHtml,
+      attachments: [
+        ...(notification.attachments?.length ? notification.attachments.map((attachment) => ({
+          filename: attachment.filename,
+          content: Buffer.from(attachment.content, 'base64'),
+          contentType: attachment.type,
+          contentDisposition: attachment.disposition,
+        })) : []),
+        ...(logoBuffer ? [{
+          filename: 'landlinq-email-logo.png',
+          content: logoBuffer,
+          cid: EMAIL_LOGO_CID,
+          contentType: 'image/png',
+          contentDisposition: 'inline' as const,
+        }] : []),
+      ],
+    });
+
+    apiCallTracker.logCall('GoDaddy SMTP', 'send', true, Date.now() - startTime);
+    console.log(`✅ [GODADDY-SMTP] Email sent from ${senderEmail} to ${notification.to} (${result.messageId})`);
+    return true;
+  } catch (error: any) {
+    apiCallTracker.logCall('GoDaddy SMTP', 'send', false, Date.now() - startTime, {
+      errorMessage: error?.message || String(error),
+    });
+    console.error(`❌ [GODADDY-SMTP] Failed to send from ${senderEmail} to ${notification.to}:`, error?.message || error);
+    return false;
+  }
+}
 
 async function getSendGridClient() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
@@ -50,6 +208,8 @@ export async function sendSystemEmail(
 ): Promise<boolean> {
   const startTime = Date.now();
   const mailbox = fromMailbox.trim().toLowerCase();
+   const cleanSubject = stripLegacyCatalystBranding(stripCompanyPhone(stripEmailEmojis(subject)));
+   const cleanHtmlBody = stripLegacyCatalystBranding(stripCompanyPhone(stripEmailEmojis(htmlBody)));
   try {
     const accessToken = await getAppOnlyGraphToken();
     const controller = new AbortController();
@@ -65,8 +225,8 @@ export async function sendSystemEmail(
         signal: controller.signal,
         body: JSON.stringify({
           message: {
-            subject,
-            body: { contentType: 'HTML', content: htmlBody },
+             subject: cleanSubject,
+            body: { contentType: 'HTML', content: cleanHtmlBody },
             toRecipients: [{ emailAddress: { address: to } }],
             ...(attachments?.length ? {
               attachments: attachments.map((attachment) => ({
@@ -103,8 +263,16 @@ export async function sendSystemEmail(
 // Email sending function
 export async function sendNotificationEmail(notification: EmailNotification, disableClickTracking: boolean = true): Promise<boolean> {
   const startTime = Date.now();
+  notification = {
+    ...notification,
+    subject: stripLegacyCatalystBranding(stripCompanyPhone(stripEmailEmojis(notification.subject))),
+    text: notification.text ? stripLegacyCatalystBranding(stripCompanyPhone(stripEmailEmojis(notification.text))) : notification.text,
+    html: notification.html ? stripLegacyCatalystBranding(stripCompanyPhone(stripEmailEmojis(notification.html))) : notification.html,
+  };
   const senderEmail = notification.fromEmail?.trim().toLowerCase() || PUBLIC_TRANSACTIONAL_EMAIL;
-  const senderName = notification.fromName || PUBLIC_TRANSACTIONAL_NAME;
+  const senderName = senderEmail === PUBLIC_TRANSACTIONAL_EMAIL
+    ? PUBLIC_TRANSACTIONAL_NAME
+    : notification.fromName || PUBLIC_TRANSACTIONAL_NAME;
   
   try {
     // MASTER MESSAGING TOGGLE CHECK (Dec 16, 2025)
@@ -134,12 +302,26 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
         ? rawHtml
         : renderBrandedEmail({ title: notification.subject, bodyHtml: rawHtml }))
       : '';
-    if (notification.subject && graphHtml) {
+    const cleanGraphHtml = stripLegacyCatalystBranding(graphHtml);
+
+    // GoDaddy-managed Microsoft 365 SMTP is the authoritative transport for
+    // the platform mailboxes. Do not fall through to Graph or SendGrid for
+    // these addresses: the mailbox identity is managed by GoDaddy, and an
+    // unverified SendGrid sender can produce misleading delivery failures.
+    if (getGoDaddyMailbox(senderEmail)) {
+      if (!notification.subject || !cleanGraphHtml) {
+        console.error(`❌ [GODADDY-SMTP] Message has no rendered subject/body; refusing to send from ${senderEmail}`);
+        return false;
+      }
+      return await sendGoDaddyEmail(notification, senderEmail, stripLegacyCatalystBranding(senderName), cleanGraphHtml);
+    }
+
+    if (notification.subject && cleanGraphHtml) {
       console.log(`📧 [GRAPH-SYSTEM] Attempting platform email to ${notification.to}`);
       const graphSent = await sendSystemEmail(
         notification.to,
         notification.subject,
-        graphHtml,
+        cleanGraphHtml,
         notification.attachments,
         senderEmail,
       );
@@ -189,7 +371,7 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
     console.log(`📧 [SENDGRID-FALLBACK] Preparing rendered HTML email for: ${notification.to}`);
     
     // Add unsubscribe link to HTML content if not already present
-    let htmlContent = graphHtml;
+    let htmlContent = cleanGraphHtml;
     // Use plain text version if available, otherwise strip HTML properly
     let textContent = notification.text || (htmlContent ? htmlContent
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style tags

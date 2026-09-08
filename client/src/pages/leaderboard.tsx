@@ -99,7 +99,7 @@ export default function Leaderboard() {
       ? `I'm ranked #${rank} on the LandLinq broker leaderboard with ${broker.totalDeals} deals submitted and ${broker.approvedDeals} approved! 🏆`
       : `I'm ranked #${rank} for growing the LandLinq broker network with ${broker.totalReferrals} successful referrals! 🌟`;
     
-    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}&summary=${encodeURIComponent(`${achievementText}\n\nJoin me on LandLinq - the premier platform where brokers submit land deals to Catalyst Capital Partners and get ranked for their success! 💪\n\n#RealEstate #LandDeals #BrokerLife #LandLinq`)}`;
+    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}&summary=${encodeURIComponent(`${achievementText}\n\nJoin me on LandLinq - the premier platform where brokers submit land deals and get ranked for their success!\n\n#RealEstate #LandDeals #BrokerLife #LandLinq`)}`;
     window.open(url, '_blank');
   };
 
@@ -108,7 +108,7 @@ export default function Leaderboard() {
       ? `Ranked #${rank} on @LandLinq leaderboard! ${broker.totalDeals} deals submitted, ${broker.approvedDeals} approved 🏆`
       : `Ranked #${rank} for growing @LandLinq network! ${broker.totalReferrals} referrals 🌟`;
     
-    const text = `${achievementText}\n\nJoin the top brokers submitting land deals to @CatalystCP! 💪\n\n#RealEstate #LandDeals #BrokerLife`;
+    const text = `${achievementText}\n\nJoin the top brokers submitting land deals to @LandLinq!\n\n#RealEstate #LandDeals #BrokerLife`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.href)}`;
     window.open(url, '_blank');
   };

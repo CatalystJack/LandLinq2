@@ -26,6 +26,22 @@
 
 import { storage } from './storage';
 
+function sanitizeTransactionalCopy(value: string): string {
+  return value
+    .replace(/(?:tel:\+?1?[\s.-]*)?\(?704\)?[\s.-]*610[\s.-]*1549/gi, '')
+    .replace(/catalyst@landlinq\.ai/gi, 'help@landlinq.ai')
+    .replace(/deals@catalyst\.landlinq\.ai/gi, 'deals@landlinq.ai')
+    .replace(/catalyst\.landlinq\.ai/gi, 'landlinq.ai')
+    .replace(/Catalyst Capital Partners/gi, 'LandLinq')
+    .replace(/Catalyst Acquisitions/gi, 'LandLinq Team')
+    .replace(/Catalyst Acquisition Team/gi, 'LandLinq Team')
+    .replace(/\bCatalyst Team\b/gi, 'LandLinq Team')
+    .replace(/\bCatalyst Security Team\b/gi, 'LandLinq Security Team')
+    .replace(/\bCatalyst\b/gi, 'LandLinq')
+    .replace(/[\p{Emoji_Presentation}\p{Emoji_Modifier}]|\p{Extended_Pictographic}\uFE0F/gu, '')
+    .replace(/\u200D|\uFE0F/gu, '');
+}
+
 /**
  * Convert plain text with \n characters to proper HTML
  */
@@ -36,9 +52,9 @@ function convertTextToHTML(text: string, brandingVars?: any): string {
   // Get current environment domain
   const baseUrl = process.env.REPLIT_DOMAINS 
     ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-    : 'https://catalyst.landlinq.ai';
+    : 'https://landlinq.ai';
   
-  // ⚠️ HARDCODED LOGO: Use CATALYST:LandLinq branding logo at top of ALL emails (per user request)
+  // Use the LandLinq branding logo at the top of all emails.
   // Served from Object Storage to reduce deployment size
   const logoUrl = `${baseUrl}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
   
@@ -46,8 +62,8 @@ function convertTextToHTML(text: string, brandingVars?: any): string {
   const dashboardUrl = `${baseUrl}/broker-dashboard`;
   
   const companyName = brandingVars?.companyName || 'LandLinq';
-  const contactEmail = brandingVars?.supportEmail || brandingVars?.contactEmail || 'catalyst@landlinq.ai';
-  const contactPhone = brandingVars?.supportPhone || brandingVars?.contactPhone || '(704) 610-1549';
+  const contactEmail = brandingVars?.supportEmail || brandingVars?.contactEmail || 'help@landlinq.ai';
+  const contactPhone = brandingVars?.supportPhone || brandingVars?.contactPhone || '';
   const websiteUrl = brandingVars?.websiteUrl || 'https://landlinq.ai';
   
   // Convert literal \n strings to actual newlines first (for templates that have escaped newlines)
@@ -225,9 +241,10 @@ function convertTextToHTML(text: string, brandingVars?: any): string {
     </div>`;
   }
   
+  const footerParts = [companyName, contactEmail, contactPhone, websiteUrl].filter(Boolean).join(' | ');
   html += `
     <div class="footer">
-      <p>© 2025 ${companyName} | ${contactEmail} | ${contactPhone} | ${websiteUrl}</p>
+      <p>© 2025 ${footerParts}</p>
     </div>
   </div>
 </body>
@@ -275,15 +292,17 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
     ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
     : 'https://landlinq.ai';
   const logoUrl = options.logoUrl || `${baseUrl}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
-  const companyName = options.companyName || 'LandLinq';
-  const supportEmail = options.supportEmail || 'help@landlinq.ai';
-  const supportPhone = options.supportPhone || '';
-  const bodyHtml = /<body[^>]*>([\s\S]*?)<\/body>/i.exec(options.bodyHtml)?.[1] || options.bodyHtml;
+  const companyName = sanitizeTransactionalCopy(options.companyName || 'LandLinq');
+  const supportEmail = sanitizeTransactionalCopy(options.supportEmail || 'help@landlinq.ai');
+  const supportPhone = sanitizeTransactionalCopy(options.supportPhone || '');
+  const title = sanitizeTransactionalCopy(options.title);
+  const preheader = sanitizeTransactionalCopy(options.preheader || title);
+  const bodyHtml = sanitizeTransactionalCopy(/<body[^>]*>([\s\S]*?)<\/body>/i.exec(options.bodyHtml)?.[1] || options.bodyHtml);
   const button = options.button
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:26px auto 8px;">
         <tr>
           <td align="center" bgcolor="#0A2B4A" style="border-radius:5px;">
-            <a href="${escapeEmailValue(options.button.url)}" style="display:inline-block;background-color:#0A2B4A;border:1px solid #0A2B4A;border-radius:5px;color:#ffffff;font-size:16px;font-weight:700;line-height:22px;text-decoration:none;padding:14px 28px;">${escapeEmailValue(options.button.label)}</a>
+            <a href="${escapeEmailValue(options.button.url)}" style="display:inline-block;background-color:#0A2B4A;border:1px solid #0A2B4A;border-radius:5px;color:#ffffff;font-size:16px;font-weight:700;line-height:22px;text-decoration:none;padding:14px 28px;">${escapeEmailValue(sanitizeTransactionalCopy(options.button.label))}</a>
           </td>
         </tr>
       </table>`
@@ -295,10 +314,10 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${escapeEmailValue(options.title)}</title>
+    <title>${escapeEmailValue(title)}</title>
   </head>
   <body style="margin:0;padding:0;background-color:#f4f7fb;color:#172b4d;font-family:Arial,Helvetica,sans-serif;">
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeEmailValue(options.preheader || options.title)}</div>
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeEmailValue(preheader)}</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f4f7fb;">
       <tr>
         <td align="center" style="padding:32px 16px;">
@@ -312,7 +331,7 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
             <tr><td style="padding:0 32px;"><div style="height:2px;background-color:#4A90E2;font-size:0;line-height:0;">&nbsp;</div></td></tr>
             <tr>
               <td style="padding:34px 32px 12px;">
-                <h1 style="margin:0;color:#0A2B4A;font-size:26px;line-height:34px;font-weight:700;">${escapeEmailValue(options.title)}</h1>
+                <h1 style="margin:0;color:#0A2B4A;font-size:26px;line-height:34px;font-weight:700;">${escapeEmailValue(title)}</h1>
               </td>
             </tr>
             <tr>
@@ -360,8 +379,8 @@ export const LANDLINQ_BRANDING = {
   tagline: 'Professional Land Acquisition Platform', // DEPRECATED - Use businessSettings.tagline
   brandColor: '#4A90E2', // DEPRECATED - Use businessSettings.secondaryColor
   brandColorDark: '#0A2B4A', // DEPRECATED - Use businessSettings.primaryColor
-  contactPhone: '(704) 610-1549', // DEPRECATED - Use businessSettings.supportPhone
-  contactEmail: 'catalyst@landlinq.ai', // DEPRECATED - Use businessSettings.supportEmail
+  contactPhone: '', // DEPRECATED - Use businessSettings.supportPhone
+  contactEmail: 'help@landlinq.ai', // DEPRECATED - Use businessSettings.supportEmail
   websiteUrl: 'https://landlinq.ai', // Static
   dashboardUrl: '/dashboard' // Static
 };
@@ -445,16 +464,16 @@ export class TemplateService {
       console.log(`🔍 [TEMPLATE-RAW] HTML preview (first 300 chars):`, html.substring(0, 300));
       console.log(`🔍 [TEMPLATE-RAW] HTML has angle brackets?`, html.includes('<div>'), html.includes('</div>'));
       
-      // ⚠️ HARDCODED LOGO: Use Catalyst:LandLinq logo at top of ALL emails (per user request)
+      // Use the LandLinq logo at the top of all emails.
       // Get current environment domain
       const currentDomain = process.env.REPLIT_DOMAINS 
         ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-        : 'https://catalyst.landlinq.ai';
+        : 'https://landlinq.ai';
       
-      // Hardcode logo URL - DO NOT use businessSettings.logoUrl - Use new Catalyst branding
+      // Use the LandLinq logo consistently rather than tenant-uploaded branding.
       // Served from Object Storage to reduce deployment size
       const logoUrl = `${currentDomain}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
-      console.log(`🔒 [LOGO-HARDCODED] Using hardcoded Catalyst:LandLinq logo: ${logoUrl}`);
+      console.log(`🔒 [LOGO-HARDCODED] Using LandLinq logo: ${logoUrl}`);
       
       const dynamicBranding = {
         logoUrl,
@@ -465,10 +484,10 @@ export class TemplateService {
         secondaryColor: businessSettings?.secondaryColor || '#4A90E2',
         brandColor: businessSettings?.secondaryColor || '#4A90E2', // Alias for backward compatibility
         brandColorDark: businessSettings?.primaryColor || '#0A2B4A', // Alias for backward compatibility
-        supportPhone: businessSettings?.supportPhone || '(704) 610-1549',
-        supportEmail: businessSettings?.supportEmail || 'catalyst@landlinq.ai',
-        contactPhone: businessSettings?.supportPhone || '(704) 610-1549', // Alias
-        contactEmail: businessSettings?.supportEmail || 'catalyst@landlinq.ai', // Alias
+        supportPhone: businessSettings?.supportPhone || '',
+        supportEmail: businessSettings?.supportEmail || 'help@landlinq.ai',
+        contactPhone: businessSettings?.supportPhone || '', // Alias
+        contactEmail: businessSettings?.supportEmail || 'help@landlinq.ai', // Alias
         emailSignature: businessSettings?.emailSignature || '', // Email signature from business settings
         websiteUrl: 'https://landlinq.ai',
         dashboardUrl: `${currentDomain}/broker-dashboard` // ✅ Fixed: Use current domain, not hardcoded old URL
@@ -554,12 +573,12 @@ export class TemplateService {
           const baseUrl = process.env.REPLIT_DOMAINS 
             ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
             : 'https://landlinq.ai';
-          // ⚠️ HARDCODED LOGO: Use Catalyst:LandLinq logo (same as line 336)
+          // Use the LandLinq logo consistently.
           // Served from Object Storage to reduce deployment size
           const logoUrl = `${baseUrl}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
           const companyName = dynamicBranding.companyName || 'LandLinq';
-          const contactEmail = dynamicBranding.supportEmail || 'catalyst@landlinq.ai';
-          const contactPhone = dynamicBranding.supportPhone || '(704) 610-1549';
+          const contactEmail = dynamicBranding.supportEmail || 'help@landlinq.ai';
+          const contactPhone = dynamicBranding.supportPhone || '';
           const websiteUrl = dynamicBranding.websiteUrl || 'https://landlinq.ai';
           
           html = `
@@ -641,7 +660,7 @@ export class TemplateService {
       ${content.replace(/(\s*<br\s*\/?>\s*)+$/gi, '')}
     </div>
     <div class="footer">
-      <p>© 2025 ${companyName} | ${contactEmail} | ${contactPhone} | ${websiteUrl}</p>
+      <p>© 2025 ${[companyName, contactEmail, contactPhone, websiteUrl].filter(Boolean).join(' | ')}</p>
     </div>
   </div>
 </body>

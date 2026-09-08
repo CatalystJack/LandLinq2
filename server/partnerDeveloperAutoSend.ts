@@ -453,7 +453,7 @@ export async function sendDeveloperDealEmail(deal: any, dev: any, overrides?: { 
 
   const appDomain = process.env.REPLIT_DOMAINS
     ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-    : 'https://catalyst.landlinq.ai';
+    : 'https://landlinq.ai';
   const logoUrl = `${appDomain}/attached_assets/Add_a_heading_1762187075044-G_X48reO_1767659017155.png`;
 
   // ── Action buttons ─────────────────────────────────────────────────────────
@@ -584,7 +584,7 @@ export async function sendDeveloperDealEmail(deal: any, dev: any, overrides?: { 
   <!-- ═══ HEADER ═══ -->
   <tr>
     <td style="background:#07172A;padding:28px 36px 24px;">
-      <img src="${logoUrl}" alt="Catalyst Capital Partners" style="height:38px;width:auto;display:block;margin-bottom:18px;" />
+      <img src="${logoUrl}" alt="LandLinq" style="height:38px;width:auto;display:block;margin-bottom:18px;" />
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td>
@@ -695,7 +695,7 @@ export async function sendDeveloperDealEmail(deal: any, dev: any, overrides?: { 
   <!-- ═══ FOOTER ═══ -->
   <tr>
     <td style="background:#07172A;padding:20px 36px;text-align:center;">
-      <p style="margin:0 0 5px;font-size:11.5px;font-weight:700;color:#9ab8c4;letter-spacing:0.06em;text-transform:uppercase;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;">Catalyst Capital Partners</p>
+       <p style="margin:0 0 5px;font-size:11.5px;font-weight:700;color:#9ab8c4;letter-spacing:0.06em;text-transform:uppercase;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;">LandLinq</p>
       <p style="margin:0 0 5px;font-size:10.5px;color:#475569;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;">1600 Camden Road Suite 200 &nbsp;&bull;&nbsp; Charlotte, NC 28203</p>
       <p style="margin:0;font-size:10.5px;color:#475569;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;"><a href="mailto:deals@landlinq.ai" style="color:#009BA7;text-decoration:none;">deals@landlinq.ai</a> &nbsp;&bull;&nbsp; Powered by LandLinq&#8482;</p>
     </td>
@@ -782,7 +782,7 @@ export async function sendDeveloperDealEmail(deal: any, dev: any, overrides?: { 
     html,
     text: textLines,
     fromEmail: 'deals@landlinq.ai',
-    fromName: 'Catalyst Acquisitions',
+    fromName: 'LandLinq Acquisitions',
     type: 'developer-deal',
     ...(pdfAttachment ? { attachments: [pdfAttachment] } : {}),
   });
@@ -979,7 +979,7 @@ async function generateICMemoPDF(ctx: {
   const pageCount = (doc as any).bufferedPageRange?.()?.count ?? 1;
   doc.rect(50, doc.page.height - 60, WIDTH, 30).fill(NAVY);
   doc.fillColor('#9ab8c4').font('Helvetica').fontSize(8)
-    .text(`Catalyst Capital Partners · deals@landlinq.ai · Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · Page ${pageCount}`,
+    .text(`LandLinq · deals@landlinq.ai · Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · Page ${pageCount}`,
       55, doc.page.height - 49, { width: WIDTH - 10, align: 'center' });
 
   doc.end();

@@ -1496,7 +1496,7 @@ async function sendYellowDealNotification(broker: any, deal: any, classification
     explanationText += `• We'll reach out within 2-3 business days with our preliminary findings\n`;
     explanationText += `• Please feel free to provide any additional property information that might be helpful\n\n`;
     explanationText += `Thank you for submitting this opportunity. We're excited to take a closer look!\n\n`;
-    explanationText += `Best regards,\nThe Catalyst Capital Partners Team`;
+    explanationText += `Best regards,\nThe LandLinq Team`;
 
     const subject = `Property Review Update: ${deal.address} - Under Analyst Review`;
 
@@ -1530,7 +1530,7 @@ async function sendYellowDealNotification(broker: any, deal: any, classification
           
           <div style="margin-top: 20px; padding: 20px; background-color: #e3f2fd; border-radius: 8px;">
             <p style="margin: 0; color: #1976d2;">
-              <strong>Questions?</strong> Contact us at <a href="tel:7046101549">(704) 610-1549</a> or reply to this email.
+              <strong>Questions?</strong> Reply to this email.
             </p>
           </div>
         </div>
@@ -1616,9 +1616,9 @@ async function sendRedDealNotification(broker: any, deal: any, classification: a
     explanationText += `\n**Next Steps:**\n`;
     explanationText += `• If you have additional information that addresses the missing criteria, please resubmit with the updated details\n`;
     explanationText += `• Consider alternative development approaches that may better fit the property characteristics\n`;
-    explanationText += `• Contact our team at (704) 610-1549 if you have questions about our criteria\n\n`;
+    explanationText += `• Reply to this email if you have questions about our criteria\n\n`;
     explanationText += `We appreciate your submission and encourage you to continue bringing us opportunities that align with our investment focus.\n\n`;
-    explanationText += `Best regards,\nThe Catalyst Capital Partners Team`;
+    explanationText += `Best regards,\nThe LandLinq Team`;
 
     const subject = `Property Review Complete: ${deal.address} - Additional Information Needed`;
 
@@ -1646,7 +1646,7 @@ async function sendRedDealNotification(broker: any, deal: any, classification: a
           
           <div style="margin-top: 30px; padding: 20px; background-color: #e3f2fd; border-radius: 8px;">
             <p style="margin: 0; color: #1976d2;">
-              <strong>Questions?</strong> Contact us at <a href="tel:7046101549">(704) 610-1549</a> or reply to this email.
+              <strong>Questions?</strong> Reply to this email.
             </p>
           </div>
         </div>
@@ -1933,19 +1933,19 @@ async function tryAttomDataAPI(address: string, locationInfo: any) {
 const emailTemplates = {
   confirmation: (brokerName: string) => ({
     subject: "LandLinq Registration Confirmed",
-    message: `Hi ${brokerName},\n\nYour LandLinq registration has been confirmed. You can now submit land deals through our platform.\n\nIf you have any land deals, please email us at catalyst@landlinq.ai or submit through our platform.\n\nBest regards,\nCatalyst Team`
+    message: `Hi ${brokerName},\n\nYour LandLinq registration has been confirmed. You can now submit land deals through our platform.\n\nIf you have any land deals, please email us at help@landlinq.ai or submit through our platform.\n\nBest regards,\nLandLinq Team`
   }),
   dealReceived: (brokerName: string) => ({
     subject: "Deal Received - Under Review",
-    message: `Hi ${brokerName},\n\nThank you for submitting your deal. Our team is reviewing the property details and will respond within 48 hours.\n\nBest regards,\nCatalyst Team`
+    message: `Hi ${brokerName},\n\nThank you for submitting your deal. Our team is reviewing the property details and will respond within 48 hours.\n\nBest regards,\nLandLinq Team`
   }),
   dealApproved: (brokerName: string) => ({
     subject: "Great News - We Want to Move Forward!",
-    message: `Hi ${brokerName},\n\nGreat news! We're interested in moving forward with your property submission. Please visit https://landlinq.ai/contact to schedule a 15-minute call with our team.\n\nBest regards,\nCatalyst Team`
+    message: `Hi ${brokerName},\n\nGreat news! We're interested in moving forward with your property submission. Please visit https://landlinq.ai/contact to schedule a 15-minute call with our team.\n\nBest regards,\nLandLinq Team`
   }),
   dealRejected: (brokerName: string) => ({
     subject: "Deal Update",
-    message: `Hi ${brokerName},\n\nThank you for thinking of Catalyst for this opportunity. While this particular deal doesn't align with our current criteria, please keep sending deals our way!\n\nBest regards,\nCatalyst Team`
+    message: `Hi ${brokerName},\n\nThank you for thinking of LandLinq for this opportunity. While this particular deal doesn't align with our current criteria, please keep sending deals our way!\n\nBest regards,\nLandLinq Team`
   }),
 };
 
@@ -2000,7 +2000,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   });
 
   // PUBLIC endpoint for email logo (no authentication required for email clients)
-  // HARDCODED: Always serves the Catalyst:LandLinq dark logo for emails from Object Storage
+  // Always serves the LandLinq dark logo for emails from Object Storage.
   app.get('/api/public/logo', async (req, res) => {
     try {
       const client = getObjectStorageClient();
@@ -2360,7 +2360,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       res.json({
         emailTemplates: animationEmailTemplates,
         smsTemplates: animationSmsTemplates,
-        companyName: (settings as any)?.companyName || 'Catalyst Capital Partners',
+        companyName: (settings as any)?.companyName || 'LandLinq',
         brandColor: (settings as any)?.brandColor || '#3b82f6'
       });
     } catch (error) {
@@ -2369,7 +2369,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       res.json({
         emailTemplates: [],
         smsTemplates: [],
-        companyName: 'Catalyst Capital Partners',
+        companyName: 'LandLinq',
         brandColor: '#3b82f6'
       });
     }
@@ -2896,7 +2896,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         type: 'contact-inquiry',
         priority: 'high',
         transactional: true,
-        fromName: 'LandLinq Website',
+        fromName: 'LandLinq Support',
       });
 
       if (!sent) {
@@ -5908,7 +5908,7 @@ ${transcriptText.substring(0, 30000)}`;
         });
       }
       
-      const analysisPrompt = `You are a real estate investment analyst for Catalyst Capital Partners. Analyze this land/multifamily development deal and provide a structured assessment.
+      const analysisPrompt = `You are a real estate investment analyst for LandLinq. Analyze this land/multifamily development deal and provide a structured assessment.
 
 DEAL DETAILS:
 - Address: ${deal.address}
@@ -10123,7 +10123,7 @@ Provide your analysis in this exact JSON format:
                   `Updated: ${new Date().toLocaleString()}\n\n` +
                   `Changes may include updates to pricing, property details, or additional notes. ` +
                   `Please review the updated deal details in your dashboard.\n\n` +
-                  `Best regards,\nCatalyst Acquisitions`
+                  `Best regards,\nLandLinq`
               };
 
               await storage.createCommunication({
@@ -10787,7 +10787,7 @@ RULES:
           `Phone: ${broker.phone || "N/A"}\n` +
           `Updated: ${new Date().toLocaleString()}\n\n` +
           `The broker has made changes to the deal details. Please review the updated information in your analyst dashboard.\n\n` +
-          `Best regards,\nCatalyst Acquisitions`
+          `Best regards,\nLandLinq`
       };
 
       // Send notifications to all team members
@@ -10807,7 +10807,7 @@ RULES:
       res.json({
         success: true,
         deal: updatedDeal,
-        message: "Deal updated successfully. All Catalyst team members have been notified."
+        message: "Deal updated successfully. The LandLinq team has been notified."
       });
     } catch (error) {
       console.error("Error updating broker deal:", error);
@@ -14962,7 +14962,7 @@ RULES:
           <td style="padding:10px 0;font-size:13px;color:${highlight ? '#d97706' : '#07172A'};font-weight:${highlight ? '700' : '500'};">${value}</td>
         </tr>` : '';
 
-      const logoUrl = 'https://catalyst.landlinq.ai/assets/landlinq-email-logo.png';
+      const logoUrl = 'https://landlinq.ai/assets/landlinq-email-logo.png';
 
       const htmlBody = `<!DOCTYPE html>
 <html>
@@ -19709,7 +19709,7 @@ RULES:
         // Build public URL
         const baseUrl = process.env.REPLIT_DOMAINS 
           ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-          : 'https://catalyst.landlinq.ai';
+          : 'https://landlinq.ai';
         
         const publicUrl = `${baseUrl}/api/public/storage/${storagePath}`;
         
@@ -19763,7 +19763,7 @@ RULES:
         // Build public URL via our proxy endpoint (works in emails)
         const baseUrl = process.env.REPLIT_DOMAINS 
           ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-          : 'https://catalyst.landlinq.ai';
+          : 'https://landlinq.ai';
         
         const fullUrl = `${baseUrl}/api/public/storage/${storagePath}`;
         
@@ -19800,7 +19800,7 @@ RULES:
         
         const baseUrl = process.env.REPLIT_DOMAINS 
           ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-          : 'https://catalyst.landlinq.ai';
+          : 'https://landlinq.ai';
         
         const relativePath = `/attached_assets/${localFilename}`;
         const fullUrl = `${baseUrl}${relativePath}`;
@@ -19854,7 +19854,7 @@ RULES:
         // Build URL via proxy endpoint
         const baseUrl = process.env.REPLIT_DOMAINS 
           ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-          : 'https://catalyst.landlinq.ai';
+          : 'https://landlinq.ai';
         
         const fullUrl = `${baseUrl}/api/private/storage/${storagePath}`;
         
@@ -20319,7 +20319,7 @@ RULES:
     </div>
 
     <div class="footer">
-      <p>© ${new Date().getFullYear()} Catalyst Capital Partners • Automated Weekly Report</p>
+      <p>© ${new Date().getFullYear()} LandLinq • Automated Weekly Report</p>
     </div>
   </div>
 </body>
@@ -20400,7 +20400,7 @@ RULES:
 
       // Get email signature with default fallback
       const emailSignature = (businessSettings as any)?.emailSignature || 
-        `Best regards,\n\nCatalyst Acquisitions\nCatalyst Capital Partners\n\n📧 catalyst@landlinq.ai | 📱 (704) 610-1549\n🌐 https://landlinq.ai`;
+        `Best regards,\n\nLandLinq Team\n\nhelp@landlinq.ai\nhttps://landlinq.ai`;
 
       const settings = {
         acquisitionCriteria: safeParseJsonField((businessSettings as any)?.acquisitionCriteria),
@@ -20539,7 +20539,7 @@ RULES:
         companyName: req.body.companyName || currentSettings.companyName,
         tagline: req.body.tagline || currentSettings.tagline,
         supportEmail: req.body.supportEmail || currentSettings.supportEmail,
-        supportPhone: req.body.supportPhone || currentSettings.supportPhone,
+        supportPhone: '',
         primaryColor: req.body.primaryColor || currentSettings.primaryColor,
         secondaryColor: req.body.secondaryColor || currentSettings.secondaryColor,
         backgroundColor: req.body.backgroundColor || currentSettings.backgroundColor,
@@ -20577,8 +20577,8 @@ RULES:
         logoUrl: currentSettings.logoUrl || '',
         companyName: currentSettings.companyName || 'LandLinq',
         tagline: currentSettings.tagline || 'Professional Land Acquisition Platform',
-        supportEmail: currentSettings.supportEmail || 'catalyst@landlinq.ai',
-        supportPhone: currentSettings.supportPhone || '(704) 610-1549',
+        supportEmail: currentSettings.supportEmail || 'help@landlinq.ai',
+        supportPhone: currentSettings.supportPhone || '',
         primaryColor: currentSettings.primaryColor || '#0A2B4A',
         secondaryColor: currentSettings.secondaryColor || '#d4af37',
         backgroundColor: currentSettings.backgroundColor || '#ffffff',
@@ -20586,7 +20586,7 @@ RULES:
         fontSize: currentSettings.fontSize || '14px',
         buttonStyle: currentSettings.buttonStyle || 'rounded',
         emailWidth: currentSettings.emailWidth || '600px',
-        emailSignature: currentSettings.emailSignature || `Best regards,\n\nCatalyst Acquisitions\nCatalyst Capital Partners\n\n📧 catalyst@landlinq.ai | 📱 (704) 610-1549\n🌐 https://landlinq.ai`
+        emailSignature: currentSettings.emailSignature || `Best regards,\n\nLandLinq Team\n\nhelp@landlinq.ai\nhttps://landlinq.ai`
       };
 
       res.json(brandingSettings);
@@ -20782,11 +20782,11 @@ RULES:
             
             <div style="font-size: 12px; line-height: 1.5; color: #666;">
               <div style="font-weight: 600; margin-bottom: 15px; color: #333;">
-                © 2025, Catalyst Capital Partners, LLC, ${brandingSettings.supportEmail} | ${brandingSettings.supportPhone}
+                © 2025, LandLinq, ${brandingSettings.supportEmail}
               </div>
               
               <div style="margin-bottom: 15px; text-align: justify; padding: 0 10px;">
-                LandLinq is a professional land acquisition platform operated by Catalyst Capital Partners. 
+                LandLinq is a professional land acquisition platform.
                 All property evaluations, market analyses, and acquisition decisions are subject to internal 
                 review and approval processes. Deal submissions do not guarantee acquisition or constitute 
                 binding offers. Property valuations and market assessments are estimates only and may vary 
@@ -20797,7 +20797,7 @@ RULES:
               
               <div style="margin-bottom: 15px; text-align: justify; padding: 0 10px;">
                 <strong>Business Information</strong><br>
-                Catalyst Capital Partners operates as a private real estate investment firm specializing in 
+                LandLinq operates as a private real estate investment platform specializing in
                 land acquisition and development opportunities. Licensed real estate activities are conducted 
                 through appropriate state-licensed professionals and entities.
               </div>
@@ -20940,11 +20940,11 @@ RULES:
         analystEmail: 'austin@catalystcp.com',
         developerName: 'Steve Hillebrand',
         partnerName: 'AJ Klenk',
-        supportPhone: '(704) 610-1549',
+        supportPhone: '',
         logoUrl: businessSettings?.logoUrl || '',
         companyName: businessSettings?.companyName || 'LandLinq',
-        contactEmail: businessSettings?.supportEmail || 'catalyst@landlinq.ai',
-        contactPhone: businessSettings?.supportPhone || '(704) 610-1549',
+        contactEmail: businessSettings?.supportEmail || 'help@landlinq.ai',
+        contactPhone: businessSettings?.supportPhone || '',
         websiteUrl: 'https://landlinq.ai',
         dashboardUrl: 'https://landlinq.ai/analyst-dashboard',
         reportDate: new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
@@ -21102,27 +21102,27 @@ RULES:
   app.post("/api/admin/populate-templates", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const comprehensiveEmailTemplates = [
-        { id: "default-welcome", name: "Broker Welcome Message", subject: "Welcome to LandLinq - Your Gateway to Fast Land Deals", content: `Hi {brokerName},\n\nWelcome to LandLinq! We're excited to have you as part of our broker network. Your account is active and ready for submissions.\n\n**🚀 How to Submit Deals (Multiple Ways)**\n📧 Email: catalyst@landlinq.ai\n📱 Text/SMS: (704) 610-1549  \n🌐 Web Portal: https://landlinq.ai/submit-deal\n\n**📋 What We Need (Minimum)**\n• Property address\n• Asking price\n• Acreage\n\n**🎯 What We're Buying**\n• Conventional Apartments - 200+ units, 4+ acres minimum\n• Active Adult Communities - 150+ units, 4+ acres minimum\n• Build-to-Rent - 70+ units, 5+ acres minimum\n• Lot Development - 50+ units, 6+ acres minimum\n\nReady to submit your first deal? Just send us the basics and we'll take it from there!\n\nCatalyst Acquisitions\nCatalyst Capital Partners`, type: "welcome" },
-        { id: "default-confirmation", name: "Deal Submission Confirmation", subject: "{classificationEmoji} Deal Received: {address}", content: `Hi {brokerName},\n\nYour deal submission has been received and processed! Here are the details:\n\n**📍 Property:** {address}\n**🆔 Deal ID:** {dealId}\n**Status:** {classification}\n\n**👥 Your Assigned Team:**\n• Analyst: {analystName} ({analystEmail})\n• Developer: {developerName}\n• Partner: {partnerName}\n\n**⚡ Next Steps:**\nOur team will review and respond within 24-48 hours.\n\nQuestions? Reply to this email or text (704) 610-1549.\n\nCatalyst Acquisitions\nCatalyst Capital Partners`, type: "confirmation" },
-        { id: "default-high-priority", name: "High Priority Deal Alert", subject: "🎯 PRIORITY DEAL: {address}", content: `Hi {brokerName},\n\nGreat news — {address} looks like a strong fit.\n\nOur analyst {analystName} will connect with you directly at {analystEmail}.\n\nWe want to move fast on this one.\n\nTalk soon,\nCatalyst Acquisitions`, type: "high_priority" },
-        { id: "default-approved", name: "Deal Approved Notification", subject: "✅ Deal Approved: {address}", content: `Hi {brokerName},\n\nExcellent news! Your property submission for {address} has been approved for acquisition.\n\n**Next Steps:**\n1. Our team will reach out within 24 hours\n2. We'll schedule a property walk-through\n3. Initial offer presentation within 1 week\n\n**Your Team:**\n• Analyst: {analystName} ({analystEmail})\n• Developer: {developerName}\n• Partner: {partnerName}\n\nThank you for bringing us this opportunity!\n\nCatalyst Acquisitions\nCatalyst Capital Partners`, type: "approved" },
-        { id: "default-rejected", name: "Deal Rejection Notice", subject: "🔴 Update on your property submission: {address}", content: `Hi {brokerName},\n\nThank you for your property submission for {address}. After careful review, we've determined that this opportunity doesn't align with our current investment criteria.\n\n**Why it wasn't a fit:**\n{rejectionReason}\n\n**Keep them coming!** We value our partnership and want to see your next submission.\n\nYou can email, text, or visit our website to submit deals:\n📧 Email: catalyst@landlinq.ai\n📱 Text: (704) 610-1549  \n🌐 Web: https://landlinq.ai/submit-deal\n\nThank you for thinking of us.\n\nCatalyst Acquisitions\nCatalyst Capital Partners`, type: "rejected" },
-        { id: "default-under-review", name: "Deal Under Review", subject: "🟡 Under Review: {address}", content: `Hi {brokerName},\n\nYour property submission for {address} is currently under review by our acquisition team.\n\n**Review Process:**\n• Market analysis in progress\n• Development feasibility assessment\n• Financial modeling\n\n**Timeline:** Full decision expected within 3-5 business days.\n\nWe'll keep you updated on our progress.\n\nBest regards,\n{analystName}\nCatalyst Acquisitions`, type: "under_review" },
-        { id: "default-follow-up", name: "Follow-up Message", subject: "Following Up: {address}", content: `Hi {brokerName},\n\nI hope this email finds you well. I'm following up on the property submission we discussed:\n\n**Property:** {address}\n\nI wanted to ensure we maintain momentum on this opportunity. Please let me know if you have any updates or if there's additional information I can provide.\n\n**Best times to reach me:**\n- Phone: {supportPhone}\n- Email: {analystEmail}\n\nLooking forward to moving this forward together.\n\nBest regards,\n{analystName}\nCatalyst Capital Partners`, type: "follow_up" },
-        { id: "default-document-request", name: "Document Request", subject: "Documents Needed: {address}", content: `Hi {brokerName},\n\nTo continue our evaluation of your property submission, we need the following documents:\n\n**Property:** {address}\n\n**Required Documents:**\n{missingFields}\n\n**Upload Instructions:**\n1. Email directly to: {analystEmail}\n2. Or text to: {supportPhone}\n\nIf you have any questions about specific documents, please don't hesitate to contact me.\n\nBest regards,\n{analystName}\nCatalyst Capital Partners`, type: "document_request" },
-        { id: "default-meeting-confirmation", name: "Meeting Confirmation", subject: "Meeting Confirmed: {address}", content: `Hi {brokerName},\n\nThis confirms our upcoming meeting about your property submission:\n\n**Property:** {address}\n**Date/Time:** {deadline}\n**Meeting Link:** Will be provided 24 hours before\n\n**We'll Discuss:**\n• Property evaluation results\n• Next steps in the acquisition process\n• Any questions you may have\n\nLooking forward to our conversation.\n\nBest regards,\n{analystName}\nCatalyst Capital Partners`, type: "meeting_confirmation" },
-        { id: "default-market-update", name: "Market Update Newsletter", subject: "Market Insights Monthly | LandLinq", content: `Hi {brokerName},\n\nHere's your monthly market update for new opportunities:\n\n**What We're Seeing:**\nStrong demand for quality land deals in our target markets. Fast decisions and competitive offers for properties that meet our criteria.\n\n**Current Acquisition Focus:**\n- Conventional Apartments: 200+ units, 4+ acres\n- Active Adult: 150+ units, 4+ acres  \n- Build-to-Rent: 70+ units, 5+ acres\n- Lot Development: 50+ units, 6+ acres\n\n**Recently Approved:**\nSeveral high-quality deals from broker partners like you!\n\n**Submit Deals:** catalyst@landlinq.ai or (704) 610-1549\n\nThank you for being a valued member of our broker network.\n\nBest regards,\nCatalyst Acquisitions\nCatalyst Capital Partners`, type: "market_update" },
-        { id: "default-commission-payment", name: "Commission Payment Notification", subject: "💰 Commission Payment Processed - {address}", content: `Hi {brokerName},\n\nGreat news! Your commission payment has been processed for the following deal:\n\n**Property:** {address}\n**Amount:** {amount}\n\nYour payment should appear in your account within 3-5 business days.\n\n**Questions about this payment?**\nContact our team:\n- Email: {analystEmail}\n- Phone: {supportPhone}\n\nThank you for bringing us this excellent opportunity!\n\nBest regards,\n{analystName}\nCatalyst Capital Partners`, type: "commission_payment" }
+         { id: "default-welcome", name: "Broker Welcome Message", subject: "Welcome to LandLinq - Your Gateway to Fast Land Deals", content: `Hi {brokerName},\n\nWelcome to LandLinq! We're excited to have you as part of our broker network. Your account is active and ready for submissions.\n\n**🚀 How to Submit Deals (Multiple Ways)**\n📧 Email: deals@landlinq.ai\n🌐 Web Portal: https://landlinq.ai/submit-deal\n\n**📋 What We Need (Minimum)**\n• Property address\n• Asking price\n• Acreage\n\n**🎯 What We're Buying**\n• Conventional Apartments - 200+ units, 4+ acres minimum\n• Active Adult Communities - 150+ units, 4+ acres minimum\n• Build-to-Rent - 70+ units, 5+ acres minimum\n• Lot Development - 50+ units, 6+ acres minimum\n\nReady to submit your first deal? Just send us the basics and we'll take it from there!\n\nLandLinq Team`, type: "welcome" },
+         { id: "default-confirmation", name: "Deal Submission Confirmation", subject: "{classificationEmoji} Deal Received: {address}", content: `Hi {brokerName},\n\nYour deal submission has been received and processed! Here are the details:\n\n**📍 Property:** {address}\n**🆔 Deal ID:** {dealId}\n**Status:** {classification}\n\n**👥 Your Assigned Team:**\n• Analyst: {analystName} ({analystEmail})\n• Developer: {developerName}\n• Partner: {partnerName}\n\n**⚡ Next Steps:**\nOur team will review and respond within 24-48 hours.\n\nQuestions? Reply to this email.\n\nLandLinq Team`, type: "confirmation" },
+         { id: "default-high-priority", name: "High Priority Deal Alert", subject: "🎯 PRIORITY DEAL: {address}", content: `Hi {brokerName},\n\nGreat news — {address} looks like a strong fit.\n\nOur analyst {analystName} will connect with you directly at {analystEmail}.\n\nWe want to move fast on this one.\n\nTalk soon,\nLandLinq Team`, type: "high_priority" },
+         { id: "default-approved", name: "Deal Approved Notification", subject: "✅ Deal Approved: {address}", content: `Hi {brokerName},\n\nExcellent news! Your property submission for {address} has been approved for acquisition.\n\n**Next Steps:**\n1. Our team will reach out within 24 hours\n2. We'll schedule a property walk-through\n3. Initial offer presentation within 1 week\n\n**Your Team:**\n• Analyst: {analystName} ({analystEmail})\n• Developer: {developerName}\n• Partner: {partnerName}\n\nThank you for bringing us this opportunity!\n\nLandLinq Team`, type: "approved" },
+         { id: "default-rejected", name: "Deal Rejection Notice", subject: "🔴 Update on your property submission: {address}", content: `Hi {brokerName},\n\nThank you for your property submission for {address}. After careful review, we've determined that this opportunity doesn't align with our current investment criteria.\n\n**Why it wasn't a fit:**\n{rejectionReason}\n\n**Keep them coming!** We value our partnership and want to see your next submission.\n\nYou can email or visit our website to submit deals:\n📧 Email: deals@landlinq.ai\n🌐 Web: https://landlinq.ai/submit-deal\n\nThank you for thinking of us.\n\nLandLinq Team`, type: "rejected" },
+         { id: "default-under-review", name: "Deal Under Review", subject: "🟡 Under Review: {address}", content: `Hi {brokerName},\n\nYour property submission for {address} is currently under review by our acquisition team.\n\n**Review Process:**\n• Market analysis in progress\n• Development feasibility assessment\n• Financial modeling\n\n**Timeline:** Full decision expected within 3-5 business days.\n\nWe'll keep you updated on our progress.\n\nBest regards,\n{analystName}\nLandLinq Team`, type: "under_review" },
+         { id: "default-follow-up", name: "Follow-up Message", subject: "Following Up: {address}", content: `Hi {brokerName},\n\nI hope this email finds you well. I'm following up on the property submission we discussed:\n\n**Property:** {address}\n\nI wanted to ensure we maintain momentum on this opportunity. Please let me know if you have any updates or if there's additional information I can provide.\n\n**Best times to reach me:**\n- Email: {analystEmail}\n\nLooking forward to moving this forward together.\n\nBest regards,\n{analystName}\nLandLinq Team`, type: "follow_up" },
+         { id: "default-document-request", name: "Document Request", subject: "Documents Needed: {address}", content: `Hi {brokerName},\n\nTo continue our evaluation of your property submission, we need the following documents:\n\n**Property:** {address}\n\n**Required Documents:**\n{missingFields}\n\n**Upload Instructions:**\n1. Email directly to: {analystEmail}\n\nIf you have any questions about specific documents, please don't hesitate to contact me.\n\nBest regards,\n{analystName}\nLandLinq Team`, type: "document_request" },
+         { id: "default-meeting-confirmation", name: "Meeting Confirmation", subject: "Meeting Confirmed: {address}", content: `Hi {brokerName},\n\nThis confirms our upcoming meeting about your property submission:\n\n**Property:** {address}\n**Date/Time:** {deadline}\n**Meeting Link:** Will be provided 24 hours before\n\n**We'll Discuss:**\n• Property evaluation results\n• Next steps in the acquisition process\n• Any questions you may have\n\nLooking forward to our conversation.\n\nBest regards,\n{analystName}\nLandLinq Team`, type: "meeting_confirmation" },
+         { id: "default-market-update", name: "Market Update Newsletter", subject: "Market Insights Monthly | LandLinq", content: `Hi {brokerName},\n\nHere's your monthly market update for new opportunities:\n\n**What We're Seeing:**\nStrong demand for quality land deals in our target markets. Fast decisions and competitive offers for properties that meet our criteria.\n\n**Current Acquisition Focus:**\n- Conventional Apartments: 200+ units, 4+ acres\n- Active Adult: 150+ units, 4+ acres  \n- Build-to-Rent: 70+ units, 5+ acres\n- Lot Development: 50+ units, 6+ acres\n\n**Recently Approved:**\nSeveral high-quality deals from broker partners like you!\n\n**Submit Deals:** deals@landlinq.ai\n\nThank you for being a valued member of our broker network.\n\nBest regards,\nLandLinq Team`, type: "market_update" },
+         { id: "default-commission-payment", name: "Commission Payment Notification", subject: "💰 Commission Payment Processed - {address}", content: `Hi {brokerName},\n\nGreat news! Your commission payment has been processed for the following deal:\n\n**Property:** {address}\n**Amount:** {amount}\n\nYour payment should appear in your account within 3-5 business days.\n\n**Questions about this payment?**\nContact our team:\n- Email: {analystEmail}\n\nThank you for bringing us this excellent opportunity!\n\nBest regards,\n{analystName}\nLandLinq Team`, type: "commission_payment" },
       ];
 
       const comprehensiveSmsTemplates = [
-        { id: "default-welcome-sms", name: "Welcome SMS", content: "🏡 Welcome to LandLinq, {brokerName}! Submit deals 3 ways: TEXT (here), EMAIL (catalyst@landlinq.ai), or WEB (landlinq.ai/submit-deal). -LandLinq", type: "welcome" },
+         { id: "default-welcome-sms", name: "Welcome SMS", content: "🏡 Welcome to LandLinq, {brokerName}! Submit deals 3 ways: TEXT (here), EMAIL (deals@landlinq.ai), or WEB (landlinq.ai/submit-deal). -LandLinq", type: "welcome" },
         { id: "default-confirmation-sms", name: "Deal Confirmation SMS", content: "{classificationEmoji} Deal received: {address}. ID: {dealId}. Status: {classification}. Analyst: {analystName}. Full details in email. -LandLinq", type: "confirmation" },
         { id: "default-high-priority-sms", name: "High Priority SMS", content: "🎯 PRIORITY: {address} looks great! {analystName} will reach out ASAP. -LandLinq", type: "high_priority" },
         { id: "default-rejected-sms", name: "Deal Rejected SMS", content: "🔴 {address} isn't a fit this time. Keep them coming — your next one could be perfect. -LandLinq", type: "rejected" },
         { id: "default-follow-up-sms", name: "Follow-up SMS", content: "Following up on {address}. Any updates? Call/text me directly at {supportPhone}. -{analystName}", type: "follow_up" },
         { id: "default-status-update-sms", name: "Status Update SMS", content: "Update: {address} status changed from {statusFrom} to {statusTo}. Check email for details. -{analystName}", type: "status_update" },
-        { id: "default-market-alert-sms", name: "Market Alert SMS", content: "🔥 MARKET ALERT: High demand for quality land deals! Submit yours: catalyst@landlinq.ai or (704) 610-1549. Fast decisions! -LandLinq", type: "market_alert" },
+         { id: "default-market-alert-sms", name: "Market Alert SMS", content: "🔥 MARKET ALERT: High demand for quality land deals! Submit yours: deals@landlinq.ai. Fast decisions! -LandLinq", type: "market_alert" },
         { id: "default-commission-paid-sms", name: "Commission Paid SMS", content: "💰 Commission processed for {address}! Payment arriving 3-5 days. Thanks for the great deal! -{analystName}", type: "commission_paid" }
       ];
 
@@ -23338,7 +23338,7 @@ RULES:
       timestamp: new Date().toISOString(),
       message: 'Webhook endpoint is reachable and ready to receive emails',
       expectedUrl: `https://${req.get('host')}/api/webhooks/email-inbound`,
-      instructions: 'Configure this URL in SendGrid Inbound Parse settings for deals@catalyst.landlinq.ai'
+      instructions: 'Configure this URL in SendGrid Inbound Parse settings for deals@landlinq.ai'
     });
   });
 
@@ -23714,7 +23714,7 @@ RULES:
     }
   });
 
-  // SENDGRID INBOUND PARSE WEBHOOK - Proper multipart handling for catalyst@landlinq.ai
+  // SENDGRID INBOUND PARSE WEBHOOK - Proper multipart handling for deals@landlinq.ai
   // Configure proper multer middleware for SendGrid's multipart/form-data format
   const sendgridWebhookUpload = multer({ 
     storage: multer.memoryStorage(),
@@ -23771,7 +23771,7 @@ RULES:
       
       const emailData = {
         from: req.body.from || '',
-        to: req.body.to || 'catalyst@landlinq.ai',
+        to: req.body.to || 'deals@landlinq.ai',
         subject: req.body.subject || 'No Subject',
         text: textContent,
         html: htmlContent,
@@ -23793,7 +23793,7 @@ RULES:
       
       // SMART ROUTING: Accept emails to landlinq.ai domains
       const recipientEmail = emailData.to.toLowerCase();
-      const isLandLinqEmail = recipientEmail.includes('@landlinq.ai') || recipientEmail.includes('@catalyst.landlinq.ai');
+      const isLandLinqEmail = recipientEmail.includes('@landlinq.ai');
       
       if (!isLandLinqEmail) {
         console.log(`⏭️ Skipping email - not addressed to landlinq.ai domain (received: ${emailData.to})`);
@@ -23940,7 +23940,7 @@ RULES:
                   </p>
                   <p>We're analyzing this deal now. You'll receive the full classification results shortly.</p>
                   <p style="color: #64748b; font-size: 14px; margin-top: 30px;">
-                    - Catalyst Acquisitions Team
+                    - LandLinq Team
                   </p>
                 </div>
               `,
@@ -24011,7 +24011,7 @@ RULES:
       // Create test email data
       const emailData = {
         from: from || 'test@example.com',
-        to: 'catalyst@landlinq.ai',
+        to: 'help@landlinq.ai',
         subject: subject || 'Test Deal Submission',
         text: body || `Property submission: ${address || '123 Main St, Charlotte, NC 28202'}`,
         html: '',
@@ -25000,7 +25000,7 @@ RULES:
       
       const result = await processEmailDeal({
         from: `${senderName} <${senderEmail}>`,
-        to: "catalyst@landlinq.ai",
+        to: "help@landlinq.ai",
         subject: "Deal Submission Test",
         text: emailText,
         html: "",
@@ -29209,7 +29209,8 @@ RULES:
         try {
           // Check if token needs refresh (get full sender data)
           const fullSenderResult = await db.execute(sql`
-            SELECT microsoft_access_token, microsoft_refresh_token, microsoft_token_expiry
+            SELECT microsoft_access_token, microsoft_refresh_token, microsoft_token_expiry,
+                   developer_profile_id as "developerProfileId"
             FROM outreach_senders WHERE id = ${senderId}
           `);
           const fullSender = fullSenderResult.rows?.[0] as any;
@@ -29224,12 +29225,13 @@ RULES:
             const clientId = process.env.MICROSOFT_CLIENT_ID;
             const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
             const tenantId = process.env.MICROSOFT_TENANT_ID || 'common';
+            const refreshAuthority = fullSender?.developerProfileId ? 'organizations' : tenantId;
             
             if (clientId && clientSecret && refreshToken) {
               try {
                 const tokenController = new AbortController();
                 const tokenTimeout = setTimeout(() => tokenController.abort(), 20000); // 20s timeout
-                const tokenResponse = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+                const tokenResponse = await fetch(`https://login.microsoftonline.com/${refreshAuthority}/oauth2/v2.0/token`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                   signal: tokenController.signal,
@@ -29486,10 +29488,13 @@ RULES:
       
       console.log('🔑 Microsoft OAuth - Redirect URI:', redirectUri);
 
-      if (!clientId || !tenantId) {
+      const oauthAuthority = isDeveloper ? 'organizations' : tenantId;
+      if (!clientId || !oauthAuthority) {
         return res.status(501).json({ 
           error: 'Microsoft OAuth not configured',
-          message: 'Please configure MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and MICROSOFT_TENANT_ID in your environment secrets.',
+          message: isDeveloper
+            ? 'Please configure MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET in your environment secrets.'
+            : 'Please configure MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and MICROSOFT_TENANT_ID in your environment secrets.',
           setupRequired: true
         });
       }
@@ -29510,7 +29515,7 @@ RULES:
         state = Buffer.from(JSON.stringify({ senderId, returnUrl })).toString('base64');
       }
       
-      const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
+      const authUrl = `https://login.microsoftonline.com/${oauthAuthority}/oauth2/v2.0/authorize?` +
         `client_id=${clientId}` +
         `&response_type=code` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -29575,13 +29580,18 @@ RULES:
       const clientId = process.env.MICROSOFT_CLIENT_ID;
       const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
       const tenantId = process.env.MICROSOFT_TENANT_ID;
+      const oauthAuthority = developerProfileId ? 'organizations' : tenantId;
       
       // Build redirect URI from request host (must match the one used in authorize request)
       const protocol = req.headers['x-forwarded-proto'] || 'https';
       const host = req.headers['host'] || req.headers['x-forwarded-host'];
       const redirectUri = `${protocol}://${host}/api/oauth/microsoft/callback`;
 
-      const tokenResponse = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+      if (!clientId || !clientSecret || !oauthAuthority) {
+        return res.redirect(`${returnUrl || '/outreach-onboarding'}?error=oauth_not_configured`);
+      }
+
+      const tokenResponse = await fetch(`https://login.microsoftonline.com/${oauthAuthority}/oauth2/v2.0/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -29801,7 +29811,7 @@ RULES:
       try {
         const smsResult = await sendSMS({
           to: phone,
-          message: `Welcome to LandLinq SMS notifications! 🎉 You'll receive updates about your property deals. Reply STOP to opt-out anytime. Questions? Call ${process.env.SUPPORT_PHONE || '(704) 610-1549'}`
+          message: `Welcome to LandLinq SMS notifications! 🎉 You'll receive updates about your property deals. Reply STOP to opt-out anytime. Reply to this message with questions.`
         });
         
         if (smsResult.success && smsResult.delivered) {

@@ -398,8 +398,7 @@ export default function EmailBuilder() {
       <div style="text-align: center; margin-top: 30px; padding: 20px; font-size: 13px; color: #6b7280; line-height: 1.6;">
         <p style="margin: 0 0 8px 0;">© 2025 {{companyName}}</p>
         <p style="margin: 0 0 8px 0;">
-          <a href="mailto:{{contactEmail}}" style="color: #d4af37; text-decoration: none;">{{contactEmail}}</a> | 
-          <a href="tel:{{contactPhone}}" style="color: #d4af37; text-decoration: none;">{{contactPhone}}</a>
+          <a href="mailto:{{contactEmail}}" style="color: #d4af37; text-decoration: none;">{{contactEmail}}</a>
         </p>
         <p style="margin: 0;">
           <a href="{{websiteUrl}}" style="color: #d4af37; text-decoration: none;">{{websiteUrl}}</a>

@@ -96,7 +96,7 @@ export default function SMSOptIn() {
           <div className="flex justify-center mb-6">
             <img 
               src={landLinqLogo} 
-              alt="Catalyst - Powered by LandLinq" 
+              alt="LandLinq"
               className="h-32 w-auto object-contain"
             />
           </div>
