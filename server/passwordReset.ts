@@ -1,12 +1,24 @@
-import { storage } from "./storage";
+import { storage, type IStorage } from "./storage";
 import { randomBytes } from "crypto";
 import { addMinutes } from "date-fns";
 
+type PasswordResetStorage = Pick<
+  IStorage,
+  | "getUserByEmail"
+  | "getValidPasswordResetToken"
+  | "createPasswordResetToken"
+  | "getPasswordResetToken"
+  | "deletePasswordResetToken"
+  | "updateUserPassword"
+>;
+
 // Password reset token management
 export class PasswordResetService {
+  constructor(private readonly resetStorage: PasswordResetStorage = storage) {}
+
   // Generate password reset token and store it
   async generateResetToken(email: string): Promise<string | null> {
-    const user = await storage.getUserByEmail(email);
+    const user = await this.resetStorage.getUserByEmail(email);
     if (!user) {
       return null; // Don't reveal if user exists
     }
@@ -14,7 +26,7 @@ export class PasswordResetService {
     const resetToken = randomBytes(32).toString('hex');
     const expiresAt = addMinutes(new Date(), 60); // 1 hour expiration
 
-    await storage.createPasswordResetToken({
+    await this.resetStorage.createPasswordResetToken({
       email,
       token: resetToken,
       expiresAt
@@ -34,15 +46,23 @@ export class PasswordResetService {
   // Generate a reset token after a successful temporary-password login.
   // Unlike a user-requested reset, this does not send an email.
   async generateForcedResetToken(email: string): Promise<string | null> {
-    const user = await storage.getUserByEmail(email);
+    const user = await this.resetStorage.getUserByEmail(email);
     if (!user) {
       return null;
+    }
+
+    // Page gates and login callbacks can both request this token repeatedly
+    // while the user is completing the forced reset. Reuse the still-valid
+    // token so each redirect keeps the same URL and token.
+    const existingToken = await this.resetStorage.getValidPasswordResetToken(user.email);
+    if (existingToken) {
+      return existingToken.token;
     }
 
     const resetToken = randomBytes(32).toString('hex');
     const expiresAt = addMinutes(new Date(), 60);
 
-    await storage.createPasswordResetToken({
+    await this.resetStorage.createPasswordResetToken({
       email: user.email,
       token: resetToken,
       expiresAt,
@@ -53,7 +73,7 @@ export class PasswordResetService {
 
   // Validate reset token
   async validateResetToken(token: string): Promise<string | null> {
-    const resetRequest = await storage.getPasswordResetToken(token);
+    const resetRequest = await this.resetStorage.getPasswordResetToken(token);
     
     if (!resetRequest) {
       return null;
@@ -61,7 +81,7 @@ export class PasswordResetService {
 
     if (new Date() > resetRequest.expiresAt) {
       // Clean up expired token
-      await storage.deletePasswordResetToken(token);
+      await this.resetStorage.deletePasswordResetToken(token);
       return null;
     }
 
@@ -75,7 +95,7 @@ export class PasswordResetService {
       return false;
     }
 
-    const user = await storage.getUserByEmail(email);
+    const user = await this.resetStorage.getUserByEmail(email);
     if (!user) {
       return false;
     }
@@ -84,8 +104,8 @@ export class PasswordResetService {
     const { hashPassword } = await import('./auth');
     const hashedPassword = await hashPassword(newPassword);
     
-    await storage.updateUserPassword(user.id, hashedPassword);
-    await storage.deletePasswordResetToken(token);
+    await this.resetStorage.updateUserPassword(user.id, hashedPassword);
+    await this.resetStorage.deletePasswordResetToken(token);
 
     return true;
   }

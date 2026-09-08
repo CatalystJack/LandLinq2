@@ -300,18 +300,32 @@ export class EmailIntakeService {
       }
     }
 
-    // Follow deal links (package, OM, due diligence) found in the HTML body
+    // Follow deal links (package, OM, due diligence, GIS, map pins) found in
+    // the HTML or plain-text body.
     let linkedContent = '';
-    if (email.html) {
+    const linkSource = [email.html, email.text].filter(Boolean).join('\n');
+    if (linkSource) {
       try {
-        linkedContent = await EmailIntakeService.fetchLinkedPackageContent(email.html);
+        linkedContent = await EmailIntakeService.fetchLinkedPackageContent(linkSource);
       } catch (e) {
         console.warn('⚠️ [INTAKE] Link following failed:', e);
       }
     }
 
+    // Keep direct Google Maps coordinates in the durable email body as well as
+    // the AI context. The automated routing pipeline extracts coordinate pairs
+    // from emailBody, so this makes URL coordinates follow the same path as
+    // coordinates written plainly in the original message.
+    const linkedCoordinateEvidence = linkedContent
+      .split('\n')
+      .filter(line => line.includes('LINKED GOOGLE MAPS COORDINATES'))
+      .join('\n');
+    const enrichedEmailText = [email.text || '', linkedCoordinateEvidence]
+      .filter(Boolean)
+      .join('\n\n');
+
     // AI parse with few-shot examples
-    const fullText = [email.text || '', attachmentText, linkedContent].filter(Boolean).join('\n\n');
+    const fullText = [enrichedEmailText, attachmentText, linkedContent].filter(Boolean).join('\n\n');
     // Don't pre-seed with internal team emails — forwarders (catalystcp.com, landlinq.ai) are not the broker
     // Also treat distribution list senders (listings@, noreply@, no-reply@, info@, etc.) as non-broker
     const isInternalSender = /(@catalystcp\.com|@landlinq\.ai)/i.test(email.from);
@@ -372,7 +386,7 @@ export class EmailIntakeService {
         fromEmail: email.from,
         fromName: EmailIntakeService.nameFromEmail(email.from),
         subject: isMultiProperty ? `${email.subject || '(No Subject)'} (${i + 1}/${parseResults.length})` : (email.subject || '(No Subject)'),
-        emailBody: email.text || '',
+         emailBody: enrichedEmailText,
         emailHtml: email.html || '',
         // Only the first row in a group carries the hash to preserve the existing
         // duplicate-detection behavior for the raw inbound email.
@@ -1070,27 +1084,73 @@ CRITICAL RULES:
   // brochure, flyer), fetches each URL, parses PDF or HTML, and returns the
   // combined text so the AI gets the full package content.
 
-  private static extractDealLinks(html: string): Array<{ url: string; label: string }> {
+  static extractDealLinks(html: string): Array<{ url: string; label: string }> {
     if (!html) return [];
-    const DEAL_KEYWORDS = /package|due.?diligence|offering.?mem|brochure|flyer|om\b|marketing|property.?info|deal.?room|data.?room|costar|loopnet|crexi/i;
-    const SKIP_DOMAINS = /mailto:|landlinq|unsubscribe|google\.com\/maps|linkedin|facebook|twitter|instagram/i;
+    const DEAL_KEYWORDS = /package|due.?diligence|offering.?mem|brochure|flyer|om\b|marketing|property.?info|deal.?room|data.?room|costar|loopnet|crexi|gis|parcel|arcgis|assessor|tax.?record/i;
+    const SKIP_DOMAINS = /mailto:|landlinq|unsubscribe|linkedin|facebook|twitter|instagram/i;
     const links: Array<{ url: string; label: string }> = [];
     const seen = new Set<string>();
-    // Match all <a href="...">text</a> pairs
-    const re = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(html)) !== null) {
-      const url = m[1].trim();
-      const label = m[2].replace(/<[^>]+>/g, '').trim();
-      if (!url.startsWith('http')) continue;
-      if (SKIP_DOMAINS.test(url)) continue;
-      if (seen.has(url)) continue;
-      if (DEAL_KEYWORDS.test(label) || DEAL_KEYWORDS.test(url)) {
+
+    const addLink = (rawUrl: string, rawLabel = '') => {
+      // URLs copied from a text email often carry sentence punctuation.
+      const url = rawUrl.trim().replace(/[),.;!?]+$/, '');
+      const label = rawLabel.replace(/<[^>]+>/g, '').trim();
+      if (!url.startsWith('http')) return;
+      const isGoogleMaps = isGoogleMapsUrl(url);
+      if (SKIP_DOMAINS.test(url) || seen.has(url)) return;
+      if (isGoogleMaps || DEAL_KEYWORDS.test(label) || DEAL_KEYWORDS.test(url)) {
         seen.add(url);
         links.push({ url, label: label || url });
       }
+    };
+
+    // Match all <a href="...">text</a> pairs.
+    const anchorRe = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = anchorRe.exec(html)) !== null) {
+      addLink(m[1], m[2]);
+    }
+
+    // Also support plain-text messages and URLs exposed by mail clients.
+    const rawUrlRe = /https?:\/\/[^\s<>"']+/gi;
+    while ((m = rawUrlRe.exec(html)) !== null) {
+      addLink(m[0]);
     }
     return links.slice(0, 4); // cap at 4 links to avoid runaway fetching
+  }
+
+  static extractGoogleMapsCoordinates(url: string): Array<{ latitude: number; longitude: number }> {
+    if (!isGoogleMapsUrl(url)) return [];
+
+    const decodedUrl = safeDecodeURIComponent(url);
+    const pairs: Array<{ latitude: number; longitude: number }> = [];
+    const seen = new Set<string>();
+    const addPair = (value: string | null | undefined) => {
+      if (!value) return;
+      const match = value.match(/(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/);
+      if (!match) return;
+      const latitude = Number(match[1]);
+      const longitude = Number(match[2]);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+          Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return;
+      const key = `${latitude},${longitude}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      pairs.push({ latitude, longitude });
+    };
+
+    // Google Maps commonly embeds the viewport as /@lat,lng,zoom.
+    addPair(decodedUrl.match(/@(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/)?.[0]);
+
+    try {
+      const parsed = new URL(decodedUrl);
+      for (const key of ['q', 'll', 'query']) {
+        addPair(parsed.searchParams.get(key));
+      }
+    } catch {
+      // Keep supporting partially copied URLs through the path match above.
+    }
+    return pairs;
   }
 
   private static async fetchLinkedPackageContent(html: string): Promise<string> {
@@ -1102,6 +1162,20 @@ CRITICAL RULES:
     const results: string[] = [];
 
     for (const { url, label } of links) {
+      const googleCoordinates = EmailIntakeService.extractGoogleMapsCoordinates(url);
+      if (googleCoordinates.length > 0) {
+        const coordinateText = googleCoordinates
+          .map(({ latitude, longitude }) => `${latitude}, ${longitude}`)
+          .join('; ');
+        results.push(`\n\nLINKED GOOGLE MAPS COORDINATES (${label}): ${coordinateText}`);
+        console.log(`✅ [INTAKE] Google Maps coordinates extracted from URL: ${coordinateText}`);
+        continue;
+      }
+      if (isGoogleMapsUrl(url)) {
+        console.warn(`⚠️ [INTAKE] Google Maps link found but no coordinates were present in the URL: ${url}`);
+        continue;
+      }
+
       try {
         console.log(`🔗 [INTAKE] Fetching linked content: ${label} — ${url}`);
         const controller = new AbortController();
@@ -1115,11 +1189,18 @@ CRITICAL RULES:
 
         const contentType = res.headers.get('content-type') || '';
         const buf = await res.buffer();
+        let extractedUsableContent = false;
+
+        if (!res.ok) {
+          console.warn(`⚠️ [INTAKE] Link fetch failed (${label}): HTTP ${res.status}`);
+          continue;
+        }
 
         if (contentType.includes('pdf') || url.toLowerCase().includes('.pdf')) {
           const parsed = await pdfParse(buf);
           const text = parsed.text?.substring(0, 4000).trim();
           if (text) {
+            extractedUsableContent = true;
             results.push(`\n\nLINKED PACKAGE (${label}):\n${text}`);
             console.log(`✅ [INTAKE] PDF fetched: ${text.length} chars from ${label}`);
           }
@@ -1133,9 +1214,16 @@ CRITICAL RULES:
             .substring(0, 4000)
             .trim();
           if (text) {
+            extractedUsableContent = true;
             results.push(`\n\nLINKED PAGE (${label}):\n${text}`);
             console.log(`✅ [INTAKE] HTML page fetched: ${text.length} chars from ${label}`);
           }
+        }
+        if (!extractedUsableContent) {
+          console.warn(
+            `⚠️ [INTAKE] Link fetched successfully but no usable text/data was extracted ` +
+            `(possibly a JavaScript-heavy interactive GIS/map page): ${label} — ${url}`,
+          );
         }
       } catch (e: any) {
         const reason = e?.name === 'AbortError' ? 'timeout' : e?.message || 'error';

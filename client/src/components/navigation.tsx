@@ -19,6 +19,56 @@ interface NavigationProps {
   onOpenSlideForm?: () => void;
 }
 
+function PublicNavigation() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  return (
+    <nav className="sticky top-0 z-50 border-b border-white/10 bg-primary shadow-sm" aria-label="Public navigation">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+        <div className="flex h-16 items-center justify-between">
+          <Link href="/" className="shrink-0" aria-label="LandLinq home">
+            <img src={landlinqWhiteLogo} alt="LandLinq" className="h-7 w-auto" data-testid="public-logo-landlinq" />
+          </Link>
+
+          <div className="hidden items-center gap-7 md:flex">
+            <a href="/#platform" className="text-sm text-white/65 transition-colors hover:text-white">Platform</a>
+            <a href="/#company" className="text-sm text-white/65 transition-colors hover:text-white">Company</a>
+            <Link href="/contact" className="text-sm text-white/65 transition-colors hover:text-white">Contact</Link>
+            <Link href="/login" className="rounded-full border border-white/35 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-landlinq-sky hover:bg-white hover:text-landlinq-blue">
+              Log in
+            </Link>
+            <Link href="/submit-deal" className="rounded-full border border-landlinq-sky bg-landlinq-sky px-4 py-2 text-sm font-semibold text-primary transition-all hover:border-landlinq-sky hover:bg-white hover:text-landlinq-blue">
+              Submit a deal
+            </Link>
+          </div>
+
+          <button
+            type="button"
+            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isMobileMenuOpen}
+            onClick={() => setIsMobileMenuOpen((open) => !open)}
+            className="rounded-full p-2 text-white md:hidden"
+          >
+            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
+
+        {isMobileMenuOpen && (
+          <div className="border-t border-white/10 py-3 md:hidden">
+            <div className="flex flex-col gap-1 pb-2">
+              <a href="/#platform" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/75 hover:bg-white/10 hover:text-white">Platform</a>
+              <a href="/#company" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/75 hover:bg-white/10 hover:text-white">Company</a>
+              <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/75 hover:bg-white/10 hover:text-white">Contact</Link>
+              <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="mt-2 rounded-lg border border-white/25 px-3 py-3 text-center text-sm font-semibold text-white hover:bg-white hover:text-primary">Log in</Link>
+              <Link href="/submit-deal" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg bg-landlinq-sky px-3 py-3 text-center text-sm font-semibold text-primary hover:bg-white">Submit a deal</Link>
+            </div>
+          </div>
+        )}
+      </div>
+    </nav>
+  );
+}
+
 function Navigation({ onOpenSlideForm }: NavigationProps) {
   const { user, isAuthenticated, logout, userRole, hasPermission, isRole } = useAuth();
   const [location] = useLocation();
@@ -192,6 +242,10 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
 
     return sections.filter((section) => section.items.length > 0);
   }, [landlinqNav, isAuthenticated, isPlatformAdmin]);
+
+  if (!isAuthenticated) {
+    return <PublicNavigation />;
+  }
 
   return (
     <nav className="relative border-b border-slate-800 sticky top-0 z-50 shadow-lg" style={{ backgroundColor: '#081729' }}>

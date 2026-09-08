@@ -57,7 +57,11 @@ export default function Terms() {
               <section>
                 <h2 className="text-xl font-semibold text-catalyst-dark-blue mb-3">Contact Information</h2>
                 <p>
-                  For questions about these Terms of Service, please contact us at (888) 486-6346.
+                  For questions about these Terms of Service, please contact us at{" "}
+                  <a href="mailto:help@landlinq.ai" className="text-landlinq-blue hover:underline">
+                    help@landlinq.ai
+                  </a>
+                  .
                 </p>
               </section>
             </div>

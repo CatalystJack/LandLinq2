@@ -42,6 +42,9 @@ export default function Footer() {
             Company &amp; Support
           </h3>
           <div className="flex flex-col gap-3 text-sm text-white/70">
+            <Link href="/contact" className="transition-colors hover:text-white">
+              Contact us
+            </Link>
             <a
               href="mailto:help@landlinq.ai"
               className="transition-colors hover:text-white"

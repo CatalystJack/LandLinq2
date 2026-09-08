@@ -18,7 +18,7 @@ const faqs = [
   ["How much of the work does LandLinq take off my team?", "LandLinq handles sourcing, screening, and outreach automatically, so your team spends its time only on the deals that clear your criteria."],
 ];
 
-function Button({ children, href = "#contact", dark = false }: { children: ReactNode; href?: string; dark?: boolean }) {
+function Button({ children, href = "/contact", dark = false }: { children: ReactNode; href?: string; dark?: boolean }) {
   return (
     <a href={href} className={`group inline-flex min-h-12 items-center justify-center gap-3 rounded-full border px-5 text-sm font-semibold transition-all duration-300 ${dark ? "border-primary bg-primary text-white hover:border-landlinq-sky hover:bg-white hover:text-landlinq-blue" : "border-landlinq-sky bg-landlinq-sky text-primary hover:border-landlinq-blue hover:bg-white hover:text-landlinq-blue"}`}>
       {children}<ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />

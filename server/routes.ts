@@ -2810,6 +2810,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       '/reset-password',
       '/privacy',
       '/terms',
+      '/contact',
       '/unsubscribe',
       '/sms-opt-in',
     ];

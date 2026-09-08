@@ -138,7 +138,7 @@ import {
   type InsertSiteEvaluation,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, count, avg, sum, and, or, like, sql, isNull, isNotNull, inArray, gte, lte } from "drizzle-orm";
+import { eq, desc, count, avg, sum, and, or, like, sql, isNull, isNotNull, inArray, gt, gte, lte } from "drizzle-orm";
 
 // Utility function to format deal numbers as 001, 002, etc.
 export function formatDealNumber(dealNumber: number): string {
@@ -260,6 +260,7 @@ export interface IStorage {
   
   // Password reset operations
   createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getValidPasswordResetToken(email: string): Promise<PasswordResetToken | undefined>;
   getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
   deletePasswordResetToken(token: string): Promise<void>;
   updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
@@ -2457,6 +2458,17 @@ export class DatabaseStorage implements IStorage {
   async createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken> {
     const [token] = await db.insert(passwordResetTokens).values(data).returning();
     return token;
+  }
+
+  async getValidPasswordResetToken(email: string): Promise<PasswordResetToken | undefined> {
+    const [resetToken] = await db.select().from(passwordResetTokens)
+      .where(and(
+        eq(passwordResetTokens.email, email),
+        gt(passwordResetTokens.expiresAt, new Date()),
+      ))
+      .orderBy(desc(passwordResetTokens.createdAt))
+      .limit(1);
+    return resetToken;
   }
 
   async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
