@@ -1,0 +1,39 @@
+The MIME-type asset-loading fix (Express SPA fallback asset guard, 
+server/vite.ts) was verified correct in the code and confirmed republished, but 
+the exact same browser errors are still occurring on the live site, tested fresh 
+in an Incognito window with zero cache:
+
+"Failed to load module script: Expected a JavaScript-or-Wasm module but the 
+server responded with a MIME type of 'text/html'"
+"Refused to apply style from '.../reset-password?token=...' because its MIME 
+type ('text/html') is not a supported stylesheet MIME type"
+
+This means either:
+1. The production build was not actually regenerated as part of the most recent 
+   deploy — the server code has the fix, but the built dist/ assets being served 
+   are stale/from before the fix, or
+2. There is a routing/proxy layer in front of this Express app (e.g. related to 
+   the custom domain configuration) that is intercepting this request before it 
+   ever reaches the fixed fallback logic in server/vite.ts.
+
+TASK 1 — Confirm the build is actually fresh
+Check the timestamp/hash of the actual files in the dist/assets directory 
+currently being served in production, and confirm a full rebuild (not just a 
+server restart) was performed after the vite.ts fix was made.
+
+TASK 2 — Trace the actual request path for this exact URL
+Add temporary logging (or use existing request logs) to confirm that a real 
+request to https://landlinq.ai/reset-password?token=... in production is actually 
+reaching the Express app and the specific fallback handler in server/vite.ts at 
+all, rather than being served by some other mechanism (a CDN cache, a different 
+routing configuration tied to the custom domain, or a separate static file host).
+
+TASK 3 — Test directly against the Replit-provided URL, bypassing the custom domain
+If possible, test the exact same route against the raw Replit deployment URL 
+(not landlinq.ai) to determine whether the bug is specific to how the custom 
+domain is configured/routed, versus a problem in the app itself.
+
+Report back findings before attempting another fix — we need to know WHERE this 
+request is actually being intercepted before applying more changes, since the 
+already-applied fix appears correct but isn't taking effect for this specific URL 
+in production.
