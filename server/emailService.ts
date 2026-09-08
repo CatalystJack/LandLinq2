@@ -204,7 +204,7 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
       const unsubscribeUrl = `${baseUrl}/unsubscribe?email=${encodeURIComponent(notification.to)}`;
       
       // Check if unsubscribe link already exists
-      if (htmlContent && !htmlContent.includes('unsubscribe')) {
+      if (htmlContent && !notification.transactional && !htmlContent.includes('unsubscribe')) {
         // Add unsubscribe link to HTML - without any special headers to avoid SendGrid rewriting
         htmlContent += `<br><br><hr><small style="color: #666;">To unsubscribe from future emails, <a href="${unsubscribeUrl}" style="color: #666;">click here</a> or reply with UNSUBSCRIBE.</small>`;
         

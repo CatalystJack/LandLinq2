@@ -12633,6 +12633,118 @@ RULES:
     }[character] || character));
   }
 
+  function buildDeveloperInvitationEmail({
+    firstName,
+    companyName,
+    email,
+    temporaryPassword,
+    loginUrl,
+    logoUrl,
+  }: {
+    firstName: string;
+    companyName: string;
+    email: string;
+    temporaryPassword: string;
+    loginUrl: string;
+    logoUrl: string;
+  }) {
+    const safeFirstName = escapeEmailHtml(firstName);
+    const safeCompanyName = escapeEmailHtml(companyName);
+    const safeEmail = escapeEmailHtml(email);
+    const safeTemporaryPassword = escapeEmailHtml(temporaryPassword);
+    const safeLoginUrl = escapeEmailHtml(loginUrl);
+    const safeLogoUrl = escapeEmailHtml(logoUrl);
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your ${safeCompanyName} portal access</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f4f7fb;color:#172b4d;font-family:Arial,Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+      Your ${safeCompanyName} Investment Company portal access is ready.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f4f7fb;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;background-color:#ffffff;border:1px solid #dbe5f0;">
+            <tr>
+              <td style="height:8px;background-color:#0a2b4a;font-size:0;line-height:0;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:30px 32px 24px;background-color:#ffffff;">
+                <img src="${safeLogoUrl}" width="220" alt="LandLinq" style="display:block;width:220px;max-width:100%;height:auto;border:0;">
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px;">
+                <div style="height:2px;background-color:#4a90e2;font-size:0;line-height:0;">&nbsp;</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:34px 32px 12px;">
+                <h1 style="margin:0;color:#0a2b4a;font-size:26px;line-height:34px;font-weight:700;">
+                  Your company portal is ready
+                </h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 8px;color:#334e68;font-size:16px;line-height:26px;">
+                <p style="margin:0 0 16px;">Hi ${safeFirstName},</p>
+                <p style="margin:0 0 16px;">
+                  Your <strong style="color:#0a2b4a;">${safeCompanyName}</strong> Investment Company portal has been created.
+                  Use the temporary credentials below to sign in.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 32px 20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f7faff;border:1px solid #cfe0f2;">
+                  <tr>
+                    <td style="padding:20px 22px;color:#334e68;font-size:14px;line-height:22px;">
+                      <div style="margin-bottom:12px;color:#0a2b4a;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">
+                        Temporary sign-in details
+                      </div>
+                      <div style="margin-bottom:8px;"><strong>Email:</strong> ${safeEmail}</div>
+                      <div><strong>Temporary password:</strong></div>
+                      <div style="margin-top:8px;padding:12px 14px;background-color:#ffffff;border:1px solid #b8cee5;color:#0a2b4a;font-family:'Courier New',Courier,monospace;font-size:18px;line-height:24px;letter-spacing:.04em;word-break:break-all;">
+                        ${safeTemporaryPassword}
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:4px 32px 24px;">
+                <a href="${safeLoginUrl}" style="display:inline-block;background-color:#0a2b4a;border:1px solid #0a2b4a;border-radius:5px;color:#ffffff;font-size:16px;font-weight:700;line-height:22px;text-decoration:none;padding:14px 28px;">
+                  Open the company login
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 30px;color:#52677d;font-size:14px;line-height:22px;">
+                <p style="margin:0;">
+                  For your security, you will be required to set a new password after signing in.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px;background-color:#f7f9fc;border-top:1px solid #e4ebf3;color:#718096;font-size:12px;line-height:18px;text-align:center;">
+                LandLinq Support &middot; help@landlinq.ai
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+  }
+
   async function createDeveloperInvitation(profile: any, name: string, normalizedEmail: string) {
     const nameParts = name.split(/\s+/);
     const firstName = nameParts.shift() || "";
@@ -12655,13 +12767,23 @@ RULES:
         "https://landlinq.ai"
       ).replace(/\/$/, "");
       const loginUrl = `${baseUrl}/developer/${encodeURIComponent(profile.slug)}/login`;
+      const logoUrl = `${baseUrl}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
+      const invitationHtml = buildDeveloperInvitationEmail({
+        firstName,
+        companyName: profile.companyName,
+        email: normalizedEmail,
+        temporaryPassword,
+        loginUrl,
+        logoUrl,
+      });
       const emailSent = await sendNotificationEmail({
         to: normalizedEmail,
         subject: `Your ${profile.companyName} Investment Company portal access`,
         type: "developer-team-invite",
         priority: "high",
+        transactional: true,
         text: `Hi ${firstName},\n\nYour ${profile.companyName} Investment Company portal is ready.\nEmail: ${normalizedEmail}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be required to set a new password after signing in.`,
-        html: `<p>Hi ${escapeEmailHtml(firstName)},</p><p>Your <strong>${escapeEmailHtml(profile.companyName)}</strong> Investment Company portal is ready.</p><p><strong>Email:</strong> ${escapeEmailHtml(normalizedEmail)}<br><strong>Temporary password:</strong> ${escapeEmailHtml(temporaryPassword)}</p><p><a href="${loginUrl}">Open the company login</a>. You will be required to set a new password after signing in.</p>`,
+        html: invitationHtml,
       });
       if (!emailSent) {
         throw new Error("The invitation email could not be sent; no login was created");
