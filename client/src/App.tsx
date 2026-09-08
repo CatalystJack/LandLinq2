@@ -183,6 +183,7 @@ function Router() {
           <Route path="/developer/analytics" component={DeveloperAnalytics} />
           <Route path="/developer/user-management" component={DeveloperUserManagement} />
           <Route path="/developer/settings" component={DeveloperCriteriaSettings} />
+          <Route path="/reset-password" component={PasswordReset} />
           <Route>
             {() => {
               const home = (user as any)?.developerProfile?.profileType === "general_sales"

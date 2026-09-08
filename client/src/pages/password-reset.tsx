@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,12 +7,33 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { AuthModal } from "@/components/auth-modal";
+import ErrorBoundary from "@/components/error-boundary";
 
-export default function PasswordReset() {
+type TokenStatus = "idle" | "checking" | "valid" | "invalid" | "error";
+
+function PasswordResetErrorFallback() {
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <h1 className="text-xl font-semibold text-slate-900">Something went wrong</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Please try again or contact support if the problem continues.
+        </p>
+        <a
+          href="/login"
+          className="mt-6 inline-flex min-h-11 items-center justify-center rounded-md bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700"
+        >
+          Back to Login
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function PasswordResetContent() {
   const [, setLocation] = useLocation();
-  // Check for token in URL query parameters to determine initial step
-  const hasToken = new URLSearchParams(window.location.search).get("token");
-  const [step, setStep] = useState<"request" | "reset">(hasToken ? "reset" : "request");
+  const [step, setStep] = useState<"request" | "reset">("request");
+  const [tokenStatus, setTokenStatus] = useState<TokenStatus>("idle");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -24,6 +45,52 @@ export default function PasswordReset() {
     confirmPassword: ""
   });
   const { toast } = useToast();
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("token");
+    if (!token) {
+      setStep("request");
+      setTokenStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+    setStep("reset");
+    setTokenStatus("checking");
+    setError("");
+
+    fetch("/api/password-reset/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (cancelled) return;
+        if (response.ok) {
+          setTokenStatus("valid");
+        } else {
+          setTokenStatus("invalid");
+          setError(data.message || "This link has expired or is invalid.");
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTokenStatus("error");
+        setError("We couldn't verify this link. Please request a new one and try again.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const returnToRequestStep = () => {
+    window.history.replaceState({}, "", "/reset-password");
+    setStep("request");
+    setTokenStatus("idle");
+    setError("");
+  };
 
   const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,6 +171,9 @@ export default function PasswordReset() {
     }
   };
 
+  const isCheckingToken = tokenStatus === "checking";
+  const tokenIsInvalid = tokenStatus === "invalid" || tokenStatus === "error";
+
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
       <div className="flex w-full items-center justify-center">
@@ -122,13 +192,22 @@ export default function PasswordReset() {
               </Button>
               <div>
                 <CardTitle>
-                  {step === "request" ? "Reset Password" : "Set New Password"}
+                  {isCheckingToken
+                    ? "Checking Reset Link"
+                    : tokenIsInvalid
+                      ? "Reset Link Unavailable"
+                      : step === "request"
+                        ? "Reset Password"
+                        : "Set New Password"}
                 </CardTitle>
                 <CardDescription>
-                  {step === "request" 
-                    ? "Enter your email to receive a password reset link"
-                    : "Enter your new password below"
-                  }
+                  {isCheckingToken
+                    ? "Please wait while we verify this link"
+                    : tokenIsInvalid
+                      ? "Request a new password reset link to continue"
+                      : step === "request"
+                        ? "Enter your email to receive a password reset link"
+                        : "Enter your new password below"}
                 </CardDescription>
               </div>
             </div>
@@ -146,7 +225,22 @@ export default function PasswordReset() {
               </Alert>
             )}
 
-            {step === "request" ? (
+            {isCheckingToken ? (
+              <div className="py-8 text-center text-sm text-slate-600" role="status">
+                Checking your reset link...
+              </div>
+            ) : tokenIsInvalid ? (
+              <div className="space-y-4">
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    This link has expired or is invalid — request a new one.
+                  </AlertDescription>
+                </Alert>
+                <Button type="button" className="w-full" onClick={returnToRequestStep}>
+                  Request a New Reset Link
+                </Button>
+              </div>
+            ) : step === "request" ? (
               <form onSubmit={handleRequestReset} className="space-y-4">
                 <div>
                   <Input
@@ -239,5 +333,13 @@ export default function PasswordReset() {
         defaultMode="login"
       />
     </div>
+  );
+}
+
+export default function PasswordReset() {
+  return (
+    <ErrorBoundary fallback={PasswordResetErrorFallback}>
+      <PasswordResetContent />
+    </ErrorBoundary>
   );
 }
