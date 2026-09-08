@@ -42,6 +42,13 @@ function sanitizeTransactionalCopy(value: string): string {
     .replace(/\u200D|\uFE0F/gu, '');
 }
 
+function stripPasswordMarketingSignature(value: string): string {
+  return value.replace(
+    /Let's\s+Build\s+What's\s+Next,\s*Together![\s\S]{0,4000}?LandLinq\s+is\s+a\s+proprietary,\s*AI-powered\s+development\s+site\s+analysis\s+system\s*[—-]\s*automating\s+and\s+optimizing\s+multifamily\s+land\s+acquisition\s+for\s+developers\.?/gi,
+    '',
+  );
+}
+
 /**
  * Convert plain text with \n characters to proper HTML
  */
@@ -410,6 +417,8 @@ export class TemplateService {
       // Normalize event name for comparison
       const normalizeEventName = (name: string) => name?.toLowerCase().trim().replace(/\s+/g, '_') || '';
       const targetNormalized = normalizeEventName(eventType);
+      const isPasswordReset = targetNormalized.includes('password_reset') ||
+                             targetNormalized.includes('password_reset_email');
       
       console.log(`📧 [TEMPLATE-LOOKUP] Normalized search term: "${targetNormalized}"`);
       
@@ -537,6 +546,11 @@ export class TemplateService {
       content = removeUnreplacedPlaceholders(content);
       html = removeUnreplacedPlaceholders(html);
       
+      if (isPasswordReset) {
+        content = stripPasswordMarketingSignature(content);
+        html = stripPasswordMarketingSignature(html);
+      }
+
       // CRITICAL FIX: Convert literal \n escape sequences to actual newlines FIRST
       // This must happen BEFORE bold formatting to prevent HTML detection from skipping newline conversion
       const convertEscapedNewlines = (text: string): string => {
@@ -768,9 +782,6 @@ export class TemplateService {
       }
       
       // ⚠️ POST-PROCESSING: Inject "Reset Password" button for password_reset emails
-      const isPasswordReset = eventType?.toLowerCase()?.includes('password_reset') ||
-                             eventType?.toLowerCase()?.includes('password reset');
-      
       if (isPasswordReset && html && html.includes('</body>') && variables.resetUrl) {
         const resetPasswordButtonHTML = `
     <!-- Reset Password Button -->
