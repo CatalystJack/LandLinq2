@@ -83,7 +83,14 @@ export function serveStatic(app: Express) {
   // causes the browser to reject it as JavaScript/CSS due to its MIME type.
   app.use("*", (req, res) => {
     const requestedPath = (req.originalUrl || req.url).split("?", 1)[0];
-    if (requestedPath.startsWith("/assets/") || path.extname(requestedPath)) {
+    const isAssetLikeRequest =
+      requestedPath.startsWith("/assets/") || path.extname(requestedPath) !== "";
+
+    console.log(
+      `[SPA-FALLBACK-TRACE] originalUrl=${req.originalUrl} url=${req.url} path=${req.path} requestedPath=${requestedPath} assetLike=${isAssetLikeRequest}`,
+    );
+
+    if (isAssetLikeRequest) {
       return res.sendStatus(404);
     }
 
