@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Plus, Users, Shield, Settings, Edit, Trash2, Mail, Calendar, UserCheck, UserX, Crown, Eye, Building, MapPin, Clock, CheckCircle2, Loader2 } from "lucide-react";
 import { formatDateEST } from "@/utils/timezone";
 import Footer from "@/components/footer";
@@ -43,19 +42,6 @@ interface NewUser {
   role: string;
   dealRole?: string;
 }
-
-// Product types and states available for assignment
-const PRODUCT_TYPES = [
-  "Active Adult",
-  "BTR (Build to Rent)",
-  "Conventional Apartments",
-  "Lot Development"
-];
-
-const STATES = [
-  "NC", "SC", "GA", "FL", "TN", "VA", 
-  "TX", "OK", "AR", "LA", "MS", "AL"
-];
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
@@ -260,7 +246,7 @@ export default function UserManagement() {
   const getRoleFromEmail = (email: string) => {
     if (isSuperAdminEmail(email)) return "Super Admin";
     if (isPlatformAdminEmail(email)) return "Admin";
-    if (email.endsWith("@catalystcp.com")) return "Catalyst Team";
+    if (email.endsWith("@catalystcp.com")) return "LandLinq Team";
     return "Broker";
   };
 
@@ -290,26 +276,6 @@ export default function UserManagement() {
   // Helper function to check if user is a Catalyst member
   const isCatalystMember = (email: string) => {
     return email.endsWith("@catalystcp.com");
-  };
-
-  // Toggle product type selection
-  const toggleProductType = (productType: string) => {
-    if (!editingUser) return;
-    const current = editingUser.productTypes || [];
-    const updated = current.includes(productType)
-      ? current.filter(type => type !== productType)
-      : [...current, productType];
-    setEditingUser({ ...editingUser, productTypes: updated });
-  };
-
-  // Toggle state selection
-  const toggleState = (state: string) => {
-    if (!editingUser) return;
-    const current = editingUser.states || [];
-    const updated = current.includes(state)
-      ? current.filter(s => s !== state)
-      : [...current, state];
-    setEditingUser({ ...editingUser, states: updated });
   };
 
   const handleDeleteUser = (userId: string, userEmail: string) => {
@@ -426,7 +392,7 @@ export default function UserManagement() {
                         <SelectItem value="all">All Roles</SelectItem>
                         <SelectItem value="super_admin">Super Admin</SelectItem>
                         <SelectItem value="admin">Admins</SelectItem>
-                        <SelectItem value="analyst">Catalyst Team</SelectItem>
+                        <SelectItem value="analyst">LandLinq Team</SelectItem>
                         <SelectItem value="broker">Brokers</SelectItem>
                       </SelectContent>
                     </Select>
@@ -492,30 +458,8 @@ export default function UserManagement() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="analyst">Analyst</SelectItem>
-                              <SelectItem value="broker">Broker</SelectItem>
+                              <SelectItem value="analyst">LandLinq Team</SelectItem>
                               <SelectItem value="admin">Admin</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="dealRole">Deal Dashboard Role</Label>
-                          <Select
-                            value={newUser.dealRole || ''}
-                            onValueChange={(value) => setNewUser({ ...newUser, dealRole: value })}
-                          >
-                            <SelectTrigger data-testid="new-user-deal-role">
-                              <SelectValue placeholder="Select deal role (optional)" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Managing Partner">Managing Partner</SelectItem>
-                              <SelectItem value="Chief Investment Officer">Chief Investment Officer</SelectItem>
-                              <SelectItem value="Regional Development Partner">Regional Development Partner</SelectItem>
-                              <SelectItem value="Senior Finance Associate">Senior Finance Associate</SelectItem>
-                              <SelectItem value="Development Associate">Development Associate</SelectItem>
-                              <SelectItem value="Junior Analyst">Junior Analyst</SelectItem>
-                              <SelectItem value="Analyst">Analyst</SelectItem>
-                              <SelectItem value="Associate">Associate</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -724,132 +668,21 @@ export default function UserManagement() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="editUserType">User Type</Label>
+                    <Label htmlFor="editUserType">Access Role</Label>
                     <Select
-                      value={editingUser.role || 'BROKER'}
+                      value={editingUser.role || 'ANALYST'}
                       onValueChange={(value) => setEditingUser({ ...editingUser, role: value })}
                     >
                       <SelectTrigger data-testid="edit-user-type">
                         <SelectValue placeholder="Select user type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="BROKER">Broker</SelectItem>
-                        <SelectItem value="TEAM">Catalyst Team</SelectItem>
+                        <SelectItem value="ANALYST">LandLinq Team</SelectItem>
                         <SelectItem value="ADMIN">Admin</SelectItem>
+                        <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {!isCatalystMember(editingUser.email) && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="editBrokerage">Brokerage Company</Label>
-                        <Input
-                          id="editBrokerage"
-                          value={editingUser.brokerage || ''}
-                          onChange={(e) => setEditingUser({ ...editingUser, brokerage: e.target.value })}
-                          placeholder="ABC Realty"
-                          data-testid="edit-user-brokerage"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="editMarkets">Markets Covered</Label>
-                        <Input
-                          id="editMarkets"
-                          value={editingUser.marketsCovered?.join(', ') || ''}
-                          onChange={(e) => setEditingUser({ 
-                            ...editingUser, 
-                            marketsCovered: e.target.value.split(',').map(m => m.trim()).filter(Boolean)
-                          })}
-                          placeholder="Charlotte, Raleigh, Atlanta"
-                          data-testid="edit-user-markets"
-                        />
-                        <p className="text-xs text-muted-foreground">Separate multiple markets with commas</p>
-                      </div>
-                    </>
-                  )}
-
-                  {isCatalystMember(editingUser.email) && (
-                    <div className="space-y-2">
-                      <Label htmlFor="editDealRole">Deal Dashboard Role</Label>
-                      <Select
-                        value={editingUser.dealRole || ''}
-                        onValueChange={(value) => setEditingUser({ ...editingUser, dealRole: value })}
-                      >
-                        <SelectTrigger data-testid="edit-user-deal-role">
-                          <SelectValue placeholder="Select deal role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Managing Partner">Managing Partner</SelectItem>
-                          <SelectItem value="Chief Investment Officer">Chief Investment Officer</SelectItem>
-                          <SelectItem value="Regional Development Partner">Regional Development Partner</SelectItem>
-                          <SelectItem value="Senior Finance Associate">Senior Finance Associate</SelectItem>
-                          <SelectItem value="Development Associate">Development Associate</SelectItem>
-                          <SelectItem value="Junior Analyst">Junior Analyst</SelectItem>
-                          <SelectItem value="Analyst">Analyst</SelectItem>
-                          <SelectItem value="Associate">Associate</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {/* Product Types and States - Only for Catalyst Members */}
-                  {isCatalystMember(editingUser.email) && (
-                    <>
-                      <div className="space-y-3 pt-4 border-t">
-                        <Label className="text-base font-semibold flex items-center gap-2">
-                          <Building className="h-4 w-4" />
-                          Product Types
-                        </Label>
-                        <p className="text-sm text-muted-foreground">Select the product types this team member handles</p>
-                        <div className="grid grid-cols-2 gap-3">
-                          {PRODUCT_TYPES.map((productType) => (
-                            <div key={productType} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`product-${productType}`}
-                                checked={editingUser.productTypes?.includes(productType) || false}
-                                onCheckedChange={() => toggleProductType(productType)}
-                                data-testid={`product-type-${productType}`}
-                              />
-                              <Label 
-                                htmlFor={`product-${productType}`}
-                                className="text-sm font-normal cursor-pointer"
-                              >
-                                {productType}
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 pt-4 border-t">
-                        <Label className="text-base font-semibold flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          States/Regions
-                        </Label>
-                        <p className="text-sm text-muted-foreground">Select the states/regions this team member covers</p>
-                        <div className="grid grid-cols-4 gap-3">
-                          {STATES.map((state) => (
-                            <div key={state} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`state-${state}`}
-                                checked={editingUser.states?.includes(state) || false}
-                                onCheckedChange={() => toggleState(state)}
-                                data-testid={`state-${state}`}
-                              />
-                              <Label 
-                                htmlFor={`state-${state}`}
-                                className="text-sm font-normal cursor-pointer"
-                              >
-                                {state}
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
 
                   <div className="flex gap-2 pt-4">
                     <Button 
@@ -1010,7 +843,7 @@ export default function UserManagement() {
                       <CardContent className="p-4">
                         <div className="flex items-center gap-2 mb-3">
                           <Users className="h-5 w-5 text-blue-500" />
-                          <h3 className="font-semibold text-blue-700">Catalyst Team</h3>
+                          <h3 className="font-semibold text-blue-700">LandLinq Team</h3>
                         </div>
                         <p className="text-sm text-gray-600 mb-3">Internal team members</p>
                         <ul className="text-sm text-gray-500 space-y-1">
