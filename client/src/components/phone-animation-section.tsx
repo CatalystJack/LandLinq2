@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Smartphone, Mail, MessageSquare } from "lucide-react";
+import { Smartphone, Mail } from "lucide-react";
 
 export default function PhoneAnimationSection() {
   const [activeStep, setActiveStep] = useState(0);
@@ -20,9 +20,9 @@ export default function PhoneAnimationSection() {
       color: "bg-blue-500"
     },
     {
-      title: "Text a Deal",
-      description: "SMS property info to (704) 610-1549",
-      icon: MessageSquare,
+      title: "Get Support",
+      description: "Email help@landlinq.ai when you need assistance",
+      icon: Mail,
       color: "bg-green-500"
     },
     {

@@ -570,22 +570,22 @@ export default function Home() {
                 </CardContent>
               </Card>
 
-              {/* SMS Submission */}
+              {/* Support */}
               <Card className="bg-white border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardContent className="p-8 flex flex-col items-center justify-center text-center">
                   <div className="w-16 h-16 bg-[#4A90E2] rounded-xl flex items-center justify-center mb-4">
-                    <MessageSquare className="text-white" size={28} />
+                    <Mail className="text-white" size={28} />
                   </div>
-                  <h3 className="text-xl font-bold text-[#081729] mb-2 tracking-tight">SMS</h3>
+                  <h3 className="text-xl font-bold text-[#081729] mb-2 tracking-tight">Need Help?</h3>
                   <p className="text-gray-600 mb-2 leading-relaxed text-sm">
-                    Text property details to
+                    Contact our support team at
                   </p>
                   <a 
-                    href="sms:7046101549" 
+                    href="mailto:help@landlinq.ai"
                     className="text-lg font-semibold text-[#4A90E2] hover:text-[#081729] transition-colors" 
-                    data-testid="text-phone-number"
+                    data-testid="text-support-email"
                   >
-                    (704) 610-1549
+                    help@landlinq.ai
                   </a>
                 </CardContent>
               </Card>

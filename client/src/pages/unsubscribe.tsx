@@ -71,8 +71,9 @@ export default function UnsubscribePage() {
             <div className="mt-6 text-sm text-gray-600 dark:text-gray-400">
               <p>If you change your mind in the future, you can always contact us at:</p>
               <p className="mt-2">
-                📧 deals@catalyst.landlinq.ai<br />
-                📱 (704) 610-1549
+                <a href="mailto:help@landlinq.ai" className="text-blue-600 hover:underline">
+                  help@landlinq.ai
+                </a>
               </p>
             </div>
           </CardContent>

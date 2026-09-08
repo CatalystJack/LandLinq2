@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Mail, MessageSquare, Upload, CheckCircle, Zap, Clock } from "lucide-react";
+import { Mail, Upload, CheckCircle, Zap, Clock } from "lucide-react";
 import { Link } from "wouter";
 
 export default function SubmissionMethods() {
@@ -107,24 +107,24 @@ export default function SubmissionMethods() {
               </CardContent>
             </Card>
 
-            {/* SMS Submission */}
+            {/* Support */}
             <Card className="bg-white border-2 border-gray-200 shadow-lg">
               <CardContent className="p-8 flex flex-col items-center justify-center text-center">
                 <div className="w-16 h-16 bg-[#4A90E2] rounded-xl flex items-center justify-center mb-6 shadow-md">
-                  <MessageSquare className="text-white" size={28} />
+                  <Mail className="text-white" size={28} />
                 </div>
-                <h3 className="text-2xl font-bold text-[#081729] mb-3 tracking-tight">SMS</h3>
+                <h3 className="text-2xl font-bold text-[#081729] mb-3 tracking-tight">Need Help?</h3>
                 <p className="text-gray-600 mb-4 leading-relaxed">
-                  Text us the address on the go. No formatting required—just send what you have and we'll process it instantly.
+                  Questions or problems with a submission? Contact our support team by email.
                 </p>
                 <div className="w-full bg-gray-50 rounded-lg p-4 mb-4">
-                  <p className="text-xs text-gray-500 mb-2 font-medium">Text to:</p>
+                  <p className="text-xs text-gray-500 mb-2 font-medium">Email:</p>
                   <a 
-                    href="sms:7046101549" 
+                    href="mailto:help@landlinq.ai"
                     className="text-lg font-bold text-[#4A90E2] hover:text-[#081729] transition-colors break-all" 
-                    data-testid="text-phone-number"
+                    data-testid="text-support-email"
                   >
-                    (704) 610-1549
+                    help@landlinq.ai
                   </a>
                 </div>
               </CardContent>

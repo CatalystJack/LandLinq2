@@ -560,6 +560,8 @@ export default function AnalystDashboard() {
   const [pipelinePanel, setPipelinePanel] = useState<DealWithBroker | null>(null);
   // Pipeline view proper state (replaces window-global hack)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [pipelineDragDealId, setPipelineDragDealId] = useState<string | null>(null);
+  const [pipelineDragOverColumn, setPipelineDragOverColumn] = useState<string | null>(null);
   const [pipelineSort, setPipelineSort] = useState<{ col: string; dir: 'asc' | 'desc' }>({ col: 'createdAt', dir: 'desc' });
   const [pipelineSearch, setPipelineSearch] = useState('');
   const pipelineSearchInputRef = useRef<HTMLInputElement>(null);
@@ -6244,9 +6246,10 @@ export default function AnalystDashboard() {
             ];
 
             // Search filter
+            const pipelineDeals = deals as DealWithBroker[];
             const searchLower = pipelineSearch.toLowerCase();
             const filteredDeals = pipelineSearch
-              ? deals.filter(d =>
+              ? pipelineDeals.filter(d =>
                   (d.address || '').toLowerCase().includes(searchLower) ||
                   (d.city || '').toLowerCase().includes(searchLower) ||
                   (d.state || '').toLowerCase().includes(searchLower) ||
@@ -6254,7 +6257,7 @@ export default function AnalystDashboard() {
                   (d.broker?.lastName || '').toLowerCase().includes(searchLower) ||
                   String(d.dealNumber || '').includes(searchLower)
                 )
-              : deals;
+              : pipelineDeals;
 
             // Sort helper
             const sortDeals = (arr: DealWithBroker[]) => {
@@ -6272,6 +6275,159 @@ export default function AnalystDashboard() {
                 return 0;
               });
             };
+
+            const classifyDeal = (deal: DealWithBroker, classification: string) => {
+              if ((deal.classification || 'unclassified') === classification) return;
+              cellUpdateMutation.mutate({
+                dealId: deal.id,
+                classification,
+              });
+            };
+            const canonicalClassification = (classification?: string | null) =>
+              classification === 'green' ? 'high_priority'
+                : classification === 'yellow' ? 'potential'
+                : classification === 'red' ? 'clear_no'
+                : classification || 'unclassified';
+
+            const counts = pipelineGroups.map(group =>
+              filteredDeals.filter(d => group.keys.includes((d.classification || 'unclassified') as never)).length
+            );
+
+            return (
+              <section className="flex min-h-0 flex-col bg-[#f6f8fb]" style={{ maxHeight: 'calc(100vh - 240px)' }}>
+                <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[#dbe2ea] bg-white px-4 py-3">
+                  <div className="mr-auto flex min-w-0 items-center gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#748196]">Deal pipeline</p>
+                      <p className="text-sm font-semibold text-[#142238]">{filteredDeals.length} active records</p>
+                    </div>
+                    <div className="hidden h-7 w-px bg-[#e4e9ef] sm:block" />
+                    <div className="flex flex-wrap gap-1.5">
+                      {pipelineGroups.map((group, index) => (
+                        <span key={group.label} className="rounded border border-[#e1e7ee] bg-[#fbfcfd] px-2 py-1 text-[10px] font-semibold text-[#526176]">
+                          {counts[index]} <span className="font-normal text-[#7a8798]">{group.label}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="relative shrink-0">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8390a2]" size={14} />
+                    <input
+                      type="text"
+                      placeholder="Search address, broker, ID"
+                      ref={pipelineSearchInputRef}
+                      onChange={e => handlePipelineSearchChange(e.target.value)}
+                      className="h-8 w-56 rounded border border-[#d6dee8] bg-[#f9fafb] pl-8 pr-8 text-xs text-[#24344d] outline-none transition-colors focus:border-[#4A90E2] focus:bg-white"
+                      aria-label="Search pipeline deals"
+                    />
+                    {pipelineSearch && (
+                      <button aria-label="Clear pipeline search" onClick={clearPipelineSearch} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8794a5] hover:text-[#24344d]">
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="min-h-0 overflow-x-auto overflow-y-hidden p-3">
+                  <div className="flex min-w-[1020px] items-stretch gap-3">
+                    {pipelineGroups.map(group => {
+                      const groupDeals = sortDeals(filteredDeals.filter(d => group.keys.includes((d.classification || 'unclassified') as never)));
+                      const isOver = pipelineDragOverColumn === group.keys[0];
+                      const totalAsk = groupDeals.reduce((sum, deal) => sum + Number(deal.askingPrice || 0), 0);
+                      return (
+                        <div
+                          key={group.label}
+                          onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setPipelineDragOverColumn(group.keys[0] as string); }}
+                          onDragEnter={e => { e.preventDefault(); setPipelineDragOverColumn(group.keys[0] as string); }}
+                          onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPipelineDragOverColumn(null); }}
+                          onDrop={e => {
+                            e.preventDefault();
+                            const deal = pipelineDeals.find(d => d.id === (e.dataTransfer.getData('text/plain') || pipelineDragDealId));
+                            if (deal) classifyDeal(deal, group.keys[0] as string);
+                            setPipelineDragDealId(null);
+                            setPipelineDragOverColumn(null);
+                          }}
+                          className={`flex w-[250px] shrink-0 flex-col rounded border bg-[#fbfcfd] transition-colors duration-150 ${isOver ? 'border-[#4A90E2] bg-[#eef6ff] ring-2 ring-[#4A90E2]/20' : 'border-[#dbe2ea]'}`}
+                          aria-label={`${group.label} column`}
+                        >
+                          <header className="border-b border-[#e1e7ee] bg-white px-3 py-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: group.barColor }} />
+                                <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#26364c]">{group.label}</h3>
+                              </div>
+                              <span className="rounded bg-[#eef2f6] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#617087]">{groupDeals.length}</span>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between text-[10px] text-[#7b899b]">
+                              <span>{groupDeals.filter(d => d.unitCount).length ? `${Math.round(groupDeals.reduce((s, d) => s + Number(d.unitCount || 0), 0) / groupDeals.filter(d => d.unitCount).length).toLocaleString()} avg units` : 'No unit data'}</span>
+                              <span>{totalAsk ? `$${(totalAsk / 1000000).toFixed(1)}M ask` : '—'}</span>
+                            </div>
+                          </header>
+                          <div className="flex min-h-[420px] flex-1 flex-col gap-2 p-2">
+                            {groupDeals.length === 0 ? (
+                              <div className={`flex flex-1 items-center justify-center rounded border border-dashed px-4 text-center text-[11px] ${isOver ? 'border-[#4A90E2] text-[#4A90E2]' : 'border-[#d8e0e9] text-[#98a4b3]'}`}>
+                                {isOver ? 'Release to classify' : 'No deals in this lane'}
+                              </div>
+                            ) : groupDeals.map(deal => (
+                              <article
+                                key={deal.id}
+                                draggable
+                                onDragStart={e => {
+                                  e.dataTransfer.setData('text/plain', deal.id);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  setPipelineDragDealId(deal.id);
+                                }}
+                                onDragEnd={() => { setPipelineDragDealId(null); setPipelineDragOverColumn(null); }}
+                                onClick={() => setPipelinePanel(deal)}
+                                className={`group cursor-pointer rounded border bg-white p-3 shadow-[0_1px_2px_rgba(15,35,60,0.04)] transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:border-[#9fb9d5] hover:shadow-[0_3px_10px_rgba(15,35,60,0.08)] focus-within:border-[#4A90E2] ${pipelineDragDealId === deal.id ? 'border-[#4A90E2] opacity-60' : 'border-[#e0e6ed]'}`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <GripVertical size={14} className="shrink-0 text-[#a9b4c2]" aria-hidden="true" />
+                                      <span className="font-mono text-[10px] text-[#8491a2]">#{deal.dealNumber}</span>
+                                    </div>
+                                    <h4 className="mt-1 truncate text-[13px] font-semibold text-[#18283e]">{deal.address || 'Address unavailable'}</h4>
+                                    <p className="mt-0.5 truncate text-[10px] text-[#7a8798]">{[deal.city, deal.state].filter(Boolean).join(', ') || 'Location pending'}{deal.broker ? ` · ${deal.broker.firstName || ''} ${deal.broker.lastName || ''}` : ''}</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    aria-label={`Edit ${deal.address || 'deal'} in table`}
+                                    onClick={e => { e.stopPropagation(); setViewMode('table'); setScrollToDealId(deal.id); setEditingRow(deal.id); }}
+                                    className="shrink-0 rounded border border-[#dbe2ea] px-1.5 py-1 text-[10px] font-semibold text-[#65748a] hover:border-[#9fb9d5] hover:text-[#254a72]"
+                                  >Edit</button>
+                                </div>
+                                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[#edf0f4] pt-2">
+                                  <div><p className="text-[9px] uppercase tracking-wide text-[#93a0af]">Units</p><p className="text-xs font-semibold text-[#35465d]">{deal.unitCount?.toLocaleString() || '—'}</p></div>
+                                  <div><p className="text-[9px] uppercase tracking-wide text-[#93a0af]">Rent / mo</p><p className="text-xs font-semibold text-[#35465d]">{deal.topRentPerUnit ? `$${Math.round(Number(deal.topRentPerUnit)).toLocaleString()}` : '—'}</p></div>
+                                  <div><p className="text-[9px] uppercase tracking-wide text-[#93a0af]">Ask</p><p className="text-xs font-semibold text-[#35465d]">{deal.askingPrice ? `$${(Number(deal.askingPrice) / 1000000).toFixed(1)}M` : '—'}</p></div>
+                                </div>
+                                <div className="mt-2 flex items-center gap-2">
+                                  <label htmlFor={`classification-${deal.id}`} className="sr-only">Classification</label>
+                                  <select
+                                    id={`classification-${deal.id}`}
+                                    value={canonicalClassification(deal.classification as string | null | undefined)}
+                                    onClick={e => e.stopPropagation()}
+                                    onChange={e => { e.stopPropagation(); classifyDeal(deal, e.target.value); }}
+                                    className="h-7 min-w-0 flex-1 rounded border border-[#dbe2ea] bg-[#fbfcfd] px-2 text-[10px] font-medium text-[#526176] outline-none focus:border-[#4A90E2]"
+                                  >
+                                    <option value="high_priority">High Priority</option>
+                                    <option value="potential">Potential</option>
+                                    <option value="clear_no">Clear No</option>
+                                    <option value="unclassified">Unclassified</option>
+                                  </select>
+                                  <button type="button" onClick={e => { e.stopPropagation(); setPipelinePanel(deal); }} className="rounded px-2 py-1 text-[10px] font-semibold text-[#4A90E2] hover:bg-[#edf5ff]">View</button>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+            );
 
             const SortHeader = ({ col, label, className }: { col: string; label: string; className?: string }) => (
               <button

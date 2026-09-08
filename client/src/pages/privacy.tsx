@@ -50,9 +50,7 @@ export default function Privacy() {
                 <h2 className="text-xl font-semibold text-catalyst-dark-blue mb-3">Contact Us</h2>
                 <p>
                   If you have questions about this Privacy Policy, please contact us at{' '}
-                  <a href="tel:7046101549" className="text-catalyst-gold hover:text-catalyst-gold/80 transition-colors">(704) 610-1549</a>
-                  {' '}or{' '}
-                  <a href="mailto:deals@catalyst.landlinq.ai" className="text-catalyst-gold hover:text-catalyst-gold/80 transition-colors">deals@catalyst.landlinq.ai</a>.
+                  <a href="mailto:help@landlinq.ai" className="text-catalyst-gold hover:text-catalyst-gold/80 transition-colors">help@landlinq.ai</a>.
                 </p>
               </section>
             </div>

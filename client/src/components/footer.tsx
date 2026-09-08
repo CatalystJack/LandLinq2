@@ -1,99 +1,77 @@
 import { Link } from "wouter";
-import { Button } from "@/components/ui/button";
-import { LogIn } from "lucide-react";
-
-const landLinqLogo = "/assets/landlinq-white-logo.png";
 
 export default function Footer() {
   return (
-    <footer className="bg-catalyst-gray-900 text-white py-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-16">
-          <div className="text-center md:text-left">
-            <h3 className="text-lg font-semibold mb-6">Quick Links</h3>
-            <div className="space-y-3 text-catalyst-gray-400">
-              <div>
-                <Link href="/" className="hover:text-cyan-300 transition-colors" data-testid="footer-link-home">
-                  Home
-                </Link>
-              </div>
-              <div>
-                <Link href="/about" className="hover:text-cyan-300 transition-colors" data-testid="footer-link-about">
-                  About
-                </Link>
-              </div>
-              <div>
-                <Link href="/process" className="hover:text-cyan-300 transition-colors" data-testid="footer-link-process">
-                  Process
-                </Link>
-              </div>
-              <div>
-                <Link href="/criteria" className="hover:text-cyan-300 transition-colors" data-testid="footer-link-criteria">
-                  Criteria
-                </Link>
-              </div>
-              <div>
-                <Link href="/submit-deal" className="hover:text-cyan-300 transition-colors" data-testid="footer-link-submit-deal">
-                  Submit a Deal
-                </Link>
-              </div>
-            </div>
-          </div>
+    <footer className="bg-primary px-5 py-14 text-white sm:px-8 sm:py-20 lg:px-10">
+      <div className="mx-auto grid max-w-7xl gap-12 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+        <div>
+          <Link href="/" className="inline-flex">
+            <img
+              src="/assets/landlinq-white-logo.png"
+              alt="LandLinq"
+              className="h-7 w-auto"
+              data-testid="footer-logo-landlinq"
+            />
+          </Link>
+          <p className="mt-5 max-w-xs text-sm leading-6 text-white/50">
+            Your supercharged
+            <br />
+            acquisitions operating system.
+          </p>
+        </div>
 
-          <div className="text-center md:text-left">
-            <h3 className="text-lg font-semibold mb-6">Contact Info</h3>
-            <div className="space-y-4 text-catalyst-gray-400">
-              <div className="flex items-center justify-center md:justify-start">
-                <a href="sms:7046101549" className="text-catalyst-gold hover:text-cyan-300 transition-colors" data-testid="text-phone">
-                  (704) 610-1549
-                </a>
-              </div>
-              <div className="flex items-center justify-center md:justify-start">
-                <a href="mailto:help@landlinq.ai" className="text-catalyst-gold hover:text-cyan-300 transition-colors" data-testid="text-email">
-                  help@landlinq.ai
-                </a>
-              </div>
-              <div className="flex items-start justify-center md:justify-start">
-                <div>
-                  <div data-testid="text-address-line1">1600 Camden Road Suite 200</div>
-                  <div data-testid="text-address-line2">Charlotte NC 28203</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center md:text-left">
-            <div className="mb-8 flex justify-center md:justify-start">
-              <Link href="/" className="inline-flex items-center">
-                <img
-                  src={landLinqLogo}
-                  alt="LandLinq"
-                  className="h-10 w-auto max-w-[190px] object-contain"
-                  data-testid="footer-logo-landlinq"
-                />
-              </Link>
-            </div>
-            <p className="text-catalyst-gray-400 mb-6 leading-relaxed font-light">
-              Accelerating multifamily land acquisition through AI-powered site intelligence and automation.
-            </p>
+        <div>
+          <h3 className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
+            Platform
+          </h3>
+          <div className="flex flex-col gap-3 text-sm text-white/70">
+            <a href="/#platform" className="transition-colors hover:text-white">
+              Deal Dashboard
+            </a>
+            <a href="/#platform" className="transition-colors hover:text-white">
+              CRM &amp; Outreach
+            </a>
+            <a href="/#platform" className="transition-colors hover:text-white">
+              Analytics
+            </a>
           </div>
         </div>
 
-        <div className="border-t border-catalyst-gray-800 pt-8 mt-12">
-          <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left">
-            <p className="text-catalyst-gray-400 text-sm" data-testid="text-copyright">
-              © 2026 LandLinq. All rights reserved.
-            </p>
-            <div className="flex space-x-6 mt-4 md:mt-0 text-sm text-catalyst-gray-400 justify-center md:justify-start">
-              <a href="/privacy" className="hover:text-white transition-colors" data-testid="footer-link-privacy">
-                Privacy Policy
-              </a>
-              <a href="/terms" className="hover:text-white transition-colors" data-testid="footer-link-terms">
-                Terms of Service
-              </a>
-            </div>
+        <div>
+          <h3 className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
+            Company &amp; Support
+          </h3>
+          <div className="flex flex-col gap-3 text-sm text-white/70">
+            <a
+              href="mailto:help@landlinq.ai"
+              className="transition-colors hover:text-white"
+              data-testid="text-email"
+            >
+              help@landlinq.ai
+            </a>
           </div>
         </div>
+
+        <div>
+          <h3 className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
+            Legal
+          </h3>
+          <div className="flex flex-col gap-3 text-sm text-white/70">
+            <Link href="/privacy" className="transition-colors hover:text-white" data-testid="footer-link-privacy">
+              Privacy
+            </Link>
+            <Link href="/terms" className="transition-colors hover:text-white" data-testid="footer-link-terms">
+              Terms
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="mx-auto mt-14 max-w-7xl border-t border-white/15 pt-6 text-xs text-white/35"
+        data-testid="text-copyright"
+      >
+        © {new Date().getFullYear()} LandLinq. All rights reserved.
       </div>
     </footer>
   );

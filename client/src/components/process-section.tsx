@@ -75,7 +75,7 @@ export default function ProcessSection() {
       title: "Submit Deals Effortlessly", 
       description: (
         <>
-          <a href="mailto:deals@catalyst.landlinq.ai" className="text-catalyst-gold hover:text-catalyst-gold/80 transition-colors" data-testid="link-deals-email">Email deals</a>, <a href="sms:7046101549" className="text-catalyst-gold hover:text-catalyst-gold/80 transition-colors" data-testid="link-submit-phone">text us</a>, or use our <Link href="/submit-deal" className="text-catalyst-gold hover:text-catalyst-gold/80 transition-colors" data-testid="link-submit-form">online form</Link>. AI-powered analysis provides instant feedback.
+          <a href="mailto:help@landlinq.ai" className="text-catalyst-gold hover:text-catalyst-gold/80 transition-colors" data-testid="link-support-email">Email us</a> or use our <Link href="/submit-deal" className="text-catalyst-gold hover:text-catalyst-gold/80 transition-colors" data-testid="link-submit-form">online form</Link>. AI-powered analysis provides instant feedback.
         </>
       ),
       highlight: "Instant AI review"

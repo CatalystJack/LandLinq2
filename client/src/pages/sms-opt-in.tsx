@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Phone } from "lucide-react";
 import { getAssetUrl } from "@/lib/asset-manifest";
+import Footer from "@/components/footer";
 
 const landLinqLogo = getAssetUrl("Catalyst:LandLinq_logo_1761758327453.png");
 
@@ -55,9 +56,10 @@ export default function SMSOptIn() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <Card className="max-w-2xl w-full bg-white border-[#4A90E2]">
-          <CardContent className="p-12 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <Card className="max-w-2xl w-full bg-white border-[#4A90E2]">
+            <CardContent className="p-12 text-center">
             <CheckCircle className="h-20 w-20 text-green-500 mx-auto mb-6" />
             <h1 className="text-3xl font-bold text-[#081729] mb-4" data-testid="title-success">
               You're All Set!
@@ -78,15 +80,18 @@ export default function SMSOptIn() {
                 Return to Home
               </Button>
             </a>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <Card className="max-w-2xl w-full bg-white border-[#4A90E2]">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="max-w-2xl w-full bg-white border-[#4A90E2]">
         <CardHeader className="text-center border-b border-slate-200 pb-6">
           <div className="flex justify-center mb-6">
             <img 
@@ -207,7 +212,9 @@ export default function SMSOptIn() {
             </a>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
+      <Footer />
     </div>
   );
 }
