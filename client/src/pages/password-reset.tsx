@@ -32,8 +32,9 @@ function PasswordResetErrorFallback() {
 
 function PasswordResetContent() {
   const [, setLocation] = useLocation();
-  const [step, setStep] = useState<"request" | "reset">("request");
-  const [tokenStatus, setTokenStatus] = useState<TokenStatus>("idle");
+  const initialToken = new URLSearchParams(window.location.search).get("token");
+  const [step, setStep] = useState<"request" | "reset">(initialToken ? "reset" : "request");
+  const [tokenStatus, setTokenStatus] = useState<TokenStatus>(initialToken ? "checking" : "idle");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -213,7 +214,7 @@ function PasswordResetContent() {
             </div>
           </CardHeader>
           <CardContent>
-            {error && (
+            {error && !tokenIsInvalid && (
               <Alert variant="destructive" className="mb-4">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
