@@ -40,6 +40,7 @@ interface ParsedFields {
   city?: string;
   state?: string;
   zip?: string;
+  parcelId?: string;
   acres?: number;
   price?: number;
   unitCount?: number;
@@ -388,6 +389,7 @@ export class EmailIntakeService {
         parsedCity: parseResult.fields.city ?? null,
         parsedState: parseResult.fields.state ?? null,
         parsedZip: parseResult.fields.zip ?? null,
+        parsedParcelId: parseResult.fields.parcelId ?? null,
         parsedAcres: parseResult.fields.acres != null ? String(parseResult.fields.acres) : null,
         parsedPrice: parseResult.fields.price ?? null,
         parsedUnitCount: parseResult.fields.unitCount ?? null,
@@ -591,6 +593,7 @@ Return this exact JSON structure:
       "city": "city name — explicitly stated in THIS email OR inferred from a named neighborhood/district/landmark you recognize. Never use a region or submarket name as a city." or null,
       "state": "2-letter US state code" or null,
       "zip": "5-digit ZIP code — look for it after city/state in address lines like 'Boiling Springs, SC 29316'. Extract it if present." or null,
+      "parcelId": the parcel identifier, parcel number, tax parcel ID, PIN, PID, or APN explicitly associated with THIS property. Preserve punctuation and leading zeros exactly as written. Return null if absent,
       "acres": number — the numeric land-size amount exactly as stated, before conversion. NEVER invent or estimate acreage. or null,
       "acresUnit": one of "acres", "sq_ft", "sq_m", or "hectares", based only on the explicit unit beside the amount. Return null when the unit is missing or ambiguous,
       "price": number in whole dollars — ONLY if a specific dollar amount is explicitly stated as the ASKING or LIST price for THIS property (e.g. "$4,500,000", "asking $2.1M"). NEVER guess, infer, or use income/rent figures as the price. If no asking price is stated, return null.,
@@ -622,6 +625,7 @@ CRITICAL RULES:
 - city vs county: A "county" is NOT a city. "Brunswick County, NC" → city=null (or the specific city if named), NOT city="Brunswick County". Only use a real city/town name in the city field.
 - propertyName: use ONLY names that literally appear in THIS email. NEVER invent a property name or use one from a training example.
 - ZIP code: explicitly look for 5-digit codes in address lines. "Boiling Springs, SC 29316" → zip = "29316".
+- parcelId: extract identifiers labeled Parcel ID, Parcel Number, Tax Parcel, PIN, PID, or APN. Preserve leading zeros, hyphens, and punctuation exactly. Never copy a parcel ID from another property in a multi-property email.
 - acres and acresUnit: preserve the explicit numeric amount and unit. "~19.7 acres" → acres=19.7, acresUnit="acres". "87,120 sq ft" → acres=87120, acresUnit="sq_ft". "2 hectares" → acres=2, acresUnit="hectares". If a land-size number has no clear unit, return acres=null and acresUnit=null; never assume acres.
 - unitCount: "306-unit multifamily" → 306. "approved for 274 apartment units" → 274. Look in BOTH the subject line and body.
 - price: if the email does NOT explicitly state an asking or list price for that property, return null. Do NOT use rent figures, valuations, or any other dollar amounts.
@@ -681,6 +685,7 @@ CRITICAL RULES:
           city: rawProp.city || undefined,
           state: rawProp.state || undefined,
           zip: rawProp.zip || undefined,
+          parcelId: rawProp.parcelId ? String(rawProp.parcelId).trim() : undefined,
           acres,
           price: rawProp.price != null ? Math.round(Number(rawProp.price)) : undefined,
           unitCount: rawProp.unitCount != null ? Number(rawProp.unitCount) : undefined,
@@ -1156,6 +1161,7 @@ CRITICAL RULES:
       city: 'parsedCity',
       state: 'parsedState',
       zip: 'parsedZip',
+      parcelId: 'parsedParcelId',
       acres: 'parsedAcres',
       price: 'parsedPrice',
       unitCount: 'parsedUnitCount',
@@ -1202,6 +1208,7 @@ CRITICAL RULES:
     const city       = overrides.city       ?? item.parsedCity      ?? '';
     const state      = overrides.state      ?? item.parsedState     ?? '';
     const zip        = overrides.zip        ?? item.parsedZip       ?? '';
+    const parcelId   = overrides.parcelId   ?? item.parsedParcelId  ?? '';
     const acres      = overrides.acres      ?? (item.parsedAcres ? Number(item.parsedAcres) : null);
     const price      = overrides.price      ?? item.parsedPrice     ?? null;
     const unitCount  = overrides.unitCount  ?? item.parsedUnitCount ?? null;
@@ -1249,6 +1256,7 @@ CRITICAL RULES:
       city: city || null,
       state: state || null,
       zip: zip || null,
+      parcelId: parcelId || null,
       sizeAcres: acres ? String(acres) : null,
       askingPrice: price ? String(price) : null,
       unitCount: unitCount ? String(unitCount) : null,
@@ -1283,6 +1291,7 @@ CRITICAL RULES:
         city: item.parsedCity,
         state: item.parsedState,
         zip: item.parsedZip,
+        parcelId: item.parsedParcelId,
         acres: item.parsedAcres ? Number(item.parsedAcres) : null,
         price: item.parsedPrice,
         unitCount: item.parsedUnitCount,
@@ -1294,7 +1303,7 @@ CRITICAL RULES:
         zoning: item.parsedZoning,
       };
       const finalOutput = {
-        address, city, state, zip,
+        address, city, state, zip, parcelId,
         acres: acres ? Number(acres) : null,
         price: price ? Number(price) : null,
         unitCount: unitCount ? Number(unitCount) : null,

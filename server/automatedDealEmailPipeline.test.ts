@@ -53,7 +53,18 @@ const profile = (id: string, county = 'Wake') => ({
 // Exact normalized address is preferred, with a coordinate fallback capped at 0.1 miles.
 {
   const duplicate = findDuplicateDeal([{ address: '100 Main Street', latitude: '35.0000', longitude: '-78.0000' }],
-    '100 Main St.', { latitude: 35.0005, longitude: -78.0005 });
+    '100 Main St.', null, { latitude: 35.0005, longitude: -78.0005 });
+  assert.ok(duplicate);
+}
+
+// Parcel identity outranks inconsistent free-text addresses for raw land.
+{
+  const duplicate = findDuplicateDeal(
+    [{ address: 'Unaddressed tract near Route 9', parcelId: '001-02-003' }],
+    '0 Highway 9',
+    '001-02-003',
+    null,
+  );
   assert.ok(duplicate);
 }
 
@@ -96,6 +107,7 @@ const profile = (id: string, county = 'Wake') => ({
 // Low confidence and missing acreage both stay behind the manual-review gate.
 {
   assert.equal(isCompleteConfidentIntake({
+    dealType: 'land_development',
     confidence: 74,
     county: 'Wake',
     state: 'NC',
@@ -104,11 +116,34 @@ const profile = (id: string, county = 'Wake') => ({
     rent: null,
   }), false);
   assert.equal(isCompleteConfidentIntake({
+    dealType: 'land_development',
     confidence: 90,
     county: 'Wake',
     state: 'NC',
     acres: null,
     price: 2_000_000,
+    rent: null,
+  }), false);
+}
+
+// Land intake does not require a price or pre-development rent.
+{
+  assert.equal(isCompleteConfidentIntake({
+    dealType: 'land_development',
+    confidence: 90,
+    county: 'Wake',
+    state: 'NC',
+    acres: 12.5,
+    price: null,
+    rent: null,
+  }), true);
+  assert.equal(isCompleteConfidentIntake({
+    dealType: 'existing_multifamily',
+    confidence: 90,
+    county: 'Wake',
+    state: 'NC',
+    acres: 12.5,
+    price: null,
     rent: null,
   }), false);
 }

@@ -456,17 +456,6 @@ export default function ExecutiveDashboard() {
               </Link>
             )}
             <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
-              <SheetTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  onClick={handleOpenSettings}
-                  className="gap-2"
-                  data-testid="button-news-settings"
-                >
-                  <Settings size={16} />
-                  News Settings
-                </Button>
-              </SheetTrigger>
               <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
                 <SheetHeader>
                   <SheetTitle>News Feed Settings</SheetTitle>

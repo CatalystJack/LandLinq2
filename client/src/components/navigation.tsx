@@ -95,6 +95,13 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
       case UserRole.PARTNER:
         landlinq.push(
           { name: "Deal Dashboard", href: "/dashboard", description: "Deal queue and pending reviews" },
+          ...(
+            userRole === UserRole.DEVELOPER || userRole === UserRole.PARTNER
+              ? [{ name: "CRM", href: "/developer/crm", description: "Your company's contacts and outreach" }]
+              : (isPlatformAdmin || userEmail.toLowerCase().endsWith('@catalystcp.com'))
+                ? [{ name: "CRM", href: "/crm", description: "Contact management & campaign outreach" }]
+                : []
+          ),
           { name: "Data Hub", href: "/data-hub", description: "Market intelligence & insights" },
           { name: "Analytics", href: "/analytics", description: "Performance metrics" },
         );

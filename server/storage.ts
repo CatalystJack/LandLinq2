@@ -1769,53 +1769,41 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteDeal(id: string): Promise<void> {
-    console.log(`🗑️ Starting SIMPLIFIED DELETE for deal ${id}`);
-    
+    console.log(`🗑️ Starting atomic delete for deal ${id}`);
     try {
-      // First verify the deal exists
-      const existingDeal = await db.select({ id: deals.id }).from(deals).where(eq(deals.id, id)).limit(1);
-      if (existingDeal.length === 0) {
-        throw new Error(`Deal ${id} not found`);
-      }
-      
-      // Check which dependent tables exist and have records
-      console.log(`🧹 Deleting dependent records for deal ${id}`);
-      
-      // Delete from existing tables in dependency order
-      // Only delete from tables that exist in our schema imports
-      
-      try {
-        await db.delete(viralSignups).where(eq(viralSignups.dealId, id));
-        console.log(`✅ Deleted from viral_signups`);
-      } catch (error: any) {
-        console.log(`⚠️ Error deleting from viral_signups (may not exist):`, error.message);
-      }
-      
-      try {
-        await db.delete(communications).where(eq(communications.relatedDealId, id));
-        console.log(`✅ Deleted from communications`);
-      } catch (error: any) {
-        console.log(`⚠️ Error deleting from communications:`, error.message);
-      }
-      
-      try {
-        await db.delete(propertyData).where(eq(propertyData.dealId, id));
-        console.log(`✅ Deleted from property_data`);
-      } catch (error: any) {
-        console.log(`⚠️ Error deleting from property_data:`, error.message);
-      }
-      
-      console.log(`✅ Deleted dependent records for deal ${id}`);
-      
-      // Now delete the deal itself
-      const deleteResult = await db.delete(deals).where(eq(deals.id, id)).returning({ id: deals.id });
-      
-      if (deleteResult.length === 0) {
-        throw new Error(`Failed to delete deal ${id} - no rows affected`);
-      }
-      
-      console.log(`✅ Successfully deleted deal ${id} and all dependent records`);
-      
+      await db.transaction(async (tx) => {
+        // Lock the parent so concurrent updates cannot add a new child reference
+        // between cleanup and deletion. DELETE remains idempotent if another
+        // request already removed the row.
+        const locked = await tx.execute(sql`SELECT id FROM deals WHERE id = ${id} FOR UPDATE`);
+        if (locked.rows.length === 0) return;
+
+        // Preserve durable source/API audit rows, but detach them from the deal.
+        await tx.execute(sql`UPDATE email_intake_queue SET deal_id = NULL WHERE deal_id = ${id}`);
+        await tx.execute(sql`UPDATE api_call_logs SET deal_id = NULL WHERE deal_id = ${id}`);
+
+        // Restrictive foreign keys must be removed explicitly. Tables configured
+        // with ON DELETE CASCADE/SET NULL are intentionally left to PostgreSQL.
+        await tx.execute(sql`DELETE FROM ai_deal_analysis WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM broker_points WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM commission_splits WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM communications WHERE related_deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM data_quality_alerts WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM deal_assignments WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM deal_tags WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM market_analysis WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM property_comments WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM property_data WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM public_listing_searches WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM referral_activities WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM site_plans WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM transcript_deal_mentions WHERE deal_id = ${id}`);
+        await tx.execute(sql`DELETE FROM viral_signups WHERE deal_id = ${id}`);
+
+        const deleteResult = await tx.delete(deals).where(eq(deals.id, id)).returning({ id: deals.id });
+        if (deleteResult.length === 0) throw new Error(`No deal row was deleted for ${id}`);
+      });
+      console.log(`✅ Successfully deleted deal ${id} and all dependent records atomically`);
     } catch (error) {
       console.error(`❌ DELETE failed for deal ${id}:`, error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

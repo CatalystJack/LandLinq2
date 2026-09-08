@@ -3575,6 +3575,7 @@ export const emailIntakeQueue = pgTable("email_intake_queue", {
   parsedCity: varchar("parsed_city"),
   parsedState: varchar("parsed_state"),
   parsedZip: varchar("parsed_zip"),
+  parsedParcelId: varchar("parsed_parcel_id"),
   parsedAcres: decimal("parsed_acres", { precision: 10, scale: 4 }),
   parsedPrice: bigint("parsed_price", { mode: "number" }),
   parsedUnitCount: integer("parsed_unit_count"),

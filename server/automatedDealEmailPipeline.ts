@@ -138,13 +138,17 @@ export function addressMismatchReviewNotes(
   return `Automation held: address_mismatch. Stated address=${statedAddress || 'not provided'}; stated/address-derived geography: county=${stated.county || 'unknown'}, state=${stated.state || 'unknown'}; coordinate-derived geography: county=${coordinateDerived.county || 'unknown'}, state=${coordinateDerived.state || 'unknown'}.`;
 }
 export function isCompleteConfidentIntake(input: {
+  dealType: string | null | undefined;
   confidence: unknown; county: string | null; state: string | null; acres: unknown; price: unknown; rent: unknown;
 }): boolean {
   const numeric = (value: unknown) => Number(value);
-  return numeric(input.confidence) >= AUTOMATION_CONFIDENCE_THRESHOLD && !!input.county && !!input.state &&
-    Number.isFinite(numeric(input.acres)) && numeric(input.acres) > 0 &&
-    ((Number.isFinite(numeric(input.price)) && numeric(input.price) > 0) ||
-      (Number.isFinite(numeric(input.rent)) && numeric(input.rent) > 0));
+  const hasRequiredLocationAndAcreage = numeric(input.confidence) >= AUTOMATION_CONFIDENCE_THRESHOLD &&
+    !!input.county && !!input.state &&
+    Number.isFinite(numeric(input.acres)) && numeric(input.acres) > 0;
+  if (!hasRequiredLocationAndAcreage) return false;
+  if (input.dealType === 'land_development') return true;
+  return (Number.isFinite(numeric(input.price)) && numeric(input.price) > 0) ||
+    (Number.isFinite(numeric(input.rent)) && numeric(input.rent) > 0);
 }
 
 export function validateIntakePlausibility(input: {
@@ -183,9 +187,17 @@ export function haversineMiles(a: { latitude: number; longitude: number }, b: { 
   const x = Math.sin(dLat / 2) ** 2 + Math.cos(radians(a.latitude)) * Math.cos(radians(b.latitude)) * Math.sin(dLng / 2) ** 2;
   return 3958.7613 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
-export function findDuplicateDeal<T extends { address: string; latitude?: unknown; longitude?: unknown }>(
-  candidates: readonly T[], address: string, coordinates: { latitude: number; longitude: number } | null,
+export function findDuplicateDeal<T extends { address: string; parcelId?: string | null; latitude?: unknown; longitude?: unknown }>(
+  candidates: readonly T[], address: string, parcelId: string | null | undefined,
+  coordinates: { latitude: number; longitude: number } | null,
 ): T | null {
+  const normalizedParcelId = String(parcelId || '').trim().toUpperCase();
+  if (normalizedParcelId) {
+    const parcelMatch = candidates.find(deal =>
+      String(deal.parcelId || '').trim().toUpperCase() === normalizedParcelId,
+    );
+    if (parcelMatch) return parcelMatch;
+  }
   const exact = candidates.find(deal => normalizeAddress(deal.address) === normalizeAddress(address));
   if (exact) return exact;
   if (!coordinates) return null;
@@ -303,7 +315,7 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
   if (plausibilityIssues.length) {
     return manual('implausible_numbers', `Automation held: implausible_numbers. ${plausibilityIssues.join('; ')}.`);
   }
-  if (!isCompleteConfidentIntake({ confidence: intake.overallConfidence, county: location.county, state: location.state, acres: intake.parsedAcres, price: intake.parsedPrice, rent })) return manual('incomplete_or_low_confidence');
+  if (!isCompleteConfidentIntake({ dealType: intake.parsedDealType, confidence: intake.overallConfidence, county: location.county, state: location.state, acres: intake.parsedAcres, price: intake.parsedPrice, rent })) return manual('incomplete_or_low_confidence');
   if (!intake.parsedAddress) return manual('missing_address');
   const profile = route.profile;
   let broker: typeof brokers.$inferSelect | null = null;
@@ -333,7 +345,7 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
     ),
   );
   const profileDeals = profileDealRows.map(row => row.deal);
-  const duplicate = findDuplicateDeal(profileDeals, intake.parsedAddress, location.latitude !== null && location.longitude !== null ? { latitude: location.latitude, longitude: location.longitude } : null);
+  const duplicate = findDuplicateDeal(profileDeals, intake.parsedAddress, intake.parsedParcelId, location.latitude !== null && location.longitude !== null ? { latitude: location.latitude, longitude: location.longitude } : null);
   if (duplicate) {
     await db.update(deals).set({
       brokerId: broker?.id || duplicate.brokerId,
@@ -341,6 +353,7 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
       sizeAcres: intake.parsedAcres == null ? duplicate.sizeAcres : String(intake.parsedAcres),
       unitCount: intake.parsedUnitCount ?? duplicate.unitCount,
       zoning: intake.parsedZoning || duplicate.zoning,
+      parcelId: intake.parsedParcelId || duplicate.parcelId,
       brokerNotes: intake.parsedNotes || duplicate.brokerNotes,
       latitude: location.latitude == null ? duplicate.latitude : String(location.latitude),
       longitude: location.longitude == null ? duplicate.longitude : String(location.longitude),
@@ -365,6 +378,7 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
       address: intake.parsedAddress, city: location.city, state: location.state, zip: location.zip,
       latitude: location.latitude === null ? null : String(location.latitude), longitude: location.longitude === null ? null : String(location.longitude),
       county: location.county, askingPrice: intake.parsedPrice === null ? null : String(intake.parsedPrice), sizeAcres: String(intake.parsedAcres),
+      parcelId: intake.parsedParcelId,
       unitCount: intake.parsedUnitCount, vintage: intake.parsedVintage, zoning: intake.parsedZoning, propertyName: intake.parsedPropertyName,
       brokerPhone: intake.parsedBrokerPhone, brokerNotes: intake.parsedNotes, assignedDeveloper: profile.companyName,
       submissionMethod: 'email', source: 'email_automation', confidenceScore: String(intake.overallConfidence || 0),

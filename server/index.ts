@@ -312,7 +312,8 @@ setTimeout(() => {
       const { pool: migrationPool } = await import('./db');
       await migrationPool.query(`
         ALTER TABLE email_intake_queue
-          ADD COLUMN IF NOT EXISTS automation_processed_at timestamp;
+          ADD COLUMN IF NOT EXISTS automation_processed_at timestamp,
+          ADD COLUMN IF NOT EXISTS parsed_parcel_id varchar;
         CREATE INDEX IF NOT EXISTS email_intake_automation_processed_idx
           ON email_intake_queue (automation_processed_at);
         CREATE TABLE IF NOT EXISTS email_intake_volume_alert_state (

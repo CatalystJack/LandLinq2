@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import Navigation from "@/components/navigation";
+import { useAuth, UserRole } from "@/hooks/useAuth";
 import { Helmet } from "react-helmet-async";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -136,6 +137,8 @@ function formatNumber(value: unknown, fractionDigits = 0): string {
 }
 
 export default function DataHub() {
+  const { userRole } = useAuth();
+  const isInvestmentCompanyProfile = userRole === UserRole.DEVELOPER || userRole === UserRole.PARTNER;
   const [activeTab, setActiveTab] = useState("deals");
   const [searchQuery, setSearchQuery] = useState("");
   const [stateFilter, setStateFilter] = useState("all");
@@ -221,9 +224,11 @@ export default function DataHub() {
 
   const { data: apiSources, isLoading: apiSourcesLoading } = useQuery<ApiSourcesData>({
     queryKey: ["/api/data-hub/api-sources"],
+    enabled: !isInvestmentCompanyProfile,
   });
   const { data: stageProfileData } = useQuery<{ profiles: StageProfile[] }>({
     queryKey: ["/api/listings/stage-profiles"],
+    enabled: !isInvestmentCompanyProfile,
   });
   const stageProfiles = stageProfileData?.profiles || [];
 
@@ -332,7 +337,7 @@ export default function DataHub() {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid grid-cols-7 w-full max-w-5xl">
+            <TabsList className={`grid ${isInvestmentCompanyProfile ? "grid-cols-4 max-w-2xl" : "grid-cols-7 max-w-5xl"} w-full`}>
               <TabsTrigger value="deals" className="flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Deal History</span>
@@ -349,18 +354,24 @@ export default function DataHub() {
                 <Home className="h-4 w-4" />
                 <span className="hidden sm:inline">Comparables</span>
               </TabsTrigger>
-              <TabsTrigger value="listings" className="flex items-center gap-2">
-                <List className="h-4 w-4" />
-                <span className="hidden sm:inline">Live Listings</span>
-              </TabsTrigger>
-              <TabsTrigger value="apis" className="flex items-center gap-2" data-testid="tab-api-sources">
-                <Globe className="h-4 w-4" />
-                <span className="hidden sm:inline">API Sources</span>
-              </TabsTrigger>
-              <TabsTrigger value="export" className="flex items-center gap-2">
-                <Download className="h-4 w-4" />
-                <span className="hidden sm:inline">Export</span>
-              </TabsTrigger>
+              {!isInvestmentCompanyProfile && (
+                <>
+                  <TabsTrigger value="listings" className="flex items-center gap-2">
+                    <List className="h-4 w-4" />
+                    <span className="hidden sm:inline">Live Listings</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="apis" className="flex items-center gap-2" data-testid="tab-api-sources">
+                    <Globe className="h-4 w-4" />
+                    <span className="hidden sm:inline">API Sources</span>
+                  </TabsTrigger>
+                </>
+              )}
+              {!isInvestmentCompanyProfile && (
+                <TabsTrigger value="export" className="flex items-center gap-2">
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Export</span>
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="deals">
@@ -703,7 +714,7 @@ export default function DataHub() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="apis">
+            {!isInvestmentCompanyProfile && <TabsContent value="apis">
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -787,9 +798,9 @@ export default function DataHub() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent>}
 
-            <TabsContent value="export">
+            {!isInvestmentCompanyProfile && <TabsContent value="export">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader>
@@ -867,10 +878,10 @@ export default function DataHub() {
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
+            </TabsContent>}
 
             {/* ─── Live Listings Tab ─── */}
-            <TabsContent value="listings">
+            {!isInvestmentCompanyProfile && <TabsContent value="listings">
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between flex-wrap gap-3">
@@ -1051,7 +1062,7 @@ export default function DataHub() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent>}
 
           </Tabs>
         </div>
