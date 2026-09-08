@@ -146,6 +146,37 @@ export function isCompleteConfidentIntake(input: {
     ((Number.isFinite(numeric(input.price)) && numeric(input.price) > 0) ||
       (Number.isFinite(numeric(input.rent)) && numeric(input.rent) > 0));
 }
+
+export function validateIntakePlausibility(input: {
+  acres: unknown;
+  price: unknown;
+  rent: unknown;
+}): string[] {
+  const acres = Number(input.acres);
+  const price = Number(input.price);
+  const rent = Number(input.rent);
+  const issues: string[] = [];
+
+  if (Number.isFinite(acres) && acres > 100_000) issues.push(`acreage ${acres.toLocaleString()} exceeds 100,000 acres`);
+  if (input.price !== null && input.price !== undefined && input.price !== '') {
+    if (!Number.isFinite(price) || price <= 0) issues.push('asking price is zero or invalid');
+    else {
+      if (price < 10_000) issues.push(`asking price $${price.toLocaleString()} is below $10,000`);
+      if (price > 10_000_000_000) issues.push(`asking price $${price.toLocaleString()} exceeds $10 billion`);
+      if (Number.isFinite(acres) && acres > 0) {
+        const pricePerAcre = price / acres;
+        if (pricePerAcre < 100) issues.push(`asking price per acre $${pricePerAcre.toFixed(0)} is below $100`);
+        if (pricePerAcre > 50_000_000) issues.push(`asking price per acre $${pricePerAcre.toFixed(0)} exceeds $50 million`);
+      }
+    }
+  }
+  if (input.rent !== null && input.rent !== undefined && input.rent !== '') {
+    if (!Number.isFinite(rent) || rent < 100 || rent > 100_000) {
+      issues.push(`monthly rent ${Number.isFinite(rent) ? `$${rent.toLocaleString()}` : 'is invalid'} is outside $100–$100,000`);
+    }
+  }
+  return issues;
+}
 export function haversineMiles(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }): number {
   const radians = (n: number) => n * Math.PI / 180;
   const dLat = radians(b.latitude - a.latitude), dLng = radians(b.longitude - a.longitude);
@@ -264,6 +295,14 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
   const profiles = await db.select().from(developerProfiles).where(eq(developerProfiles.isActive, true));
   const route = routeProfile(profiles as AutomationRouteProfile[], identities.routingSender, location.county, location.state);
   if (!route.profile) return manual(route.reason);
+  const plausibilityIssues = validateIntakePlausibility({
+    acres: intake.parsedAcres,
+    price: intake.parsedPrice,
+    rent,
+  });
+  if (plausibilityIssues.length) {
+    return manual('implausible_numbers', `Automation held: implausible_numbers. ${plausibilityIssues.join('; ')}.`);
+  }
   if (!isCompleteConfidentIntake({ confidence: intake.overallConfidence, county: location.county, state: location.state, acres: intake.parsedAcres, price: intake.parsedPrice, rent })) return manual('incomplete_or_low_confidence');
   if (!intake.parsedAddress) return manual('missing_address');
   const profile = route.profile;

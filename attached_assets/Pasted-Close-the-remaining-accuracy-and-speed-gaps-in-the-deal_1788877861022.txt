@@ -1,0 +1,70 @@
+Close the remaining accuracy and speed gaps in the deals@landlinq.ai automated 
+intake pipeline. This is the most critical feature in the platform — the goal is 
+parity with a human manually reading and entering the same email, not just "mostly 
+works."
+
+TASK 1 — Multi-property email splitting
+Reuse the existing groupId/groupIndex/groupTotal fields on emailIntakeQueue (already 
+built for this purpose). Update AI extraction to detect multiple distinct 
+properties in one email and create one queue row per property, sharing a groupId. 
+Each property runs through the full pipeline independently — one failing its 
+confidence gate must not block the others. Single-property emails (the common case) 
+must behave identically to today.
+
+TASK 2 — Real address/coordinate cross-check, not silent overwrite
+In server/automatedDealEmailPipeline.ts (~line 156), when BOTH a stated county/state 
+AND coordinates are present, compare the reverse-geocoded county/state against the 
+AI-extracted value. If they clearly disagree, route to manual review with reason 
+'address_mismatch', recording both conflicting values for the analyst to see — do 
+not silently pick one. Only auto-use the reverse-geocoded value when there was 
+nothing stated in the text to compare against (today's coordinate-only fallback 
+case is fine as-is).
+
+TASK 3 — Unit conversion for acreage
+Update the aiEmailParser.ts extraction prompt/logic to recognize land size stated 
+in square feet (or other common units) and convert to acres before storing 
+(1 acre = 43,560 sq ft), rather than assuming every number is already in acres. If 
+the unit is ambiguous or can't be determined confidently, treat this the same as a 
+missing acreage value — route to manual review rather than guessing.
+
+TASK 4 — Close the correction feedback loop
+correctionDiff and isTrainingExample are populated on emailIntakeQueue whenever an 
+analyst corrects a parsed field, but aiEmailParser.ts never reads this back. Before 
+running extraction on a new email, pull a small sample of recent correction 
+examples (rows where correctionCount > 0) and include them as few-shot guidance in 
+the extraction prompt, so the parser improves from patterns your team has had to 
+fix repeatedly.
+
+TASK 5 — Move from polling to real-time processing
+Replace (or supplement) the 3-minute polling interval in server/graphDealsPoller.ts 
+with a Microsoft Graph webhook subscription on the deals@landlinq.ai mailbox, so 
+new messages are processed within seconds of arriving rather than waiting for the 
+next poll cycle. Keep the existing poller as a fallback safety net (e.g. every 15-30 
+minutes) in case a webhook notification is ever missed, rather than removing polling 
+entirely — this protects against silently losing an email if the webhook itself 
+has a delivery problem.
+
+TASK 6 — Sanity-check extracted numbers for plausibility
+Before auto-classifying, flag (route to manual review) any extraction where a 
+number is wildly implausible for real estate — e.g. acreage over some very high 
+threshold (likely a unit-conversion miss even after Task 3), an asking price of $0 
+or unreasonably low/high for the stated acreage, or rent figures far outside any 
+normal range. This catches AI misreads that technically pass the confidence gate 
+but would make a human reviewer immediately suspicious.
+
+TASK 7 — Hourly volume alert and admin performance dashboard (from earlier 
+scoping, still not built)
+Track processed-email volume; alert jack@apexresi.com if more than 20 are processed 
+in any rolling hour (one alert per spike, not per email). Add an admin-only 
+dashboard showing weekly volume, auto-classified vs. manual-review breakdown, 
+average confidence, and a breakdown of manual-review reasons (including 
+address_mismatch from Task 2) so any spike in a specific failure type is visible 
+immediately.
+
+Verify: forward a test email listing three properties and confirm three independent 
+results. Forward one with deliberately conflicting address/coordinate data and 
+confirm it's caught. Forward one stating size in square feet and confirm correct 
+acre conversion. Correct a parsed field and confirm a similar future email shows 
+evidence of the correction improving extraction. Confirm webhook-triggered 
+processing completes within seconds of a test email arriving, with the poller 
+fallback confirmed still functional as a backup.

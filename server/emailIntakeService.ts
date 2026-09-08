@@ -68,6 +68,17 @@ interface ParseResult {
   overallConfidence: number;
 }
 
+export function convertAcreageToAcres(value: unknown, unit: unknown): number | undefined {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return undefined;
+  const normalizedUnit = String(unit || '').trim().toLowerCase().replace(/[.\s_-]+/g, '');
+  if (['acre', 'acres', 'ac'].includes(normalizedUnit)) return amount;
+  if (['sqft', 'squarefeet', 'squarefoot', 'ft2', 'ft²'].includes(normalizedUnit)) return amount / 43_560;
+  if (['sqm', 'squaremeters', 'squaremetres', 'm2', 'm²'].includes(normalizedUnit)) return amount / 4_046.8564224;
+  if (['hectare', 'hectares', 'ha'].includes(normalizedUnit)) return amount * 2.4710538147;
+  return undefined;
+}
+
 export interface FewShotTrainingExample {
   emailBody?: string | null;
   subject?: string | null;
@@ -580,7 +591,8 @@ Return this exact JSON structure:
       "city": "city name — explicitly stated in THIS email OR inferred from a named neighborhood/district/landmark you recognize. Never use a region or submarket name as a city." or null,
       "state": "2-letter US state code" or null,
       "zip": "5-digit ZIP code — look for it after city/state in address lines like 'Boiling Springs, SC 29316'. Extract it if present." or null,
-      "acres": number — look for patterns like "19.7 acres", "~19.7 acres", "(~19.7 acres)", "±20 acres", "12.5 ac". The ~ and ± symbols mean 'approximately' — still extract the number. NEVER invent or estimate acreage. or null,
+      "acres": number — the numeric land-size amount exactly as stated, before conversion. NEVER invent or estimate acreage. or null,
+      "acresUnit": one of "acres", "sq_ft", "sq_m", or "hectares", based only on the explicit unit beside the amount. Return null when the unit is missing or ambiguous,
       "price": number in whole dollars — ONLY if a specific dollar amount is explicitly stated as the ASKING or LIST price for THIS property (e.g. "$4,500,000", "asking $2.1M"). NEVER guess, infer, or use income/rent figures as the price. If no asking price is stated, return null.,
       "unitCount": integer — VERY IMPORTANT: look for patterns like "306-unit", "306 units", "306 apartments", "approved for 306 units", "entitled for 274 apartment units". Extract the number. For land/development deals, look for approved or entitled unit counts. or null,
       "vintage": for a single year use that year; for MULTIPLE years (e.g. "1985, 1987 & 1989") use the MOST RECENT year (1989); 4-digit integer or null,
@@ -610,7 +622,7 @@ CRITICAL RULES:
 - city vs county: A "county" is NOT a city. "Brunswick County, NC" → city=null (or the specific city if named), NOT city="Brunswick County". Only use a real city/town name in the city field.
 - propertyName: use ONLY names that literally appear in THIS email. NEVER invent a property name or use one from a training example.
 - ZIP code: explicitly look for 5-digit codes in address lines. "Boiling Springs, SC 29316" → zip = "29316".
-- acres: "~19.7 acres" → 19.7. "(~19.7 acres)" → 19.7. "±20 ac" → 20. The ~ and ± are approximation symbols, not negatives — extract the number.
+- acres and acresUnit: preserve the explicit numeric amount and unit. "~19.7 acres" → acres=19.7, acresUnit="acres". "87,120 sq ft" → acres=87120, acresUnit="sq_ft". "2 hectares" → acres=2, acresUnit="hectares". If a land-size number has no clear unit, return acres=null and acresUnit=null; never assume acres.
 - unitCount: "306-unit multifamily" → 306. "approved for 274 apartment units" → 274. Look in BOTH the subject line and body.
 - price: if the email does NOT explicitly state an asking or list price for that property, return null. Do NOT use rent figures, valuations, or any other dollar amounts.
 - brokerName: if the email ends with "Best, Jay" or "Thanks, Jay" or "Sincerely, Jay", brokerName = "Jay". If the email ends with "Best, Jay Smith", brokerName = "Jay Smith". The broker is usually the SAME person for every property in the email — reuse the same brokerName/brokerEmail/brokerPhone across all entries unless the email clearly states a different broker per property.
@@ -659,6 +671,7 @@ CRITICAL RULES:
       };
       const keyConfs = [confidences.address, confidences.city, confidences.state];
       const overallConfidence = Math.round(keyConfs.reduce((a, b) => a + b, 0) / keyConfs.length);
+      const acres = convertAcreageToAcres(rawProp.acres, rawProp.acresUnit);
 
       return {
         fields: {
@@ -668,7 +681,7 @@ CRITICAL RULES:
           city: rawProp.city || undefined,
           state: rawProp.state || undefined,
           zip: rawProp.zip || undefined,
-          acres: rawProp.acres != null ? Number(rawProp.acres) : undefined,
+          acres,
           price: rawProp.price != null ? Math.round(Number(rawProp.price)) : undefined,
           unitCount: rawProp.unitCount != null ? Number(rawProp.unitCount) : undefined,
           vintage: rawProp.vintage != null ? Number(rawProp.vintage) : undefined,

@@ -9,7 +9,9 @@ import {
   isCompleteConfidentIntake,
   normalizeState,
   routeProfile,
+  validateIntakePlausibility,
 } from './automatedDealEmailPipeline.js';
+import { convertAcreageToAcres } from './emailIntakeService.js';
 
 const profile = (id: string, county = 'Wake') => ({
   id, companyName: id, profileType: 'real_estate', isActive: true,
@@ -22,6 +24,21 @@ const profile = (id: string, county = 'Wake') => ({
     '---------- Forwarded message ----------\nFrom: Jane Broker <jane@broker.com>');
   assert.equal(identities.routingSender.email, 'analyst@tenant.com');
   assert.equal(identities.originalLeadSource?.email, 'jane@broker.com');
+}
+
+// Explicit land-size units are normalized to acres; ambiguous units are held.
+{
+  assert.equal(convertAcreageToAcres(87_120, 'sq_ft'), 2);
+  assert.equal(Number(convertAcreageToAcres(2, 'hectares')?.toFixed(4)), 4.9421);
+  assert.equal(convertAcreageToAcres(12, null), undefined);
+}
+
+// Wildly implausible values are held before automatic classification.
+{
+  assert.deepEqual(validateIntakePlausibility({ acres: 25, price: 2_500_000, rent: null }), []);
+  assert.ok(validateIntakePlausibility({ acres: 250_000, price: 2_500_000, rent: null }).length > 0);
+  assert.ok(validateIntakePlausibility({ acres: 25, price: 0, rent: null }).length > 0);
+  assert.ok(validateIntakePlausibility({ acres: 25, price: null, rent: 1_000_000 }).length > 0);
 }
 // The innermost/earliest message wins when a forward is nested.
 {

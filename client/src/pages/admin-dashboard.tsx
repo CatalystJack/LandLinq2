@@ -45,6 +45,15 @@ interface DealWithBroker extends Deal {
   broker: Broker;
 }
 
+interface EmailIntakePerformance {
+  weekStart: string;
+  processedCount: number;
+  autoClassifiedCount: number;
+  manualReviewCount: number;
+  averageOverallConfidence: number | null;
+  manualReviewReasons: Array<{ reason: string; count: number }>;
+}
+
 // Team members for dropdowns
 const teamMembers = [
   "Austin Blondell",
@@ -129,6 +138,16 @@ export default function AdminDashboard() {
   });
   
   const msaMarkets = Array.isArray(msaData) ? msaData : [];
+
+  const { data: intakePerformance, isLoading: intakePerformanceLoading } = useQuery<EmailIntakePerformance>({
+    queryKey: ['/api/analytics/email-intake-performance'],
+    queryFn: async () => {
+      const response = await fetch('/api/analytics/email-intake-performance', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to load intake performance');
+      return response.json();
+    },
+    enabled: user?.role === 'SUPER_ADMIN',
+  });
 
   const updateDealMutation = useMutation({
     mutationFn: async (data: { 
@@ -974,7 +993,7 @@ export default function AdminDashboard() {
         {/* Tabs for all authenticated users */}
         {user ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full max-w-lg grid-cols-3">
+            <TabsList className={`grid w-full max-w-2xl ${user?.role === 'SUPER_ADMIN' ? 'grid-cols-4' : 'grid-cols-3'}`}>
               <TabsTrigger value="deals" data-testid="tab-deals">
                 <FileText className="h-4 w-4 mr-2" />
                 Deals
@@ -987,6 +1006,12 @@ export default function AdminDashboard() {
                 <Zap className="h-4 w-4 mr-2" />
                 Admin Tools
               </TabsTrigger>
+              {user?.role === 'SUPER_ADMIN' && (
+                <TabsTrigger value="intake-performance" data-testid="tab-intake-performance">
+                  <Activity className="h-4 w-4 mr-2" />
+                  Intake
+                </TabsTrigger>
+              )}
             </TabsList>
             
             {/* Deals Tab Content */}
@@ -1883,6 +1908,44 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {user?.role === 'SUPER_ADMIN' && <TabsContent value="intake-performance" className="mt-6 space-y-6">
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900">Email Intake Performance</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Current week beginning {intakePerformance?.weekStart ? new Date(intakePerformance.weekStart).toLocaleDateString() : '—'}
+                </p>
+              </div>
+              {intakePerformanceLoading ? (
+                <Card><CardContent className="p-8 text-center text-gray-500">Loading intake performance…</CardContent></Card>
+              ) : (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {[
+                      ['Processed emails', intakePerformance?.processedCount ?? 0],
+                      ['Auto-classified', intakePerformance?.autoClassifiedCount ?? 0],
+                      ['Manual review', intakePerformance?.manualReviewCount ?? 0],
+                      ['Average confidence', intakePerformance?.averageOverallConfidence == null ? '—' : `${intakePerformance.averageOverallConfidence.toFixed(1)}%`],
+                    ].map(([label, value]) => (
+                      <Card key={label}><CardContent className="p-5"><p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p><p className="mt-2 text-3xl font-bold text-[#07172A]">{value}</p></CardContent></Card>
+                    ))}
+                  </div>
+                  <Card>
+                    <CardContent className="p-6">
+                      <h3 className="text-lg font-semibold text-gray-900">Manual-review reasons</h3>
+                      <div className="mt-4 divide-y divide-gray-100">
+                        {intakePerformance?.manualReviewReasons.length ? intakePerformance.manualReviewReasons.map((item) => (
+                          <div key={item.reason} className="flex items-center justify-between py-3 text-sm">
+                            <span className="font-medium text-gray-700">{item.reason.replace(/_/g, ' ')}</span>
+                            <Badge variant="secondary">{item.count}</Badge>
+                          </div>
+                        )) : <p className="py-6 text-sm text-gray-500">No manual-review reasons recorded this week.</p>}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>}
 
             {/* Admin Tools Tab Content */}
             <TabsContent value="admin-tools" className="mt-6 space-y-6">

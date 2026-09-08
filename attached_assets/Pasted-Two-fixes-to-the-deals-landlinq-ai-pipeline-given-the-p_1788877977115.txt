@@ -1,0 +1,41 @@
+Two fixes to the deals@landlinq.ai pipeline, given the primary use case is raw land 
+sites (address, coordinates, parcel ID, acreage, and sometimes pricing — notably NOT 
+rent, which doesn't exist for undeveloped land and is filled in later via comp pull).
+
+TASK 1 — Fix the confidence gate for land deals
+In server/automatedDealEmailPipeline.ts, isCompleteConfidentIntake() currently 
+requires acreage AND (price OR rent) above zero. This incorrectly blocks legitimate 
+land deals where price is withheld (common for off-market land) and rent doesn't 
+apply pre-development.
+
+Change the requirement to: confidence above threshold, county AND state present, 
+acreage present and greater than zero. Price should be optional — if present, 
+store it, but don't require it to proceed. Remove the rent requirement from this 
+gate entirely for land-type deals, since rent is populated after deal creation via 
+the existing comp-pull step (Task A from earlier work), not something that should 
+ever be expected in the source email itself.
+
+If dealType extraction distinguishes land from existing multifamily/other property 
+types, apply this relaxed requirement specifically to land deals; if existing 
+multifamily deals should still reasonably expect a stated rent or price at intake, 
+keep the stricter requirement for those, but land must not be blocked by a missing 
+price.
+
+TASK 2 — Persist parcel ID on deal creation
+aiEmailParser.ts already extracts parcelId, and the deals table already has a 
+parcelId column, but the deal-insert logic in automatedDealEmailPipeline.ts never 
+writes it. Add parcelId: intake.parsedParcelId (or whatever the actual field name 
+is on the intake record) to the deal creation object.
+
+TASK 3 — Use parcel ID as a duplicate-detection signal
+In findDuplicateDeal(), if both the incoming intake and an existing deal for this 
+profile have a non-null parcelId and they match exactly, treat this as a definite 
+duplicate regardless of how different the address text looks — parcel ID is a more 
+reliable identifier for raw land than a free-text address, which often doesn't 
+exist in a standardized form for undeveloped parcels.
+
+Verify: forward a test land-deal email with address, coordinates, parcel ID, and 
+acreage but NO stated price, and confirm it auto-processes successfully rather than 
+falling to manual review. Confirm the created deal record has the parcel ID stored. 
+Forward the same parcel again with a slightly different address format and confirm 
+it's correctly caught as a duplicate via the parcel ID match.
