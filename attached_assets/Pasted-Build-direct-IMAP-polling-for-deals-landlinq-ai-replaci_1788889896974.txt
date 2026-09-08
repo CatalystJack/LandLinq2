@@ -1,0 +1,94 @@
+Build direct IMAP polling for deals@landlinq.ai, replacing the Microsoft Graph 
+poller for this mailbox (which cannot work — deals@landlinq.ai is a GoDaddy-hosted 
+mailbox on a basic plan, not Microsoft 365, and this is a deliberate decision to 
+avoid the Microsoft 365 upgrade cost). Reuse all existing downstream processing — 
+EmailIntakeService.processInboundEmail(), the AI parser, attachment/link handling, 
+and processAutomatedDealEmailIntake() — none of that changes. Only the "how do we 
+get the raw email in" step is new.
+
+TASK 1 — Add an IMAP client
+Install and use a well-maintained IMAP library (imapflow is a good modern choice) 
+plus mailparser for converting raw MIME messages into clean structured fields 
+(from, to, subject, text, html, attachments).
+
+Connection settings for GoDaddy's standard email (not Microsoft 365 from GoDaddy):
+  Host: imap.secureserver.net
+  Port: 993 (SSL/TLS)
+  Username: deals@landlinq.ai
+  Password: process.env.DEALS_EMAIL_PASSWORD (already exists — reused from the 
+    existing GoDaddy SMTP sending code, same credential)
+
+TASK 2 — New file server/imapDealsPoller.ts
+Mirror the structure and safety properties already established in 
+server/graphDealsPoller.ts:
+  - Check EMAIL_SCRAPING_ENABLED (from server/emailAutomationConfig.ts) on every 
+    poll cycle, not just at startup
+  - Singleton guard: if a poll is already running, skip starting another
+  - Poll interval: every 3 minutes, matching the existing Graph poller's cadence
+  - Delay the first poll until after the app finishes starting up (reuse the same 
+    setTimeout-after-listen pattern already used for the Graph poller in 
+    server/index.ts), so this never blocks deployment health checks
+
+For each poll cycle:
+  1. Connect to the IMAP server, select the inbox, search for UNSEEN messages
+  2. For each unseen message, fetch the full raw content and parse it with 
+     mailparser to get: from, to, subject, text, html, and attachments (each 
+     attachment as { fieldname, originalname (filename), mimetype (contentType), 
+     buffer (content) } — matching the same shape server/emailIntakeService.ts's 
+     parseAttachments() already expects, so no changes needed there)
+  3. Use the message's IMAP UID as the replay/idempotency key — before processing, 
+     check whether this UID has already been processed (store processed UIDs, or 
+     check against an existing intake record if one can be matched) to avoid 
+     double-processing if the same message is somehow seen twice
+  4. Build a rawBody object in the same shape server/emailInboundService.ts's 
+     processGraphMessage() already builds for Graph messages (from, to, cc, 
+     subject, text, html, replyTo, envelope, attachments) — reuse that exact 
+     conversion pattern, just sourcing the raw data from IMAP/mailparser instead 
+     of a Graph message object
+  5. Call EmailIntakeService.processInboundEmail(rawBody, attachments) — the same 
+     function every other intake path already uses
+  6. If that succeeds, call processAutomatedDealEmailIntake() on the resulting 
+     intake ID(s) — the same automated routing/classification/comp-pull pipeline 
+     already built and tested
+  7. CRITICAL — only mark the message as read/seen on the IMAP server AFTER step 6 
+     completes (whether it resulted in an auto-classified deal or a durable 
+     manual-review queue entry) — mirror the exact same "don't mark read until 
+     durably processed" safety guarantee already documented for the Graph poller, 
+     so a crash mid-processing means the message gets retried on the next poll 
+     rather than silently lost
+
+TASK 3 — Wire it into startup
+In server/index.ts, alongside the existing Graph poller startup call, add:
+  const { startDealsMailboxImapPoller } = await import('./imapDealsPoller');
+  startDealsMailboxImapPoller();
+Keep this inside the same delayed post-listen block as the Graph poller.
+
+TASK 4 — Disable the Graph poller specifically for this mailbox
+Since Graph cannot address deals@landlinq.ai and never will on this plan, stop the 
+Graph poller from continuing to attempt and fail against it (avoiding recurring 
+log noise and wasted requests). Either remove the Graph poller's startup call 
+entirely, or add a check so it skips deals@landlinq.ai specifically if it's ever 
+reused for a different mailbox later. Report which approach was taken.
+
+TASK 5 — Test with real fixtures before enabling
+Reuse the same test fixture types already established for the Graph poller (clean 
+plain-text forward, multi-layer forward with signature clutter, PDF-attachment- 
+only email, coordinates-only email, duplicate-forward test) — write equivalent 
+IMAP-based tests, or if IMAP itself can't be easily mocked, at minimum unit-test 
+the message-parsing and rawBody-conversion logic in isolation, and manually verify 
+end-to-end against a real test email sent to the real mailbox in a controlled test.
+
+TASK 6 — Only then enable the switch
+Once Task 5 passes, set EMAIL_SCRAPING_ENABLED = true in 
+server/emailAutomationConfig.ts, and update the comment there to reflect that this 
+now runs via direct IMAP against a GoDaddy mailbox, not Microsoft Graph.
+
+Verify: send a real test email to deals@landlinq.ai (plain text, then one with a 
+PDF attachment) and confirm each one is picked up within one poll cycle (~3 
+minutes), correctly routed to the right Investment Company, classified, and 
+appears in that company's dashboard. Confirm messages are marked read only after 
+successful processing, and confirm sending the same email twice doesn't create a 
+duplicate deal.
+
+Do not modify anything related to outbound sending (help@landlinq.ai's SMTP/Graph 
+logic) — this task is scoped entirely to inbound reading of deals@landlinq.ai.
