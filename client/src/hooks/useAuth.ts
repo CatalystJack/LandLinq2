@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { queryClient } from "../lib/queryClient";
 import { isPlatformAdminEmail, isSuperAdminEmail } from "@shared/admin-auth";
 
 // User role types matching backend (for system access control)
@@ -304,18 +303,6 @@ export function useAuth() {
       } catch (error) {
         console.error('Logout request failed:', error);
       } finally {
-        // Clear global state
-        globalAuthState = {
-          user: null,
-          isLoading: false,
-          isAuthenticated: false,
-          isInitialized: true,
-          userRole: null,
-          businessRole: null,
-          permissions: []
-        };
-        queryClient.clear();
-        notifyListeners();
         window.location.href = '/';
       }
     }
