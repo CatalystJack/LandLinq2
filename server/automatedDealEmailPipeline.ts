@@ -13,6 +13,7 @@ import {
   type DeveloperProfile,
 } from '../shared/schema.js';
 import { parseForwardedChainIdentities, type OriginalLeadSource, type RoutingSender } from './aiEmailParser.js';
+import { recordEmailIntakeOutcomeAndAlert } from './emailIntakeVolumeAlert.js';
 
 export const AUTOMATION_CONFIDENCE_THRESHOLD = 75;
 
@@ -46,7 +47,20 @@ export function normalizeCounty(value: string | null | undefined): string {
   return String(value || '').toLowerCase().replace(/\bcounty\b/g, '').replace(/[^a-z0-9]/g, '').trim();
 }
 export function normalizeState(value: string | null | undefined): string {
-  return String(value || '').trim().toUpperCase();
+  const normalized = String(value || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
+  const abbreviations: Record<string, string> = {
+    ALABAMA: 'AL', ALASKA: 'AK', ARIZONA: 'AZ', ARKANSAS: 'AR', CALIFORNIA: 'CA', COLORADO: 'CO',
+    CONNECTICUT: 'CT', DELAWARE: 'DE', FLORIDA: 'FL', GEORGIA: 'GA', HAWAII: 'HI', IDAHO: 'ID',
+    ILLINOIS: 'IL', INDIANA: 'IN', IOWA: 'IA', KANSAS: 'KS', KENTUCKY: 'KY', LOUISIANA: 'LA',
+    MAINE: 'ME', MARYLAND: 'MD', MASSACHUSETTS: 'MA', MICHIGAN: 'MI', MINNESOTA: 'MN',
+    MISSISSIPPI: 'MS', MISSOURI: 'MO', MONTANA: 'MT', NEBRASKA: 'NE', NEVADA: 'NV',
+    NEWHAMPSHIRE: 'NH', NEWJERSEY: 'NJ', NEWMEXICO: 'NM', NEWYORK: 'NY', NORTHCAROLINA: 'NC',
+    NORTHDAKOTA: 'ND', OHIO: 'OH', OKLAHOMA: 'OK', OREGON: 'OR', PENNSYLVANIA: 'PA',
+    RHODEISLAND: 'RI', SOUTHCAROLINA: 'SC', SOUTHDAKOTA: 'SD', TENNESSEE: 'TN', TEXAS: 'TX',
+    UTAH: 'UT', VERMONT: 'VT', VIRGINIA: 'VA', WASHINGTON: 'WA', WESTVIRGINIA: 'WV',
+    WISCONSIN: 'WI', WYOMING: 'WY', DISTRICTOFCOLUMBIA: 'DC',
+  };
+  return abbreviations[normalized] || normalized;
 }
 export function normalizeAddress(value: string | null | undefined): string {
   return String(value || '').toLowerCase().replace(/\b(street)\b/g, 'st').replace(/\b(road)\b/g, 'rd')
@@ -76,12 +90,28 @@ export function routeProfile(
 }
 
 export function extractCoordinates(text: string | null | undefined): { latitude: number; longitude: number } | null {
-  const match = String(text || '').match(/(?:lat(?:itude)?\s*[:=,]?\s*)(-?\d{1,2}\.\d+)\D{1,24}(?:lng|lon|longitude)\s*[:=,]?\s*(-?\d{1,3}\.\d+)/i)
-    || String(text || '').match(/\b(-?\d{1,2}\.\d{4,})\s*,\s*(-?\d{1,3}\.\d{4,})\b/);
-  if (!match) return null;
-  const latitude = Number(match[1]), longitude = Number(match[2]);
-  return Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
-    ? { latitude, longitude } : null;
+  return extractCoordinatePairs(text)[0] || null;
+}
+/** Extract every valid pair so multi-property emails cannot silently share one pin. */
+export function extractCoordinatePairs(text: string | null | undefined): { latitude: number; longitude: number }[] {
+  const source = String(text || '');
+  const patterns = [
+    /(?:lat(?:itude)?\s*[:=,]?\s*)(-?\d{1,2}\.\d+)\D{1,24}(?:lng|lon|longitude)\s*[:=,]?\s*(-?\d{1,3}\.\d+)/gi,
+    /\b(-?\d{1,2}\.\d{4,})\s*,\s*(-?\d{1,3}\.\d{4,})\b/g,
+  ];
+  const found: Array<{ latitude: number; longitude: number; index: number }> = [];
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(source)) !== null) {
+      const latitude = Number(match[1]), longitude = Number(match[2]);
+      if (Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180) {
+        found.push({ latitude, longitude, index: match.index });
+      }
+    }
+  }
+  return found.sort((a, b) => a.index - b.index).filter((pair, index, pairs) =>
+    !pairs.slice(0, index).some(previous => previous.latitude === pair.latitude && previous.longitude === pair.longitude),
+  ).map(({ latitude, longitude }) => ({ latitude, longitude }));
 }
 export function extractCountyState(text: string | null | undefined): { county: string | null; state: string | null } {
   const match = String(text || '').match(/\b([A-Za-z][A-Za-z .'-]{1,60}?)\s+County\s*,?\s+([A-Z]{2})\b/i);
@@ -90,6 +120,22 @@ export function extractCountyState(text: string | null | undefined): { county: s
 export function extractStatedRent(text: string | null | undefined): number | null {
   const match = String(text || '').match(/(?:rent|lease)\D{0,30}\$\s*([\d,]+(?:\.\d+)?)(?:\s*\/\s*(?:mo|month))?/i);
   return match ? Number(match[1].replace(/,/g, '')) || null : null;
+}
+export function hasGeographyConflict(
+  stated: Pick<LocationEvidence, 'county' | 'state'>,
+  coordinateDerived: Pick<LocationEvidence, 'county' | 'state'>,
+): boolean {
+  return (!!stated.county && !!coordinateDerived.county &&
+    normalizeCounty(stated.county) !== normalizeCounty(coordinateDerived.county)) ||
+    (!!stated.state && !!coordinateDerived.state &&
+      normalizeState(stated.state) !== normalizeState(coordinateDerived.state));
+}
+export function addressMismatchReviewNotes(
+  stated: Pick<LocationEvidence, 'county' | 'state'>,
+  coordinateDerived: Pick<LocationEvidence, 'county' | 'state'>,
+  statedAddress?: string | null,
+): string {
+  return `Automation held: address_mismatch. Stated address=${statedAddress || 'not provided'}; stated/address-derived geography: county=${stated.county || 'unknown'}, state=${stated.state || 'unknown'}; coordinate-derived geography: county=${coordinateDerived.county || 'unknown'}, state=${coordinateDerived.state || 'unknown'}.`;
 }
 export function isCompleteConfidentIntake(input: {
   confidence: unknown; county: string | null; state: string | null; acres: unknown; price: unknown; rent: unknown;
@@ -131,10 +177,14 @@ function names(name: string | null | undefined) {
 export async function processAutomatedDealEmailIntake(intakeId: string): Promise<{ outcome: AutomationOutcome; handled: true; dealId?: string; reason: string }> {
   const [intake] = await db.select().from(emailIntakeQueue).where(eq(emailIntakeQueue.id, intakeId)).limit(1);
   if (!intake) throw new Error(`Email intake ${intakeId} was not found`);
+  const complete = async <T extends { outcome: AutomationOutcome; handled: true; dealId?: string; reason: string }>(result: T): Promise<T> => {
+    await recordEmailIntakeOutcomeAndAlert(intake.id);
+    return result;
+  };
   if (intake.status === 'approved' && intake.dealId) {
     await db.update(emailIntakeQueue).set({ routingReason: 'already_processed' })
       .where(eq(emailIntakeQueue.id, intake.id));
-    return { outcome: 'duplicate', handled: true, dealId: intake.dealId, reason: 'already_processed' };
+    return complete({ outcome: 'duplicate', handled: true, dealId: intake.dealId, reason: 'already_processed' });
   }
   const identities = parseForwardedChainIdentities({ name: intake.fromName, email: intake.fromEmail }, intake.emailBody);
   const looksForwarded = /^(?:fw|fwd):|forwarded message|original message/i.test(
@@ -144,30 +194,75 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
     (!looksForwarded && identities.routingSender.email
       ? { ...identities.routingSender, fromForwardedChain: false }
       : null);
-  const coordinates = extractCoordinates(intake.emailBody);
+  // Grouped rows must never consume evidence belonging to a sibling. The AI's
+  // per-property notes are the only unstructured evidence safe to use there.
+  const propertyEvidence = intake.groupId
+    ? `${intake.parsedAddress || ''}\n${intake.parsedCity || ''} ${intake.parsedState || ''}\n${intake.parsedNotes || ''}`
+    : intake.emailBody;
+  const coordinatePairs = extractCoordinatePairs(propertyEvidence);
+  const coordinates = coordinatePairs[0] || null;
+  const extractedGeography = extractCountyState(propertyEvidence);
+  const statedGeography = {
+    county: extractedGeography.county,
+    state: intake.parsedState || extractedGeography.state,
+  };
   let location: LocationEvidence = {
-    county: extractCountyState(intake.emailBody).county, state: intake.parsedState || extractCountyState(intake.emailBody).state,
+    county: statedGeography.county, state: statedGeography.state,
     latitude: coordinates?.latitude || null, longitude: coordinates?.longitude || null,
     address: intake.parsedAddress, city: intake.parsedCity, zip: intake.parsedZip,
   };
+  const manual = async (reason: string, reviewNotes = `Automation held: ${reason}`) => {
+    await db.update(emailIntakeQueue).set({
+      status: 'pending', routingReason: reason, reviewNotes,
+    }).where(eq(emailIntakeQueue.id, intake.id));
+    return complete({ outcome: 'manual' as const, handled: true as const, reason });
+  };
+  if (coordinatePairs.length > 1) {
+    return manual('ambiguous_coordinate_association',
+      `Automation held: ambiguous_coordinate_association. Found ${coordinatePairs.length} coordinate pairs for grouped property ${intake.groupIndex || 'unknown'} of ${intake.groupTotal}.`);
+  }
   // API calls intentionally happen before any write transaction (there is no long-held transaction here).
   const geocoder = new GeocodioService();
   if (coordinates) {
+    // A written street address is independent evidence. Forward-geocode it so
+    // county conflicts are detectable even when the email did not spell out a county.
+    const addressGeo = intake.parsedAddress
+      ? await geocoder.geocodeAddress(
+          intake.parsedAddress,
+          [intake.parsedCity, intake.parsedState, intake.parsedZip].filter(Boolean).join(', '),
+        )
+      : null;
+    const addressDerivedGeography = {
+      county: statedGeography.county || (addressGeo?.success ? addressGeo.county || null : null),
+      state: statedGeography.state || (addressGeo?.success ? addressGeo.state || null : null),
+    };
     const reverse = await geocoder.reverseGeocode(coordinates.latitude, coordinates.longitude);
-    if (reverse.success) location = { ...location, county: reverse.county || location.county, state: reverse.state || location.state, city: reverse.city || location.city, zip: reverse.zipCode || location.zip };
+    if (reverse.success) {
+      const coordinateDerived = { county: reverse.county || null, state: reverse.state || null };
+      if (hasGeographyConflict(addressDerivedGeography, coordinateDerived)) {
+        return manual('address_mismatch', addressMismatchReviewNotes(
+          addressDerivedGeography,
+          coordinateDerived,
+          intake.parsedAddress,
+        ));
+      }
+      // Explicitly stated county/state take precedence; reverse-geocoding is a
+      // coordinate-only fallback, not an overwrite of email evidence.
+      location = {
+        ...location,
+        county: addressDerivedGeography.county || reverse.county || null,
+        state: addressDerivedGeography.state || reverse.state || null,
+        city: location.city || (addressGeo?.success ? addressGeo.city : null) || reverse.city || null,
+        zip: location.zip || (addressGeo?.success ? addressGeo.zipCode : null) || reverse.zipCode || null,
+      };
+    }
   } else if (intake.parsedAddress) {
     const geo = await geocoder.geocodeAddress(intake.parsedAddress, [intake.parsedCity, intake.parsedState, intake.parsedZip].filter(Boolean).join(', '));
-    if (geo.success) location = { ...location, county: geo.county || location.county, state: geo.state || location.state, city: geo.city || location.city, zip: geo.zipCode || location.zip, latitude: geo.lat || null, longitude: geo.lng || null };
+    if (geo.success) location = { ...location, county: location.county || geo.county || null, state: location.state || geo.state || null, city: geo.city || location.city, zip: geo.zipCode || location.zip, latitude: geo.lat || null, longitude: geo.lng || null };
   }
-  const rent = extractStatedRent(intake.emailBody);
+  const rent = extractStatedRent(propertyEvidence);
   const profiles = await db.select().from(developerProfiles).where(eq(developerProfiles.isActive, true));
   const route = routeProfile(profiles as AutomationRouteProfile[], identities.routingSender, location.county, location.state);
-  const manual = async (reason: string) => {
-    await db.update(emailIntakeQueue).set({
-      status: 'pending', routingReason: reason, reviewNotes: `Automation held: ${reason}`,
-    }).where(eq(emailIntakeQueue.id, intake.id));
-    return { outcome: 'manual' as const, handled: true as const, reason };
-  };
   if (!route.profile) return manual(route.reason);
   if (!isCompleteConfidentIntake({ confidence: intake.overallConfidence, county: location.county, state: location.state, acres: intake.parsedAcres, price: intake.parsedPrice, rent })) return manual('incomplete_or_low_confidence');
   if (!intake.parsedAddress) return manual('missing_address');
@@ -220,7 +315,7 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
       routingReason: 'duplicate_address_or_coordinates',
       reviewNotes: 'Automation: duplicate submission merged.',
     }).where(eq(emailIntakeQueue.id, intake.id));
-    return { outcome: 'duplicate', handled: true, dealId: duplicate.id, reason: 'duplicate_address_or_coordinates' };
+    return complete({ outcome: 'duplicate', handled: true, dealId: duplicate.id, reason: 'duplicate_address_or_coordinates' });
   }
   let deal = intake.dealId
     ? (await db.select().from(deals).where(eq(deals.id, intake.dealId)).limit(1))[0]
@@ -260,5 +355,5 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
     status: 'approved', dealId: deal.id, reviewedAt: new Date(), routingReason: route.reason,
     reviewNotes: 'Automation: confident intake created.',
   }).where(eq(emailIntakeQueue.id, intake.id));
-  return { outcome: 'created', handled: true, dealId: deal.id, reason: route.reason };
+  return complete({ outcome: 'created', handled: true, dealId: deal.id, reason: route.reason });
 }

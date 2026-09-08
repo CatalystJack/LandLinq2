@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { parseForwardedChainIdentities } from './aiEmailParser.js';
+import { isVolumeThresholdExceeded } from './emailIntakeVolumeAlert.js';
 import {
   extractCoordinates,
+  extractCoordinatePairs,
   findDuplicateDeal,
+  hasGeographyConflict,
   isCompleteConfidentIntake,
+  normalizeState,
   routeProfile,
 } from './automatedDealEmailPipeline.js';
 
@@ -42,6 +46,34 @@ const profile = (id: string, county = 'Wake') => ({
     latitude: 35.7796,
     longitude: -78.6382,
   });
+}
+
+// The alert threshold is strictly greater than 20 outcomes per rolling hour.
+{
+  assert.equal(isVolumeThresholdExceeded(20), false);
+  assert.equal(isVolumeThresholdExceeded(21), true);
+}
+
+// Full state names and postal abbreviations are equivalent when checking a pin.
+{
+  assert.equal(normalizeState('North Carolina'), 'NC');
+  assert.equal(hasGeographyConflict(
+    { county: 'Wake County', state: 'North Carolina' },
+    { county: 'Wake', state: 'NC' },
+  ), false);
+  assert.equal(hasGeographyConflict(
+    { county: 'Wake County', state: 'NC' },
+    { county: 'Durham County', state: 'NC' },
+  ), true);
+}
+
+// Grouped rows must not inherit an arbitrary first coordinate from a body with
+// several property pins; callers can use this complete list to hold review.
+{
+  assert.deepEqual(extractCoordinatePairs('A: 35.7796, -78.6382; B: 36.0012, -78.9001'), [
+    { latitude: 35.7796, longitude: -78.6382 },
+    { latitude: 36.0012, longitude: -78.9001 },
+  ]);
 }
 
 // Low confidence and missing acreage both stay behind the manual-review gate.

@@ -1,0 +1,57 @@
+Close four remaining gaps in the deals@landlinq.ai automated intake pipeline before 
+this is trusted at full volume.
+
+TASK 1 — Multi-property email splitting
+Reuse the EXISTING groupId/groupIndex/groupTotal fields already on emailIntakeQueue 
+(built for exactly this purpose) rather than inventing new schema. Update the AI 
+extraction to detect when an email describes multiple distinct properties and 
+create one emailIntakeQueue row per property, sharing a groupId, with groupIndex/
+groupTotal set correctly. Each property then runs through the full pipeline 
+(confidence gate, duplicate check, comp pull, routing, classification) 
+independently — one property failing its confidence gate must not block the others 
+in the same email. The common single-property case must behave identically to today.
+
+TASK 2 — Fix the address/coordinate handling to detect conflicts, not silently overwrite
+In server/automatedDealEmailPipeline.ts (~line 156), the current logic silently 
+replaces the AI-extracted county/state with whatever reverse-geocoding returns when 
+coordinates are present. Change this: when BOTH a stated address/county-state AND 
+coordinates are present, compare the reverse-geocoded county/state against the 
+AI-extracted county/state. If they clearly disagree, do NOT proceed with either 
+value automatically — route to manual review with reason 'address_mismatch' and 
+record both conflicting values in reviewNotes so the analyst can see exactly what 
+disagreed. Only use the reverse-geocoded value automatically when there was no 
+stated county/state to compare against in the first place (the current coordinate- 
+only fallback case, which is fine as-is).
+
+TASK 3 — Hourly volume alert
+Track how many emails the pipeline has processed (any outcome) in the trailing 60 
+minutes. If more than 20 are processed within any rolling 1-hour window, send one 
+alert to jack@apexresi.com via the existing sendNotificationEmail() function with a 
+clear subject and the actual count — do not send a duplicate alert for the same 
+spike, and do not pause processing.
+
+TASK 4 — Admin pipeline performance dashboard
+Add an admin-only view (extend the existing analytics dashboard) showing: emails 
+processed this week, auto-classified vs. manual-review breakdown, average 
+confidence score, and a breakdown of manual-review reasons (including the new 
+address_mismatch from Task 2) so a spike in any one reason is visible at a glance. 
+Read from emailIntakeQueue, which already has everything needed for this.
+
+TASK 5 — Actually close the correction feedback loop
+correctionDiff and isTrainingExample are populated on emailIntakeQueue whenever an 
+analyst corrects a parsed field, but aiEmailParser.ts never reads this data back — 
+meaning corrections don't currently improve future extraction accuracy at all. Fix 
+this: before running extraction on a new email, pull a small sample of recent 
+correction examples (rows where correctionCount > 0) and include them as few-shot 
+guidance in the GPT-5 prompt, so the parser can actually learn from patterns your 
+team has had to fix repeatedly (e.g. a specific broker's email format, a recurring 
+misread field).
+
+Verify: forward a test email listing three properties and confirm three separate, 
+independently-processed intake records are created. Forward a test email with 
+deliberately conflicting address text and coordinates and confirm it routes to 
+manual review with both values visible. Simulate 21 processed emails in an hour and 
+confirm exactly one alert fires. Confirm the new admin dashboard reflects test data 
+accurately. Correct a parsed field on a test intake record and confirm a 
+subsequent, similar test email shows evidence the correction influenced the new 
+extraction (e.g. visible in logs or the prompt sent to the AI).

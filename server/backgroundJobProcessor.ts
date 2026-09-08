@@ -259,7 +259,7 @@ class BackgroundJobProcessor {
       this.isProcessing = true;
 
       // Find next pending job that's ready to process
-      const [job] = await db
+      let [job] = await db
         .select()
         .from(backgroundJobs)
         .where(
@@ -277,15 +277,18 @@ class BackgroundJobProcessor {
 
       console.log(`🔄 [JOB-PROCESSOR] Processing job ${job.id} (type: ${job.jobType})`);
 
-      // Mark as processing
-      await db
+      // Cross-process compare-and-set: only one worker may own this job.
+      const [claimedJob] = await db
         .update(backgroundJobs)
         .set({
           status: 'processing',
           startedAt: new Date(),
           attempts: sql`${backgroundJobs.attempts} + 1`,
         })
-        .where(eq(backgroundJobs.id, job.id));
+        .where(and(eq(backgroundJobs.id, job.id), eq(backgroundJobs.status, 'pending')))
+        .returning();
+      if (!claimedJob) return;
+      job = claimedJob;
 
       // Process the job based on type
       try {
@@ -307,6 +310,15 @@ class BackgroundJobProcessor {
           case 'quick_deal_enrichment':
             result = await this.processQuickDealEnrichmentJob(job);
             break;
+
+          case 'email_intake_volume_alert': {
+            const { processClaimedEmailIntakeVolumeAlert } = await import('./emailIntakeVolumeAlert');
+            result = await processClaimedEmailIntakeVolumeAlert(
+              String((job.payload as any)?.spikeId || ''),
+              Number((job.payload as any)?.processedCount || 0),
+            );
+            break;
+          }
 
           default:
             throw new Error(`Unknown job type: ${job.jobType}`);
@@ -359,6 +371,10 @@ class BackgroundJobProcessor {
             .where(eq(backgroundJobs.id, job.id));
 
           console.error(`💀 [JOB-PROCESSOR] Job ${job.id} failed permanently after ${currentAttempts} attempts`);
+          if (job.jobType === 'email_intake_volume_alert') {
+            const { releaseEmailIntakeVolumeAlertClaim } = await import('./emailIntakeVolumeAlert');
+            await releaseEmailIntakeVolumeAlertClaim(String((job.payload as any)?.spikeId || ''));
+          }
 
           // Send admin notification for failed job
           await this.notifyAdminOfFailedJob(job, errorMessage);

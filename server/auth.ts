@@ -54,7 +54,28 @@ function platformRoleForEmail(email: string | null | undefined, fallbackRole: st
   return fallbackRole;
 }
 
+function enforcePlatformRolePolicy<T extends SelectUser | null | undefined>(user: T): T {
+  if (!user) return user;
+  const email = String(user.email || "").toLowerCase();
+  if (isPlatformAdminEmail(email)) {
+    return { ...user, role: platformRoleForEmail(email, user.role || "ADMIN") } as T;
+  }
+  const role = String(user.role || "").toUpperCase();
+  if (role === "ADMIN" || role === "SUPER_ADMIN") {
+    // Privileged platform roles are never accepted from persistence alone.
+    return {
+      ...user,
+      role: "USER",
+    } as T;
+  }
+  return user;
+}
+
 export function setupAuth(app: Express) {
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    throw new Error("SESSION_SECRET is required; refusing to start with insecure session configuration");
+  }
   const PostgresSessionStore = connectPg(session);
   const sessionStore = new PostgresSessionStore({ 
     conString: process.env.DATABASE_URL,
@@ -68,7 +89,7 @@ export function setupAuth(app: Express) {
   
   // Enhanced session configuration for financial platform security
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "catalyst-secret-key-2024",
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     rolling: true, // Reset expiration on activity
@@ -124,38 +145,7 @@ export function setupAuth(app: Express) {
         const normalizedEmail = email.toLowerCase().trim();
         console.log(`🔐 [AUTH] Login attempt: ${normalizedEmail}`);
         
-        // Check if it's a @catalystcp.com email
-        const isCatalystEmail = normalizedEmail.endsWith('@catalystcp.com');
-        console.log(`🏢 [AUTH] Is Catalyst email: ${isCatalystEmail}`);
-        
-        // Special handling for @catalystcp.com emails with environment password
-        const CATALYST_TEAM_PASSWORD = process.env.CATALYST_TEAM_PASSWORD;
-        if (isCatalystEmail && CATALYST_TEAM_PASSWORD && password === CATALYST_TEAM_PASSWORD) {
-          console.log(`✅ [AUTH] Catalyst email with correct password - proceeding with auth`);
-          let user = await storage.getUserByEmail(normalizedEmail);
-          
-          // Auto-create account if it doesn't exist
-          if (!user) {
-            console.log(`➕ [AUTH] User doesn't exist, creating new account for: ${normalizedEmail}`);
-            const namePart = normalizedEmail.split('@')[0];
-            const hashedPassword = await hashPassword(password);
-            user = await storage.createUser({
-              email: normalizedEmail,
-              password: hashedPassword,
-              firstName: namePart.charAt(0).toUpperCase() + namePart.slice(1),
-              lastName: "Team",
-            });
-            console.log(`✅ [AUTH] New user created successfully: ${user.id}`);
-          } else {
-            console.log(`✅ [AUTH] Existing user found: ${user.id}`);
-          }
-          return done(null, user);
-        }
-        
-        // For Catalyst emails that didn't use team password, try individual password authentication
-        // This allows Catalyst team members to use either team password OR individual password
-        
-        // Regular authentication flow (works for non-Catalyst emails AND Catalyst emails with individual passwords)
+        // Every account authenticates only with its own stored password.
         let user = await storage.getUserByEmail(normalizedEmail);
 
         // Development and production data are isolated. Allow the exact initial
@@ -322,122 +312,16 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
-      done(null, user && isPlatformAdminEmail(user.email)
-        ? { ...user, role: platformRoleForEmail(user.email, user.role || "ADMIN") }
-        : user);
+      done(null, enforcePlatformRolePolicy(user));
     } catch (error) {
       done(error);
     }
   });
 
-  app.post("/api/register", async (req, res, next) => {
-    try {
-      const { password, email, firstName, lastName, phone, marketsCovered, smsConsent } = req.body;
-      
-      // Log security event for registration attempts
-      console.log(`[SECURITY] Registration attempt for email: ${email} from IP: ${req.ip}`);
-      console.log(`[SECURITY] SMS opt-in consent: ${smsConsent === true ? 'YES' : 'NO'}`);
-
-      // Validate required fields first (before expensive hashing)
-      if (!email || !firstName || !lastName || !phone || !marketsCovered || !password) {
-        return res.status(400).json({ message: "All fields are required" });
-      }
-      
-      // CRITICAL FIX: Convert marketsCovered from string to array
-      // Frontend sends comma-separated string, DB expects array
-      const marketsCoveredArray = typeof marketsCovered === 'string' 
-        ? marketsCovered.split(',').map((m: string) => m.trim()).filter((m: string) => m.length > 0)
-        : Array.isArray(marketsCovered) ? marketsCovered : [];
-      
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return res.status(400).json({ message: "Invalid email format" });
-      }
-
-      // Normalize email
-      const normalizedEmail = email.toLowerCase().trim();
-      
-      // Check if user account already exists
-      const existingUser = await storage.getUserByEmail(normalizedEmail);
-      if (existingUser) {
-        return res.status(400).json({ message: "Email already registered. Please sign in instead." });
-      }
-
-      // Check if broker profile already exists (from email/SMS submission)
-      const existingBroker = await storage.getBrokerByEmail(normalizedEmail);
-
-      const hashedPassword = await hashPassword(password);
-      const user = await storage.createUser({
-        password: hashedPassword,
-        email: normalizedEmail,
-        firstName,
-        lastName,
-      });
-
-      let broker;
-      
-      if (existingBroker) {
-        // Broker exists from email/SMS submission - link it to the new user account
-        console.log(`✅ [REGISTRATION] Linking existing broker to user account: ${normalizedEmail}`);
-        broker = await storage.updateBroker(existingBroker.id, {
-          userId: user.id,
-          firstName, // Update with registration data
-          lastName,
-          phone: phone || existingBroker.phone, // Preserve existing phone if not provided
-          marketsCovered: marketsCoveredArray.length > 0 ? marketsCoveredArray : existingBroker.marketsCovered,
-          smsOptIn: smsConsent === true,
-          smsOptInDate: smsConsent === true ? new Date() : existingBroker.smsOptInDate,
-        });
-      } else {
-        // Create new broker profile with SMS opt-in
-        broker = await storage.createBrokerWithUserId({
-          userId: user.id,
-          firstName,
-          lastName,
-          email: normalizedEmail,
-          phone,
-          marketsCovered: marketsCoveredArray,
-          smsOptIn: smsConsent === true,
-          smsOptInDate: smsConsent === true ? new Date() : null,
-        } as any);
-      }
-
-      // Send welcome email and SMS using EventDispatchService (fire-and-forget, non-blocking)
-      // Don't await - this prevents registration from failing if notifications fail
-      const { EventDispatchService } = await import('./eventDispatch');
-      void EventDispatchService.emit('broker_registered', {
-        brokerId: broker.id,
-        brokerEmail: normalizedEmail,
-        brokerPhone: phone,
-        brokerName: `${firstName} ${lastName}`,
-        metadata: {
-          registrationDate: new Date().toISOString(),
-          marketsCovered: marketsCoveredArray
-        }
-      }).then((result) => {
-        if (result && typeof result === 'object') {
-          console.log(`✅ Welcome notifications dispatched for ${firstName} ${lastName} - Email: ${result.emailSent}, SMS: ${result.smsSent}`);
-        } else {
-          console.log(`✅ Welcome notifications dispatched for ${firstName} ${lastName}`);
-        }
-      }).catch((error) => {
-        console.error(`❌ Welcome notification error for ${firstName} ${lastName}:`, {
-          error: error?.message || 'Unknown error',
-          brokerEmail: normalizedEmail,
-          brokerPhone: phone
-        });
-        // Swallow error - registration already succeeded
-      });
-
-      req.login(user, (err) => {
-        if (err) return next(err);
-        res.status(201).json({ ...user, password: undefined });
-      });
-    } catch (error) {
-      console.error("Registration error:", error);
-      res.status(500).json({ message: "Registration failed" });
-    }
+  app.post("/api/register", (_req, res) => {
+    return res.status(403).json({
+      message: "Public registration is disabled. Contact a LandLinq administrator for an account.",
+    });
   });
 
   app.post("/api/login", (req, res, next) => {
@@ -603,8 +487,6 @@ export function setupAuth(app: Express) {
         role = 'DEVELOPER';
       } else if (userEmail === 'demo@catalystcp.com') {
         role = 'DEMO';
-      } else if (userEmail === 'jack@catalystcp.com') {
-        role = 'SUPER_ADMIN';
       } else if (userEmail.endsWith('@catalystcp.com')) {
         // Check for partners. DEVELOPER is intentionally never inferred from
         // email because it is a tenant-isolated platform role.

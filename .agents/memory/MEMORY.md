@@ -26,3 +26,4 @@
 - [Authenticated runtime smoke tests](authenticated-runtime-smoke-tests.md) — the production build can pass with an undefined JSX icon; data-driven authenticated pages need a browser runtime check.
 - [Microsoft deals mailbox](microsoft-deals-mailbox.md) — Graph intake must stay disabled until deals@landlinq.ai exists in the configured Microsoft tenant or its real mailbox identity is known.
 - [Email intake routing audit](email-intake-routing-audit.md) — every automated intake outcome must persist its routing reason so platform admins can reconstruct how a deal entered the system.
+- [Intake volume alert durability](email-intake-volume-alert-durability.md) — count distinct source emails; use spike-scoped durable jobs so retries and restarts cannot duplicate or suppress alerts.

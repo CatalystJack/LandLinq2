@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -71,6 +72,15 @@ interface AnalyticsData {
   marketInsights: Array<{ metric: string; value: string; trend: number; description: string }>;
 }
 
+interface EmailIntakePerformance {
+  weekStart: string;
+  processedCount: number;
+  autoClassifiedCount: number;
+  manualReviewCount: number;
+  averageOverallConfidence: number | null;
+  manualReviewReasons: Array<{ reason: string; count: number }>;
+}
+
 export default function AnalyticsPage() {
   const { user, isAuthenticated } = useAuth();
   const [selectedTimeframe, setSelectedTimeframe] = useState("30");
@@ -87,6 +97,7 @@ export default function AnalyticsPage() {
   // FIX (Dec 15, 2025): Support both OIDC auth (user.claims.email) and traditional auth (user.email)
   const userEmail = (user as any)?.claims?.email || (user as any)?.email || '';
   const userRole = (user as any)?.role || '';
+  const isPlatformAdmin = isPlatformAdminEmail(userEmail);
   
   // Check for analyst access: email domain OR role-based (including Jack's Ultimate Power)
   const isAnalyst = userEmail.includes('@catalystcp.com') || 
@@ -117,6 +128,12 @@ export default function AnalyticsPage() {
 
   const { data: analytics } = useQuery<AnalyticsData>({
     queryKey: ["/api/analytics", selectedTimeframe],
+  });
+
+  const { data: emailIntakePerformance, isLoading: isEmailIntakeLoading } = useQuery<EmailIntakePerformance>({
+    queryKey: ["/api/analytics/email-intake-performance"],
+    enabled: isPlatformAdmin,
+    refetchInterval: 5 * 60 * 1000,
   });
 
   // Filter deals based on current filter settings
@@ -447,6 +464,89 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Email Intake Performance */}
+        {isPlatformAdmin && <Card className="mb-8 bg-white border-catalyst-gray-200 shadow-sm" data-testid="card-email-intake-performance">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-catalyst-gold" />
+              Email Intake Performance
+            </CardTitle>
+            <p className="text-sm text-catalyst-gray-600">
+              Current calendar week {emailIntakePerformance?.weekStart
+                ? `starting ${new Date(emailIntakePerformance.weekStart).toLocaleDateString()}`
+                : ""}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {isEmailIntakeLoading ? (
+              <p className="text-sm text-catalyst-gray-500">Loading email intake performance…</p>
+            ) : !emailIntakePerformance || emailIntakePerformance.processedCount === 0 ? (
+              <div className="rounded-lg border border-dashed border-catalyst-gray-200 p-6 text-sm text-catalyst-gray-500">
+                No email intake has been processed this calendar week.
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="rounded-lg bg-catalyst-gray-50 p-4">
+                    <p className="text-sm text-catalyst-gray-500">Emails / properties processed</p>
+                    <p className="mt-1 text-2xl font-bold text-catalyst-navy">{emailIntakePerformance.processedCount}</p>
+                  </div>
+                  <div className="rounded-lg bg-catalyst-gray-50 p-4">
+                    <p className="text-sm text-catalyst-gray-500">Auto-classified</p>
+                    <p className="mt-1 text-2xl font-bold text-green-700">
+                      {emailIntakePerformance.autoClassifiedCount}
+                      <span className="ml-2 text-sm font-medium text-catalyst-gray-500">
+                        ({((emailIntakePerformance.autoClassifiedCount / emailIntakePerformance.processedCount) * 100).toFixed(1)}%)
+                      </span>
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-catalyst-gray-50 p-4">
+                    <p className="text-sm text-catalyst-gray-500">Average confidence</p>
+                    <p className="mt-1 text-2xl font-bold text-catalyst-navy">
+                      {emailIntakePerformance.averageOverallConfidence === null
+                        ? "No confidence data"
+                        : `${emailIntakePerformance.averageOverallConfidence.toFixed(1)}%`}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="font-semibold text-catalyst-navy">Manual-review breakdown</h3>
+                    <span className="text-sm text-catalyst-gray-600">
+                      {emailIntakePerformance.manualReviewCount} ({((emailIntakePerformance.manualReviewCount / emailIntakePerformance.processedCount) * 100).toFixed(1)}%)
+                    </span>
+                  </div>
+                  {emailIntakePerformance.manualReviewReasons.length === 0 ? (
+                    <p className="text-sm text-catalyst-gray-500">No items required manual review.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {emailIntakePerformance.manualReviewReasons.map(({ reason, count }) => {
+                        const width = emailIntakePerformance.manualReviewCount > 0
+                          ? (count / emailIntakePerformance.manualReviewCount) * 100
+                          : 0;
+                        return (
+                          <div key={reason}>
+                            <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                              <span className="font-medium text-catalyst-gray-700 capitalize">
+                                {reason.replace(/_/g, " ")}
+                              </span>
+                              <span className="text-catalyst-gray-600">{count}</span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-catalyst-gray-200">
+                              <div className="h-full rounded-full bg-catalyst-gold" style={{ width: `${width}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>}
 
         {/* Main Analytics Tabs */}
         <Tabs defaultValue="overview" className="space-y-6">

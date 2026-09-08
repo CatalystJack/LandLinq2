@@ -3598,6 +3598,9 @@ export const emailIntakeQueue = pgTable("email_intake_queue", {
   reviewedAt: timestamp("reviewed_at"),
   reviewedBy: varchar("reviewed_by"),
   reviewNotes: text("review_notes"),
+  // Set once an automation attempt reaches a durable outcome. This supports
+  // outcome-volume monitoring without counting retries more than once.
+  automationProcessedAt: timestamp("automation_processed_at"),
 
   isTrainingExample: boolean("is_training_example").default(false),
   correctionDiff: jsonb("correction_diff"),
@@ -3615,13 +3618,26 @@ export const emailIntakeQueue = pgTable("email_intake_queue", {
   index("email_intake_created_idx").on(table.createdAt),
   index("email_intake_from_idx").on(table.fromEmail),
   index("email_intake_group_idx").on(table.groupId),
+  index("email_intake_automation_processed_idx").on(table.automationProcessedAt),
 ]);
 
 export const insertEmailIntakeQueueSchema = createInsertSchema(emailIntakeQueue).omit({
-  id: true, createdAt: true,
+  id: true, createdAt: true, automationProcessedAt: true,
 });
 export type EmailIntakeQueue = typeof emailIntakeQueue.$inferSelect;
 export type InsertEmailIntakeQueue = z.infer<typeof insertEmailIntakeQueueSchema>;
+
+// Singleton durable state for the automated-email rolling-volume alert. Keeping
+// the transition state in Postgres prevents concurrent workers from each
+// sending an alert for the same threshold crossing.
+export const emailIntakeVolumeAlertState = pgTable("email_intake_volume_alert_state", {
+  singletonKey: varchar("singleton_key", { length: 64 }).primaryKey(),
+  alertSpikeId: varchar("alert_spike_id"),
+  isAboveThreshold: boolean("is_above_threshold").notNull().default(false),
+  alertClaimed: boolean("alert_claimed").notNull().default(false),
+  alertSentAt: timestamp("alert_sent_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
 
 // ── Email Intake Training Examples ────────────────────────────────────────────
 // Curated input-output pairs used as few-shot context in the AI prompt.

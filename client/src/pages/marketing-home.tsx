@@ -2,7 +2,6 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "wouter";
 import {
   ArrowRight,
-  Check,
   ChevronDown,
   Menu,
   Search,
@@ -205,26 +204,25 @@ export default function MarketingHome() {
               <div className="ll-route-line" aria-hidden="true"><i /></div>
               <article className="ll-journey-step ll-step-dashboard">
                 <div className="ll-step-marker"><span>01</span></div>
-                <div className="ll-step-copy"><div className="ll-eyebrow">DEAL INTELLIGENCE</div><h3>Deal Dashboard</h3><p>Every deal arrives pre-screened against your own criteria, so your team knows what is worth a second look.</p><div className="ll-step-meta"><span>7 criteria</span><span>18 ready for review</span></div></div>
-                <div className="ll-step-surface ll-surface-dark"><DashboardMockup compact /></div>
+                <div className="ll-step-copy"><div className="ll-eyebrow">DEAL INTELLIGENCE</div><h3>Deal Dashboard</h3><p>Every deal arrives pre-screened against your own criteria, so your team knows what is worth a second look.</p></div>
+                <div className="ll-step-surface ll-surface-plain"><DashboardMockup compact /></div>
               </article>
               <article className="ll-journey-step ll-step-outreach">
                 <div className="ll-step-marker"><span>02</span></div>
-                <div className="ll-step-copy"><div className="ll-eyebrow">CONNECTED ACTION</div><h3>CRM & Outreach</h3><p>Campaigns run from your own connected email, reaching brokers without anyone drafting or sending each message by hand.</p><div className="ll-step-meta"><span>784 contacts</span><span>Outreach queued</span></div></div>
+                <div className="ll-step-copy"><div className="ll-eyebrow">CONNECTED ACTION</div><h3>CRM & Outreach</h3><p>Campaigns run from your own connected email, reaching brokers without anyone drafting or sending each message by hand.</p></div>
                 <div className="ll-step-surface ll-surface-paper"><OutreachMockup /></div>
               </article>
               <article className="ll-journey-step ll-step-pipeline">
                 <div className="ll-step-marker"><span>03</span></div>
-                <div className="ll-step-copy"><div className="ll-eyebrow">OPERATIONAL CLARITY</div><h3>Pipeline</h3><p>Track opportunities through stages you define without a dedicated ops hire to maintain it.</p><div className="ll-step-meta"><span>New → Qualified</span><span>Shared context</span></div></div>
-                <div className="ll-step-surface ll-surface-navy"><PipelineMockup /></div>
+                <div className="ll-step-copy"><div className="ll-eyebrow">OPERATIONAL CLARITY</div><h3>Pipeline</h3><p>Track opportunities through stages you define without a dedicated ops hire to maintain it.</p></div>
+                <div className="ll-step-surface ll-surface-plain"><PipelineMockup /></div>
               </article>
               <article className="ll-journey-step ll-step-analytics">
                 <div className="ll-step-marker"><span>04</span></div>
-                <div className="ll-step-copy"><div className="ll-eyebrow">COMPOUNDING FOCUS</div><h3>Outreach Analytics</h3><p>See send activity, contacts reached, and drip enrollment status without pulling it together yourself.</p><div className="ll-step-meta"><span>178 in sequences</span><span>30 day view</span></div></div>
+                <div className="ll-step-copy"><div className="ll-eyebrow">COMPOUNDING FOCUS</div><h3>Outreach Analytics</h3><p>See send activity, contacts reached, and drip enrollment status without pulling it together yourself.</p></div>
                 <div className="ll-step-surface ll-surface-paper"><OutreachAnalyticsMockup /></div>
               </article>
             </div>
-            <div className="ll-journey-result"><div><Search className="h-5 w-5 text-landlinq-blue" /><span className="ll-eyebrow">THE RESULT</span></div><h3>More time for the deals that clear your bar.</h3><p><Check className="mr-2 inline h-4 w-4 text-landlinq-blue" />Sourcing, screening, and outreach in the background</p></div>
           </div>
         </section>
 

@@ -12,18 +12,12 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Check for Jack's ultimate power role override
-  const jackRole = localStorage.getItem("jack-ultimate-role");
   const headers: Record<string, string> = {};
   
   if (data) {
     headers["Content-Type"] = "application/json";
   }
   
-  if (jackRole) {
-    headers["X-Jack-Ultimate-Role"] = jackRole;
-  }
-
   const res = await fetch(url, {
     method,
     headers,
@@ -41,19 +35,10 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey, signal }) => {
-    // Check for Jack's ultimate power role override
-    const jackRole = localStorage.getItem("jack-ultimate-role");
-    const headers: Record<string, string> = {};
-    
-    if (jackRole) {
-      headers["X-Jack-Ultimate-Role"] = jackRole;
-    }
-
     try {
       // Use React Query's signal directly without creating competing AbortControllers
       const res = await fetch(queryKey.join("/") as string, {
         credentials: "include",
-        headers,
         signal: signal, // Use React Query's signal directly
       });
 

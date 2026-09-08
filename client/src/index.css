@@ -1453,6 +1453,22 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   transform: perspective(1400px) rotateY(-1deg) rotateX(0) translateY(-6px);
 }
 
+.ll-machine-dashboard .ll-window,
+.ll-machine-dashboard .ll-window:hover {
+  transform: none;
+  transition: none;
+}
+
+.ll-machine-dashboard .ll-analyst-toolbar,
+.ll-machine-dashboard .ll-analyst-table-scroll {
+  scrollbar-width: none;
+}
+
+.ll-machine-dashboard .ll-analyst-toolbar::-webkit-scrollbar,
+.ll-machine-dashboard .ll-analyst-table-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 /* Platform showcase activity: rows, queues, cards, and reporting bars animate
    in place so the product reads as a working system rather than a screenshot. */
 .ll-showcase-dashboard .grid.grid-cols-\[1\.5fr\] > div:nth-child(2),
@@ -1926,6 +1942,12 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 }
 .ll-surface-dark { background: #183047; }
 .ll-surface-navy { background: #0d263c; }
+.ll-surface-plain {
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
 .ll-surface-paper { border: 1px solid #d6e2e8; background: #eaf1f4; }
 .ll-step-surface .ll-window,
 .ll-step-surface .ll-app-frame {

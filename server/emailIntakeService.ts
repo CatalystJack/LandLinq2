@@ -11,7 +11,7 @@
 
 import { db } from './db.js';
 import { emailIntakeQueue, emailIntakeTrainingExamples } from '../shared/schema.js';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, and, sql, gt } from 'drizzle-orm';
 import { apiCallTracker } from './apiCallTracker.js';
 import { simpleParser } from 'mailparser';
 
@@ -66,6 +66,109 @@ interface ParseResult {
   fields: ParsedFields;
   confidences: FieldConfidences;
   overallConfidence: number;
+}
+
+export interface FewShotTrainingExample {
+  emailBody?: string | null;
+  subject?: string | null;
+  fromEmail?: string | null;
+  parsedOutput?: unknown;
+  correctedOutput?: unknown;
+  label?: string | null;
+  createdAt?: Date | null;
+}
+
+const FEW_SHOT_EXAMPLE_LIMIT = 5;
+
+/**
+ * Keep correction examples ahead of ordinary positive examples while preserving
+ * recency within each category. A correction can be identified either by its
+ * label or by the corrected payload, which also supports older saved rows.
+ */
+export function prioritizeFewShotExamples<T extends FewShotTrainingExample>(
+  examples: T[],
+  limit = FEW_SHOT_EXAMPLE_LIMIT,
+): T[] {
+  const corrections: T[] = [];
+  const otherExamples: T[] = [];
+  for (const example of examples) {
+    if (example.label === 'correction' || example.correctedOutput != null) {
+      corrections.push(example);
+    } else {
+      otherExamples.push(example);
+    }
+  }
+  return [...corrections, ...otherExamples].slice(0, limit);
+}
+
+/** Format curated examples without allowing them to become source data. */
+export function formatFewShotBlock(examples: FewShotTrainingExample[]): string {
+  if (examples.length === 0) return '';
+
+  let block = '\n\nLEARNED EXAMPLES — these are real emails our analysts have corrected. Use them only to learn extraction patterns; they are NOT facts about the current email. Never copy names, addresses, prices, or any other values from them.\n\n';
+  for (let i = 0; i < examples.length; i++) {
+    const ex = examples[i];
+    const correctOutput = ex.correctedOutput ?? ex.parsedOutput ?? {};
+    const snippet = (ex.emailBody || '').substring(0, 800).replace(/\n{3,}/g, '\n\n');
+    block += `=== EXAMPLE ${i + 1} ===\n`;
+    block += `Subject: ${ex.subject || '(none)'}\nFrom: ${ex.fromEmail || '(none)'}\n`;
+    block += `Email body (truncated):\n${snippet}\n\n`;
+    // If analyst corrected the AI, show what was WRONG and what is RIGHT.
+    if (ex.correctedOutput != null && ex.parsedOutput != null
+      && typeof ex.correctedOutput === 'object' && typeof ex.parsedOutput === 'object') {
+      const wrong = ex.parsedOutput as Record<string, unknown>;
+      const right = ex.correctedOutput as Record<string, unknown>;
+      const corrections: string[] = [];
+      for (const k of Object.keys(right)) {
+        if (JSON.stringify(right[k]) !== JSON.stringify(wrong[k]) && right[k] != null) {
+          corrections.push(`  "${k}": AI said ${JSON.stringify(wrong[k])} → CORRECT is ${JSON.stringify(right[k])}`);
+        }
+      }
+      if (corrections.length > 0) {
+        block += `ANALYST CORRECTIONS (AI was wrong on these fields):\n${corrections.join('\n')}\n`;
+      }
+    }
+    block += `CORRECT JSON OUTPUT: ${JSON.stringify(correctOutput)}\n\n`;
+  }
+  return `${block}=== END OF EXAMPLES ===\n\n`;
+}
+
+export function queueCorrectionToFewShotExample(row: any): FewShotTrainingExample {
+  const parsedOutput: Record<string, unknown> = {
+    dealType: row.parsedDealType, propertyName: row.parsedPropertyName,
+    address: row.parsedAddress, city: row.parsedCity, state: row.parsedState,
+    zip: row.parsedZip, acres: row.parsedAcres, price: row.parsedPrice,
+    unitCount: row.parsedUnitCount, vintage: row.parsedVintage,
+    brokerName: row.parsedBrokerName, brokerEmail: row.parsedBrokerEmail,
+    brokerPhone: row.parsedBrokerPhone, notes: row.parsedNotes, zoning: row.parsedZoning,
+  };
+  const correctedOutput = { ...parsedOutput };
+  for (const [field, change] of Object.entries((row.correctionDiff || {}) as Record<string, any>)) {
+    correctedOutput[field] = change?.analyst;
+  }
+  return {
+    emailBody: row.emailBody, subject: row.subject, fromEmail: row.fromEmail,
+    parsedOutput, correctedOutput, label: 'correction', createdAt: row.reviewedAt || row.createdAt,
+  };
+}
+
+/**
+ * Each intake row is an independently durable unit. Failures are converted to
+ * false only after every sibling has had a chance to be processed.
+ */
+export async function processIntakeIdsIndependently(
+  intakeIds: string[],
+  processIntake: (intakeId: string) => Promise<{ handled: boolean }>,
+): Promise<boolean> {
+  let allHandled = true;
+  for (const intakeId of intakeIds) {
+    try {
+      if (!(await processIntake(intakeId)).handled) allHandled = false;
+    } catch {
+      allHandled = false;
+    }
+  }
+  return allHandled;
 }
 
 // A single email can list several distinct, unrelated tracts/properties
@@ -246,7 +349,7 @@ export class EmailIntakeService {
       console.log(`📧 [INTAKE] Multi-property email detected — splitting into ${parseResults.length} intake entries (group ${groupId})`);
     }
 
-    const insertedRows: { id: string }[] = [];
+    const rowValues: Array<typeof emailIntakeQueue.$inferInsert> = [];
     for (let i = 0; i < parseResults.length; i++) {
       const parseResult = parseResults[i];
       // Ensure broker info isn't lost for properties where the AI didn't repeat it
@@ -257,7 +360,7 @@ export class EmailIntakeService {
         parseResult.fields.brokerName = fallbackFields.brokerName;
       }
 
-      const [row] = await db.insert(emailIntakeQueue).values({
+      rowValues.push({
         fromEmail: email.from,
         fromName: EmailIntakeService.nameFromEmail(email.from),
         subject: isMultiProperty ? `${email.subject || '(No Subject)'} (${i + 1}/${parseResults.length})` : (email.subject || '(No Subject)'),
@@ -289,9 +392,13 @@ export class EmailIntakeService {
         groupId,
         groupIndex: isMultiProperty ? i + 1 : null,
         groupTotal: isMultiProperty ? parseResults.length : null,
-      }).returning();
-      insertedRows.push(row);
+      });
     }
+    // A duplicate retry must never discover a partial group. Either every
+    // independently-processable sibling exists or none of them do.
+    const insertedRows = await db.transaction(tx =>
+      tx.insert(emailIntakeQueue).values(rowValues).returning({ id: emailIntakeQueue.id }),
+    );
 
     // Upload all attachment buffers to object storage now that we have intake IDs.
     // Shared attachments (e.g. one PDF listing all properties) are attached to every
@@ -372,11 +479,7 @@ export class EmailIntakeService {
     const queued = await EmailIntakeService.processInboundEmail(rawBody);
     if (!queued) return false;
     const { processAutomatedDealEmailIntake } = await import('./automatedDealEmailPipeline.js');
-    for (const intakeId of queued.intakeIds) {
-      const result = await processAutomatedDealEmailIntake(intakeId);
-      if (!result.handled) return false;
-    }
-    return true;
+    return processIntakeIdsIndependently(queued.intakeIds, processAutomatedDealEmailIntake);
   }
 
   // ── Extract original sender from a forwarded email body ─────────────────
@@ -514,6 +617,7 @@ CRITICAL RULES:
 - state: must be a valid 2-letter US state code (NC, SC, GA, FL, TX, TN, etc.)
 - brokerEmail: NEVER @catalystcp.com or @landlinq.ai
 - confidence: 100 = explicitly stated verbatim, 70-90 = inferred from recognized landmark, 40-60 = inferred from context, 0 = null
+- For EACH property, preserve that property's county, coordinates, and stated rent in its own "notes" field. Never put another property's location or rent evidence in that entry.
 - If the email describes only ONE property, return a "properties" array with exactly ONE entry.`;
 
     const startTime = Date.now();
@@ -586,41 +690,24 @@ CRITICAL RULES:
 
   private static async buildFewShotBlock(): Promise<string> {
     try {
-      const examples = await db
+      const correctedRows = await db
+        .select()
+        .from(emailIntakeQueue)
+        .where(gt(emailIntakeQueue.correctionCount, 0))
+        .orderBy(desc(emailIntakeQueue.reviewedAt))
+        .limit(FEW_SHOT_EXAMPLE_LIMIT);
+      const correctionExamples = correctedRows.map(queueCorrectionToFewShotExample);
+      const curatedExamples = await db
         .select()
         .from(emailIntakeTrainingExamples)
         .where(eq(emailIntakeTrainingExamples.useInPrompt, true))
         .orderBy(desc(emailIntakeTrainingExamples.createdAt))
-        .limit(5);
+        .limit(FEW_SHOT_EXAMPLE_LIMIT);
 
-      if (examples.length === 0) return '';
-
-      let block = '\n\nLEARNED EXAMPLES — these are real emails our analysts have corrected. Use them as ground truth for how to extract fields:\n\n';
-      for (let i = 0; i < examples.length; i++) {
-        const ex = examples[i];
-        const correctOutput = ex.correctedOutput || ex.parsedOutput;
-        const snippet = (ex.emailBody || '').substring(0, 800).replace(/\n{3,}/g, '\n\n');
-        block += `=== EXAMPLE ${i + 1} ===\n`;
-        block += `Subject: ${ex.subject || '(none)'}\nFrom: ${ex.fromEmail || '(none)'}\n`;
-        block += `Email body (truncated):\n${snippet}\n\n`;
-        // If analyst corrected the AI, show what was WRONG and what is RIGHT
-        if (ex.correctedOutput && ex.parsedOutput) {
-          const wrong = ex.parsedOutput as any;
-          const right = ex.correctedOutput as any;
-          const corrections: string[] = [];
-          for (const k of Object.keys(right)) {
-            if (JSON.stringify(right[k]) !== JSON.stringify((wrong as any)[k]) && right[k] != null) {
-              corrections.push(`  "${k}": AI said ${JSON.stringify((wrong as any)[k])} → CORRECT is ${JSON.stringify(right[k])}`);
-            }
-          }
-          if (corrections.length > 0) {
-            block += `ANALYST CORRECTIONS (AI was wrong on these fields):\n${corrections.join('\n')}\n`;
-          }
-        }
-        block += `CORRECT JSON OUTPUT: ${JSON.stringify(correctOutput, null, 0)}\n\n`;
-      }
-      block += '=== END OF EXAMPLES ===\n\n';
-      return block;
+      return formatFewShotBlock(prioritizeFewShotExamples(
+        [...correctionExamples, ...curatedExamples],
+        FEW_SHOT_EXAMPLE_LIMIT,
+      ));
     } catch (e) {
       console.warn('⚠️ [INTAKE] Could not load few-shot examples:', e);
       return '';
@@ -1095,7 +1182,6 @@ CRITICAL RULES:
     // Compute correction diff — this is our training signal
     const correctionDiff = EmailIntakeService.computeCorrectionDiff(item, overrides);
     const correctionCount = Object.keys(correctionDiff).length;
-    const wasFullyCorrect = correctionCount === 0;
 
     // Merge analyst edits over parsed fields
     const propertyName = overrides.propertyName ?? item.parsedPropertyName ?? '';
@@ -1172,7 +1258,7 @@ CRITICAL RULES:
         reviewed_by = ${reviewerEmail},
         correction_diff = ${JSON.stringify(correctionDiff)}::jsonb,
         correction_count = ${correctionCount},
-        is_training_example = ${wasFullyCorrect}
+        is_training_example = TRUE
       WHERE id = ${intakeId}
     `);
 

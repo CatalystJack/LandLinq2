@@ -2890,7 +2890,10 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.get('/api/team-members', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
-      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
+      const analystRole = String(user?.role || "").toUpperCase();
+      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email)
+        || analystRole === "ANALYST"
+        || analystRole === "ADMIN";
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -10823,6 +10826,86 @@ RULES:
     }
   });
 
+  // Aggregate-only email intake performance for the current calendar week.
+  // Deliberately selects no sender, subject, attachment, or email-content fields.
+  app.get("/api/analytics/email-intake-performance", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+        return res.status(403).json({ message: "Platform administrator access required." });
+      }
+
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setHours(0, 0, 0, 0);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+
+      const rows = await db
+        .select({
+          id: emailIntakeQueue.id,
+          groupId: emailIntakeQueue.groupId,
+          status: emailIntakeQueue.status,
+          routingReason: emailIntakeQueue.routingReason,
+          overallConfidence: emailIntakeQueue.overallConfidence,
+          reviewNotes: emailIntakeQueue.reviewNotes,
+        })
+        .from(emailIntakeQueue)
+        .where(gte(emailIntakeQueue.automationProcessedAt, weekStart));
+
+      let autoClassifiedCount = 0;
+      let manualReviewCount = 0;
+      let confidenceTotal = 0;
+      let confidenceCount = 0;
+      const manualReviewReasons: Record<string, number> = {};
+
+      const sourceEmails = new Map<string, { hasManual: boolean; reasons: Set<string> }>();
+      for (const row of rows) {
+        const confidence = row.overallConfidence === null ? NaN : Number(row.overallConfidence);
+        if (Number.isFinite(confidence)) {
+          confidenceTotal += confidence;
+          confidenceCount++;
+        }
+
+        // Automated pipeline approvals are marked with its durable review note.
+        // All other outcomes originated in, or remained in, manual review.
+        const wasAutoClassified = row.status === "approved"
+          && String(row.reviewNotes || "").startsWith("Automation:");
+        const sourceKey = row.groupId || row.id;
+        const source = sourceEmails.get(sourceKey) || { hasManual: false, reasons: new Set<string>() };
+        if (!wasAutoClassified) {
+          source.hasManual = true;
+          const reason = row.routingReason?.trim() || "unspecified";
+          source.reasons.add(reason);
+        }
+        sourceEmails.set(sourceKey, source);
+      }
+      sourceEmails.forEach((source) => {
+        if (source.hasManual) {
+          manualReviewCount++;
+          source.reasons.forEach(reason => {
+            manualReviewReasons[reason] = (manualReviewReasons[reason] || 0) + 1;
+          });
+        } else autoClassifiedCount++;
+      });
+
+      const reasonCounts = Object.entries(manualReviewReasons)
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason));
+
+      return res.json({
+        weekStart: weekStart.toISOString(),
+        processedCount: sourceEmails.size,
+        autoClassifiedCount,
+        manualReviewCount,
+        averageOverallConfidence: confidenceCount > 0 ? confidenceTotal / confidenceCount : null,
+        manualReviewReasons: reasonCounts,
+      });
+    } catch (error) {
+      console.error("Email intake performance analytics error:", error);
+      return res.status(500).json({ message: "Failed to load email intake performance analytics" });
+    }
+  });
+
   // Get analytics dashboard data with proper authentication
   app.get("/api/analytics/dashboard", isAuthenticated, async (req, res) => {
     try {
@@ -17072,15 +17155,6 @@ RULES:
   // Get all deals for analysts (with broker information)
   app.get("/api/analyst/deals", isAuthenticated, async (req, res) => {
     try {
-      // Check for Jack's ultimate power override first
-      const jackRole = req.headers['x-jack-ultimate-role'];
-      if (jackRole === 'analyst' || jackRole === 'admin') {
-        console.log("🔥 ULTIMATE POWER: Jack accessing analyst deals as", jackRole);
-        const deals = await storage.getAllDealsWithBrokers();
-        return res.json(deals);
-      }
-      
-      // Regular authentication check for everyone else
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -19818,7 +19892,7 @@ RULES:
       });
 
       // Handle classifications
-      if (status === "clear_no") {
+      if (deal.status === "clear_no") {
         const rejectedTemplate = emailTemplates.dealRejected(`${broker.firstName} ${broker.lastName}`);
 
         await storage.createCommunication({
@@ -19830,7 +19904,7 @@ RULES:
           subject: (rejectedTemplate as any).subject,
           message: (rejectedTemplate as any).message,
         });
-      } else if (status === "high_priority") {
+      } else if (deal.status === "high_priority") {
         const approvedTemplate = emailTemplates.dealApproved(`${broker.firstName} ${broker.lastName}`);
 
         await storage.createCommunication({
@@ -21442,14 +21516,9 @@ RULES:
   // Advanced Property Analysis Endpoints
   
   // Get comprehensive property data and analysis - REAL HELLODATA API ONLY - OPTIMIZED
-  // TEMPORARILY REMOVE AUTHENTICATION FOR DEBUGGING
-  app.get("/api/property-analysis/:dealId", async (req, res) => {
+  app.get("/api/property-analysis/:dealId", isAuthenticated, async (req, res) => {
     try {
       console.log(`🚀 OPTIMIZED Property Analysis request for deal: ${req.params.dealId}`);
-      console.log(`🔍 DEBUG: Request method: ${req.method}, URL: ${req.url}, Headers: ${JSON.stringify(req.headers, null, 2)}`);
-      
-      // Skip authentication temporarily for debugging
-      const user = req.user || { email: 'test@catalystcp.com' };
 
       const { dealId } = req.params;
       const deal = await storage.getDeal(dealId);
@@ -21457,6 +21526,33 @@ RULES:
       if (!deal) {
         console.log(`❌ Deal not found: ${dealId}`);
         return res.status(404).json({ message: "Deal not found" });
+      }
+
+      const user = req.user as any;
+      const userEmail = String(user?.email || user?.claims?.email || "").toLowerCase();
+      const persistedRole = String(user?.role || "").toUpperCase();
+      let canAccess = isPlatformAdminEmail(userEmail)
+        || persistedRole === "ADMIN"
+        || persistedRole === "ANALYST";
+
+      if (!canAccess && persistedRole === "DEVELOPER" && user?.developerProfileId) {
+        const [send] = await db.select({ id: partnerDeveloperSends.id })
+          .from(partnerDeveloperSends)
+          .where(and(
+            eq(partnerDeveloperSends.dealId, dealId),
+            eq(partnerDeveloperSends.developerProfileId, user.developerProfileId),
+          ))
+          .limit(1);
+        canAccess = Boolean(send);
+      }
+
+      if (!canAccess && user?.id) {
+        const broker = await storage.getBrokerByUserId(user.id);
+        canAccess = Boolean(broker && deal.brokerId === broker.id);
+      }
+
+      if (!canAccess) {
+        return res.status(403).json({ message: "Access denied for this deal" });
       }
 
       console.log(`🚀 OPTIMIZED Property Analysis for deal ${dealId}: ${deal.address} - PERFORMANCE OPTIMIZED`);
