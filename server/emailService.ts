@@ -12,6 +12,9 @@ import { storage } from './storage';
 import { getAppOnlyGraphToken } from './microsoftAuth';
 import sgMail from '@sendgrid/mail';
 
+export const PUBLIC_TRANSACTIONAL_EMAIL = 'help@landlinq.ai';
+export const PUBLIC_TRANSACTIONAL_NAME = 'LandLinq Support';
+
 /**
  * Helper to get raw email template from business settings (for sendgridTemplateId access)
  * CRITICAL: If a template has a SendGrid template ID configured, we MUST use it
@@ -77,13 +80,10 @@ export async function sendSystemEmail(
   subject: string,
   htmlBody: string,
   attachments: EmailNotification['attachments'] = [],
+  fromMailbox = PUBLIC_TRANSACTIONAL_EMAIL,
 ): Promise<boolean> {
   const startTime = Date.now();
-  const mailbox = process.env.NOTIFICATIONS_MAILBOX;
-  if (!mailbox) {
-    console.error('❌ [GRAPH-SYSTEM] NOTIFICATIONS_MAILBOX is not configured');
-    return false;
-  }
+  const mailbox = fromMailbox.trim().toLowerCase();
   try {
     const accessToken = await getAppOnlyGraphToken();
     const controller = new AbortController();
@@ -137,6 +137,8 @@ export async function sendSystemEmail(
 // Email sending function
 export async function sendNotificationEmail(notification: EmailNotification, disableClickTracking: boolean = true): Promise<boolean> {
   const startTime = Date.now();
+  const senderEmail = notification.fromEmail?.trim().toLowerCase() || PUBLIC_TRANSACTIONAL_EMAIL;
+  const senderName = notification.fromName || PUBLIC_TRANSACTIONAL_NAME;
   
   try {
     // MASTER MESSAGING TOGGLE CHECK (Dec 16, 2025)
@@ -168,6 +170,7 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
         notification.subject,
         graphHtml,
         notification.attachments,
+        senderEmail,
       );
       if (graphSent) return true;
       console.warn('⚠️ [GRAPH-SYSTEM] Graph delivery failed; using temporary SendGrid fallback');
@@ -181,14 +184,11 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
     
     // Try to get SendGrid client from Replit connector first, fallback to env var
     let sendGridClient;
-    let fromEmail = 'deals@catalyst.landlinq.ai';
-    
     try {
       console.log('📧 [SENDGRID] Attempting to use Replit SendGrid Connector...');
       const connectorClient = await getSendGridClient();
       sendGridClient = connectorClient.client;
-      fromEmail = connectorClient.fromEmail;
-      console.log('✅ [SENDGRID] Using Replit connector with from:', fromEmail);
+      console.log('✅ [SENDGRID] Using Replit connector; transactional sender:', senderEmail);
     } catch (connectorError) {
       console.log('⚠️ [SENDGRID] Connector failed, trying environment variable...');
       console.log('   Connector error:', connectorError instanceof Error ? connectorError.message : String(connectorError));
@@ -228,10 +228,10 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
       msg = {
         to: notification.to,
         from: {
-          email: notification.fromEmail || fromEmail,
-          name: notification.fromName || 'Catalyst Acquisitions'
+          email: senderEmail,
+          name: senderName
         },
-        replyTo: 'acquisitions@catalystcp.com',
+        replyTo: senderEmail,
         templateId: notification.sendgridTemplateId,
         dynamicTemplateData: notification.sendgridDynamicData || {}
       };
@@ -274,10 +274,10 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
       msg = {
         to: notification.to,
         from: {
-          email: notification.fromEmail || fromEmail,
-          name: notification.fromName || 'Catalyst Acquisitions'
+          email: senderEmail,
+          name: senderName
         },
-        replyTo: notification.fromEmail || 'acquisitions@catalystcp.com',
+        replyTo: senderEmail,
         subject: notification.subject,
         // SendGrid requires text/plain FIRST, then text/html
         content: [
