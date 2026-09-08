@@ -1,0 +1,284 @@
+Replace the content of client/src/pages/privacy.tsx and client/src/pages/terms.tsx 
+with the substantially expanded versions below. Keep the exact same component 
+structure, imports, and Tailwind className patterns already used in these files 
+(Navigation, Footer, the same h1/h2/p classes) — only the content inside the 
+<div className="prose..."> block changes. Add new <section> blocks following the 
+same pattern as the existing ones.
+
+=== client/src/pages/privacy.tsx — new content ===
+
+<h1>Privacy Policy</h1>
+
+<section>
+<h2>Overview</h2>
+<p>This Privacy Policy describes how LandLinq ("LandLinq," "we," "us") collects, 
+uses, and shares information in connection with our platform, which provides deal 
+sourcing, screening, CRM, outreach, and pipeline management tools for real estate 
+investment companies and other business teams.</p>
+</section>
+
+<section>
+<h2>Information We Collect</h2>
+<p><strong>Information you provide directly:</strong> When you create an account, 
+we collect your name, email address, phone number, and role. Investment Companies 
+and other organizations using the platform provide additional information, 
+including acquisition criteria, target markets, branding assets, and contact lists 
+they upload for use in the platform's CRM and outreach tools.</p>
+<p><strong>Information about third parties you provide to us:</strong> If you 
+upload contacts (such as brokers, architects, contractors, or property owners) into 
+the platform's CRM, that information may include names, email addresses, phone 
+numbers, and business affiliations of individuals who are not LandLinq users 
+themselves. If you are one of these individuals and have questions about your 
+information, see "Your Rights and Choices" below.</p>
+<p><strong>Deal and property information:</strong> We collect property details, 
+pricing, and related documents submitted through the platform, forwarded by email, 
+or obtained through automated processing of emails sent to our deal-intake 
+addresses (such as deals@landlinq.ai).</p>
+<p><strong>Connected account information:</strong> If you connect a third-party 
+email account (such as Microsoft Outlook) to use our outreach features, we access 
+only the permissions you explicitly grant during that connection, used solely to 
+send outreach messages on your behalf and, where applicable, read associated 
+delivery status.</p>
+<p><strong>Usage and technical information:</strong> We automatically collect 
+certain technical information, including IP address, browser type, device 
+information, and how you interact with the platform.</p>
+</section>
+
+<section>
+<h2>How We Use Your Information</h2>
+<p>We use collected information to provide and improve our services, including 
+to:</p>
+<ul>
+<li>Create and manage accounts and Investment Company profiles</li>
+<li>Automatically extract and classify property and deal information from 
+submitted or forwarded emails, including through the use of artificial 
+intelligence and automated parsing tools. Automated classification results are 
+provided as a screening aid and do not constitute a final determination — see our 
+Terms of Service for more on the limitations of automated processing.</li>
+<li>Match rent and market comparable data to properties</li>
+<li>Enable outreach messaging sent by you or on your behalf through connected 
+accounts</li>
+<li>Communicate with you about your account, deals, or platform updates</li>
+<li>Maintain platform security and prevent misuse</li>
+<li>Analyze and improve platform performance</li>
+</ul>
+</section>
+
+<section>
+<h2>Information Sharing</h2>
+<p>We do not sell your personal information.</p>
+<p>We may share information with:</p>
+<ul>
+<li><strong>Service providers</strong> who help us operate the platform, including 
+providers of AI-based email and document processing, property and market data 
+providers, email delivery and hosting infrastructure, and geocoding services. These 
+providers are authorized to use information only as necessary to provide services 
+to us.</li>
+<li><strong>Other LandLinq team members</strong>, for deal evaluation, platform 
+administration, and support purposes.</li>
+<li><strong>Legal and safety purposes</strong>, where required by law, subpoena, 
+or other legal process, or to protect the rights, property, or safety of LandLinq, 
+our users, or others.</li>
+</ul>
+<p><strong>Investment Company data isolation:</strong> Information associated with 
+one Investment Company's account — including their acquisition criteria, contacts, 
+and outreach activity — is kept isolated from other Investment Companies using the 
+platform and is not shared between them.</p>
+</section>
+
+<section>
+<h2>Cookies and Tracking Technologies</h2>
+<p>We use cookies and similar technologies to maintain login sessions, remember 
+preferences, and understand platform usage. Outreach emails sent through the 
+platform may include technologies that indicate whether a message was opened or a 
+link was clicked, used to provide delivery and engagement analytics to the sending 
+Investment Company.</p>
+</section>
+
+<section>
+<h2>Data Retention</h2>
+<p>We retain information for as long as necessary to provide our services, comply 
+with legal obligations, resolve disputes, and enforce our agreements. Retention 
+periods may vary depending on the type of information and the nature of the 
+relationship with LandLinq.</p>
+</section>
+
+<section>
+<h2>Your Rights and Choices</h2>
+<p>Depending on your location and relationship to LandLinq, you may have the right 
+to request access to, correction of, or deletion of your personal information. If 
+your information was uploaded to the platform by an Investment Company or other 
+organization as part of their contact list, please contact us at help@landlinq.ai, 
+and we will work with the relevant organization to address your request.</p>
+<p>You may opt out of non-essential email communications using the unsubscribe 
+link included in such communications, where applicable.</p>
+</section>
+
+<section>
+<h2>Data Security</h2>
+<p>We implement reasonable administrative, technical, and physical safeguards 
+designed to protect personal information against unauthorized access, alteration, 
+disclosure, or destruction. No method of transmission or storage is completely 
+secure, and we cannot guarantee absolute security.</p>
+</section>
+
+<section>
+<h2>Children's Privacy</h2>
+<p>LandLinq is not directed to individuals under the age of 18, and we do not 
+knowingly collect personal information from children.</p>
+</section>
+
+<section>
+<h2>Changes to This Policy</h2>
+<p>We may update this Privacy Policy from time to time. We will indicate the date 
+of the most recent revision, and material changes will be communicated as 
+appropriate.</p>
+</section>
+
+<section>
+<h2>Contact Us</h2>
+<p>If you have questions about this Privacy Policy, please contact us at{' '}
+<a href="mailto:help@landlinq.ai">help@landlinq.ai</a>.</p>
+</section>
+
+=== client/src/pages/terms.tsx — new content ===
+
+<h1>Terms of Service</h1>
+
+<section>
+<h2>Acceptance of Terms</h2>
+<p>By accessing or using LandLinq (the "Platform"), you agree to be bound by these 
+Terms of Service. If you are using the Platform on behalf of an organization, you 
+represent that you have the authority to bind that organization to these terms.</p>
+</section>
+
+<section>
+<h2>Description of Service</h2>
+<p>LandLinq provides a platform for real estate deal sourcing and screening, 
+customer relationship management (CRM), outreach messaging, and sales pipeline 
+tracking. The Platform is used both by real estate investment companies for 
+acquisition-related workflows and by other business teams for general CRM, 
+outreach, and pipeline management. Deals and property information may be submitted 
+directly, forwarded by email, or identified through automated processing of 
+inbound communications.</p>
+</section>
+
+<section>
+<h2>Accounts and Access</h2>
+<p>You are responsible for maintaining the confidentiality of your account 
+credentials and for all activity that occurs under your account. Investment 
+Company and organization accounts may include multiple individual users, each of 
+whom is bound by these terms.</p>
+</section>
+
+<section>
+<h2>Connected Third-Party Accounts and Outreach</h2>
+<p>The Platform allows you to connect your own third-party email account (such as 
+Microsoft Outlook) to send outreach messages on your behalf. By connecting an 
+account, you authorize LandLinq to send messages and access related information 
+solely as necessary to provide this functionality. You remain solely responsible 
+for the content of messages sent through your connected account and for compliance 
+with applicable law, including the CAN-SPAM Act and similar regulations governing 
+commercial email. You may disconnect a connected account at any time through your 
+account settings.</p>
+</section>
+
+<section>
+<h2>Property and Deal Submissions</h2>
+<p>By submitting property or deal information — whether directly, by forwarding an 
+email, or through any other means made available on the Platform — you represent 
+that you have the right to submit such information and that it is accurate to the 
+best of your knowledge.</p>
+</section>
+
+<section>
+<h2>Automated Processing and AI-Generated Information</h2>
+<p>The Platform uses automated tools, including artificial intelligence, to 
+extract, classify, and screen property and deal information from submitted or 
+forwarded content. Automated results are provided as a screening aid only and may 
+contain errors or omissions. LandLinq does not guarantee the accuracy, 
+completeness, or reliability of any automatically extracted or classified 
+information, and you are solely responsible for independently verifying any 
+information before relying on it for a business, financial, or transactional 
+decision.</p>
+</section>
+
+<section>
+<h2>Commission Structure and Brokerage Services</h2>
+<p>Where applicable, real estate brokerage services in connection with deals 
+identified through the Platform are provided by Apex Residential, LLC, a licensed 
+real estate brokerage, under separate commission and brokerage agreements. 
+Commission rates and terms are governed by those agreements and are not altered by 
+these Terms of Service.</p>
+</section>
+
+<section>
+<h2>Data and Content Ownership</h2>
+<p>As between you and LandLinq, you retain ownership of the acquisition criteria, 
+contact lists, and other content you upload to the Platform. You grant LandLinq a 
+license to use this content solely as necessary to provide the Platform's 
+services to you. LandLinq owns all rights to the Platform itself, including its 
+underlying technology, classification systems, and branding.</p>
+</section>
+
+<section>
+<h2>Acceptable Use</h2>
+<p>You agree to use the Platform only for lawful purposes and in accordance with 
+these terms. You may not use the Platform to send unsolicited or unlawful 
+communications, to access another user's or organization's data without 
+authorization, or to interfere with the Platform's operation or security.</p>
+</section>
+
+<section>
+<h2>Termination</h2>
+<p>LandLinq may suspend or terminate your access to the Platform for violation of 
+these terms or for other reasonable business purposes. You may stop using the 
+Platform at any time; certain obligations under these terms will survive 
+termination.</p>
+</section>
+
+<section>
+<h2>Disclaimer of Warranties</h2>
+<p>THE PLATFORM IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTIES OF ANY 
+KIND, WHETHER EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS 
+FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. LANDLINQ DOES NOT WARRANT THAT THE 
+PLATFORM WILL BE UNINTERRUPTED, ERROR-FREE, OR THAT ANY DEAL OR MARKET DATA 
+PROVIDED THROUGH THE PLATFORM IS ACCURATE OR COMPLETE.</p>
+</section>
+
+<section>
+<h2>Limitation of Liability</h2>
+<p>To the maximum extent permitted by law, LandLinq shall not be liable for any 
+indirect, incidental, special, consequential, or punitive damages, or any loss of 
+profits or revenue, arising from your use of the Platform, including reliance on 
+any automatically classified or AI-generated information.</p>
+</section>
+
+<section>
+<h2>Indemnification</h2>
+<p>You agree to indemnify and hold LandLinq harmless from any claims, damages, or 
+expenses arising from your use of the Platform, your violation of these terms, or 
+content you submit or send through the Platform, including outreach messages sent 
+through your connected email account.</p>
+</section>
+
+<section>
+<h2>Governing Law</h2>
+<p>These terms are governed by the laws of the State of North Carolina, without 
+regard to conflict of law principles.</p>
+</section>
+
+<section>
+<h2>Changes to These Terms</h2>
+<p>We may update these Terms of Service from time to time. Continued use of the 
+Platform after changes take effect constitutes acceptance of the revised terms.</p>
+</section>
+
+<section>
+<h2>Contact Information</h2>
+<p>For questions about these Terms of Service, please contact us at{' '}
+<a href="mailto:help@landlinq.ai">help@landlinq.ai</a> or (888) 486-6346.</p>
+</section>
+
+Verify: confirm both pages render correctly with proper spacing/formatting matching 
+the existing visual style, and confirm all links (mailto:help@landlinq.ai) work.
