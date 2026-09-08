@@ -12310,7 +12310,19 @@ RULES:
       const imageType = identifySafeRasterImage(req.file.buffer);
       if (!imageType) return res.status(400).json({ error: "The uploaded file is not a valid PNG, JPG, or WebP image" });
       const filename = `investment-company-logos/${Date.now()}-${randomBytes(6).toString("hex")}${imageType.extension}`;
-      const logoUrl = await new ObjectStorageService().uploadPublicAsset(req.file.buffer, filename, imageType.contentType);
+      let logoUrl: string;
+      try {
+        logoUrl = await new ObjectStorageService().uploadPublicAsset(req.file.buffer, filename, imageType.contentType);
+      } catch (storageError: any) {
+        if (!String(storageError?.message || "").includes("Object storage not configured")) {
+          throw storageError;
+        }
+        // Company logos must still persist when a Replit public object bucket has
+        // not been provisioned. PostgreSQL varchar columns accept unbounded text,
+        // and browsers can render this value directly as an image source.
+        logoUrl = `data:${imageType.contentType};base64,${req.file.buffer.toString("base64")}`;
+        console.warn("[admin investment company logo] Public Object Storage is not configured; using database-backed image data.");
+      }
       return res.status(201).json({ logoUrl });
     } catch (error: any) {
       console.error("[admin investment company logo] Error:", error);
