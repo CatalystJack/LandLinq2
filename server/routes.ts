@@ -13173,6 +13173,60 @@ RULES:
     }
   });
 
+  app.post("/api/developer-profile/me/pipeline/stages/reorder", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const stageIds = req.body?.stageIds;
+      if (
+        !Array.isArray(stageIds) ||
+        stageIds.length === 0 ||
+        stageIds.some((id: unknown) => typeof id !== "string" || !id.trim()) ||
+        new Set(stageIds).size !== stageIds.length
+      ) {
+        return res.status(400).json({ error: "A unique ordered list of stage IDs is required" });
+      }
+
+      const stages = await db.transaction(async (tx) => {
+        const ownedStages = await tx.select({ id: pipelineStages.id })
+          .from(pipelineStages)
+          .where(eq(pipelineStages.developerProfileId, developerProfileId));
+        const ownedIds = new Set(ownedStages.map((stage) => stage.id));
+
+        if (
+          ownedStages.length !== stageIds.length ||
+          stageIds.some((id: string) => !ownedIds.has(id))
+        ) {
+          const error: any = new Error("Stage order must include every stage in this pipeline exactly once");
+          error.status = 400;
+          throw error;
+        }
+
+        for (const [index, stageId] of stageIds.entries()) {
+          const [updated] = await tx.update(pipelineStages)
+            .set({ sortOrder: index + 1 })
+            .where(and(
+              eq(pipelineStages.id, stageId),
+              eq(pipelineStages.developerProfileId, developerProfileId),
+            ))
+            .returning({ id: pipelineStages.id });
+          if (!updated) throw new Error("Pipeline stage disappeared during reorder");
+        }
+
+        return tx.select().from(pipelineStages)
+          .where(eq(pipelineStages.developerProfileId, developerProfileId))
+          .orderBy(sql`${pipelineStages.sortOrder} ASC, ${pipelineStages.name} ASC`);
+      });
+
+      return res.json({ stages });
+    } catch (error: any) {
+      console.error("[developer pipeline stages reorder POST] Error:", error);
+      return res.status(error.status || 500).json({ error: error.message || "Failed to reorder pipeline stages" });
+    }
+  });
+
   app.patch("/api/developer-profile/me/pipeline/stages/:id", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
@@ -13345,6 +13399,27 @@ RULES:
     } catch (error: any) {
       console.error("[developer pipeline opportunities PATCH] Error:", error);
       return res.status(500).json({ error: "Failed to update pipeline opportunity" });
+    }
+  });
+
+  app.delete("/api/developer-profile/me/pipeline/opportunities/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const deleted = await db.delete(pipelineOpportunities)
+        .where(and(
+          eq(pipelineOpportunities.id, req.params.id),
+          eq(pipelineOpportunities.developerProfileId, developerProfileId),
+        ))
+        .returning({ id: pipelineOpportunities.id });
+      if (!deleted.length) return res.status(404).json({ error: "Pipeline opportunity not found" });
+
+      return res.json({ success: true });
+    } catch (error: any) {
+      console.error("[developer pipeline opportunities DELETE] Error:", error);
+      return res.status(500).json({ error: "Failed to delete pipeline opportunity" });
     }
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import {
   ArrowRight,
@@ -126,6 +126,66 @@ function PipelineMockup() {
   return <ContactDetailMockup />;
 }
 
+const heroStats = [
+  { value: 18000, format: (value: number) => `${Math.round(value).toLocaleString()}+`, label: "Units developed" },
+  { value: 12, format: (value: number) => Math.round(value).toLocaleString(), label: "Projects under development" },
+  { value: 1.5, format: (value: number) => `$${value.toFixed(1)}B`, label: "In development" },
+  { value: 5.5, format: (value: number) => `$${value.toFixed(1)}B`, label: "In real estate transactions" },
+];
+
+function HeroStats() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setProgress(1);
+      return;
+    }
+
+    let animationFrame = 0;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      observer.disconnect();
+      const startedAt = performance.now();
+      const duration = 1800;
+
+      const animate = (now: number) => {
+        const elapsed = Math.min((now - startedAt) / duration, 1);
+        const eased = 1 - Math.pow(1 - elapsed, 3);
+        setProgress(eased);
+        if (elapsed < 1) animationFrame = requestAnimationFrame(animate);
+      };
+
+      animationFrame = requestAnimationFrame(animate);
+    }, { threshold: 0.25 });
+
+    observer.observe(section);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(animationFrame);
+    };
+  }, []);
+
+  return (
+    <section ref={sectionRef} className="ll-hero-stats" aria-label="LandLinq development statistics">
+      <div className="mx-auto grid max-w-7xl sm:grid-cols-2 lg:grid-cols-4">
+        {heroStats.map((stat) => (
+          <div className="ll-hero-stat" key={stat.label}>
+            <strong style={{ transform: `scale(${0.78 + progress * 0.22})` }}>
+              {stat.format(stat.value * progress)}
+            </strong>
+            <p>{stat.label}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function MarketingHome() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -176,26 +236,7 @@ export default function MarketingHome() {
           </div>
         </section>
 
-        <section className="ll-hero-stats" aria-label="LandLinq development statistics">
-          <div className="mx-auto grid max-w-7xl sm:grid-cols-2 lg:grid-cols-4">
-            <div className="ll-hero-stat">
-              <strong>18,000<span>+</span></strong>
-              <p>Units developed</p>
-            </div>
-            <div className="ll-hero-stat">
-              <strong>12</strong>
-              <p>Projects under development</p>
-            </div>
-            <div className="ll-hero-stat">
-              <strong><span>$</span>1.5B</strong>
-              <p>In development</p>
-            </div>
-            <div className="ll-hero-stat">
-              <strong><span>$</span>5.5B</strong>
-              <p>In real estate transactions</p>
-            </div>
-          </div>
-        </section>
+        <HeroStats />
 
          <section id="workflow" data-reveal className="ll-scroll-reveal ll-focus-section px-5 py-24 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-7xl"><div className="ll-focus-intro"><div><div className="ll-focus-kicker">A QUIETER OPERATING RHYTHM</div><h2 className="text-4xl font-semibold leading-[1.02] tracking-[-0.05em] sm:text-6xl">Your funnel is wide.<br /><em>Your attention should not be.</em></h2></div><p className="mt-7 max-w-xl text-lg leading-8 text-muted-foreground">Manual screening, one-off follow-up, and disconnected deal notes make good opportunities easy to miss. LandLinq gives every lead a path forward.</p></div></div></section>
 

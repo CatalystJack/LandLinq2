@@ -1,0 +1,34 @@
+Fix four issues in the Pipeline feature (client/src/pages/developer-pipeline.tsx 
+and its backend routes).
+
+TASK 1 — Add the ability to delete an individual opportunity
+Add DELETE /api/developer-profile/me/pipeline/opportunities/:id (isAuthenticated, 
+scoped via the existing getDeveloperProfileId helper — verify the opportunity 
+belongs to the caller's own profile before deleting). Add a delete button (trash 
+icon) to each row in the opportunities table, with a confirmation prompt before 
+deleting (a simple browser confirm() is fine, or use the existing AlertDialog 
+component if one is already used elsewhere in the app for this pattern).
+
+TASK 2 — Make stage reordering atomic
+Replace the two independent PATCH calls in moveStage() with a single new endpoint: 
+POST /api/developer-profile/me/pipeline/stages/reorder, accepting an array of stage 
+IDs in their new order. The backend should update all sortOrder values in a single 
+database transaction, so a partial failure can't leave stages in an inconsistent 
+state. Update moveStage() to compute the new full order and call this single 
+endpoint instead of two separate PATCH requests.
+
+TASK 3 — Add a confirmation before deleting a stage
+In the "Manage Pipeline Stages" dialog, wrap the delete-stage button's action in a 
+confirmation dialog (reuse the same AlertDialog/confirm pattern as Task 1) before 
+calling deleteStageMutation.
+
+TASK 4 — Indicate when contact search results are truncated
+In the "New Opportunity" dialog's contact search, if filteredContacts.length > 100, 
+show a small note below the dropdown: "Showing first 100 of X matching contacts — 
+refine your search to narrow results."
+
+Verify: delete an opportunity and confirm it's actually removed from the list; 
+reorder three or more stages rapidly and confirm the final order is always correct 
+and consistent; confirm deleting a stage now requires confirmation; search for a 
+contact with more than 100 matches (or simulate this) and confirm the truncation 
+note appears.

@@ -1738,7 +1738,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 
 .ll-hero-stats {
   border-bottom: 1px solid rgba(16,40,61,.14);
-  background: #f4f8fa;
+  background: #fff;
   padding: 0 1.25rem;
 }
 .ll-hero-stat {
@@ -1752,14 +1752,18 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   border-top: 1px solid rgba(16,40,61,.14);
 }
 .ll-hero-stat strong {
+  display: inline-block;
+  align-self: flex-start;
   color: #10283d;
   font-size: clamp(2.4rem, 5vw, 4.5rem);
   font-weight: 650;
   letter-spacing: -.065em;
   line-height: .95;
+  transform-origin: left bottom;
+  will-change: transform;
 }
 .ll-hero-stat strong span {
-  color: #3286c8;
+  color: inherit;
 }
 .ll-hero-stat p {
   margin-top: .75rem;
