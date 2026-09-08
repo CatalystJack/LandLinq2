@@ -2726,8 +2726,28 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     '/developer/analytics',
     '/developer/user-management',
     '/developer/settings',
+    '/outreach-onboarding',
     '/reset-password',
   ]);
+  const DEVELOPER_OAUTH_FALLBACK_PATH = '/outreach-onboarding';
+  const getSafeDeveloperOAuthReturnUrl = (returnUrl: unknown): string => {
+    if (typeof returnUrl !== 'string' || !returnUrl.trim()) {
+      return DEVELOPER_OAUTH_FALLBACK_PATH;
+    }
+
+    try {
+      const parsed = new URL(returnUrl, 'https://landlinq.ai');
+      if (
+        parsed.origin !== 'https://landlinq.ai' ||
+        !DEVELOPER_ALLOWED_PAGE_PATHS.has(parsed.pathname)
+      ) {
+        return DEVELOPER_OAUTH_FALLBACK_PATH;
+      }
+      return parsed.pathname;
+    } catch {
+      return DEVELOPER_OAUTH_FALLBACK_PATH;
+    }
+  };
   const getDeveloperHomePath = async (user: any) => {
     if (user?.developerProfile?.profileType === 'general_sales') {
       return '/developer/crm';
@@ -29473,7 +29493,7 @@ RULES:
         `);
         const ownedSender = senderCheck.rows?.[0] as any;
         if (!ownedSender) return res.status(404).json({ error: 'Sender not found' });
-        returnUrl = `/developer/${ownedSender.slug}/outreach`;
+        returnUrl = DEVELOPER_OAUTH_FALLBACK_PATH;
       }
 
       // Check if required env vars are set
@@ -29557,22 +29577,28 @@ RULES:
         stateData = developerMicrosoftOAuthStates.get(token);
         developerMicrosoftOAuthStates.delete(token);
         if (!stateData || stateData.expiresAt < Date.now()) {
-          return res.redirect('/?error=oauth_state_invalid');
+          const invalidStatePath = String(req.user?.role || '').toUpperCase() === 'DEVELOPER'
+            ? DEVELOPER_OAUTH_FALLBACK_PATH
+            : '/';
+          return res.redirect(`${invalidStatePath}?error=oauth_state_invalid`);
         }
       } else {
         stateData = JSON.parse(Buffer.from(rawState, 'base64').toString());
         if (String(req.user?.role || '').toUpperCase() === 'DEVELOPER') {
-          return res.redirect('/?error=oauth_state_invalid');
+          return res.redirect(`${DEVELOPER_OAUTH_FALLBACK_PATH}?error=oauth_state_invalid`);
         }
       }
       const { senderId, returnUrl, developerProfileId } = stateData;
+      const callbackReturnUrl = developerProfileId
+        ? getSafeDeveloperOAuthReturnUrl(returnUrl)
+        : (returnUrl || '/');
       if (developerProfileId) {
         const callbackUser = (req as any).user;
         if (
           String(callbackUser?.role || '').toUpperCase() !== 'DEVELOPER'
           || callbackUser?.developerProfileId !== developerProfileId
         ) {
-          return res.redirect(`${returnUrl || '/'}?error=oauth_session_mismatch`);
+          return res.redirect(`${callbackReturnUrl}?error=oauth_session_mismatch`);
         }
       }
 
@@ -29588,7 +29614,7 @@ RULES:
       const redirectUri = `${protocol}://${host}/api/oauth/microsoft/callback`;
 
       if (!clientId || !clientSecret || !oauthAuthority) {
-        return res.redirect(`${returnUrl || '/outreach-onboarding'}?error=oauth_not_configured`);
+        return res.redirect(`${callbackReturnUrl}?error=oauth_not_configured`);
       }
 
       const tokenResponse = await fetch(`https://login.microsoftonline.com/${oauthAuthority}/oauth2/v2.0/token`, {
@@ -29627,10 +29653,10 @@ RULES:
       const senderRecord = senderResult.rows?.[0] as any;
       if (!senderRecord) {
         console.error(`❌ [OAUTH-ERROR] Sender not found in database: ${senderId}`);
-        return res.redirect(`${returnUrl || "/outreach-onboarding"}?error=sender_not_found&message=Sender+ID+no+longer+exists`);
+        return res.redirect(`${callbackReturnUrl}?error=sender_not_found&message=Sender+ID+no+longer+exists`);
       }
       if (developerProfileId && senderRecord.developer_profile_id !== developerProfileId) {
-        return res.redirect(`${returnUrl || '/'}?error=sender_not_owned`);
+        return res.redirect(`${callbackReturnUrl}?error=sender_not_owned`);
       }
       const senderEmail = senderRecord?.email?.toLowerCase() || '';
       const senderName = senderRecord?.name || 'Unknown';
@@ -29643,7 +29669,7 @@ RULES:
       if (senderEmail && microsoftEmail && senderEmail !== microsoftEmail) {
         console.error(`❌ [OAUTH-MISMATCH] Microsoft account email (${microsoftEmail}) does not match sender email (${senderEmail})`);
         console.error(`   Microsoft user: ${microsoftDisplayName}, Sender: ${senderName}`);
-        return res.redirect(`${returnUrl || '/outreach-onboarding'}?error=email_mismatch&expected=${encodeURIComponent(senderEmail)}&actual=${encodeURIComponent(microsoftEmail)}`);
+        return res.redirect(`${callbackReturnUrl}?error=email_mismatch&expected=${encodeURIComponent(senderEmail)}&actual=${encodeURIComponent(microsoftEmail)}`);
       }
 
       // Update sender with tokens
@@ -29662,9 +29688,7 @@ RULES:
 
       console.log(`✅ Microsoft Outlook connected for sender: ${senderId} (${microsoftEmail})`);
       // Always add success parameter to the redirect URL
-      const successUrl = returnUrl 
-        ? `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}success=outlook_connected`
-        : '/outreach-onboarding?success=outlook_connected';
+      const successUrl = `${callbackReturnUrl}?success=outlook_connected`;
       res.redirect(successUrl);
     } catch (error) {
       console.error('Error in Microsoft OAuth callback:', error);
