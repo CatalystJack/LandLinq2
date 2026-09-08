@@ -1,0 +1,43 @@
+Convert every remaining SendGrid dynamic-template email to locally-rendered HTML so 
+Microsoft Graph (help@landlinq.ai) can send all of them directly, closing the last 
+real gap keeping SendGrid in the outbound path.
+
+TASK 1 — Inventory every dynamic-template-dependent email
+List every caller identified in the earlier audit: server/dailyMorningReports.ts, 
+server/eventDispatch.ts, server/services/outreachService.ts, 
+server/emailAutomation.ts, server/backgroundJobProcessor.ts, 
+server/unifiedDealPipeline.ts, server/passwordReset.ts, plus any route-triggered 
+notification paths in server/routes.ts and built-in helpers in 
+server/emailService.ts. For each, identify the SendGrid template ID it currently 
+uses and what dynamic variables it passes in (sendgridDynamicData).
+
+TASK 2 — Render each template as local HTML
+For each identified template, build an equivalent HTML email (with the same 
+subject line and content, substituting in the same variables) directly in the 
+application — using whatever templating approach server/templateService.ts already 
+uses elsewhere, so this stays consistent with existing patterns rather than 
+introducing a new one.
+
+TASK 3 — Update each caller to pass rendered content instead of a template ID
+Change each caller to build { subject, html } directly and pass that to 
+sendNotificationEmail(), instead of passing sendgridTemplateId/sendgridDynamicData. 
+Since sendNotificationEmail() already tries Graph first whenever a rendered 
+subject/body exists, this alone routes these emails through Graph — no other 
+change needed to the sending logic itself.
+
+TASK 4 — Verify each converted email
+Send a real test of every converted email type (password reset, deal confirmation, 
+missing-info notice, greenlight/rejection, morning report, and any others found in 
+Task 1) and confirm each one now sends via Microsoft Graph from help@landlinq.ai, 
+not SendGrid — check server logs/api_call_logs to confirm which path was actually 
+used for each.
+
+TASK 5 — Report anything that doesn't convert cleanly
+If any specific template relies on a SendGrid-only feature with no reasonable 
+equivalent (e.g. their built-in A/B testing or something similarly SendGrid- 
+specific), report that clearly rather than forcing an incomplete conversion — flag 
+it as a real tradeoff to decide on, not something to silently skip.
+
+Do not touch deals@landlinq.ai's inbound SendGrid webhook (POST /api/inbound-email) 
+— that's a separate, intentional use of SendGrid for receiving mail, unrelated to 
+this outbound conversion, and should remain untouched.
