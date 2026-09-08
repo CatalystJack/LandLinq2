@@ -2405,6 +2405,15 @@ export default function AnalystDashboard() {
           };
         }
       );
+
+      if (field === 'classification') {
+        void queryClient.invalidateQueries({
+          predicate: (query) => {
+            const root = query.queryKey[0];
+            return root === '/api/deals' || root === '/api/analyst/deals';
+          },
+        });
+      }
       
       console.log('🔄 Optimized query cache update completed for cellUpdateMutation');
     },
@@ -6239,10 +6248,10 @@ export default function AnalystDashboard() {
           ) : viewMode === 'cards' ? (
           (() => {
             const pipelineGroups = [
-              { keys: ['high_priority', 'green'], label: 'High Priority', accentColor: '#16a34a', lightBg: '#f0fdf4', badgeBg: '#dcfce7', badgeText: '#15803d', barColor: '#22c55e', dotColor: 'bg-emerald-500' },
-              { keys: ['yellow', 'potential'],    label: 'Potential',     accentColor: '#ca8a04', lightBg: '#fefce8', badgeBg: '#fef9c3', badgeText: '#a16207', barColor: '#eab308', dotColor: 'bg-amber-400' },
-              { keys: ['red', 'clear_no'],        label: 'Clear No',      accentColor: '#dc2626', lightBg: '#fff7f7', badgeBg: '#fee2e2', badgeText: '#b91c1c', barColor: '#ef4444', dotColor: 'bg-red-500' },
-              { keys: ['unclassified', null, undefined, ''], label: 'Unclassified', accentColor: '#6b7280', lightBg: '#f9fafb', badgeBg: '#f3f4f6', badgeText: '#374151', barColor: '#9ca3af', dotColor: 'bg-gray-400' },
+              { keys: ['high_priority', 'green'], classification: 'green', label: 'High Priority', accentColor: '#16a34a', lightBg: '#f0fdf4', badgeBg: '#dcfce7', badgeText: '#15803d', barColor: '#22c55e', dotColor: 'bg-emerald-500' },
+              { keys: ['yellow', 'potential'], classification: 'yellow', label: 'Potential', accentColor: '#ca8a04', lightBg: '#fefce8', badgeBg: '#fef9c3', badgeText: '#a16207', barColor: '#eab308', dotColor: 'bg-amber-400' },
+              { keys: ['red', 'clear_no'], classification: 'red', label: 'Clear No', accentColor: '#dc2626', lightBg: '#fff7f7', badgeBg: '#fee2e2', badgeText: '#b91c1c', barColor: '#ef4444', dotColor: 'bg-red-500' },
+              { keys: ['unclassified', null, undefined, ''], classification: 'unclassified', label: 'Unclassified', accentColor: '#6b7280', lightBg: '#f9fafb', badgeBg: '#f3f4f6', badgeText: '#374151', barColor: '#9ca3af', dotColor: 'bg-gray-400' },
             ];
 
             // Search filter
@@ -6277,16 +6286,16 @@ export default function AnalystDashboard() {
             };
 
             const classifyDeal = (deal: DealWithBroker, classification: string) => {
-              if ((deal.classification || 'unclassified') === classification) return;
+              if (canonicalClassification(deal.classification as string | null | undefined) === classification) return;
               cellUpdateMutation.mutate({
                 dealId: deal.id,
                 classification,
               });
             };
             const canonicalClassification = (classification?: string | null) =>
-              classification === 'green' ? 'high_priority'
-                : classification === 'yellow' ? 'potential'
-                : classification === 'red' ? 'clear_no'
+              classification === 'high_priority' ? 'green'
+                : classification === 'potential' ? 'yellow'
+                : classification === 'clear_no' ? 'red'
                 : classification || 'unclassified';
 
             const counts = pipelineGroups.map(group =>
@@ -6332,18 +6341,18 @@ export default function AnalystDashboard() {
                   <div className="flex min-w-[1020px] items-stretch gap-3">
                     {pipelineGroups.map(group => {
                       const groupDeals = sortDeals(filteredDeals.filter(d => group.keys.includes((d.classification || 'unclassified') as never)));
-                      const isOver = pipelineDragOverColumn === group.keys[0];
+                      const isOver = pipelineDragOverColumn === group.classification;
                       const totalAsk = groupDeals.reduce((sum, deal) => sum + Number(deal.askingPrice || 0), 0);
                       return (
                         <div
                           key={group.label}
-                          onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setPipelineDragOverColumn(group.keys[0] as string); }}
-                          onDragEnter={e => { e.preventDefault(); setPipelineDragOverColumn(group.keys[0] as string); }}
+                          onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setPipelineDragOverColumn(group.classification); }}
+                          onDragEnter={e => { e.preventDefault(); setPipelineDragOverColumn(group.classification); }}
                           onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPipelineDragOverColumn(null); }}
                           onDrop={e => {
                             e.preventDefault();
                             const deal = pipelineDeals.find(d => d.id === (e.dataTransfer.getData('text/plain') || pipelineDragDealId));
-                            if (deal) classifyDeal(deal, group.keys[0] as string);
+                            if (deal) classifyDeal(deal, group.classification);
                             setPipelineDragDealId(null);
                             setPipelineDragOverColumn(null);
                           }}
@@ -6411,9 +6420,9 @@ export default function AnalystDashboard() {
                                     onChange={e => { e.stopPropagation(); classifyDeal(deal, e.target.value); }}
                                     className="h-7 min-w-0 flex-1 rounded border border-[#dbe2ea] bg-[#fbfcfd] px-2 text-[10px] font-medium text-[#526176] outline-none focus:border-[#4A90E2]"
                                   >
-                                    <option value="high_priority">High Priority</option>
-                                    <option value="potential">Potential</option>
-                                    <option value="clear_no">Clear No</option>
+                                    <option value="green">High Priority</option>
+                                    <option value="yellow">Potential</option>
+                                    <option value="red">Clear No</option>
                                     <option value="unclassified">Unclassified</option>
                                   </select>
                                   <button type="button" onClick={e => { e.stopPropagation(); setPipelinePanel(deal); }} className="rounded px-2 py-1 text-[10px] font-semibold text-[#4A90E2] hover:bg-[#edf5ff]">View</button>

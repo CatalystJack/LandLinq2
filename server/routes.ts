@@ -9591,6 +9591,26 @@ Provide your analysis in this exact JSON format:
       if (!deal) {
         return res.status(404).json({ message: "Deal not found" });
       }
+
+      if ('classification' in updateData) {
+        const allowedClassifications = new Set([
+          'green',
+          'yellow',
+          'red',
+          'unclassified',
+          'lost',
+          'dead',
+          'high_priority',
+          'potential',
+          'clear_no',
+        ]);
+        if (
+          updateData.classification !== null &&
+          !allowedClassifications.has(updateData.classification)
+        ) {
+          return res.status(400).json({ message: "Invalid deal classification" });
+        }
+      }
       
       // DEAL TYPE CHANGE DETECTION: Clear rejection reason and reset classification
       // When switching between Land <-> Acquisition, the old rejection reasons don't apply
