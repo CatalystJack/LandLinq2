@@ -1118,18 +1118,14 @@ class BackgroundJobProcessor {
             });
             
             if (emailTemplate) {
-              // CRITICAL: Pass sendgridTemplateId for dynamic templates
               console.log(`📧 [QUICK-DEAL-ENRICHMENT] Sending ${eventType} email to ${broker.email}...`);
               await sendNotificationEmail({
                 to: broker.email,
                 subject: emailTemplate.subject,
                 html: emailTemplate.html,
                 type: eventType,
-                sendgridTemplateId: emailTemplate.sendgridTemplateId,
-                sendgridDynamicData: emailTemplate.sendgridDynamicData,
               });
-              const templateMode = emailTemplate.sendgridTemplateId ? `SendGrid (${emailTemplate.sendgridTemplateId})` : 'Outreach Tab';
-              console.log(`✅ [QUICK-DEAL-ENRICHMENT] Classification email sent via ${templateMode} to broker: ${broker.email}`);
+              console.log(`✅ [QUICK-DEAL-ENRICHMENT] Classification email sent via locally-rendered HTML to broker: ${broker.email}`);
 
               // Log to communications table so analysts can audit notification history
               try {

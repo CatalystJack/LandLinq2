@@ -18227,7 +18227,7 @@ RULES:
         }
       });
       
-      // FIX (Jan 22, 2026): Send deal_submitted confirmation email immediately (using SendGrid template)
+      // FIX (Jan 22, 2026): Send deal_submitted confirmation email immediately.
       try {
         const broker = brokerId ? await storage.getBrokerById(brokerId) : null;
         const isManualBroker = broker?.email === 'manual@catalystcp.com';
@@ -18248,17 +18248,13 @@ RULES:
           });
           
           if (emailTemplate) {
-            // CRITICAL: Pass sendgridTemplateId for dynamic templates
             await sendNotificationEmail({
               to: broker.email,
               subject: emailTemplate.subject,
               html: emailTemplate.html,
               type: 'deal_submitted',
-              sendgridTemplateId: emailTemplate.sendgridTemplateId,
-              sendgridDynamicData: emailTemplate.sendgridDynamicData,
             });
-            const templateMode = emailTemplate.sendgridTemplateId ? `SendGrid (${emailTemplate.sendgridTemplateId})` : 'Outreach Tab';
-            console.log(`✅ [QUICK-DEAL] Confirmation email sent via ${templateMode} to: ${broker.email}`);
+            console.log(`✅ [QUICK-DEAL] Confirmation email sent via locally-rendered HTML to: ${broker.email}`);
           } else {
             console.log(`⚠️ [QUICK-DEAL] No email template found for deal_submitted event`);
           }

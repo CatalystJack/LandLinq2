@@ -19,9 +19,6 @@ export interface EmailNotification {
   attachments?: EmailAttachment[];
   fromEmail?: string; // Optional override for the sender address
   fromName?: string;  // Optional override for the sender display name
-  // SendGrid Dynamic Template support
-  sendgridTemplateId?: string; // SendGrid template ID (d-xxxxx format)
-  sendgridDynamicData?: Record<string, unknown>; // Variables to pass to SendGrid template
 }
 
 export interface SMSParams {

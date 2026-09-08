@@ -1,34 +1,6 @@
 import { TemplateEvent, EmailTemplate, SMSTemplate } from '@shared/schema';
 import { storage } from './storage';
 
-// Helper: Sanitize dynamic template data for SendGrid
-// Converts Dates and complex objects to JSON-serializable primitives
-function sanitizeDynamicTemplateData(data: Record<string, any>): Record<string, any> {
-  const sanitized: Record<string, any> = {};
-  
-  for (const [key, value] of Object.entries(data)) {
-    if (value === null || value === undefined) {
-      sanitized[key] = '';
-    } else if (value instanceof Date) {
-      sanitized[key] = value.toISOString();
-    } else if (typeof value === 'object' && !Array.isArray(value)) {
-      // Flatten nested objects to strings
-      sanitized[key] = JSON.stringify(value);
-    } else if (Array.isArray(value)) {
-      // Sanitize arrays recursively
-      sanitized[key] = value.map(item => {
-        if (item instanceof Date) return item.toISOString();
-        if (typeof item === 'object' && item !== null) return JSON.stringify(item);
-        return item;
-      });
-    } else {
-      sanitized[key] = value;
-    }
-  }
-  
-  return sanitized;
-}
-
 // Event payload interface for template variable replacement
 export interface EventPayload {
   brokerName: string;
@@ -215,47 +187,10 @@ export class EventDispatchService {
       if (emailTemplate && payload.brokerEmail) {
         console.log(`📧 Sending email: ${emailTemplate.name}`);
         
-        // Auto-detect: If sendgridTemplateId is provided → use SendGrid; otherwise use Outreach Tab
-        const useSendGrid = emailTemplate.sendgridTemplateId && emailTemplate.sendgridTemplateId.trim() !== '';
-        console.log(`📧 Template source: ${useSendGrid ? 'SendGrid' : 'Outreach Tab'} ${useSendGrid ? `(ID: ${emailTemplate.sendgridTemplateId})` : '(Database template)'}`);
-        
-        // Check if using SendGrid Dynamic Templates
-        if (useSendGrid) {
-          // Use SendGrid Dynamic Template
-          console.log(`📧 [SENDGRID] Using SendGrid Dynamic Template ID: ${emailTemplate.sendgridTemplateId}`);
-          
-          // Sanitize dynamic data for SendGrid (convert Dates/objects to strings)
-          const sanitizedData = sanitizeDynamicTemplateData(enhancedPayload);
-          console.log(`📧 [SENDGRID] Sanitized ${Object.keys(sanitizedData).length} template variables`);
-          
-          const { sendNotificationEmail } = await import('./emailService');
-          try {
-            const sendResult = await sendNotificationEmail({
-              to: payload.brokerEmail,
-              subject: '', // Subject is defined in SendGrid template
-              html: '', // HTML is defined in SendGrid template
-              type: 'broker_invitation',
-              priority: 'medium',
-              sendgridTemplateId: emailTemplate.sendgridTemplateId,
-              sendgridDynamicData: sanitizedData // Pass sanitized variables to SendGrid
-            });
-            
-            if (sendResult) {
-              emailSent = true;
-              console.log(`✅ [SENDGRID] Email sent via SendGrid Dynamic Template`);
-            } else {
-              console.error(`❌ [SENDGRID-ERROR] Failed to send SendGrid Dynamic Template email`);
-              return { emailSent: false, smsSent: false, error: 'SendGrid send failed' };
-            }
-          } catch (error) {
-            console.error(`❌ [SENDGRID-ERROR] Exception while sending SendGrid email:`, error);
-            return { emailSent: false, smsSent: false, error: 'SendGrid send exception' };
-          }
-        } else {
-          // Use Outreach Tab template (default/backward compatible)
-          console.log(`📧 [OUTREACH] Using Outreach Tab template`);
-          console.log(`📧 [OUTREACH] Template has html field: ${!!emailTemplate.html}`);
-          console.log(`📧 [OUTREACH] Template has content field: ${!!emailTemplate.content}`);
+        // Always render the database template locally so Graph can deliver it.
+        console.log(`📧 [OUTREACH] Rendering email template locally`);
+        console.log(`📧 [OUTREACH] Template has html field: ${!!emailTemplate.html}`);
+        console.log(`📧 [OUTREACH] Template has content field: ${!!emailTemplate.content}`);
           
           const subject = renderTemplate(emailTemplate.subject, enhancedPayload, true); // Decode HTML entities for subject line
           
@@ -387,19 +322,21 @@ export class EventDispatchService {
             return { emailSent: false, smsSent: false, error: 'No template content' };
           }
           
-          // Send email via sendNotificationEmail
-          const { sendNotificationEmail } = await import('./emailService');
-          await sendNotificationEmail({
-            to: payload.brokerEmail,
-            subject: subject,
-            html: htmlContent,
-            type: 'broker_invitation', // default type for template events
-            priority: 'medium'
-          });
-          
-          emailSent = true;
-          console.log(`✅ [OUTREACH] Email sent via Outreach Tab template`);
-        }
+         // Send email via sendNotificationEmail
+         const { sendNotificationEmail } = await import('./emailService');
+         const sendResult = await sendNotificationEmail({
+           to: payload.brokerEmail,
+           subject,
+           html: htmlContent,
+           type: 'broker_invitation',
+           priority: 'medium'
+         });
+         
+         if (!sendResult) {
+           return { emailSent: false, smsSent: false, error: 'Email send failed' };
+         }
+         emailSent = true;
+         console.log(`✅ [OUTREACH] Email sent via locally-rendered HTML`);
       }
       
       // Process SMS template (exclude loi_sent for SMS)

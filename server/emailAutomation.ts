@@ -136,13 +136,10 @@ export class EmailAutomationService {
         subject: emailTemplate.subject,
         html: emailTemplate.html,
         type: eventType,
-        sendgridTemplateId: emailTemplate.sendgridTemplateId,
-        sendgridDynamicData: emailTemplate.sendgridDynamicData,
         priority: 'medium'
       });
 
-      const templateMode = emailTemplate.sendgridTemplateId ? `SendGrid (${emailTemplate.sendgridTemplateId})` : 'Outreach Tab';
-      console.log(`✅ [STATUS-UPDATE] ${eventType} email sent via ${templateMode} to ${broker.email}`);
+      console.log(`✅ [STATUS-UPDATE] ${eventType} email sent via locally-rendered HTML to ${broker.email}`);
 
       // Log communication
       const plainText = (emailTemplate.html || emailTemplate.content || emailTemplate.subject)

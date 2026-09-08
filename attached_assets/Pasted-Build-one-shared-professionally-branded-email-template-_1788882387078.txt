@@ -1,0 +1,55 @@
+Build one shared, professionally branded email template, apply it consistently 
+across every transactional email in the app, migrate them all off SendGrid onto 
+Microsoft Graph, and fix the marketing site's contact form to actually submit 
+through the backend instead of relying on a mailto: link.
+
+TASK 1 — Build one shared branded email layout
+Create a single reusable HTML email wrapper (a function that takes a title and 
+body content and returns full branded HTML): LandLinq logo at the top, the 
+existing navy brand color for a header band or accent, clean typography, a properly 
+styled button component (not a plain text link) for any call-to-action, consistent 
+footer. Inline CSS, table-based layout for email client compatibility. Every email 
+below should be built using this one shared wrapper, not styled individually.
+
+TASK 2 — Apply it to the Investment Company invite email
+server/routes.ts ~line 12650-12651 — rebuild using the Task 1 wrapper. No 
+unsubscribe link (transactional email).
+
+TASK 3 — Fix password reset — this one has a DATA component, not just code
+Password reset (server/emailService.ts sendPasswordResetEmail, ~line 621) pulls 
+its actual content from a database-stored template ("Password Reset", managed 
+through the admin Templates/outreach-management page), and conditionally uses 
+SendGrid's dynamic-template rendering if that STORED record has a sendgridTemplateId 
+set. Code changes alone won't fix this — the stored "Password Reset" template 
+record itself needs its content replaced with real rendered HTML (using the Task 1 
+wrapper) and its sendgridTemplateId field cleared, through whatever admin interface 
+manages these templates. Identify every other template in this same database-backed 
+system (check for other entries alongside "Password Reset" in whatever table 
+stores these) and apply the same fix to each.
+
+TASK 4 — Apply to every other transactional email
+Convert every remaining dynamic-template-dependent email identified in the earlier 
+audit (dailyMorningReports.ts, eventDispatch.ts, outreachService.ts, 
+emailAutomation.ts, backgroundJobProcessor.ts, unifiedDealPipeline.ts, and any 
+route-triggered notifications in routes.ts) to use the Task 1 shared wrapper and 
+send via sendNotificationEmail() with rendered content, routing them through 
+Microsoft Graph.
+
+TASK 5 — Build a real "contact us" form on the marketing homepage
+client/src/pages/marketing-home.tsx currently has no real contact form — "Get in 
+touch" buttons are mailto: links, and the email signup form also just tries to 
+open the visitor's own mail client rather than submitting anywhere. Replace this 
+with a real form: 
+  - New endpoint POST /api/contact-inquiry accepting name, email, and message
+  - On submit, send a real notification email (via sendNotificationEmail/Graph, 
+    using the Task 1 wrapper) to help@landlinq.ai with the inquiry details
+  - Show the visitor a genuine on-page confirmation ("Thanks — we'll be in touch") 
+    instead of relying on their own email client opening
+  - Keep this simple — no need for a database record of every inquiry unless 
+    that's independently wanted; the email notification is the primary function
+
+Verify: send a real test of every converted email type and confirm each is 
+visually consistent, properly branded, and sends via Microsoft Graph with no 
+SendGrid sender warning. Submit a real test through the new contact form and 
+confirm a real email arrives at help@landlinq.ai without relying on any mail 
+client on the visitor's end.

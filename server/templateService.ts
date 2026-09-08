@@ -260,8 +260,6 @@ export interface TemplateResult {
   subject: string;
   content: string;
   html?: string;
-  sendgridTemplateId?: string;
-  sendgridDynamicData?: Record<string, any>;
 }
 
 export class TemplateService {
@@ -673,25 +671,12 @@ export class TemplateService {
         console.log(`✅ [SMS-OPT-IN-BUTTON] Injected "Opt In to SMS" button into SMS opt-in email`);
       }
       
-      // Check if template has a SendGrid dynamic template ID configured
-      const sendgridTemplateId = template.sendgridTemplateId || undefined;
-      
-      // If SendGrid template ID is set, prepare dynamic data for SendGrid
-      let sendgridDynamicData: Record<string, any> | undefined = undefined;
-      if (sendgridTemplateId) {
-        console.log(`✅✅✅ [SENDGRID-DYNAMIC] Using SendGrid template: ${sendgridTemplateId} for event: ${eventType}`);
-        // Pass all variables as dynamic template data for SendGrid
-        sendgridDynamicData = allVariables;
-      } else {
-        console.log(`📧 [OUTREACH-TAB] Using Outreach Tab HTML template for event: ${eventType} (no SendGrid ID configured)`);
-      }
+      console.log(`📧 [OUTREACH-TAB] Using locally-rendered HTML template for event: ${eventType}`);
       
       return {
         subject,
         content,
-        html,
-        sendgridTemplateId,
-        sendgridDynamicData
+        html
       };
     } catch (error) {
       console.error(`Error loading email template for ${eventType}:`, error);

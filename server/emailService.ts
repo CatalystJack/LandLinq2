@@ -15,40 +15,6 @@ import sgMail from '@sendgrid/mail';
 export const PUBLIC_TRANSACTIONAL_EMAIL = 'help@landlinq.ai';
 export const PUBLIC_TRANSACTIONAL_NAME = 'LandLinq Support';
 
-/**
- * Helper to get raw email template from business settings (for sendgridTemplateId access)
- * CRITICAL: If a template has a SendGrid template ID configured, we MUST use it
- */
-async function getRawEmailTemplate(eventType: string): Promise<any | null> {
-  try {
-    const businessSettings = await storage.getBusinessSettings();
-    let emailTemplates: any[] = [];
-    
-    try {
-      emailTemplates = typeof (businessSettings as any)?.emailTemplates === 'string'
-        ? JSON.parse((businessSettings as any).emailTemplates)
-        : (businessSettings as any)?.emailTemplates || [];
-    } catch (parseError) {
-      console.error(`❌ [TEMPLATE-PARSE] Failed to parse emailTemplates:`, parseError);
-      return null;
-    }
-    
-    // Normalize event name for comparison
-    const normalizeEventName = (name: string) => name?.toLowerCase().trim().replace(/\s+/g, '_') || '';
-    const targetNormalized = normalizeEventName(eventType);
-    
-    // Find template by event name (flexible matching)
-    return emailTemplates.find((t: any) => {
-      const templateEvent = t.event || t.type || t.trigger || t.eventType || t.name || '';
-      const templateNormalized = normalizeEventName(templateEvent);
-      return templateNormalized === targetNormalized;
-    }) || null;
-  } catch (error) {
-    console.error(`❌ Error getting raw template for ${eventType}:`, error);
-    return null;
-  }
-}
-
 async function getSendGridClient() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
@@ -175,7 +141,7 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
       if (graphSent) return true;
       console.warn('⚠️ [GRAPH-SYSTEM] Graph delivery failed; using temporary SendGrid fallback');
     } else {
-      console.warn('⚠️ [GRAPH-SYSTEM] Message has no rendered subject/body; using temporary SendGrid dynamic-template fallback');
+      console.warn('⚠️ [GRAPH-SYSTEM] Message has no rendered subject/body; using transport fallback');
     }
     
     console.log('📧 [SENDGRID] Attempting to send email...');
@@ -211,41 +177,16 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
 
     console.log('📧 [SENDGRID] Preparing email for:', notification.to);
 
-    // Check if using SendGrid Dynamic Template
     let msg: any;
     
-    if (notification.sendgridTemplateId) {
-      // SendGrid Dynamic Template mode
-      console.log('');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('✅✅✅ USING SENDGRID DYNAMIC TEMPLATE ✅✅✅');
-      console.log(`📧 Template ID: ${notification.sendgridTemplateId}`);
-      console.log(`📧 Recipient: ${notification.to}`);
-      console.log(`📧 Variables: ${Object.keys(notification.sendgridDynamicData || {}).join(', ')}`);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('');
-      
-      msg = {
-        to: notification.to,
-        from: {
-          email: senderEmail,
-          name: senderName
-        },
-        replyTo: senderEmail,
-        templateId: notification.sendgridTemplateId,
-        dynamicTemplateData: notification.sendgridDynamicData || {}
-      };
-    } else {
-      // Traditional HTML/Text mode (Outreach Tab templates)
-      console.log('');
-      console.log('⚠️⚠️⚠️ USING OUTREACH TAB HTML (not SendGrid Dynamic Template) ⚠️⚠️⚠️');
-      console.log(`📧 Recipient: ${notification.to}`);
-      console.log('');
-      
-      // Add unsubscribe link to HTML content if not already present
-      let htmlContent = notification.html || '';
-      // Use plain text version if available, otherwise strip HTML properly
-      let textContent = notification.text || (htmlContent ? htmlContent
+    // All outbound email uses locally-rendered HTML. Keep SendGrid available only
+    // as the transport fallback when Graph delivery is unavailable.
+    console.log(`📧 [SENDGRID-FALLBACK] Preparing rendered HTML email for: ${notification.to}`);
+    
+    // Add unsubscribe link to HTML content if not already present
+    let htmlContent = notification.html || '';
+    // Use plain text version if available, otherwise strip HTML properly
+    let textContent = notification.text || (htmlContent ? htmlContent
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style tags
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tags  
         .replace(/<[^>]+>/g, '') // Remove all HTML tags
@@ -271,32 +212,26 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
         textContent += `\n\n---\nTo unsubscribe from future emails, visit: ${unsubscribeUrl} or reply with UNSUBSCRIBE.`;
       }
       
-      msg = {
-        to: notification.to,
-        from: {
-          email: senderEmail,
-          name: senderName
+    msg = {
+      to: notification.to,
+      from: {
+        email: senderEmail,
+        name: senderName
+      },
+      replyTo: senderEmail,
+      subject: notification.subject,
+      // SendGrid requires text/plain FIRST, then text/html
+      content: [
+        {
+          type: 'text/plain',
+          value: textContent || notification.text || ''
         },
-        replyTo: senderEmail,
-        subject: notification.subject,
-        // SendGrid requires text/plain FIRST, then text/html
-        content: [
-          {
-            type: 'text/plain',
-            value: textContent || notification.text || ''
-          },
-          {
-            type: 'text/html',
-            value: htmlContent || notification.html || notification.text || ''
-          }
-        ],
-        // Remove unsubscribe group to avoid configuration issues
-        // asm: {
-        //   groupId: 1, // Use SendGrid's built-in unsubscribe group
-        //   groupsToDisplay: [1]
-        // }
-      };
-    }
+        {
+          type: 'text/html',
+          value: htmlContent || notification.html || notification.text || ''
+        }
+      ],
+    };
 
     // Disable click tracking if requested (prevents SSL issues with SendGrid tracking domains)
     if (disableClickTracking) {
@@ -316,12 +251,9 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
 
     console.log('📧 [SENDGRID] Calling SendGrid API...');
     
-    // Only log HTML debug info for traditional HTML mode (not dynamic templates)
-    if (!notification.sendgridTemplateId && notification.html) {
+    if (notification.html) {
       console.log('🔍 [DEBUG] HTML Preview (first 500 chars):', notification.html.substring(0, 500));
       console.log('🔍 [DEBUG] Has angle brackets?', notification.html.includes('<div'), notification.html.includes('</div>'));
-    } else if (notification.sendgridTemplateId) {
-      console.log('🔍 [DEBUG] Using SendGrid Dynamic Template - HTML content managed by SendGrid');
     }
     
     const result = await sendGridClient.send(msg);
@@ -417,10 +349,6 @@ const emailService = {
     
     console.log('📧 [EMAIL-CONFIRM] Looking for "Deal Submitted" template in outreach management...');
     
-    // CRITICAL: Get raw template to check for sendgridTemplateId
-    const rawTemplate = await getRawEmailTemplate('deal_submitted');
-    console.log(`📧 [EMAIL-CONFIRM] Raw template found: ${!!rawTemplate}, Has sendgridTemplateId: ${!!rawTemplate?.sendgridTemplateId}`);
-    
     // Get processed template from outreach management tab
     const template = await TemplateService.getEmailTemplate('Deal Submitted', templateVars);
     
@@ -431,22 +359,15 @@ const emailService = {
     }
     
     console.log('✅ [EMAIL-CONFIRM] Template found! Subject:', template.subject);
-    console.log('📧 [EMAIL-CONFIRM] Preparing to send via SendGrid...');
-    
-    // CRITICAL: Pass sendgridTemplateId if configured (for SendGrid dynamic templates)
+    console.log('📧 [EMAIL-CONFIRM] Preparing locally-rendered HTML email...');
     const notification: EmailNotification = {
       to: brokerEmail,
       subject: template.subject,
       html: template.html,
       text: template.content, // Plain text version from template
       type: 'confirmation',
-      priority: 'medium',
-      sendgridTemplateId: rawTemplate?.sendgridTemplateId || undefined,
-      sendgridDynamicData: rawTemplate?.sendgridTemplateId ? templateVars : undefined
+      priority: 'medium'
     };
-    
-    const templateMode = rawTemplate?.sendgridTemplateId ? `SendGrid (${rawTemplate.sendgridTemplateId})` : 'Outreach Tab';
-    console.log(`📧 [EMAIL-CONFIRM] Template mode: ${templateMode}`);
     
     const result = await sendNotificationEmail(notification);
     
@@ -478,10 +399,6 @@ const emailService = {
     
     console.log('📧 [MISSING-INFO] Looking for "Info Missing" template in outreach management...');
     
-    // CRITICAL: Get raw template to check for sendgridTemplateId
-    const rawTemplate = await getRawEmailTemplate('info_missing');
-    console.log(`📧 [MISSING-INFO] Raw template found: ${!!rawTemplate}, Has sendgridTemplateId: ${!!rawTemplate?.sendgridTemplateId}`);
-    
     // Get processed template from outreach management tab
     const template = await TemplateService.getEmailTemplate('Info Missing', templateVars);
     
@@ -492,22 +409,15 @@ const emailService = {
     }
     
     console.log('✅ [MISSING-INFO] Template found! Subject:', template.subject);
-    console.log('📧 [MISSING-INFO] Preparing to send via SendGrid...');
-    
-    // CRITICAL: Pass sendgridTemplateId if configured (for SendGrid dynamic templates)
+    console.log('📧 [MISSING-INFO] Preparing locally-rendered HTML email...');
     const notification: EmailNotification = {
       to: brokerEmail,
       subject: template.subject,
       html: template.html,
       text: template.content, // Plain text version from template
       type: 'info_request',
-      priority: 'medium',
-      sendgridTemplateId: rawTemplate?.sendgridTemplateId || undefined,
-      sendgridDynamicData: rawTemplate?.sendgridTemplateId ? templateVars : undefined
+      priority: 'medium'
     };
-    
-    const templateMode = rawTemplate?.sendgridTemplateId ? `SendGrid (${rawTemplate.sendgridTemplateId})` : 'Outreach Tab';
-    console.log(`📧 [MISSING-INFO] Template mode: ${templateMode}`);
     
     const result = await sendNotificationEmail(notification);
     
@@ -534,10 +444,6 @@ const emailService = {
       classificationEmoji: '🟢',
     };
     
-    // CRITICAL: Get raw template to check for sendgridTemplateId
-    const rawTemplate = await getRawEmailTemplate('status_pursuing');
-    console.log(`🟢 [GREENLIGHT] Raw template found: ${!!rawTemplate}, Has sendgridTemplateId: ${!!rawTemplate?.sendgridTemplateId}`);
-    
     // Get processed template from outreach management tab
     const template = await TemplateService.getEmailTemplate('status_pursuing', templateVars);
     
@@ -546,20 +452,14 @@ const emailService = {
       return false;
     }
     
-    // CRITICAL: Pass sendgridTemplateId if configured (for SendGrid dynamic templates)
     const notification: EmailNotification = {
       to: brokerEmail,
       subject: template.subject,
       html: template.html,
       text: template.content,
       type: 'deal_alert',
-      priority: 'high',
-      sendgridTemplateId: rawTemplate?.sendgridTemplateId || undefined,
-      sendgridDynamicData: rawTemplate?.sendgridTemplateId ? templateVars : undefined
+      priority: 'high'
     };
-    
-    const templateMode = rawTemplate?.sendgridTemplateId ? `SendGrid (${rawTemplate.sendgridTemplateId})` : 'Outreach Tab';
-    console.log(`🟢 [GREENLIGHT] Template mode: ${templateMode}`);
     
     return await sendNotificationEmail(notification);
   },
@@ -574,10 +474,6 @@ const emailService = {
       classificationEmoji: '🔴',
     };
     
-    // CRITICAL: Get raw template to check for sendgridTemplateId
-    const rawTemplate = await getRawEmailTemplate('status_rejected');
-    console.log(`🔴 [PASS] Raw template found: ${!!rawTemplate}, Has sendgridTemplateId: ${!!rawTemplate?.sendgridTemplateId}`);
-    
     // Get processed template from outreach management tab
     const template = await TemplateService.getEmailTemplate('status_rejected', templateVars);
     
@@ -586,20 +482,14 @@ const emailService = {
       return false;
     }
     
-    // CRITICAL: Pass sendgridTemplateId if configured (for SendGrid dynamic templates)
     const notification: EmailNotification = {
       to: brokerEmail,
       subject: template.subject,
       html: template.html,
       text: template.content,
       type: 'status_update',
-      priority: 'medium',
-      sendgridTemplateId: rawTemplate?.sendgridTemplateId || undefined,
-      sendgridDynamicData: rawTemplate?.sendgridTemplateId ? templateVars : undefined
+      priority: 'medium'
     };
-    
-    const templateMode = rawTemplate?.sendgridTemplateId ? `SendGrid (${rawTemplate.sendgridTemplateId})` : 'Outreach Tab';
-    console.log(`🔴 [PASS] Template mode: ${templateMode}`);
     
     return await sendNotificationEmail(notification);
   },
@@ -631,10 +521,6 @@ const emailService = {
         userEmail: email
       };
       
-      // CRITICAL: Get raw template to check for sendgridTemplateId
-      const rawTemplate = await getRawEmailTemplate('password_reset');
-      console.log(`🔐 [PASSWORD-RESET] Raw template found: ${!!rawTemplate}, Has sendgridTemplateId: ${!!rawTemplate?.sendgridTemplateId}`);
-      
       // Get processed template from outreach management system
       const template = await TemplateService.getEmailTemplate('Password Reset', templateVars);
       
@@ -644,19 +530,14 @@ const emailService = {
         throw new Error('Password reset template not configured in outreach management. All templates must be configured in the outreach tab.');
       }
       
-      const templateMode = rawTemplate?.sendgridTemplateId ? `SendGrid (${rawTemplate.sendgridTemplateId})` : 'Outreach Tab';
-      console.log(`🔐 [PASSWORD-RESET] Template mode: ${templateMode}`);
-      
-      // Send email using template-based system with SendGrid dynamic template if configured
+      // Send email using the locally-rendered template.
       await sendNotificationEmail({
         to: email,
         subject: template.subject,
         html: template.html,
         text: template.content,
         type: 'password_reset',
-        priority: 'high',
-        sendgridTemplateId: rawTemplate?.sendgridTemplateId || undefined,
-        sendgridDynamicData: rawTemplate?.sendgridTemplateId ? templateVars : undefined
+        priority: 'high'
       });
       
       console.log(`✅ Password reset email sent to: ${email}`);
@@ -690,10 +571,6 @@ const emailService = {
     
     console.log('📧 [SMS-OPT-IN] Looking for "SMS Opt-In" template in outreach management...');
     
-    // CRITICAL: Get raw template to check for sendgridTemplateId
-    const rawTemplate = await getRawEmailTemplate('sms_opt_in');
-    console.log(`📧 [SMS-OPT-IN] Raw template found: ${!!rawTemplate}, Has sendgridTemplateId: ${!!rawTemplate?.sendgridTemplateId}`);
-    
     // Get processed template from outreach management tab
     const template = await TemplateService.getEmailTemplate('SMS Opt-In', templateVars);
     
@@ -704,22 +581,15 @@ const emailService = {
     }
     
     console.log('✅ [SMS-OPT-IN] Template found! Subject:', template.subject);
-    console.log('📧 [SMS-OPT-IN] Preparing to send via SendGrid...');
-    
-    // CRITICAL: Pass sendgridTemplateId if configured (for SendGrid dynamic templates)
+    console.log('📧 [SMS-OPT-IN] Preparing locally-rendered HTML email...');
     const notification: EmailNotification = {
       to: brokerEmail,
       subject: template.subject,
       html: template.html,
       text: template.content,
       type: 'info_request',
-      priority: 'medium',
-      sendgridTemplateId: rawTemplate?.sendgridTemplateId || undefined,
-      sendgridDynamicData: rawTemplate?.sendgridTemplateId ? templateVars : undefined
+      priority: 'medium'
     };
-    
-    const templateMode = rawTemplate?.sendgridTemplateId ? `SendGrid (${rawTemplate.sendgridTemplateId})` : 'Outreach Tab';
-    console.log(`📧 [SMS-OPT-IN] Template mode: ${templateMode}`);
     
     const result = await sendNotificationEmail(notification);
     

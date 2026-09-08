@@ -11,40 +11,6 @@ import * as cron from 'node-cron';
  * 2. Senior team (analyst/developer/partner) get their assigned deals at 6AM (until red/green)
  */
 
-/**
- * Helper to get raw email template from business settings (for sendgridTemplateId access)
- * CRITICAL: If a template has a SendGrid template ID configured, we MUST use it
- */
-async function getRawEmailTemplate(eventType: string): Promise<any | null> {
-  try {
-    const businessSettings = await storage.getBusinessSettings();
-    let emailTemplates: any[] = [];
-    
-    try {
-      emailTemplates = typeof (businessSettings as any)?.emailTemplates === 'string'
-        ? JSON.parse((businessSettings as any).emailTemplates)
-        : (businessSettings as any)?.emailTemplates || [];
-    } catch (parseError) {
-      console.error(`❌ [TEMPLATE-PARSE] Failed to parse emailTemplates:`, parseError);
-      return null;
-    }
-    
-    // Normalize event name for comparison
-    const normalizeEventName = (name: string) => name?.toLowerCase().trim().replace(/\s+/g, '_') || '';
-    const targetNormalized = normalizeEventName(eventType);
-    
-    // Find template by event name (flexible matching)
-    return emailTemplates.find((t: any) => {
-      const templateEvent = t.event || t.type || t.trigger || t.eventType || t.name || '';
-      const templateNormalized = normalizeEventName(templateEvent);
-      return templateNormalized === targetNormalized;
-    }) || null;
-  } catch (error) {
-    console.error(`❌ Error getting raw template for ${eventType}:`, error);
-    return null;
-  }
-}
-
 export class DailyMorningReports {
   
   /**
@@ -143,9 +109,6 @@ export class DailyMorningReports {
         
         const template = await TemplateService.getEmailTemplate('Junior Analyst Daily Digest', templateVariables);
         
-        // CRITICAL: Get raw template to check for sendgridTemplateId
-        const rawTemplate = await getRawEmailTemplate('junior_analyst_daily_digest');
-        
         if (template) {
           await sendNotificationEmail({
             to: analyst.email,
@@ -153,13 +116,10 @@ export class DailyMorningReports {
             html: template.html,
             text: template.content,
             type: 'daily_report',
-            priority: 'high',
-            sendgridTemplateId: rawTemplate?.sendgridTemplateId || undefined,
-            sendgridDynamicData: rawTemplate?.sendgridTemplateId ? templateVariables : undefined
+            priority: 'high'
           });
           
-          const templateMode = rawTemplate?.sendgridTemplateId ? `SendGrid (${rawTemplate.sendgridTemplateId})` : 'Outreach Tab';
-          console.log(`📧 Junior analyst report sent to ${analyst.email} via ${templateMode}`);
+          console.log(`📧 Junior analyst report sent to ${analyst.email} via locally-rendered HTML`);
         } else {
           console.error('❌ No daily_digest_analyst template configured');
         }
@@ -232,9 +192,6 @@ export class DailyMorningReports {
         
         const template = await TemplateService.getEmailTemplate('Senior Team Daily Digest', templateVariables);
         
-        // CRITICAL: Get raw template to check for sendgridTemplateId
-        const rawTemplate = await getRawEmailTemplate('daily_digest_senior');
-        
         if (template) {
           await sendNotificationEmail({
             to: teamMember.email,
@@ -242,13 +199,10 @@ export class DailyMorningReports {
             html: template.html,
             text: template.content,
             type: 'daily_report',
-            priority: 'medium',
-            sendgridTemplateId: rawTemplate?.sendgridTemplateId || undefined,
-            sendgridDynamicData: rawTemplate?.sendgridTemplateId ? templateVariables : undefined
+            priority: 'medium'
           });
           
-          const templateMode = rawTemplate?.sendgridTemplateId ? `SendGrid (${rawTemplate.sendgridTemplateId})` : 'Outreach Tab';
-          console.log(`📧 Senior team report sent to ${teamMember.email} (${teamMember.dealRole}) via ${templateMode}`);
+          console.log(`📧 Senior team report sent to ${teamMember.email} (${teamMember.dealRole}) via locally-rendered HTML`);
         } else {
           console.error('❌ No daily_digest_senior template configured');
         }

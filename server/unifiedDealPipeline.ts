@@ -2047,44 +2047,23 @@ export class UnifiedDealPipeline {
       // Send email if broker has email
       if (broker.email) {
         try {
-          // CRITICAL FIX: Get raw template object to access sendgridTemplateId
-          // TemplateService.getEmailTemplate() only returns rendered content, not the template ID
-          const businessSettings = await storage.getBusinessSettings();
-          
-          // CRITICAL FIX: Parse emailTemplates if it's a JSON string
-          let emailTemplates: any[] = [];
-          try {
-            emailTemplates = typeof (businessSettings as any)?.emailTemplates === 'string' 
-              ? JSON.parse((businessSettings as any).emailTemplates)
-              : (businessSettings as any)?.emailTemplates || [];
-          } catch (parseError) {
-            console.error(`❌ [TEMPLATE-PARSE] Failed to parse emailTemplates:`, parseError);
-            emailTemplates = [];
-          }
-          
-          const rawTemplate = emailTemplates.find((t: any) => t.event === emailTemplateEvent);
-          
           const emailTemplate = await TemplateService.getEmailTemplate(emailTemplateEvent, variables);
           if (emailTemplate) {
             const { sendNotificationEmail } = await import('./emailService');
             
-            // CRITICAL FIX: Pass sendgridTemplateId if configured (for SendGrid dynamic templates)
             // CRITICAL FIX: Capture return value to check if email actually sent
             const emailSuccess = await sendNotificationEmail({
               type: 'transactional',
               to: broker.email,
               subject: emailTemplate.subject || `Property Classification: ${propertyAddress}`,
               html: emailTemplate.html || emailTemplate.content,
-              text: emailTemplate.content || '',
-              sendgridTemplateId: rawTemplate?.sendgridTemplateId || undefined,
-              sendgridDynamicData: rawTemplate?.sendgridTemplateId ? variables : undefined
+              text: emailTemplate.content || ''
             });
             
             // CRITICAL FIX: Only set emailSent if sendNotificationEmail returned true
             if (emailSuccess) {
               emailSent = true;
-              const templateMode = rawTemplate?.sendgridTemplateId ? `SendGrid (ID: ${rawTemplate.sendgridTemplateId})` : 'Outreach Tab';
-              console.log(`✅ [EMAIL] Classification notification sent to ${broker.email} using event "${emailTemplateEvent}" via ${templateMode}`);
+              console.log(`✅ [EMAIL] Classification notification sent to ${broker.email} using event "${emailTemplateEvent}" via locally-rendered HTML`);
             } else {
               console.error(`❌ [EMAIL] sendNotificationEmail returned false - email delivery failed`);
             }

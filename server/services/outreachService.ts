@@ -8,40 +8,6 @@ import { TemplateService, TemplateVariables } from '../templateService';
 import { outreachSafeguardService } from '../outreachSafeguardService';
 import type { OutreachCampaign, OutreachRun, OutreachMessage, Broker, InsertOutreachRun, InsertOutreachMessage } from '@shared/schema';
 
-/**
- * Helper to get raw email template from business settings (for sendgridTemplateId access)
- * CRITICAL: If a template has a SendGrid template ID configured, we MUST use it
- */
-async function getRawEmailTemplate(eventType: string): Promise<any | null> {
-  try {
-    const businessSettings = await storage.getBusinessSettings();
-    let emailTemplates: any[] = [];
-    
-    try {
-      emailTemplates = typeof (businessSettings as any)?.emailTemplates === 'string'
-        ? JSON.parse((businessSettings as any).emailTemplates)
-        : (businessSettings as any)?.emailTemplates || [];
-    } catch (parseError) {
-      console.error(`❌ [TEMPLATE-PARSE] Failed to parse emailTemplates:`, parseError);
-      return null;
-    }
-    
-    // Normalize event name for comparison
-    const normalizeEventName = (name: string) => name?.toLowerCase().trim().replace(/\s+/g, '_') || '';
-    const targetNormalized = normalizeEventName(eventType);
-    
-    // Find template by event name (flexible matching)
-    return emailTemplates.find((t: any) => {
-      const templateEvent = t.event || t.type || t.trigger || t.eventType || t.name || '';
-      const templateNormalized = normalizeEventName(templateEvent);
-      return templateNormalized === targetNormalized;
-    }) || null;
-  } catch (error) {
-    console.error(`❌ Error getting raw template for ${eventType}:`, error);
-    return null;
-  }
-}
-
 export interface OutreachExecutionOptions {
   dryRun?: boolean;
   maxMessages?: number;
@@ -399,9 +365,6 @@ export class OutreachService {
           throw new Error(`${templateKey || 'Monthly Outreach'} email template not configured in outreach management`);
         }
         
-        // CRITICAL: Get raw template to check for sendgridTemplateId
-        const rawTemplate = await getRawEmailTemplate(templateKey || 'monthly_outreach');
-        
         // Get sender's signature HTML if available
         let senderSignature = '';
         if (campaign.senderId) {
@@ -436,17 +399,14 @@ export class OutreachService {
           return { success: true };
         }
         
-        // Send real email with proper HTML transformation for spacing preservation
-        // CRITICAL: Pass sendgridTemplateId if configured in outreach management
+        // Send real email with locally-rendered HTML.
         const emailResult = await sendNotificationEmail({
           to: broker.email!,
           subject: template.subject,
           html: emailHtmlWithSignature,
           text: template.content,
           type: 'monthly_outreach',
-          priority: 'low',
-          sendgridTemplateId: rawTemplate?.sendgridTemplateId || undefined,
-          sendgridDynamicData: rawTemplate?.sendgridTemplateId ? templateVars : undefined
+          priority: 'low'
         });
         
         if (emailResult) {
@@ -454,8 +414,7 @@ export class OutreachService {
             status: 'sent',
             sentAt: new Date()
           });
-          const templateMode = rawTemplate?.sendgridTemplateId ? `SendGrid (${rawTemplate.sendgridTemplateId})` : 'Outreach Tab';
-          console.log(`📧 Email sent to ${broker.firstName} ${broker.lastName} (${broker.email}) via ${templateMode}`);
+          console.log(`📧 Email sent to ${broker.firstName} ${broker.lastName} (${broker.email}) via locally-rendered HTML`);
           return { success: true };
         } else {
           throw new Error('Email sending failed');
