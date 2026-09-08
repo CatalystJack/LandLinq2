@@ -5,7 +5,7 @@
 // NO hardcoded HTML, subjects, or content allowed anywhere.
 
 import type { EmailNotification } from './types';
-import { TemplateService } from './templateService';
+import { TemplateService, renderBrandedEmail } from './templateService';
 import { apiCallTracker } from './apiCallTracker.js';
 import { storage } from './storage';
 
@@ -128,7 +128,12 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
       console.warn('⚠️ [EMAIL] Could not check master toggle, proceeding with send:', toggleError);
     }
 
-    const graphHtml = notification.html || (notification.text ? transformTextToHTML(notification.text) : '');
+    const rawHtml = notification.html || (notification.text ? transformTextToHTML(notification.text) : '');
+    const graphHtml = rawHtml
+      ? (rawHtml.includes('landlinq-branded-email')
+        ? rawHtml
+        : renderBrandedEmail({ title: notification.subject, bodyHtml: rawHtml }))
+      : '';
     if (notification.subject && graphHtml) {
       console.log(`📧 [GRAPH-SYSTEM] Attempting platform email to ${notification.to}`);
       const graphSent = await sendSystemEmail(
@@ -184,7 +189,7 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
     console.log(`📧 [SENDGRID-FALLBACK] Preparing rendered HTML email for: ${notification.to}`);
     
     // Add unsubscribe link to HTML content if not already present
-    let htmlContent = notification.html || '';
+    let htmlContent = graphHtml;
     // Use plain text version if available, otherwise strip HTML properly
     let textContent = notification.text || (htmlContent ? htmlContent
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style tags
@@ -537,7 +542,8 @@ const emailService = {
         html: template.html,
         text: template.content,
         type: 'password_reset',
-        priority: 'high'
+        priority: 'high',
+        transactional: true
       });
       
       console.log(`✅ Password reset email sent to: ${email}`);

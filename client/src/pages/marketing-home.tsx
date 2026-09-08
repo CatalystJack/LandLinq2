@@ -18,7 +18,7 @@ const faqs = [
   ["How much of the work does LandLinq take off my team?", "LandLinq handles sourcing, screening, and outreach automatically, so your team spends its time only on the deals that clear your criteria."],
 ];
 
-function Button({ children, href = "mailto:help@landlinq.ai", dark = false }: { children: ReactNode; href?: string; dark?: boolean }) {
+function Button({ children, href = "#contact", dark = false }: { children: ReactNode; href?: string; dark?: boolean }) {
   return (
     <a href={href} className={`group inline-flex min-h-12 items-center justify-center gap-3 rounded-full border px-5 text-sm font-semibold transition-all duration-300 ${dark ? "border-primary bg-primary text-white hover:border-landlinq-sky hover:bg-white hover:text-landlinq-blue" : "border-landlinq-sky bg-landlinq-sky text-primary hover:border-landlinq-blue hover:bg-white hover:text-landlinq-blue"}`}>
       {children}<ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
@@ -189,8 +189,9 @@ function HeroStats() {
 export default function MarketingHome() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: "", email: "", message: "" });
+  const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [contactError, setContactError] = useState("");
   useEffect(() => {
     const elements = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -269,7 +270,45 @@ export default function MarketingHome() {
 
         <section id="company" data-reveal className="ll-scroll-reveal bg-background px-5 py-24 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-3xl"><div className="mb-14"><h2 className="text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">Know what you're getting.</h2></div><div className="divide-y divide-border border-y border-border">{faqs.map(([question, answer], i) => <div key={question}><button type="button" onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i} className="flex w-full items-center justify-between gap-5 py-6 text-left text-base font-semibold sm:text-lg"><span>{question}</span><ChevronDown className={`h-5 w-5 shrink-0 text-primary transition-transform duration-300 ${openFaq === i ? "rotate-180" : ""}`} /></button><div className={`grid transition-[grid-template-rows,opacity] duration-300 ${openFaq === i ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}><div className="overflow-hidden"><p className="max-w-2xl pb-6 leading-7 text-muted-foreground">{answer}</p></div></div></div>)}</div></div></section>
 
-        <section data-reveal className="ll-scroll-reveal bg-muted/40 px-5 py-24 sm:px-8 sm:py-32 lg:px-10"><div className="mx-auto max-w-7xl rounded-3xl bg-primary p-8 text-primary-foreground sm:p-14 lg:p-20"><div className="grid gap-12 lg:grid-cols-[1fr_0.65fr] lg:items-end"><div><p className="mb-6 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">Make the next decision faster</p><h2 className="max-w-3xl text-5xl font-semibold leading-[0.98] tracking-[-0.06em] sm:text-7xl">See what a supercharged acquisitions team looks like.</h2><div className="mt-9"><Button>Get in touch</Button></div></div><form onSubmit={(e) => { e.preventDefault(); if (email) { setSubmitted(true); window.location.href = `mailto:help@landlinq.ai?subject=LandLinq%20updates&body=${encodeURIComponent(`Please add ${email} to the LandLinq updates list.`)}`; } }} className="rounded-2xl border border-white/20 p-6"><label htmlFor="updates-email" className="text-sm font-medium">Get the occasional LandLinq update.</label>{submitted ? <p className="mt-5 text-sm text-white/65">Your email client is ready to complete the handoff.</p> : <><div className="mt-5 flex flex-col gap-3 sm:flex-row"><input id="updates-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" className="h-12 min-w-0 flex-1 rounded-full border border-white/25 bg-transparent px-5 text-base text-white outline-none placeholder:text-white/40" /><button type="submit" className="h-12 rounded-full bg-white px-5 text-sm font-semibold text-primary">Join list</button></div><p className="mt-4 text-xs leading-5 text-white/45">Your email client will open to complete the handoff.</p></>}</form></div></div></section>
+        <section id="contact" data-reveal className="ll-scroll-reveal bg-muted/40 px-5 py-24 sm:px-8 sm:py-32 lg:px-10">
+          <div className="mx-auto max-w-7xl rounded-3xl bg-primary p-8 text-primary-foreground sm:p-14 lg:p-20">
+            <div className="grid gap-12 lg:grid-cols-[1fr_0.72fr] lg:items-end">
+              <div>
+                <p className="mb-6 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">Make the next decision faster</p>
+                <h2 className="max-w-3xl text-5xl font-semibold leading-[0.98] tracking-[-0.06em] sm:text-7xl">See what a supercharged acquisitions team looks like.</h2>
+                <p className="mt-7 max-w-xl text-base leading-7 text-white/65">Tell us a little about what your team is trying to solve. We’ll be in touch.</p>
+              </div>
+              <form onSubmit={async (event) => {
+                event.preventDefault();
+                setContactStatus("sending");
+                setContactError("");
+                try {
+                  const response = await fetch("/api/contact-inquiry", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(contactForm),
+                  });
+                  const result = await response.json().catch(() => ({}));
+                  if (!response.ok) throw new Error(result.error || "We could not send your message.");
+                  setContactStatus("success");
+                } catch (error) {
+                  setContactStatus("error");
+                  setContactError(error instanceof Error ? error.message : "We could not send your message.");
+                }
+              }} className="rounded-2xl border border-white/20 p-6">
+                {contactStatus === "success" ? <p className="text-lg font-semibold text-white">Thanks — we’ll be in touch.</p> : <>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <input aria-label="Your name" required value={contactForm.name} onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })} placeholder="Your name" className="h-12 rounded-full border border-white/25 bg-transparent px-5 text-base text-white outline-none placeholder:text-white/40" />
+                    <input aria-label="Your email" type="email" required value={contactForm.email} onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })} placeholder="you@company.com" className="h-12 rounded-full border border-white/25 bg-transparent px-5 text-base text-white outline-none placeholder:text-white/40" />
+                  </div>
+                  <textarea aria-label="Your message" required rows={4} value={contactForm.message} onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })} placeholder="How can we help?" className="mt-3 w-full resize-none rounded-2xl border border-white/25 bg-transparent p-4 text-base text-white outline-none placeholder:text-white/40" />
+                  <button type="submit" disabled={contactStatus === "sending"} className="mt-4 h-12 rounded-full bg-white px-6 text-sm font-semibold text-primary disabled:opacity-60">{contactStatus === "sending" ? "Sending…" : "Send message"}</button>
+                  {contactStatus === "error" && <p role="alert" className="mt-3 text-sm text-red-200">{contactError}</p>}
+                </>}
+              </form>
+            </div>
+          </div>
+        </section>
       </main>
       <Footer />
     </div>

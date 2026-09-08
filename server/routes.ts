@@ -172,7 +172,7 @@ async function purgeLegacyDemoData(): Promise<void> {
 // HelloDataService removed per user request
 import { emailService, sendNotificationEmail } from "./emailService";
 import { sendSMS, landLinqSMSTemplates } from "./smsService";
-import { TemplateService } from "./templateService";
+import { TemplateService, renderBrandedEmail } from "./templateService";
 import { marketIntelligence } from "./marketIntelligence";
 import { dealScoringService, SCORING_WEIGHTS } from "./dealScoringService";
 import { dealInsightsEngine } from "./dealInsightsEngine";
@@ -2849,6 +2849,64 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
   app.post("/api/demo-login", (_req, res) => {
     return res.status(410).json({ message: "The public demo has been retired" });
+  });
+
+  app.post("/api/contact-inquiry", authLimiter, async (req, res) => {
+    try {
+      const name = String(req.body?.name || '').trim();
+      const email = String(req.body?.email || '').trim().toLowerCase();
+      const message = String(req.body?.message || '').trim();
+
+      if (!name || name.length > 120) {
+        return res.status(400).json({ error: 'Please provide your name.' });
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+        return res.status(400).json({ error: 'Please provide a valid email address.' });
+      }
+      if (!message || message.length > 5000) {
+        return res.status(400).json({ error: 'Please provide a message.' });
+      }
+
+      const escapeInquiry = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[character] || character));
+      const inquiryHtml = renderBrandedEmail({
+        title: 'New website inquiry',
+        preheader: `New contact inquiry from ${name}`,
+        bodyHtml: `
+          <p style="margin:0 0 18px;">A visitor submitted the LandLinq contact form.</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f7faff;border:1px solid #cfe0f2;">
+            <tr><td style="padding:16px 18px;color:#334E68;font-size:15px;line-height:24px;">
+              <p style="margin:0 0 8px;"><strong>Name:</strong> ${escapeInquiry(name)}</p>
+              <p style="margin:0 0 8px;"><strong>Email:</strong> ${escapeInquiry(email)}</p>
+              <p style="margin:0;"><strong>Message:</strong><br>${escapeInquiry(message).replace(/\r?\n/g, '<br>')}</p>
+            </td></tr>
+          </table>`,
+      });
+
+      const sent = await sendNotificationEmail({
+        to: 'help@landlinq.ai',
+        subject: `LandLinq website inquiry from ${name}`,
+        html: inquiryHtml,
+        text: `New website inquiry\n\nName: ${name}\nEmail: ${email}\n\n${message}`,
+        type: 'contact-inquiry',
+        priority: 'high',
+        transactional: true,
+        fromName: 'LandLinq Website',
+      });
+
+      if (!sent) {
+        return res.status(502).json({ error: 'We could not send your message right now. Please try again.' });
+      }
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('[CONTACT-INQUIRY] Failed to send inquiry:', error);
+      return res.status(500).json({ error: 'We could not send your message right now. Please try again.' });
+    }
   });
 
   // Email webhook removed - using /api/webhooks/email instead
@@ -12652,97 +12710,33 @@ RULES:
     const safeCompanyName = escapeEmailHtml(companyName);
     const safeEmail = escapeEmailHtml(email);
     const safeTemporaryPassword = escapeEmailHtml(temporaryPassword);
-    const safeLoginUrl = escapeEmailHtml(loginUrl);
-    const safeLogoUrl = escapeEmailHtml(logoUrl);
-
-    return `
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your ${safeCompanyName} portal access</title>
-  </head>
-  <body style="margin:0;padding:0;background-color:#f4f7fb;color:#172b4d;font-family:Arial,Helvetica,sans-serif;">
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
-      Your ${safeCompanyName} Investment Company portal access is ready.
-    </div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f4f7fb;">
-      <tr>
-        <td align="center" style="padding:32px 16px;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;background-color:#ffffff;border:1px solid #dbe5f0;">
-            <tr>
-              <td style="height:8px;background-color:#0a2b4a;font-size:0;line-height:0;">&nbsp;</td>
-            </tr>
-            <tr>
-              <td align="center" style="padding:30px 32px 24px;background-color:#ffffff;">
-                <img src="${safeLogoUrl}" width="220" alt="LandLinq" style="display:block;width:220px;max-width:100%;height:auto;border:0;">
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:0 32px;">
-                <div style="height:2px;background-color:#4a90e2;font-size:0;line-height:0;">&nbsp;</div>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:34px 32px 12px;">
-                <h1 style="margin:0;color:#0a2b4a;font-size:26px;line-height:34px;font-weight:700;">
-                  Your company portal is ready
-                </h1>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:0 32px 8px;color:#334e68;font-size:16px;line-height:26px;">
-                <p style="margin:0 0 16px;">Hi ${safeFirstName},</p>
-                <p style="margin:0 0 16px;">
-                  Your <strong style="color:#0a2b4a;">${safeCompanyName}</strong> Investment Company portal has been created.
-                  Use the temporary credentials below to sign in.
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:8px 32px 20px;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f7faff;border:1px solid #cfe0f2;">
-                  <tr>
-                    <td style="padding:20px 22px;color:#334e68;font-size:14px;line-height:22px;">
-                      <div style="margin-bottom:12px;color:#0a2b4a;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">
-                        Temporary sign-in details
-                      </div>
-                      <div style="margin-bottom:8px;"><strong>Email:</strong> ${safeEmail}</div>
-                      <div><strong>Temporary password:</strong></div>
-                      <div style="margin-top:8px;padding:12px 14px;background-color:#ffffff;border:1px solid #b8cee5;color:#0a2b4a;font-family:'Courier New',Courier,monospace;font-size:18px;line-height:24px;letter-spacing:.04em;word-break:break-all;">
-                        ${safeTemporaryPassword}
-                      </div>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td align="center" style="padding:4px 32px 24px;">
-                <a href="${safeLoginUrl}" style="display:inline-block;background-color:#0a2b4a;border:1px solid #0a2b4a;border-radius:5px;color:#ffffff;font-size:16px;font-weight:700;line-height:22px;text-decoration:none;padding:14px 28px;">
-                  Open the company login
-                </a>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:0 32px 30px;color:#52677d;font-size:14px;line-height:22px;">
-                <p style="margin:0;">
-                  For your security, you will be required to set a new password after signing in.
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:20px 32px;background-color:#f7f9fc;border-top:1px solid #e4ebf3;color:#718096;font-size:12px;line-height:18px;text-align:center;">
-                LandLinq Support &middot; help@landlinq.ai
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+    return renderBrandedEmail({
+      title: "Your company portal is ready",
+      preheader: `Your ${companyName} Investment Company portal access is ready.`,
+      logoUrl,
+      companyName: "LandLinq",
+      supportEmail: "help@landlinq.ai",
+      bodyHtml: `
+        <p style="margin:0 0 16px;">Hi ${safeFirstName},</p>
+        <p style="margin:0 0 20px;">
+          Your <strong style="color:#0A2B4A;">${safeCompanyName}</strong> Investment Company portal has been created.
+          Use the temporary credentials below to sign in.
+        </p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f7faff;border:1px solid #cfe0f2;">
+          <tr>
+            <td style="padding:20px 22px;color:#334E68;font-size:14px;line-height:22px;">
+              <div style="margin-bottom:12px;color:#0A2B4A;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;">Temporary sign-in details</div>
+              <div style="margin-bottom:8px;"><strong>Email:</strong> ${safeEmail}</div>
+              <div><strong>Temporary password:</strong></div>
+              <div style="margin-top:8px;padding:12px 14px;background-color:#ffffff;border:1px solid #b8cee5;color:#0A2B4A;font-family:'Courier New',Courier,monospace;font-size:18px;line-height:24px;letter-spacing:.04em;word-break:break-all;">${safeTemporaryPassword}</div>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:22px 0 0;color:#52677D;font-size:14px;line-height:22px;">
+          For your security, you will be required to set a new password after signing in.
+        </p>`,
+      button: { label: "Open the company login", url: loginUrl },
+    });
   }
 
   async function createDeveloperInvitation(profile: any, name: string, normalizedEmail: string) {

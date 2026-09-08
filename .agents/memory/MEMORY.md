@@ -1,3 +1,4 @@
+- [Shared transactional email rendering](email-rendering-conversion.md) — render one inline branded shell before Graph delivery; SendGrid remains transport fallback only.
 - [Unclassified deal reasons](unclassified-deal-ui.md) — "unclassified" can be a legitimate completed-classification outcome (e.g. no HelloData coverage), not just "never ran"; UI must check rejectionReason/comparableNotes before showing generic "not run" message.
 - [deals.comparables_json shape](deals-comparables-json-shape.md) — comp entries use camelCase keys (propertyName, yearBuilt, unitCount, rentPSF, rentPerUnit, distance), not snake_case.
 - [drizzle-kit db:push broken](drizzle-kit-db-push-broken.md) — fails with "Please provide required params" even with correct config; use raw SQL via psql for schema changes instead.

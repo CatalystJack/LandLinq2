@@ -240,6 +240,116 @@ export interface TemplateVariables {
   [key: string]: string | undefined;
 }
 
+export interface BrandedEmailButton {
+  label: string;
+  url: string;
+}
+
+export interface BrandedEmailOptions {
+  title: string;
+  bodyHtml: string;
+  button?: BrandedEmailButton;
+  preheader?: string;
+  logoUrl?: string;
+  companyName?: string;
+  supportEmail?: string;
+  supportPhone?: string;
+}
+
+function escapeEmailValue(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[character] || character));
+}
+
+/**
+ * Shared email shell for all locally-rendered outbound email.
+ * Keep this table-based and inline-styled for Outlook/Gmail compatibility.
+ */
+export function renderBrandedEmail(options: BrandedEmailOptions): string {
+  const baseUrl = process.env.REPLIT_DOMAINS
+    ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+    : 'https://landlinq.ai';
+  const logoUrl = options.logoUrl || `${baseUrl}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
+  const companyName = options.companyName || 'LandLinq';
+  const supportEmail = options.supportEmail || 'help@landlinq.ai';
+  const supportPhone = options.supportPhone || '';
+  const bodyHtml = /<body[^>]*>([\s\S]*?)<\/body>/i.exec(options.bodyHtml)?.[1] || options.bodyHtml;
+  const button = options.button
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:26px auto 8px;">
+        <tr>
+          <td align="center" bgcolor="#0A2B4A" style="border-radius:5px;">
+            <a href="${escapeEmailValue(options.button.url)}" style="display:inline-block;background-color:#0A2B4A;border:1px solid #0A2B4A;border-radius:5px;color:#ffffff;font-size:16px;font-weight:700;line-height:22px;text-decoration:none;padding:14px 28px;">${escapeEmailValue(options.button.label)}</a>
+          </td>
+        </tr>
+      </table>`
+    : '';
+
+  return `<!-- landlinq-branded-email -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeEmailValue(options.title)}</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f4f7fb;color:#172b4d;font-family:Arial,Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeEmailValue(options.preheader || options.title)}</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f4f7fb;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:600px;background-color:#ffffff;border:1px solid #dbe5f0;">
+            <tr><td style="height:8px;background-color:#0A2B4A;font-size:0;line-height:0;">&nbsp;</td></tr>
+            <tr>
+              <td align="center" style="padding:30px 32px 24px;">
+                <img src="${escapeEmailValue(logoUrl)}" width="220" alt="${escapeEmailValue(companyName)}" style="display:block;width:220px;max-width:100%;height:auto;border:0;">
+              </td>
+            </tr>
+            <tr><td style="padding:0 32px;"><div style="height:2px;background-color:#4A90E2;font-size:0;line-height:0;">&nbsp;</div></td></tr>
+            <tr>
+              <td style="padding:34px 32px 12px;">
+                <h1 style="margin:0;color:#0A2B4A;font-size:26px;line-height:34px;font-weight:700;">${escapeEmailValue(options.title)}</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 30px;color:#334E68;font-size:16px;line-height:26px;">
+                ${bodyHtml}
+                ${button}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px;background-color:#f7f9fc;border-top:1px solid #e4ebf3;color:#718096;font-size:12px;line-height:18px;text-align:center;">
+                ${escapeEmailValue(companyName)}${supportEmail ? ` &middot; ${escapeEmailValue(supportEmail)}` : ''}${supportPhone ? ` &middot; ${escapeEmailValue(supportPhone)}` : ''}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+function extractEmailBody(html: string): string {
+  const contentOpen = /<div[^>]*class=["'][^"']*\bcontent\b[^"']*["'][^>]*>/i.exec(html);
+  if (contentOpen?.index !== undefined) {
+    const contentStart = contentOpen.index + contentOpen[0].length;
+    const footerOpen = /<div[^>]*class=["'][^"']*\bfooter\b[^"']*["'][^>]*>/i.exec(html.slice(contentStart));
+    const contentEnd = footerOpen?.index === undefined ? html.length : contentStart + footerOpen.index;
+    return html.slice(contentStart, contentEnd).trim();
+  }
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  return (bodyMatch?.[1] || html)
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<div[^>]*class=["'][^"']*\bheader\b[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, '')
+    .replace(/<div[^>]*class=["'][^"']*\bfooter\b[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, '')
+    .trim();
+}
+
 // DEPRECATED: DO NOT USE - All branding comes from outreach management settings
 // This constant is kept ONLY for backward compatibility with legacy code
 // All new code should fetch branding from businessSettings via storage.getBusinessSettings()
@@ -669,6 +779,17 @@ export class TemplateService {
         
         html = html.replace('</body>', smsOptInButtonHTML);
         console.log(`✅ [SMS-OPT-IN-BUTTON] Injected "Opt In to SMS" button into SMS opt-in email`);
+      }
+
+      if (!html.includes('landlinq-branded-email')) {
+        html = renderBrandedEmail({
+          title: subject,
+          bodyHtml: extractEmailBody(html),
+          logoUrl,
+          companyName: 'LandLinq',
+          supportEmail: 'help@landlinq.ai',
+          supportPhone: dynamicBranding.supportPhone || '',
+        });
       }
       
       console.log(`📧 [OUTREACH-TAB] Using locally-rendered HTML template for event: ${eventType}`);
