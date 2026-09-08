@@ -1,0 +1,46 @@
+Two confirmed bugs share the same root cause: a page a DEVELOPER-role user needs to 
+be redirected to temporarily was never added to the developer-specific route 
+allowlist, causing either an infinite redirect loop or silently lost feedback.
+
+TASK 1 — Fix /reset-password (server-side)
+In server/routes.ts, add '/reset-password' to DEVELOPER_ALLOWED_PAGE_PATHS 
+(~line 2721-2729). This fixes the infinite redirect loop on first login with a 
+temp password.
+
+TASK 2 — Fix /outreach-onboarding (server AND client-side)
+Add '/outreach-onboarding' to DEVELOPER_ALLOWED_PAGE_PATHS in server/routes.ts. 
+Also add a route for it inside the actual DEVELOPER routing block in 
+client/src/App.tsx (~lines 170-198, alongside the other <Route path="/developer/..."> 
+entries) that renders the OutreachOnboarding component so a developer landing there 
+after the Microsoft OAuth callback actually sees their connection result (success 
+or error) instead of being silently redirected to their dashboard.
+
+TASK 3 — Systematically audit for every other instance of this same pattern
+Search the entire codebase for every res.redirect(...) call in server/routes.ts 
+that could target a DEVELOPER-role user (i.e., any redirect reachable from a route 
+a developer might hit — not just routes explicitly checking role === 'DEVELOPER', 
+but any OAuth callback, email link, or utility endpoint a developer account could 
+land on). For each redirect target found, confirm it's present in 
+DEVELOPER_ALLOWED_PAGE_PATHS. Cross-reference the same list against every <Route> 
+registered inside the DEVELOPER branch in client/src/App.tsx (~lines 170-198) to 
+confirm client and server allowlists actually match each other — right now they 
+appear to have drifted (the client has fewer/different entries than the server), 
+which is exactly how both of these bugs happened.
+
+Report back a full list of every redirect target and route path relevant to 
+DEVELOPER accounts, cross-checked against both allowlists, before making changes — 
+so we can confirm nothing else was missed, rather than fixing only the two found 
+so far and assuming the rest are fine.
+
+TASK 4 — Consider a more robust long-term fix
+Rather than maintaining two separate, hand-written lists (one in server/routes.ts, 
+one implicitly defined by the <Route> entries in client/src/App.tsx) that can 
+silently drift apart exactly as happened here, consider whether the server-side 
+allowlist could be derived from or kept in sync with the same source of truth as 
+the client-side routes, or at minimum add a code comment at both locations pointing 
+to each other, so anyone adding a new developer-facing page in the future is 
+reminded to update both places together.
+
+Verify: test a fresh developer account through first login (Task 1) and through 
+the full outreach email-connection flow, both success and failure cases (Task 2). 
+Confirm the Task 3 audit surfaces the actual full list of any remaining gaps.

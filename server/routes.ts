@@ -2726,6 +2726,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     '/developer/analytics',
     '/developer/user-management',
     '/developer/settings',
+    '/reset-password',
   ]);
   const getDeveloperHomePath = async (user: any) => {
     if (user?.developerProfile?.profileType === 'general_sales') {
