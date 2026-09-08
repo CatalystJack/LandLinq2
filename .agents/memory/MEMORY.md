@@ -31,3 +31,4 @@
  - [Email intake routing audit](email-intake-routing-audit.md) — every automated intake outcome must persist its routing reason so platform admins can reconstruct how a deal entered the system.
  - [Transactional email mailbox verification](transactional-email-mailbox-verification.md) — only a newly approved post-fix message proves the current renderer/transport; older mailbox messages are not evidence.
 - [Intake volume alert durability](email-intake-volume-alert-durability.md) — count distinct source emails; use spike-scoped durable jobs so retries and restarts cannot duplicate or suppress alerts.
+- [Express SPA fallback asset guard](express-spa-fallback-asset-guard.md) — wildcard middleware paths are mount-relative; inspect originalUrl before deciding whether to return index.html for missing assets.

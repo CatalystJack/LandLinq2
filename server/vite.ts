@@ -82,7 +82,7 @@ export function serveStatic(app: Express) {
   // HTML shell for a missing asset/file. Returning index.html for /assets/*
   // causes the browser to reject it as JavaScript/CSS due to its MIME type.
   app.use("*", (req, res) => {
-    const requestedPath = req.path;
+    const requestedPath = (req.originalUrl || req.url).split("?", 1)[0];
     if (requestedPath.startsWith("/assets/") || path.extname(requestedPath)) {
       return res.sendStatus(404);
     }
