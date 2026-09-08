@@ -1,12 +1,10 @@
 ---
 name: drizzle-kit db:push broken in this repo
-description: db:push fails with "Please provide required params" even with correct drizzle config; use raw SQL instead for schema changes.
+description: This repo's Drizzle CLI rejects unsupported extension filters and can pause on data-preserving constraint prompts in noninteractive setup.
 ---
 
-Running `drizzle-kit push` (or the npm script wrapping it) in this repo fails with an error like "Please provide required params", even when `drizzle.config.ts` looks correctly configured and `DATABASE_URL` is set.
+This repo uses Drizzle Kit 0.31.4. Its `extensionsFilters` config only accepts supported filters such as `postgis`; listing `pg_stat_statements` causes `drizzle-kit push` to fail with “Please provide required params” even when `DATABASE_URL` is set. After that is removed, `push` can still present per-table truncate-choice prompts while adding unique constraints, which do not behave reliably with closed stdin.
 
-**Why:** Root cause not fully diagnosed (likely a drizzle-kit CLI/env-detection quirk in this project's setup); not worth re-investigating each time since raw SQL is fast and reliable.
+**Why:** The installed CLI validates extension filters more narrowly than the project config expected, and its interactive selector is not safe to depend on inside post-merge automation.
 
-**How to apply:** When you need to add/alter columns or tables, skip `db:push` and run the DDL directly, e.g.:
-`psql "$DATABASE_URL" -c "ALTER TABLE some_table ADD COLUMN IF NOT EXISTS new_col text;"`
-Still update `shared/schema.ts` (Drizzle table definitions) to match, so the ORM/type layer stays in sync — just don't rely on `db:push` to apply it.
+**How to apply:** Keep `drizzle.config.ts` limited to filters supported by the installed CLI. Treat post-merge `db:push` as a development-only best effort when it encounters interactive constraint prompts; for deliberate schema changes, update `shared/schema.ts` and apply reviewed development DDL directly, then verify the schema before relying on the ORM.
