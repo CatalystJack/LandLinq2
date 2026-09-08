@@ -1,10 +1,10 @@
 ---
-name: GoDaddy Microsoft Graph mailbox alignment
-description: GoDaddy-hosted Microsoft 365 mailboxes require the Graph app tenant and sender mailbox tenant to match.
+name: GoDaddy mailbox transport
+description: The GoDaddy-hosted deals mailbox is not a Microsoft 365 Graph mailbox and uses direct IMAP for inbound intake.
 ---
 
-Microsoft Graph app-only sendMail cannot address a GoDaddy Professional Email/Email Plus mailbox; Graph requires an Exchange Online mailbox in the same Microsoft tenant named by the app configuration. A successful GoDaddy user login alone does not prove that alignment.
+The GoDaddy-hosted deals mailbox must use direct IMAP for inbound polling. Microsoft Graph app-only access requires an Exchange Online mailbox in the same Microsoft tenant named by the app configuration; a successful GoDaddy user login does not prove that alignment. Outbound transport remains a separate concern.
 
 **Why:** Graph returned `ErrorInvalidUser` for the sender, while the GoDaddy admin view identified the account as Email Plus rather than Microsoft 365, indicating a transport/product mismatch rather than an HTML-rendering problem.
 
-**How to apply:** Either move the sender to Exchange Online in the app's tenant and grant application-level Mail.Send, or use a supported SMTP/SendGrid transport with a verified sender; do not treat GoDaddy Email Plus as Graph-addressable.
+**How to apply:** Keep the deals mailbox's inbound path on IMAP until the mailbox is actually moved to Exchange Online and aligned with the Graph app tenant. Do not re-enable Graph polling for this mailbox based only on GoDaddy login or alias evidence.

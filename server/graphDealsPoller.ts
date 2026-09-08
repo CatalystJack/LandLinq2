@@ -295,26 +295,11 @@ export function pollDealsMailbox(processMessage: DealsMailboxProcessor): Promise
 
 /** Start one delayed, non-overlapping production schedule. */
 export function startDealsMailboxPoller(intervalMs = 3 * 60 * 1000): void {
-  if (pollSchedule) return;
-  const run = async () => {
-    try {
-      const { EMAIL_SCRAPING_ENABLED } = await import('./emailAutomationConfig.js');
-      if (!EMAIL_SCRAPING_ENABLED) {
-        console.log('[GRAPH-DEALS] Poll skipped — email automation is disabled');
-        return;
-      }
-      const { EmailIntakeService } = await import('./emailIntakeService.js');
-      const result = await pollDealsMailbox(message => EmailIntakeService.processGraphMessage(message));
-      console.log(
-        `[GRAPH-DEALS] Poll complete: seen=${result.messagesSeen}, processed=${result.processed}, ` +
-        `manual/deferred=${result.deferred}, errors=${result.errors}, readFailures=${result.markReadFailures}`,
-      );
-    } catch (error) {
-      console.error('[GRAPH-DEALS] Poll failed; messages remain unread:', error);
-    }
-  };
-  pollSchedule = setInterval(run, intervalMs);
-  pollSchedule.unref?.();
-  void run();
-  console.log(`[GRAPH-DEALS] Poller scheduled every ${Math.round(intervalMs / 1000)} seconds`);
+  // deals@landlinq.ai is GoDaddy-hosted and must be polled through IMAP.
+  // Keep the Graph adapter available for its fixtures and provider utilities,
+  // but never let this legacy production entry point connect to the mailbox.
+  console.warn(
+    `[GRAPH-DEALS] Disabled for deals@landlinq.ai; use the IMAP poller instead ` +
+    `(requested interval ${Math.round(intervalMs / 1000)} seconds)`,
+  );
 }
