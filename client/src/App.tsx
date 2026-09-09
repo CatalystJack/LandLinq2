@@ -224,6 +224,8 @@ function Router() {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <Switch>
+          <Route path="/auth" component={AuthPage} />
+          <Route path="/login" component={AuthPage} />
           <Route path="/developer/dashboard" component={DeveloperDashboardPage} />
           <Route path="/developer/crm" component={DeveloperCrm} />
           <Route path="/developer/outreach" component={DeveloperOutreach} />

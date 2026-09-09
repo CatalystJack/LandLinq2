@@ -2727,6 +2727,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     '/developer/settings',
     '/outreach-onboarding',
     '/reset-password',
+    '/auth',
+    '/login',
   ]);
   const DEVELOPER_OAUTH_FALLBACK_PATH = '/outreach-onboarding';
   const getSafeDeveloperOAuthReturnUrl = (returnUrl: unknown): string => {

@@ -70,6 +70,19 @@ const notifyListeners = () => {
   authListeners.forEach(listener => listener());
 };
 
+export function clearLocalAuthState() {
+  globalAuthState = {
+    user: null,
+    isLoading: false,
+    isAuthenticated: false,
+    isInitialized: true,
+    userRole: null,
+    businessRole: null,
+    permissions: [],
+  };
+  notifyListeners();
+}
+
 const fetchUserOnce = async () => {
   if (globalAuthState.isInitialized) return;
   

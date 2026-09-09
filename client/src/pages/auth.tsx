@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/useAuth";
+import { clearLocalAuthState, useAuth } from "@/hooks/useAuth";
 import { Eye, EyeOff } from "lucide-react";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
 
@@ -18,10 +18,13 @@ export default function AuthPage() {
   const { isAuthenticated, isLoading, user, userRole } = useAuth();
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [preparingFreshLogin, setPreparingFreshLogin] = useState(false);
   
   // Get the auth mode from URL params
   const searchParams = new URLSearchParams(window.location.search);
   const authMode = searchParams.get('mode') || 'login'; // default to login
+  const isExplicitLoginEntry =
+    (location === "/login" || location === "/auth") && authMode !== "register";
   const authenticatedEmail = String((user as any)?.claims?.email || (user as any)?.email || "").toLowerCase();
   const authenticatedRole = String(
     (user as any)?.role ||
@@ -40,17 +43,49 @@ export default function AuthPage() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
+    if (!isLoading && isAuthenticated && !isExplicitLoginEntry) {
       setLocation(redirectUrl);
     }
-  }, [isLoading, isAuthenticated, setLocation, redirectUrl]);
+  }, [isLoading, isAuthenticated, isExplicitLoginEntry, setLocation, redirectUrl]);
 
-  if (!isLoading && isAuthenticated) {
+  useEffect(() => {
+    if (!isExplicitLoginEntry || isLoading || !isAuthenticated || preparingFreshLogin) {
+      return;
+    }
+
+    let cancelled = false;
+    setPreparingFreshLogin(true);
+    fetch("/api/logout", {
+      method: "POST",
+      credentials: "include",
+    })
+      .catch(() => {
+        // Clear the local state even if the server-side session is already gone.
+      })
+      .finally(() => {
+        if (cancelled) return;
+        queryClient.removeQueries({ queryKey: ["/api/user"] });
+        clearLocalAuthState();
+        setPreparingFreshLogin(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isExplicitLoginEntry, isLoading, isAuthenticated, preparingFreshLogin]);
+
+  if (
+    preparingFreshLogin ||
+    (isExplicitLoginEntry && isLoading) ||
+    (!isExplicitLoginEntry && !isLoading && isAuthenticated)
+  ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center text-slate-600">
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-catalyst-gold" />
-          <p className="mt-3 text-sm">Redirecting to your workspace…</p>
+          <p className="mt-3 text-sm">
+            {isExplicitLoginEntry ? "Preparing sign in…" : "Redirecting to your workspace…"}
+          </p>
         </div>
       </div>
     );
