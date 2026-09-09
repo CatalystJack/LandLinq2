@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Response } from "express";
 import fs from "fs";
 import path from "path";
 import { createServer as createViteServer, createLogger } from "vite";
@@ -76,7 +76,21 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  const setHtmlNoCacheHeaders = (res: Response) => {
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0",
+      Pragma: "no-cache",
+      Expires: "0",
+    });
+  };
+
+  app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      if (path.basename(filePath) === "index.html") {
+        setHtmlNoCacheHeaders(res);
+      }
+    },
+  }));
 
   // Fall through to index.html for client-side routes, but never return the
   // HTML shell for a missing asset/file. Returning index.html for /assets/*
@@ -94,6 +108,7 @@ export function serveStatic(app: Express) {
       return res.sendStatus(404);
     }
 
-    res.sendFile(path.resolve(distPath, "index.html"));
+    setHtmlNoCacheHeaders(res);
+    res.sendFile(path.resolve(distPath, "index.html"), { cacheControl: false });
   });
 }
