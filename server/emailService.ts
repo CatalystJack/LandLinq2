@@ -12,7 +12,6 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { getAppOnlyGraphToken } from './microsoftAuth';
-import sgMail from '@sendgrid/mail';
 import nodemailer from 'nodemailer';
 
 export const PUBLIC_TRANSACTIONAL_EMAIL = 'help@landlinq.ai';
@@ -173,32 +172,6 @@ async function sendGoDaddyEmail(
   }
 }
 
-async function getSendGridClient() {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? 'repl ' + process.env.REPL_IDENTITY
-    : process.env.WEB_REPL_RENEWAL
-      ? 'depl ' + process.env.WEB_REPL_RENEWAL
-      : null;
-  if (!xReplitToken) throw new Error('X_REPLIT_TOKEN not found - cannot authenticate with SendGrid connector');
-  const connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=sendgrid',
-    {
-      headers: {
-        Accept: 'application/json',
-        X_REPLIT_TOKEN: xReplitToken,
-      },
-    },
-  ).then((res) => res.json()).then((data) => data.items?.[0]);
-  if (!connectionSettings || !connectionSettings.settings.api_key || !connectionSettings.settings.from_email) {
-    throw new Error('SendGrid not connected via Replit connector');
-  }
-  sgMail.setApiKey(connectionSettings.settings.api_key);
-  return { client: sgMail, fromEmail: connectionSettings.settings.from_email };
-}
-
-if (process.env.SENDGRID_API_KEY) sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
 export async function sendSystemEmail(
   to: string,
   subject: string,
@@ -305,13 +278,20 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
       : '';
     const cleanGraphHtml = stripLegacyCatalystBranding(graphHtml);
 
-    // Public transactional mail tries SendGrid first because its API accepts
-    // the message immediately and generally delivers faster than SMTP
-    // submission. Keep the GoDaddy/Microsoft 365 mailbox as a fallback so
-    // delivery still works if the SendGrid sender identity is not verified.
-    if (isGoDaddySender && (!notification.subject || !cleanGraphHtml)) {
-      console.error(`❌ [EMAIL] Message has no rendered subject/body; refusing to send from ${senderEmail}`);
-      return false;
+    // GoDaddy-managed Microsoft 365 SMTP is the authoritative transport for
+    // the platform mailboxes. Keep these messages on the mailbox transport so
+    // help@landlinq.ai remains the actual authenticated sender.
+    if (isGoDaddySender) {
+      if (!notification.subject || !cleanGraphHtml) {
+        console.error(`❌ [GODADDY-SMTP] Message has no rendered subject/body; refusing to send from ${senderEmail}`);
+        return false;
+      }
+      return await sendGoDaddyEmail(
+        notification,
+        senderEmail,
+        stripLegacyCatalystBranding(senderName),
+        cleanGraphHtml,
+      );
     }
 
     if (notification.subject && cleanGraphHtml) {
@@ -324,161 +304,12 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
         senderEmail,
       );
       if (graphSent) return true;
-      console.warn('⚠️ [GRAPH-SYSTEM] Graph delivery failed; using temporary SendGrid fallback');
-    } else {
-      console.warn('⚠️ [GRAPH-SYSTEM] Message has no rendered subject/body; using transport fallback');
-    }
-    
-    console.log('📧 [SENDGRID] Attempting to send email...');
-    console.log('📧 [SENDGRID] To:', notification.to);
-    console.log('📧 [SENDGRID] Subject:', notification.subject);
-    
-    // Try to get SendGrid client from Replit connector first, fallback to env var
-    let sendGridClient;
-    try {
-      console.log('📧 [SENDGRID] Attempting to use Replit SendGrid Connector...');
-      const connectorClient = await getSendGridClient();
-      sendGridClient = connectorClient.client;
-      console.log('✅ [SENDGRID] Using Replit connector; transactional sender:', senderEmail);
-    } catch (connectorError) {
-      console.log('⚠️ [SENDGRID] Connector failed, trying environment variable...');
-      console.log('   Connector error:', connectorError instanceof Error ? connectorError.message : String(connectorError));
-      
-      if (!process.env.SENDGRID_API_KEY) {
-        if (isGoDaddySender) {
-          console.warn(`⚠️ [SENDGRID] Connector unavailable; falling back to GoDaddy SMTP for ${senderEmail}`);
-          return await sendGoDaddyEmail(
-            notification,
-            senderEmail,
-            stripLegacyCatalystBranding(senderName),
-            cleanGraphHtml,
-          );
-        }
-        console.error('❌ [SENDGRID] API key not configured - email cannot be sent');
-        console.error('❌ [SENDGRID] Set SENDGRID_API_KEY environment variable or configure SendGrid connector');
-        console.log('📧 [EMAIL SIMULATION] - Would have sent:');
-        console.log('   To:', notification.to);
-        console.log('   Subject:', notification.subject);
-        console.log('   Type:', notification.type);
-        console.log('   Priority:', notification.priority);
-        console.log('---');
-        return false;
-      }
-      
-      sendGridClient = sgMail;
-      console.log('✅ [SENDGRID] Using environment variable API key');
     }
 
-    console.log('📧 [SENDGRID] Preparing email for:', notification.to);
-
-    let msg: any;
-    
-    // All outbound email uses locally-rendered HTML. Keep SendGrid available only
-    // as the transport fallback when Graph delivery is unavailable.
-    console.log(`📧 [SENDGRID-FALLBACK] Preparing rendered HTML email for: ${notification.to}`);
-    
-    // Add unsubscribe link to HTML content if not already present
-    let htmlContent = cleanGraphHtml;
-    // Use plain text version if available, otherwise strip HTML properly
-    let textContent = notification.text || (htmlContent ? htmlContent
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style tags
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tags  
-        .replace(/<[^>]+>/g, '') // Remove all HTML tags
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-        .replace(/\s+/g, ' ')
-        .trim() : '');
-      
-      // Use the published domain to avoid SSL issues with SendGrid tracking
-      const baseUrl = process.env.REPLIT_DOMAINS ? 
-        `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 
-        'https://landlinq.ai';
-      const unsubscribeUrl = `${baseUrl}/unsubscribe?email=${encodeURIComponent(notification.to)}`;
-      
-      // Check if unsubscribe link already exists
-      if (htmlContent && !notification.transactional && !htmlContent.includes('unsubscribe')) {
-        // Add unsubscribe link to HTML - without any special headers to avoid SendGrid rewriting
-        htmlContent += `<br><br><hr><small style="color: #666;">To unsubscribe from future emails, <a href="${unsubscribeUrl}" style="color: #666;">click here</a> or reply with UNSUBSCRIBE.</small>`;
-        
-        // Add unsubscribe text to plain text version
-        textContent += `\n\n---\nTo unsubscribe from future emails, visit: ${unsubscribeUrl} or reply with UNSUBSCRIBE.`;
-      }
-      
-    msg = {
-      to: notification.to,
-      from: {
-        email: senderEmail,
-        name: senderName
-      },
-      replyTo: senderEmail,
-      subject: notification.subject,
-      // SendGrid requires text/plain FIRST, then text/html
-      content: [
-        {
-          type: 'text/plain',
-          value: textContent || notification.text || ''
-        },
-        {
-          type: 'text/html',
-          value: htmlContent || notification.html || notification.text || ''
-        }
-      ],
-    };
-
-    // Disable click tracking if requested (prevents SSL issues with SendGrid tracking domains)
-    if (disableClickTracking) {
-      msg.trackingSettings = {
-        clickTracking: {
-          enable: false
-        }
-      };
-      console.log('📧 Click tracking DISABLED for this email to prevent SSL certificate issues');
-    }
-
-    // Add file attachments if provided
-    if (notification.attachments && notification.attachments.length > 0) {
-      msg.attachments = notification.attachments;
-      console.log(`📎 [SENDGRID] Adding ${notification.attachments.length} attachment(s): ${notification.attachments.map(a => a.filename).join(', ')}`);
-    }
-
-    console.log('📧 [SENDGRID] Calling SendGrid API...');
-    
-    if (notification.html) {
-      console.log('🔍 [DEBUG] HTML Preview (first 500 chars):', notification.html.substring(0, 500));
-      console.log('🔍 [DEBUG] Has angle brackets?', notification.html.includes('<div'), notification.html.includes('</div>'));
-    }
-    
-    const result = await sendGridClient.send(msg);
-    
-    const responseTime = Date.now() - startTime;
-    apiCallTracker.logCall('SendGrid', 'send', true, responseTime);
-    
-    console.log('✅ [SENDGRID] SUCCESS! Email sent to:', notification.to);
-    console.log('✅ [SENDGRID] Subject:', notification.subject);
-    console.log('✅ [SENDGRID] SendGrid response status:', result[0]?.statusCode);
-    return true;
+    console.error(`❌ [EMAIL] No configured transport delivered message from ${senderEmail} to ${notification.to}`);
+    return false;
   } catch (error: any) {
-    const responseTime = Date.now() - startTime;
-    apiCallTracker.logCall('SendGrid', 'send', false, responseTime, {
-      errorMessage: error.message || String(error)
-    });
-    
-    console.error('❌ [SENDGRID] FAILED to send email');
-    console.error('❌ [SENDGRID] To:', notification.to);
-    console.error('❌ [SENDGRID] Subject:', notification.subject);
-    console.error('❌ [SENDGRID] Error:', error.message || error);
-    console.error('❌ [SENDGRID] Error details:', JSON.stringify(error, null, 2));
-    if (isGoDaddySender) {
-      console.warn(`⚠️ [SENDGRID] Falling back to GoDaddy SMTP for ${senderEmail}`);
-      return await sendGoDaddyEmail(
-        notification,
-        senderEmail,
-        stripLegacyCatalystBranding(senderName),
-        cleanGraphHtml,
-      );
-    }
+    console.error('❌ [EMAIL] Failed to send notification:', error?.message || error);
     return false;
   }
 }

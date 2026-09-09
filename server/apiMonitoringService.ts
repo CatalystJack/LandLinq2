@@ -83,14 +83,6 @@ export class ApiMonitoringService {
         changelogUrl: 'https://www.twilio.com/docs/all/changelog',
         updateInstructions: 'Twilio uses dated API versions. Current version in use is stable. Check changelog for new features.'
       },
-      {
-        name: 'SendGrid',
-        currentVersion: 'v3',
-        latestVersion: 'v3',
-        needsUpdate: false,
-        changelogUrl: 'https://www.twilio.com/docs/sendgrid/api-reference',
-        updateInstructions: 'SendGrid API v3 is current. Check API reference for new endpoints and features.'
-      }
     );
     
     // Check HelloData
@@ -105,10 +97,6 @@ export class ApiMonitoringService {
     const twilioCheck = await this.checkTwilio();
     healthChecks.push(twilioCheck);
     
-    // Check SendGrid
-    const sendgridCheck = await this.checkSendGrid();
-    healthChecks.push(sendgridCheck);
-
     // Log all results to database
     await this.logHealthMetrics(healthChecks);
 
@@ -336,57 +324,6 @@ export class ApiMonitoringService {
       const responseTime = Date.now() - startTime;
       return {
         name: 'Twilio',
-        status: 'down',
-        responseTime,
-        errorMessage: error.message || 'Connection failed'
-      };
-    }
-  }
-
-  /**
-   * Check SendGrid API health
-   */
-  private static async checkSendGrid(): Promise<ApiHealthCheck> {
-    const startTime = Date.now();
-    try {
-      const apiKey = process.env.SENDGRID_API_KEY;
-      if (!apiKey) {
-        return {
-          name: 'SendGrid',
-          status: 'down',
-          responseTime: 0,
-          errorMessage: 'API key not configured'
-        };
-      }
-
-      // Check API status
-      const response = await fetch('https://api.sendgrid.com/v3/scopes', {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`
-        },
-        signal: AbortSignal.timeout(10000)
-      });
-
-      const responseTime = Date.now() - startTime;
-
-      if (response.ok) {
-        return {
-          name: 'SendGrid',
-          status: 'healthy',
-          responseTime
-        };
-      } else {
-        return {
-          name: 'SendGrid',
-          status: 'degraded',
-          responseTime,
-          errorMessage: `HTTP ${response.status}: ${response.statusText}`
-        };
-      }
-    } catch (error: any) {
-      const responseTime = Date.now() - startTime;
-      return {
-        name: 'SendGrid',
         status: 'down',
         responseTime,
         errorMessage: error.message || 'Connection failed'

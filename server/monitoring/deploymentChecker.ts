@@ -93,7 +93,7 @@ class DeploymentReadinessChecker {
    */
   private async checkEnvironmentVariables(): Promise<DeploymentCheckResult> {
     const required = ['DATABASE_URL', 'SESSION_SECRET'];
-    const optional = ['OPENAI_API_KEY', 'SENDGRID_API_KEY', 'ANTHROPIC_API_KEY'];
+    const optional = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY'];
     
     const missing = required.filter(varName => !process.env[varName]);
     const missingOptional = optional.filter(varName => !process.env[varName]);

@@ -234,10 +234,6 @@ export class EmailInboundService {
 
       console.log(`📧 Processing email from ${emailData.from} to ${emailData.to} - Subject: ${emailData.subject}`);
 
-      // CAPTURE RAW PAYLOAD FOR DEBUGGING
-      const { sendGridDebugger } = await import('./sendgridDebugger.js');
-      sendGridDebugger.capturePayload(req.headers as Record<string, string>, req.body);
-
       // FILTER: Only process emails sent to deals@landlinq.ai as deals
       // CRITICAL FIX (Dec 2, 2025): Use includes() instead of strict equality
       // Email "To" field may include display name like "LandLinq <deals@landlinq.ai>"

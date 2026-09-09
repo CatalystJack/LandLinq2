@@ -224,7 +224,6 @@ import { publicListingValidationService } from "./publicListingValidationService
 import { DealBlockingService } from "./dealBlockingService";
 import { EmergencyReviewService } from "./emergencyReviewService";
 import { dealBlockingEndpoints, emergencyReviewEndpoints, configurationEndpoints } from "./apiEndpoints";
-import { EventWebhook } from "@sendgrid/eventwebhook";
 import twilio from "twilio";
 
 // Module-level cache for municipality population lookups (expires on server restart per spec)
@@ -23437,34 +23436,7 @@ RULES:
       // Use content-based hash if provider ID is not available (prevents random IDs on webhook retries)
       const messageId = getProviderMessageId(emailData, 'email') || generateDeterministicEmailId(emailData);
       
-      // 1. SIGNATURE VERIFICATION - TEMPORARILY DISABLED TO ALLOW EMAIL PROCESSING
-      // Note: Webhook verification temporarily bypassed due to missing SENDGRID_WEBHOOK_PUBLIC_KEY
-      const hasSignatureVerification = !!process.env.SENDGRID_WEBHOOK_PUBLIC_KEY;
-      console.log('⚠️ WEBHOOK VERIFICATION TEMPORARILY DISABLED - EMAILS WILL PROCESS WITHOUT SIGNATURE CHECK');
-      if (hasSignatureVerification) {
-        console.log('📧 Attempting webhook signature verification...');
-        try {
-          const eventWebhook = new EventWebhook();
-          const publicKey = process.env.SENDGRID_WEBHOOK_PUBLIC_KEY;
-          const signature = req.headers['x-twilio-email-event-webhook-signature'] as string;
-          const timestamp = req.headers['x-twilio-email-event-webhook-timestamp'] as string;
-          const rawBody = req.body;
-        
-          if (!eventWebhook.verifySignature(rawBody, signature, timestamp, publicKey || '')) {
-            console.log('❌ Webhook signature verification failed');
-            return res.status(401).send('Invalid signature');
-          }
-          console.log('✅ Webhook signature verified successfully');
-        } catch (verificationError) {
-          console.log('⚠️ Webhook signature verification error:', verificationError);
-          // For Inbound Parse, continue processing even if verification fails
-          console.log('📧 Continuing with email processing (Inbound Parse doesn\'t require signature verification)');
-        }
-      } else {
-        console.log('📧 No signature verification configured - processing email directly (normal for Inbound Parse)');
-      }
-      
-      // 2. CHECK DEDUPLICATION AFTER signature verification
+      // CHECK DEDUPLICATION BEFORE processing.
       if (isMessageAlreadyProcessed(messageId)) {
         console.log(`📧 Duplicate message detected: ${messageId}`);
         return res.json({ 
@@ -23662,79 +23634,6 @@ RULES:
     }
   });
 
-  // SENDGRID EVENT WEBHOOK - Track opens, clicks, bounces for engagement analytics
-  // Configure in SendGrid: Settings > Mail Settings > Event Webhook
-  // URL: https://landlinq.replit.app/webhooks/sendgrid-events
-  app.post('/webhooks/sendgrid-events', express.json(), async (req, res) => {
-    try {
-      const events = Array.isArray(req.body) ? req.body : [req.body];
-      console.log(`📊 [SENDGRID-EVENTS] Received ${events.length} event(s)`);
-      
-      // Process each event
-      for (const event of events) {
-        const eventType = event.event;
-        const email = event.email;
-        const sgMessageId = event.sg_message_id;
-        
-        console.log(`📊 [SENDGRID-EVENTS] Event: ${eventType} for ${email}`);
-        
-        // Track engagement in our safeguard service
-        if (['delivered', 'open', 'click', 'bounce', 'spamreport'].includes(eventType)) {
-          try {
-            // Find the sender from the message if available
-            const senderId = event.senderId || null;
-            
-            // Map SendGrid events to our event types
-            const mappedEvent = eventType === 'open' ? 'opened' 
-                             : eventType === 'click' ? 'clicked'
-                             : eventType === 'bounce' ? 'bounced'
-                             : eventType === 'spamreport' ? 'complained'
-                             : 'delivered';
-            
-            // Record in our stats (if we have sender info)
-            if (senderId) {
-              const { outreachSafeguardService } = await import('./outreachSafeguardService');
-              await outreachSafeguardService.recordSendOutcome(
-                senderId, 
-                eventType !== 'bounce' && eventType !== 'spamreport',
-                mappedEvent as any,
-                'email'
-              );
-            }
-            
-            // Update broker engagement stats in our database
-            if ((eventType === 'open' || eventType === 'click') && email) {
-              try {
-                await db.execute(sql`
-                  UPDATE brokers 
-                  SET 
-                    last_email_opened_at = CASE WHEN ${eventType} = 'open' THEN now() ELSE last_email_opened_at END,
-                    email_opens_count = CASE WHEN ${eventType} = 'open' THEN COALESCE(email_opens_count, 0) + 1 ELSE email_opens_count END,
-                    last_email_clicked_at = CASE WHEN ${eventType} = 'click' THEN now() ELSE last_email_clicked_at END,
-                    email_clicks_count = CASE WHEN ${eventType} = 'click' THEN COALESCE(email_clicks_count, 0) + 1 ELSE email_clicks_count END,
-                    updated_at = now()
-                  WHERE email = ${email}
-                `);
-              } catch (dbErr) {
-                // Columns might not exist yet - that's ok
-                console.log(`📊 [SENDGRID-EVENTS] Could not update broker stats (columns may not exist)`);
-              }
-            }
-            
-          } catch (processErr) {
-            console.error(`❌ [SENDGRID-EVENTS] Error processing ${eventType} event:`, processErr);
-          }
-        }
-      }
-      
-      // Always return 200 to acknowledge receipt (SendGrid will retry on non-2xx)
-      res.status(200).json({ received: events.length });
-    } catch (error) {
-      console.error('❌ [SENDGRID-EVENTS] Webhook error:', error);
-      res.status(200).json({ error: 'Processing error', received: 0 });
-    }
-  });
-
   // SENDGRID INBOUND PARSE WEBHOOK - Proper multipart handling for deals@landlinq.ai
   // Configure proper multer middleware for SendGrid's multipart/form-data format
   const sendgridWebhookUpload = multer({ 
@@ -23743,6 +23642,8 @@ RULES:
   });
   
   app.post('/webhooks/landlinq-inbound', sendgridWebhookUpload.any(), webhookRateLimit, async (req, res) => {
+    return res.status(410).json({ error: 'This inbound provider webhook is no longer supported.' });
+    /*
     try {
       console.log('📧 Received SendGrid inbound email webhook');
       console.log('📧 Content-Type:', req.get('Content-Type') || 'Unknown');
@@ -24020,6 +23921,7 @@ RULES:
       console.error('❌ SendGrid webhook processing error:', error);
       res.status(500).json({ error: 'Failed to process SendGrid webhook' });
     }
+    */
   });
 
   // MANUAL EMAIL TEST ENDPOINT - for testing email processing without SendGrid
@@ -26464,51 +26366,6 @@ RULES:
     } catch (error) {
       console.error('❌ Error fetching recent API calls:', error);
       res.status(500).json({ error: 'Failed to fetch recent API calls' });
-    }
-  });
-
-  // SendGrid Webhook Debugger - View captured payloads
-  app.get('/api/sendgrid/debug/recent', isAuthenticated, async (req, res) => {
-    try {
-      const { sendGridDebugger } = await import('./sendgridDebugger.js');
-      const limit = parseInt(req.query.limit as string) || 10;
-      const payloads = sendGridDebugger.getRecentPayloads(limit);
-      
-      res.json({
-        payloads: payloads.map(p => ({
-          ...p,
-          timestamp: p.timestamp.toISOString(),
-          // Truncate body for readability
-          body: JSON.stringify(p.body).length > 1000 
-            ? JSON.stringify(p.body).substring(0, 1000) + '...[truncated]'
-            : p.body
-        }))
-      });
-    } catch (error) {
-      console.error('❌ Error fetching debug payloads:', error);
-      res.status(500).json({ error: 'Failed to fetch debug payloads' });
-    }
-  });
-
-  app.get('/api/sendgrid/debug/stats', isAuthenticated, async (req, res) => {
-    try {
-      const { sendGridDebugger } = await import('./sendgridDebugger.js');
-      const stats = sendGridDebugger.getStats();
-      res.json(stats);
-    } catch (error) {
-      console.error('❌ Error fetching debug stats:', error);
-      res.status(500).json({ error: 'Failed to fetch debug stats' });
-    }
-  });
-
-  app.post('/api/sendgrid/debug/clear', isAuthenticated, async (req, res) => {
-    try {
-      const { sendGridDebugger } = await import('./sendgridDebugger.js');
-      sendGridDebugger.clear();
-      res.json({ message: 'Debug payloads cleared' });
-    } catch (error) {
-      console.error('❌ Error clearing debug payloads:', error);
-      res.status(500).json({ error: 'Failed to clear debug payloads' });
     }
   });
 

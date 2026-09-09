@@ -41,7 +41,6 @@ const SMSOptIn = lazy(() => import("@/pages/sms-opt-in"));
 const AnalystDashboard = lazy(() => import("@/pages/analyst-dashboard"));
 const AnalystDashboardV2 = lazy(() => import("@/pages/analyst-dashboard-v2"));
 const AdminDashboard = lazy(() => import("@/pages/admin-dashboard"));
-const SendGridDebugger = lazy(() => import("@/pages/sendgrid-debugger"));
 const UserManagement = lazy(() => import("@/pages/user-management"));
 const OutreachManagement = lazy(() => import("@/pages/outreach-management"));
 const OutreachOnboarding = lazy(() => import("@/pages/outreach-onboarding"));
@@ -217,7 +216,6 @@ function Router() {
           <Route path="/ai-training" component={AITraining} />
           <Route path="/email-preview" component={EmailPreview} />
           <Route path="/email-builder" component={TemplateEditor} />
-          <Route path="/sendgrid-debugger" component={SendGridDebugger} />
           <Route path="/auth" component={AuthPage} />
           <Route path="/login" component={AuthPage} />
           <Route path="/signup" component={AuthPage} />

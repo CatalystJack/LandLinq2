@@ -28,14 +28,6 @@ export const REQUIRED_ENV_VARS = {
     example: 'sk-proj-...'
   },
   
-  // Email Services
-  SENDGRID_API_KEY: {
-    description: 'SendGrid API key for email notifications',
-    required: true,
-    production: true,
-    example: 'SG.xxx'
-  },
-  
   // SMS Services
   TWILIO_ACCOUNT_SID: {
     description: 'Twilio Account SID for SMS functionality',
@@ -211,7 +203,7 @@ export async function runProductionSafetyCheck(): Promise<{
   }
   
   // Critical Services Check
-  const criticalServices = ['DATABASE_URL', 'SENDGRID_API_KEY', 'TWILIO_ACCOUNT_SID'];
+  const criticalServices = ['DATABASE_URL', 'TWILIO_ACCOUNT_SID'];
   const missingCritical = criticalServices.filter(service => !process.env[service]);
   
   checks.push({

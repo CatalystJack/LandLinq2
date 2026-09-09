@@ -136,7 +136,6 @@ export class EmailDeliverabilityService {
       "✅ Unsubscribe link in every email",
       "✅ Professional HTML design with proper structure",
       "✅ Clear subject lines without spam trigger words",
-      "✅ SendGrid tracking optimized for deliverability",
       "✅ Email categories for analytics and reputation",
       "✅ No excessive links or promotional content",
       "✅ Professional signature with contact information"
@@ -187,27 +186,5 @@ export class EmailDeliverabilityService {
     return { riskLevel, issues, recommendations };
   }
 }
-
-// Domain authentication setup instructions
-export const DOMAIN_SETUP_INSTRUCTIONS = {
-  sendgrid: {
-    steps: [
-      "1. Go to SendGrid → Settings → Sender Authentication",
-      "2. Authenticate Domain: landlinq.ai",
-      "3. Add these DNS records to your domain:",
-      "   - CNAME: s1._domainkey → s1.domainkey.uXXXX.wl.sendgrid.net",
-      "   - CNAME: s2._domainkey → s2.domainkey.uXXXX.wl.sendgrid.net", 
-      "   - CNAME: em1234 → u12345.wl.sendgrid.net",
-      "4. Wait for DNS propagation (24-48 hours)",
-      "5. Verify domain authentication in SendGrid"
-    ],
-    benefits: [
-      "✅ SPF and DKIM authentication automatically configured",
-      "✅ Improved sender reputation and deliverability",
-      "✅ Reduced chance of emails being marked as spam",
-      "✅ Professional email authentication visible to recipients"
-    ]
-  }
-};
 
 export default EmailDeliverabilityService;

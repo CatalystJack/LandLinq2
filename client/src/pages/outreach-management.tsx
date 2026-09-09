@@ -77,9 +77,6 @@ interface EmailTemplate {
   fontSize?: string;
   fontFamily?: string;
   logoUrl?: string;
-  // SendGrid integration - auto-detection based on sendgridTemplateId
-  templateSource?: 'outreach' | 'sendgrid'; // DEPRECATED - kept for backward compatibility
-  sendgridTemplateId?: string; // If provided, uses SendGrid; if empty, uses Outreach Tab
 }
 
 interface SmsTemplate {
@@ -558,24 +555,6 @@ export default function OutreachManagement() {
   const handleSaveTemplates = async (templateId?: string, customEmailTemplates?: EmailTemplate[], customSmsTemplates?: SmsTemplate[]) => {
     try {
       const templatesToSave = customEmailTemplates || emailTemplates;
-      
-      // Validate: If sendgridTemplateId has been started (not null/undefined) but is empty, show error
-      const invalidTemplates = templatesToSave.filter(
-        (t: any) => t.sendgridTemplateId !== undefined && 
-                    t.sendgridTemplateId !== null && 
-                    t.sendgridTemplateId.trim() !== '' && 
-                    !t.sendgridTemplateId.startsWith('d-')
-      );
-      
-      if (invalidTemplates.length > 0) {
-        const templateNames = invalidTemplates.map((t: any) => t.name).join(', ');
-        toast({
-          title: "Invalid Template ID",
-          description: `SendGrid template IDs must start with "d-": ${templateNames}`,
-          variant: "destructive"
-        });
-        return;
-      }
       
       await saveTemplatesMutation.mutateAsync({
         emailTemplates: templatesToSave,
@@ -1964,77 +1943,6 @@ export default function OutreachManagement() {
                             <SelectItem value="daily_digest_super_admin">Super Admin Daily Digest</SelectItem>
                           </SelectContent>
                         </Select>
-                      </div>
-                      
-                      {/* SendGrid Mode Toggle */}
-                      <div className="space-y-3 border-t pt-4">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <Label className="text-base flex items-center gap-2">
-                              Use SendGrid Dynamic Templates
-                              {(template.sendgridTemplateId !== undefined && template.sendgridTemplateId !== null) ? (
-                                <Badge variant="default" className="bg-blue-600 text-white">
-                                  <Zap className="w-3 h-3 mr-1" />
-                                  SendGrid
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary">
-                                  📝 Outreach Tab
-                                </Badge>
-                              )}
-                            </Label>
-                            <p className="text-xs text-muted-foreground">
-                              Toggle ON to use SendGrid templates, OFF for Outreach Tab
-                            </p>
-                          </div>
-                          <Switch
-                            checked={!!(template.sendgridTemplateId !== undefined && template.sendgridTemplateId !== null)}
-                            onCheckedChange={(checked) => {
-                              const updated = emailTemplates.map(t => {
-                                if (t.id === template.id) {
-                                  if (!checked) {
-                                    // Turn OFF: remove the field entirely
-                                    const { sendgridTemplateId, ...rest } = t;
-                                    return rest as EmailTemplate;
-                                  } else {
-                                    // Turn ON: set to empty string (will show input field)
-                                    return { ...t, sendgridTemplateId: '' };
-                                  }
-                                }
-                                return t;
-                              });
-                              handleEmailTemplatesChange(updated);
-                            }}
-                            disabled={editingTemplateId !== template.id}
-                            data-testid={`email-template-sendgrid-toggle-${template.id}`}
-                          />
-                        </div>
-                        
-                        {/* Conditional SendGrid Template ID Field - Show when NOT null/undefined */}
-                        {(template.sendgridTemplateId !== undefined && template.sendgridTemplateId !== null) ? (
-                          <div className="space-y-2 bg-blue-50 dark:bg-blue-950 p-4 rounded-md border border-blue-200 dark:border-blue-800">
-                            <Label className="flex items-center gap-2">
-                              SendGrid Template ID
-                              <span className="text-xs text-red-600 font-normal">*Required</span>
-                            </Label>
-                            <Input
-                              value={template.sendgridTemplateId || ''}
-                              onChange={(e) => {
-                                const updated = emailTemplates.map(t => 
-                                  t.id === template.id ? { ...t, sendgridTemplateId: e.target.value } : t
-                                );
-                                handleEmailTemplatesChange(updated);
-                              }}
-                              disabled={editingTemplateId !== template.id}
-                              placeholder="d-1234567890abcdef"
-                              className="font-mono"
-                              data-testid={`email-template-sendgrid-id-${template.id}`}
-                            />
-                            <p className="text-xs text-blue-600 dark:text-blue-400">
-                              ℹ️ Template content is managed in SendGrid. Subject and content fields below will be ignored.
-                            </p>
-                          </div>
-                        ) : null}
                       </div>
                       
                       <div className="space-y-2">

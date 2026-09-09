@@ -93,14 +93,6 @@ export const API_FALLBACK_CONFIGS: Record<string, ApiFallbackConfig> = {
     requiresManualReview: false,
     criticalForOperation: true, // SMS confirmations are important
   },
-  SendGrid: {
-    apiName: 'SendGrid',
-    primaryStrategy: FallbackStrategy.RETRY_LATER,
-    retryAttempts: 5,
-    retryDelay: 10000, // 10 seconds
-    requiresManualReview: false,
-    criticalForOperation: true, // Email confirmations are important
-  },
 };
 
 export interface AlertEvent {
@@ -204,7 +196,7 @@ export class ApiSafetySystem {
     const oneHourAgo = new Date(Date.now() - 3600000);
 
     try {
-      const services = ['HelloData', 'Geocodio', 'OpenAI', 'ArcGIS', 'Twilio', 'SendGrid'];
+      const services = ['HelloData', 'Geocodio', 'OpenAI', 'ArcGIS', 'Twilio'];
 
       for (const service of services) {
         const result = await db
