@@ -27,6 +27,26 @@ export default function DeveloperLogin() {
   const [brandingError, setBrandingError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  // Opening a company login is an explicit request to authenticate again.
+  // Clear any prior session so this page always requires fresh credentials.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/logout", {
+      method: "POST",
+      credentials: "include",
+    })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) {
+          queryClient.removeQueries({ queryKey: ["/api/user"] });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 

@@ -2785,6 +2785,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       !req.path.startsWith('/node_modules/');
     if (req.isAuthenticated?.()) {
       const role = String(req.user?.role || '').toUpperCase();
+      const isDeveloperLoginPath = /^\/developer\/[^/]+\/login$/.test(req.path);
       if (role === 'DEVELOPER' && req.user?.mustResetPassword === true && req.path !== '/reset-password') {
         try {
           const { passwordResetService } = await import('./passwordReset');
@@ -2796,7 +2797,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
           return next(error);
         }
       }
-      if (role === 'DEVELOPER' && !DEVELOPER_ALLOWED_PAGE_PATHS.has(req.path)) {
+      if (role === 'DEVELOPER' && !DEVELOPER_ALLOWED_PAGE_PATHS.has(req.path) && !isDeveloperLoginPath) {
         return res.redirect(await getDeveloperHomePath(req.user));
       }
       return next();
