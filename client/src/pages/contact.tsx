@@ -43,7 +43,7 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-[100dvh] bg-[#f7f9fc] text-[#18324a]">
-      <Navigation />
+      <Navigation hideSubmitDeal />
 
       <main>
         <section className="border-b border-[#e2eaf1] bg-white px-5 py-16 sm:px-8 sm:py-20 lg:px-10">

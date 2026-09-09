@@ -17,9 +17,10 @@ const landlinqWhiteLogo = "/assets/landlinq-white-logo.png";
 
 interface NavigationProps {
   onOpenSlideForm?: () => void;
+  hideSubmitDeal?: boolean;
 }
 
-function PublicNavigation() {
+function PublicNavigation({ hideSubmitDeal = false }: Pick<NavigationProps, "hideSubmitDeal">) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
@@ -37,9 +38,11 @@ function PublicNavigation() {
             <Link href="/login" className="rounded-full border border-white/35 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-landlinq-sky hover:bg-white hover:text-landlinq-blue">
               Log in
             </Link>
-            <Link href="/submit-deal" className="rounded-full border border-landlinq-sky bg-landlinq-sky px-4 py-2 text-sm font-semibold text-primary transition-all hover:border-landlinq-sky hover:bg-white hover:text-landlinq-blue">
-              Submit a deal
-            </Link>
+            {!hideSubmitDeal && (
+              <Link href="/submit-deal" className="rounded-full border border-landlinq-sky bg-landlinq-sky px-4 py-2 text-sm font-semibold text-primary transition-all hover:border-landlinq-sky hover:bg-white hover:text-landlinq-blue">
+                Submit a deal
+              </Link>
+            )}
           </div>
 
           <button
@@ -60,7 +63,9 @@ function PublicNavigation() {
               <a href="/#company" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/75 hover:bg-white/10 hover:text-white">Company</a>
               <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/75 hover:bg-white/10 hover:text-white">Contact</Link>
               <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="mt-2 rounded-lg border border-white/25 px-3 py-3 text-center text-sm font-semibold text-white hover:bg-white hover:text-primary">Log in</Link>
-              <Link href="/submit-deal" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg bg-landlinq-sky px-3 py-3 text-center text-sm font-semibold text-primary hover:bg-white">Submit a deal</Link>
+              {!hideSubmitDeal && (
+                <Link href="/submit-deal" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg bg-landlinq-sky px-3 py-3 text-center text-sm font-semibold text-primary hover:bg-white">Submit a deal</Link>
+              )}
             </div>
           </div>
         )}
@@ -69,7 +74,7 @@ function PublicNavigation() {
   );
 }
 
-function Navigation({ onOpenSlideForm }: NavigationProps) {
+function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps) {
   const { user, isAuthenticated, logout, userRole, hasPermission, isRole } = useAuth();
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -244,7 +249,7 @@ function Navigation({ onOpenSlideForm }: NavigationProps) {
   }, [landlinqNav, isAuthenticated, isPlatformAdmin]);
 
   if (!isAuthenticated) {
-    return <PublicNavigation />;
+    return <PublicNavigation hideSubmitDeal={hideSubmitDeal} />;
   }
 
   return (
