@@ -1,0 +1,37 @@
+Found the precise bug: while authenticated as a DEVELOPER-role user, requests for 
+static assets (JS/CSS files under /assets/) are being redirected to 
+/developer/dashboard instead of being served as real files — confirmed by direct 
+evidence: an authenticated fetch of /assets/index-CQOjNzDn.js returns the 
+dashboard's HTML content instead of JavaScript.
+
+This is almost certainly a NEW route-protection/redirect check, added in the most 
+recent authentication flow changes, that is missing the same static-asset 
+exclusion the ORIGINAL working guard already has (server/routes.ts, 
+DEVELOPER_ALLOWED_PAGE_PATHS check, which correctly excludes paths containing "." 
+or starting with "/assets/", "/src/", "/node_modules/").
+
+TASK 1 — Find every route-protection/redirect check added in the recent 
+authentication flow work
+Search for any NEW logic (server-side middleware, or client-side route guards) 
+added in the recent commits related to "auth flow updates," "route protection 
+logic," or "authentication flow and form validation" that checks a DEVELOPER 
+user's current path against an allowed-pages list and redirects if not found.
+
+TASK 2 — Add the missing static-asset exclusion
+Whichever check is responsible, add the same exclusion the original working guard 
+already has: skip this redirect check entirely if the request path contains a "." 
+(a file extension) or starts with "/assets/", "/src/", or "/node_modules/" — these 
+are never page navigations and must never be redirected.
+
+TASK 3 — Verify with the exact same authenticated test that found this
+Log in as the same real developer/investment company account used to find this 
+bug, and directly fetch /assets/[the current JS bundle filename] while 
+authenticated. Confirm it now returns real JavaScript (Content-Type: 
+application/javascript) instead of the dashboard's HTML. Then load 
+/developer/dashboard itself as that same authenticated user and confirm it 
+renders real content, not blank.
+
+Do not report this fixed without pasting the actual authenticated-session fetch 
+result for the asset file, exactly as was done to find this bug — that direct 
+evidence is what finally revealed the real problem after several rounds of 
+testing the wrong scenario.
