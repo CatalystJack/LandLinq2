@@ -80,7 +80,7 @@ export default function DeveloperLogin() {
       if (isPlatformAdmin) {
         queryClient.setQueryData(["/api/user"], userData);
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-        window.location.href = "/dashboard";
+        window.location.replace("/dashboard");
         return;
       }
 
@@ -104,9 +104,9 @@ export default function DeveloperLogin() {
       if (userData.mustResetPassword === true) {
         const token = userData.passwordResetToken;
         if (token) {
-          window.location.href = `/reset-password?token=${encodeURIComponent(token)}&developerSlug=${encodeURIComponent(slug)}`;
+          window.location.replace(`/reset-password?token=${encodeURIComponent(token)}&developerSlug=${encodeURIComponent(slug)}`);
         } else {
-          window.location.href = "/reset-password";
+          window.location.replace("/reset-password");
         }
         return;
       }
@@ -125,9 +125,9 @@ export default function DeveloperLogin() {
         // The developer route will apply the same safe default if this read
         // is temporarily unavailable.
       }
-      window.location.href = profileType === "general_sales"
+      window.location.replace(profileType === "general_sales"
         ? "/developer/crm"
-        : "/developer/dashboard";
+        : "/developer/dashboard");
     },
     onError: (error: Error) => {
       toast({

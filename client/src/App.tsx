@@ -24,7 +24,6 @@ import NotFound from "@/pages/not-found";
 import ErrorPage from "@/pages/error-page";
 import Landing from "@/pages/landing";
 import MarketingHome from "@/pages/marketing-home";
-import DeveloperDashboardPage from "@/pages/developer-dashboard";
 import PasswordResetPage from "@/pages/password-reset";
 
 // Lazy load ALL other pages to reduce initial bundle size
@@ -89,6 +88,7 @@ const DeveloperAnalytics = lazy(() => import("@/pages/developer-analytics"));
 const DeveloperUserManagement = lazy(() => import("@/pages/developer-user-management"));
 const DeveloperCriteriaSettings = lazy(() => import("@/pages/developer-criteria-settings"));
 const DeveloperLogin = lazy(() => import("@/pages/developer-login"));
+const DeveloperDashboardPage = lazy(() => import("@/pages/developer-dashboard"));
 
 // Loading component for lazy-loaded routes
 const LoadingFallback = () => (

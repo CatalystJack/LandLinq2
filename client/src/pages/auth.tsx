@@ -15,7 +15,7 @@ import { isPlatformAdminEmail } from "@shared/admin-auth";
 export default function AuthPage() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, userRole } = useAuth();
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   
@@ -23,7 +23,12 @@ export default function AuthPage() {
   const searchParams = new URLSearchParams(window.location.search);
   const authMode = searchParams.get('mode') || 'login'; // default to login
   const authenticatedEmail = String((user as any)?.claims?.email || (user as any)?.email || "").toLowerCase();
-  const authenticatedRole = String((user as any)?.role || "").toUpperCase();
+  const authenticatedRole = String(
+    (user as any)?.role ||
+    (user as any)?.claims?.role ||
+    userRole ||
+    "",
+  ).toUpperCase();
   const authenticatedDeveloperHome = (user as any)?.developerProfile?.profileType === "general_sales"
     ? "/developer/crm"
     : "/developer/dashboard";
@@ -41,7 +46,14 @@ export default function AuthPage() {
   }, [isLoading, isAuthenticated, setLocation, redirectUrl]);
 
   if (!isLoading && isAuthenticated) {
-    return null; // Don't render the form while redirecting
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center text-slate-600">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-catalyst-gold" />
+          <p className="mt-3 text-sm">Redirecting to your workspace…</p>
+        </div>
+      </div>
+    );
   }
 
   const loginMutation = useMutation({
