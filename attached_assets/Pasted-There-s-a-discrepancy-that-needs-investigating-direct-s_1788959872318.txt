@@ -1,0 +1,37 @@
+There's a discrepancy that needs investigating: direct server-side verification 
+just confirmed https://landlinq.ai/reset-password?token=test returns correct 
+headers (application/javascript, text/css) — but a real user, testing the exact 
+same page in a fresh Incognito browser window seconds later, still sees the old 
+broken MIME-type errors (text/html for the JS/CSS assets).
+
+This strongly suggests a caching layer between the server and real browser 
+requests — a CDN, edge cache, or reverse proxy in front of the custom domain 
+landlinq.ai — is serving a stale, cached copy of this page from before the fix, 
+even though the origin server itself is now confirmed correct.
+
+TASK 1 — Check for caching layers
+Identify whether landlinq.ai's custom domain routes through any CDN, caching 
+proxy, or edge layer before reaching the actual Replit deployment (check DNS/CNAME 
+configuration, and check Replit's own custom domain documentation for whether it 
+places anything in front of VM deployments by default).
+
+TASK 2 — Check response cache-control headers
+Check what Cache-Control, CDN-Cache-Control, or similar headers are actually being 
+returned for /reset-password and its JS/CSS assets. If these pages/assets are 
+being cached longer than intended, or with no explicit no-cache directive on the 
+dynamic HTML page, that could explain stale content being served to real users 
+even after the origin is fixed.
+
+TASK 3 — Purge any cache found, and add explicit cache headers going forward
+If a caching layer is confirmed, purge/invalidate its cache for this domain now. 
+Then add explicit Cache-Control: no-cache (or an appropriately short max-age) 
+headers to the HTML page response specifically (not necessarily the hashed, 
+versioned JS/CSS asset files, which are safe to cache long-term since their 
+filenames change on every rebuild) — this prevents this exact class of problem 
+from recurring on future deploys.
+
+TASK 4 — Verify with a real browser test, not just a server-side check
+After purging any cache, test the actual URL in a genuinely fresh Incognito 
+browser window yourself and confirm the console shows no MIME-type errors — a 
+server-side header check alone was not sufficient to catch this, so a real browser 
+test is required this time before reporting resolution.
