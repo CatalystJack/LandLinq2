@@ -273,6 +273,7 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
   const senderName = senderEmail === PUBLIC_TRANSACTIONAL_EMAIL
     ? PUBLIC_TRANSACTIONAL_NAME
     : notification.fromName || PUBLIC_TRANSACTIONAL_NAME;
+  const isGoDaddySender = Boolean(getGoDaddyMailbox(senderEmail));
   
   try {
     // MASTER MESSAGING TOGGLE CHECK (Dec 16, 2025)
@@ -304,16 +305,13 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
       : '';
     const cleanGraphHtml = stripLegacyCatalystBranding(graphHtml);
 
-    // GoDaddy-managed Microsoft 365 SMTP is the authoritative transport for
-    // the platform mailboxes. Do not fall through to Graph or SendGrid for
-    // these addresses: the mailbox identity is managed by GoDaddy, and an
-    // unverified SendGrid sender can produce misleading delivery failures.
-    if (getGoDaddyMailbox(senderEmail)) {
-      if (!notification.subject || !cleanGraphHtml) {
-        console.error(`❌ [GODADDY-SMTP] Message has no rendered subject/body; refusing to send from ${senderEmail}`);
-        return false;
-      }
-      return await sendGoDaddyEmail(notification, senderEmail, stripLegacyCatalystBranding(senderName), cleanGraphHtml);
+    // Public transactional mail tries SendGrid first because its API accepts
+    // the message immediately and generally delivers faster than SMTP
+    // submission. Keep the GoDaddy/Microsoft 365 mailbox as a fallback so
+    // delivery still works if the SendGrid sender identity is not verified.
+    if (isGoDaddySender && (!notification.subject || !cleanGraphHtml)) {
+      console.error(`❌ [EMAIL] Message has no rendered subject/body; refusing to send from ${senderEmail}`);
+      return false;
     }
 
     if (notification.subject && cleanGraphHtml) {
@@ -347,6 +345,15 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
       console.log('   Connector error:', connectorError instanceof Error ? connectorError.message : String(connectorError));
       
       if (!process.env.SENDGRID_API_KEY) {
+        if (isGoDaddySender) {
+          console.warn(`⚠️ [SENDGRID] Connector unavailable; falling back to GoDaddy SMTP for ${senderEmail}`);
+          return await sendGoDaddyEmail(
+            notification,
+            senderEmail,
+            stripLegacyCatalystBranding(senderName),
+            cleanGraphHtml,
+          );
+        }
         console.error('❌ [SENDGRID] API key not configured - email cannot be sent');
         console.error('❌ [SENDGRID] Set SENDGRID_API_KEY environment variable or configure SendGrid connector');
         console.log('📧 [EMAIL SIMULATION] - Would have sent:');
@@ -463,6 +470,15 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
     console.error('❌ [SENDGRID] Subject:', notification.subject);
     console.error('❌ [SENDGRID] Error:', error.message || error);
     console.error('❌ [SENDGRID] Error details:', JSON.stringify(error, null, 2));
+    if (isGoDaddySender) {
+      console.warn(`⚠️ [SENDGRID] Falling back to GoDaddy SMTP for ${senderEmail}`);
+      return await sendGoDaddyEmail(
+        notification,
+        senderEmail,
+        stripLegacyCatalystBranding(senderName),
+        cleanGraphHtml,
+      );
+    }
     return false;
   }
 }

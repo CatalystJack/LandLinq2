@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +30,6 @@ function PasswordResetErrorFallback() {
 }
 
 function PasswordResetContent() {
-  const [, setLocation] = useLocation();
   const initialToken = new URLSearchParams(window.location.search).get("token");
   const [step, setStep] = useState<"request" | "reset">(initialToken ? "reset" : "request");
   const [tokenStatus, setTokenStatus] = useState<TokenStatus>(initialToken ? "checking" : "idle");
@@ -157,11 +155,23 @@ function PasswordResetContent() {
           description: "Your password has been reset successfully.",
         });
         const developerSlug = new URLSearchParams(window.location.search).get("developerSlug");
-        if (developerSlug) {
-          window.location.href = `/developer/${encodeURIComponent(developerSlug)}/login`;
-        } else {
-          setLocation("/login");
+        // A reset can be completed while an old authenticated session is still
+        // open. Clear that session and perform a full navigation so App.tsx
+        // cannot make a decision from stale mustResetPassword state.
+        try {
+          await fetch("/api/logout", {
+            method: "POST",
+            credentials: "include",
+          });
+        } catch {
+          // The password was already changed; continue to the login page even
+          // if the best-effort session cleanup is unavailable.
         }
+        window.location.assign(
+          developerSlug
+            ? `/developer/${encodeURIComponent(developerSlug)}/login`
+            : "/login",
+        );
       } else {
         setError(data.message || "Failed to reset password");
       }
