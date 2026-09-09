@@ -2780,14 +2780,22 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
     // Evaluate this allowlist before normal page routing so future internal
     // routes cannot accidentally become available to DEVELOPER users.
+    const isStaticAssetRequest =
+      req.path.includes('.') ||
+      req.path.startsWith('/assets/') ||
+      req.path.startsWith('/src/') ||
+      req.path.startsWith('/node_modules/');
     const isDocumentRequest =
-      !req.path.includes('.') &&
-      !req.path.startsWith('/@') &&
-      !req.path.startsWith('/src/') &&
-      !req.path.startsWith('/node_modules/');
+      !isStaticAssetRequest &&
+      !req.path.startsWith('/@');
     if (req.isAuthenticated?.()) {
       const role = String(req.user?.role || '').toUpperCase();
       const isDeveloperLoginPath = /^\/developer\/[^/]+\/login$/.test(req.path);
+      // Static assets are not page navigations and must never be redirected
+      // through the developer page allowlist. Otherwise an authenticated
+      // browser receives the dashboard HTML for JS/CSS requests and fails
+      // strict MIME checking.
+      if (!isDocumentRequest) return next();
       if (role === 'DEVELOPER' && req.user?.mustResetPassword === true && req.path !== '/reset-password') {
         try {
           const { passwordResetService } = await import('./passwordReset');
