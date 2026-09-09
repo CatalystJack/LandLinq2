@@ -7,6 +7,7 @@
 - [Multer multipart webhook handling](multer-multipart-webhook.md) — multer.any() splits multipart bodies: text fields go to req.body, file uploads go to req.files; always pass req.files explicitly to any handler that needs attachment content.
 - [Import deal 413 fix](import-deal-413.md) — pasting HTML emails with embedded base64 images can easily exceed 10mb; Express JSON limit raised to 50mb, and frontend strips data URIs before sending.
 - [Login entrypoint presentation](login-entrypoint-presentation.md) — keep the credential form minimal; place alternate sign-in and demo paths outside the primary visual flow.
+- [Protected route auth bootstrap](protected-route-auth-bootstrap.md) — resolve auth loading before selecting role-specific route tables; direct protected URLs need an explicit unauthenticated fallback.
 - [Developer role authority](developer-role-authority.md) — Investment Company portal access must come only from the persisted DEVELOPER role, never email/name inference.
 - [Developer forced password reset](developer-forced-password-reset.md) — temporary-password users must complete a tokenized reset before any developer-shell page is reachable.
 - [Per-profile deal classification](per-profile-deal-classification.md) — partner send labels are computed independently per developer profile; both passed and review remain visible.

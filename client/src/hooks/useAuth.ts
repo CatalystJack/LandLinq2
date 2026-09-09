@@ -126,17 +126,18 @@ const fetchUserOnce = async () => {
 
 // Helper function to determine user role
 async function determineUserRole(user: any): Promise<UserRole | null> {
-  if (!user?.email) return null;
+  const email = String(user?.email || user?.claims?.email || '').trim().toLowerCase();
+  if (!email) return null;
 
   // The two designated platform owners retain super-admin privileges,
   // regardless of a stale database role value.
-  if (isSuperAdminEmail(user.email)) {
+  if (isSuperAdminEmail(email)) {
     return UserRole.SUPER_ADMIN;
   }
 
   // Other platform-domain accounts use the parent platform view with
   // standard administrator privileges.
-  if (isPlatformAdminEmail(user.email)) {
+  if (isPlatformAdminEmail(email)) {
     return UserRole.ADMIN;
   }
   
@@ -167,7 +168,6 @@ async function determineUserRole(user: any): Promise<UserRole | null> {
   }
   
   // Role determination based on email domain and position
-  const email = user.email.toLowerCase();
   const name = user.name?.toLowerCase() || '';
   
   // Super admins - only Jack Berg
@@ -199,7 +199,8 @@ async function determineUserRole(user: any): Promise<UserRole | null> {
 
 // Helper function to determine business role
 async function determineBusinessRole(user: any): Promise<BusinessRole | null> {
-  if (!user?.email) return null;
+  const email = String(user?.email || user?.claims?.email || '').trim().toLowerCase();
+  if (!email) return null;
   
   // Check if user has explicit business role from backend
   if (user.business_role) {
@@ -207,8 +208,6 @@ async function determineBusinessRole(user: any): Promise<BusinessRole | null> {
   }
   
   // Default business role mapping based on email
-  const email = user.email.toLowerCase();
-  
   // Managing partners
   if (email === 'jack@catalystcp.com') {
     return BusinessRole.MANAGING_PARTNER;

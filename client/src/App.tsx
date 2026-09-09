@@ -105,6 +105,20 @@ function Router() {
   // Automatically scroll to top on route changes
   useScrollToTop();
 
+  // Resolve authentication before selecting any role-specific route table.
+  // Without this guard, a direct visit to /developer/dashboard can briefly
+  // fall through to the public catch-all while /api/user is still loading.
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-catalyst-gold mx-auto"></div>
+          <p className="mt-2 text-catalyst-gray-600">Loading your workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
   // ── DEMO MODE — locked to deal dashboard only, no internal tools ──────────
   if (isAuthenticated && user && userRole === UserRole.DEMO) {
     return (
@@ -170,13 +184,7 @@ function Router() {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <Switch>
-          <Route path="/developer/dashboard" component={() => {
-            if ((user as any)?.developerProfile?.profileType === "general_sales") {
-              window.location.replace("/developer/crm");
-              return <LoadingFallback />;
-            }
-            return <DeveloperDashboardPage />;
-          }} />
+          <Route path="/developer/dashboard" component={DeveloperDashboardPage} />
           <Route path="/developer/crm" component={DeveloperCrm} />
           <Route path="/developer/outreach" component={DeveloperOutreach} />
           <Route path="/developer/pipeline" component={DeveloperPipeline} />
@@ -268,17 +276,6 @@ function Router() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-catalyst-gold mx-auto"></div>
-          <p className="mt-2 text-catalyst-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Switch>
@@ -289,6 +286,7 @@ function Router() {
         <Route path="/developer/:slug/login" component={DeveloperLogin} />
         <Route path="/analyst-login" component={AnalystLogin} />
         <Route path="/reset-password" component={PasswordResetPage} />
+        <Route path="/developer/dashboard" component={AuthPage} />
         <Route path="/test" component={() => <div className="p-8 text-center"><h1 className="text-2xl">Test Route Works!</h1></div>} />
         
         {/* Public routes that must remain reachable without authentication */}
