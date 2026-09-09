@@ -24,6 +24,8 @@ import NotFound from "@/pages/not-found";
 import ErrorPage from "@/pages/error-page";
 import Landing from "@/pages/landing";
 import MarketingHome from "@/pages/marketing-home";
+import DeveloperDashboardPage from "@/pages/developer-dashboard";
+import PasswordResetPage from "@/pages/password-reset";
 
 // Lazy load ALL other pages to reduce initial bundle size
 const Home = lazy(() => import("@/pages/home"));
@@ -59,7 +61,6 @@ const IntakeAudit = lazy(() => import("@/pages/intake-audit"));
 const AnalystLogin = lazy(() => import("@/pages/analyst-login"));
 const AnalyticsPage = lazy(() => import("@/pages/analytics-page"));
 const ManualEmail = lazy(() => import("@/pages/manual-email"));
-const PasswordReset = lazy(() => import("@/pages/password-reset"));
 const EmailPreview = lazy(() => import("@/pages/email-preview"));
 const TemplateEditor = lazy(() => import("@/pages/template-editor"));
 const GamificationPage = lazy(() => import("@/pages/gamification-page"));
@@ -82,7 +83,6 @@ const MarketIntelligence = lazy(() => import("@/pages/market-intelligence"));
 const ApiKeysAdmin = lazy(() => import("@/pages/api-keys-admin"));
 const AdminInvestmentCompanies = lazy(() => import("@/pages/admin-investment-companies"));
 const MasterPipeline = lazy(() => import("@/pages/master-pipeline"));
-const DeveloperDashboard = lazy(() => import("@/pages/developer-dashboard"));
 const DeveloperCrm = lazy(() => import("@/pages/developer-crm"));
 const DeveloperOutreach = lazy(() => import("@/pages/developer-outreach"));
 const DeveloperPipeline = lazy(() => import("@/pages/developer-pipeline"));
@@ -157,7 +157,7 @@ function Router() {
       return (
         <Suspense fallback={<LoadingFallback />}>
           <Switch>
-            <Route path="/reset-password" component={PasswordReset} />
+            <Route path="/reset-password" component={PasswordResetPage} />
             <Route>
               {() => {
                 window.location.replace("/reset-password");
@@ -176,7 +176,7 @@ function Router() {
               window.location.replace("/developer/crm");
               return <LoadingFallback />;
             }
-            return <DeveloperDashboard />;
+            return <DeveloperDashboardPage />;
           }} />
           <Route path="/developer/crm" component={DeveloperCrm} />
           <Route path="/developer/outreach" component={DeveloperOutreach} />
@@ -185,7 +185,7 @@ function Router() {
           <Route path="/developer/user-management" component={DeveloperUserManagement} />
           <Route path="/developer/settings" component={DeveloperCriteriaSettings} />
           <Route path="/outreach-onboarding" component={OutreachOnboarding} />
-          <Route path="/reset-password" component={PasswordReset} />
+          <Route path="/reset-password" component={PasswordResetPage} />
           <Route>
             {() => {
               const home = (user as any)?.developerProfile?.profileType === "general_sales"
@@ -290,7 +290,7 @@ function Router() {
         <Route path="/signup" component={AuthPage} />
         <Route path="/developer/:slug/login" component={DeveloperLogin} />
         <Route path="/analyst-login" component={AnalystLogin} />
-        <Route path="/reset-password" component={PasswordReset} />
+        <Route path="/reset-password" component={PasswordResetPage} />
         <Route path="/test" component={() => <div className="p-8 text-center"><h1 className="text-2xl">Test Route Works!</h1></div>} />
         
         {/* Public routes that must remain reachable without authentication */}
