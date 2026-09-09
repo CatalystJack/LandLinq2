@@ -7,4 +7,4 @@ Use the original request URL, with its query string removed, when deciding wheth
 
 **Why:** A missing JavaScript or stylesheet request must not receive the HTML shell, or browsers report MIME-type errors and the page appears blank. The mount-relative path behavior is easy to miss and can make a seemingly correct asset guard ineffective.
 
-**How to apply:** Serve static files before the SPA fallback, then return 404 for `/assets/` and extension-bearing paths that were not found. Use `req.originalUrl` (or equivalent full request URL), not only `req.path`, for that classification.
+**How to apply:** Serve the current build output before any legacy public-asset directory, keep legacy assets as a fallback for images/logos only, then return 404 for `/assets/` and extension-bearing paths that were not found. Use `req.originalUrl` (or equivalent full request URL), not only `req.path`, for that classification.

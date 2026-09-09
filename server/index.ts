@@ -135,15 +135,6 @@ app.use('/attached_assets', express.static('attached_assets', {
   }
 }));
 
-// Serve static assets from server/public/assets
-app.use('/assets', express.static('server/public/assets', {
-  maxAge: '1d',
-  setHeaders: (res, filePath) => {
-    const mimeType = lookup(filePath) || 'application/octet-stream';
-    res.setHeader('Content-Type', mimeType);
-  }
-}));
-
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;

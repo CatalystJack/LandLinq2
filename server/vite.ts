@@ -41,8 +41,20 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.middlewares);
+  // Keep legacy images and logos available during development, but register
+  // them after Vite so they can never shadow the current build's JS/CSS.
+  app.use('/assets', express.static(path.resolve(process.cwd(), 'server/public/assets'), {
+    maxAge: '1d',
+  }));
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
+    const requestedPath = (req.originalUrl || req.url).split("?", 1)[0];
+    const isAssetLikeRequest =
+      requestedPath.startsWith("/assets/") || path.extname(requestedPath) !== "";
+
+    if (isAssetLikeRequest) {
+      return res.sendStatus(404);
+    }
 
     try {
       const clientTemplate = path.resolve(
@@ -90,6 +102,13 @@ export function serveStatic(app: Express) {
         setHtmlNoCacheHeaders(res);
       }
     },
+  }));
+
+  // The build output owns all generated JS/CSS. Legacy files are only a
+  // fallback for images and other static assets that are intentionally kept
+  // in server/public/assets.
+  app.use('/assets', express.static(path.resolve(process.cwd(), 'server/public/assets'), {
+    maxAge: '1d',
   }));
 
   // Fall through to index.html for client-side routes, but never return the
