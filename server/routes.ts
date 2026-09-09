@@ -2718,6 +2718,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // Login-only page gate. API endpoints, static assets, auth flows, and the
   // explicitly public pages below must remain reachable without a session.
   const DEVELOPER_ALLOWED_PAGE_PATHS = new Set([
+    '/',
     '/developer/dashboard',
     '/developer/crm',
     '/developer/pipeline',
