@@ -140,6 +140,13 @@ function DeveloperDashboardEntry() {
   );
 }
 
+function DeveloperHomeEntry() {
+  const { user } = useAuth();
+  const isGeneralSales = (user as any)?.developerProfile?.profileType === "general_sales";
+
+  return isGeneralSales ? <DeveloperCrm /> : <DeveloperDashboardPage />;
+}
+
 function Router() {
   const { isAuthenticated, isLoading, user, userRole } = useAuth();
   // Automatically scroll to top on route changes
@@ -226,6 +233,7 @@ function Router() {
         <Switch>
           <Route path="/auth" component={AuthPage} />
           <Route path="/login" component={AuthPage} />
+          <Route path="/dashboard" component={DeveloperHomeEntry} />
           <Route path="/developer/dashboard" component={DeveloperDashboardPage} />
           <Route path="/developer/crm" component={DeveloperCrm} />
           <Route path="/developer/outreach" component={DeveloperOutreach} />

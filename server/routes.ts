@@ -2719,6 +2719,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // explicitly public pages below must remain reachable without a session.
   const DEVELOPER_ALLOWED_PAGE_PATHS = new Set([
     '/',
+    '/dashboard',
     '/developer/dashboard',
     '/developer/crm',
     '/developer/pipeline',
