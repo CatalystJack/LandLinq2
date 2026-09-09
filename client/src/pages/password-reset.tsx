@@ -167,7 +167,7 @@ function PasswordResetContent() {
           // The password was already changed; continue to the login page even
           // if the best-effort session cleanup is unavailable.
         }
-        window.location.assign(
+        window.location.replace(
           developerSlug
             ? `/developer/${encodeURIComponent(developerSlug)}/login`
             : "/login",

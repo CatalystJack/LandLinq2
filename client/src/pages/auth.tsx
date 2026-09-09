@@ -61,6 +61,9 @@ export default function AuthPage() {
     onSuccess: async (userData) => {
       let authenticatedUser = userData;
       const isDeveloper = String(userData?.role || "").toUpperCase() === "DEVELOPER";
+      const forcedResetToken = isDeveloper
+        ? String(userData?.passwordResetToken || "")
+        : "";
       if (isDeveloper) {
         const currentUserResponse = await fetch("/api/user", { credentials: "include" }).catch(() => null);
         if (currentUserResponse?.ok) {
@@ -80,13 +83,17 @@ export default function AuthPage() {
       const developerHome = authenticatedUser?.developerProfile?.profileType === "general_sales"
         ? "/developer/crm"
         : "/developer/dashboard";
-      const redirectPath = isPlatformAdmin
+      const redirectPath = forcedResetToken
+        ? `/reset-password?token=${encodeURIComponent(forcedResetToken)}`
+        : isPlatformAdmin
         ? "/dashboard"
         : String(authenticatedUser?.role || "").toUpperCase() === "DEVELOPER"
         ? developerHome
         : (searchParams.get('redirect') || '/dashboard');
       setTimeout(() => {
-        window.location.href = redirectPath;
+        // Do not leave the temporary-password dashboard or reset URL in
+        // browser history. Back should not reopen a one-time reset link.
+        window.location.replace(redirectPath);
       }, 100);
     },
     onError: (error: Error) => {

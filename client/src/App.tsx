@@ -100,6 +100,46 @@ const LoadingFallback = () => (
   </div>
 );
 
+function DeveloperDashboardEntry() {
+  const { isAuthenticated, isLoading, user, userRole } = useAuth();
+
+  if (isLoading) {
+    return <LoadingFallback />;
+  }
+
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
+
+  const persistedRole = String(
+    (user as any)?.role || (user as any)?.claims?.role || "",
+  ).toUpperCase();
+
+  // Router normally handles this branch above. Keep the direct route safe if
+  // role derivation ever lags behind the authenticated user payload.
+  if (userRole === UserRole.DEVELOPER || persistedRole === "DEVELOPER") {
+    return <DeveloperDashboardPage />;
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
+      <div className="max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <h1 className="text-xl font-semibold text-slate-900">Developer access unavailable</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Your account is signed in, but it is not assigned the Developer role.
+          Contact a LandLinq administrator if this is unexpected.
+        </p>
+        <a
+          href="/"
+          className="mt-6 inline-flex min-h-10 items-center justify-center rounded-md bg-[#0A2B4A] px-4 text-sm font-medium text-white"
+        >
+          Return home
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function Router() {
   const { isAuthenticated, isLoading, user, userRole } = useAuth();
   // Automatically scroll to top on route changes
@@ -286,7 +326,7 @@ function Router() {
         <Route path="/developer/:slug/login" component={DeveloperLogin} />
         <Route path="/analyst-login" component={AnalystLogin} />
         <Route path="/reset-password" component={PasswordResetPage} />
-        <Route path="/developer/dashboard" component={AuthPage} />
+        <Route path="/developer/dashboard" component={DeveloperDashboardEntry} />
         <Route path="/test" component={() => <div className="p-8 text-center"><h1 className="text-2xl">Test Route Works!</h1></div>} />
         
         {/* Public routes that must remain reachable without authentication */}
