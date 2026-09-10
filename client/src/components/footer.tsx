@@ -45,13 +45,6 @@ export default function Footer() {
             <Link href="/contact" className="transition-colors hover:text-white">
               Contact us
             </Link>
-            <a
-              href="mailto:help@landlinq.ai"
-              className="transition-colors hover:text-white"
-              data-testid="text-email"
-            >
-              help@landlinq.ai
-            </a>
           </div>
         </div>
 
