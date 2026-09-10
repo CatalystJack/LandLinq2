@@ -243,6 +243,8 @@ function Router() {
           <Route path="/developer/outreach" component={DeveloperOutreach} />
           <Route path="/developer/pipeline" component={DeveloperPipeline} />
           <Route path="/developer/analytics" component={DeveloperAnalytics} />
+           <Route path="/analytics" component={DeveloperAnalytics} />
+           <Route path="/outreach-analytics" component={DeveloperAnalytics} />
           <Route path="/developer/user-management" component={DeveloperUserManagement} />
           <Route path="/developer/settings" component={DeveloperCriteriaSettings} />
           <Route path="/outreach-onboarding" component={OutreachOnboarding} />
