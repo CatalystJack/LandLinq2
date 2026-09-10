@@ -34,7 +34,7 @@ export default function AuthPage() {
   ).toUpperCase();
   const authenticatedDeveloperHome = (user as any)?.developerProfile?.profileType === "general_sales"
     ? "/developer/crm"
-    : "/developer/dashboard";
+    : "/dashboard";
   const redirectUrl = isPlatformAdminEmail(authenticatedEmail)
     ? "/dashboard"
     : authenticatedRole === "DEVELOPER"

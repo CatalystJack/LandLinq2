@@ -234,8 +234,11 @@ function Router() {
         <Switch>
           <Route path="/auth" component={AuthPage} />
           <Route path="/login" component={AuthPage} />
-          <Route path="/dashboard" component={DeveloperHomeEntry} />
-          <Route path="/developer/dashboard" component={DeveloperDashboardPage} />
+          {/* Investment Company users use the restored historical analyst dashboard
+              as their main deal workspace. Supporting developer routes below remain
+              available without changing their existing behavior. */}
+          <Route path="/dashboard" component={AnalystDashboard} />
+          <Route path="/developer/dashboard" component={AnalystDashboard} />
           <Route path="/developer/crm" component={DeveloperCrm} />
           <Route path="/developer/outreach" component={DeveloperOutreach} />
           <Route path="/developer/pipeline" component={DeveloperPipeline} />
@@ -248,7 +251,7 @@ function Router() {
             {() => {
               const home = (user as any)?.developerProfile?.profileType === "general_sales"
                 ? "/developer/crm"
-                : "/developer/dashboard";
+                : "/dashboard";
               window.location.replace(home);
               return <LoadingFallback />;
             }}
