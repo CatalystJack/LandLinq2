@@ -5,11 +5,18 @@ import { useLocation } from "wouter";
 import {
   Building2,
   CheckCircle2,
+  Columns3,
+  Download,
   FileSpreadsheet,
   Loader2,
+  Map as MapIcon,
   MapPin,
+  Plus,
+  RefreshCw,
   Search,
+  SlidersHorizontal,
   Star,
+  Table2,
   Upload,
 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
@@ -134,6 +141,11 @@ export default function DeveloperDashboard() {
   const [importStep, setImportStep] = useState<"select" | "map">("select");
   const [parsing, setParsing] = useState(false);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [viewMode, setViewMode] = useState<"table" | "pipeline" | "map">("table");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [productTypeFilter, setProductTypeFilter] = useState("all");
+  const [showColumns, setShowColumns] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const dealsQuery = useQuery<{ deals: DeveloperDeal[] }>({
     queryKey: ["/api/developer-profile/me/deals"],
@@ -266,15 +278,31 @@ export default function DeveloperDashboard() {
   };
 
   const rows = dealsQuery.data?.deals || [];
+  const productTypeOptions = useMemo(() => {
+    const values = new Set<string>();
+    rows.forEach((row) => {
+      (row.matchedProductTypes || []).forEach((value) => values.add(value));
+      (row.deal.productTypes || []).forEach((value) => values.add(value));
+    });
+    return Array.from(values).sort();
+  }, [rows]);
+
   const filteredRows = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return rows;
-    return rows.filter(({ deal }) =>
-      [deal.address, deal.city, deal.county, deal.state]
+    return rows.filter((row) => {
+      const matchesSearch = !term || [row.deal.address, row.deal.city, row.deal.county, row.deal.state]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term)),
-    );
-  }, [rows, search]);
+        .some((value) => String(value).toLowerCase().includes(term));
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "pursuing" && row.greenFlaggedByDeveloper) ||
+        (statusFilter === "review" && row.classification === "review" && !row.greenFlaggedByDeveloper) ||
+        (statusFilter === "passed" && row.classification !== "review" && !row.greenFlaggedByDeveloper);
+      const productTypes = [...(row.matchedProductTypes || []), ...(row.deal.productTypes || [])];
+      const matchesProductType = productTypeFilter === "all" || productTypes.includes(productTypeFilter);
+      return matchesSearch && matchesStatus && matchesProductType;
+    });
+  }, [rows, search, statusFilter, productTypeFilter]);
 
   const counts = useMemo(() => ({
     total: rows.length,
@@ -284,6 +312,37 @@ export default function DeveloperDashboard() {
   }), [rows]);
 
   const canImport = Boolean(file && mapping.address && mapping.acreage && rowCount > 0 && !parsing);
+
+  const exportDeals = () => {
+    const escapeCsv = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const header = ["Property", "City", "County", "State", "Acreage", "Rent", "Status", "Product Type"];
+    const body = filteredRows.map((row) => [
+      row.deal.address,
+      row.deal.city,
+      row.deal.county,
+      row.deal.state,
+      row.deal.sizeAcres,
+      rentText(row.deal),
+      row.greenFlaggedByDeveloper ? "Pursuing" : row.classification === "review" ? "Review" : "Passed",
+      (row.matchedProductTypes || row.deal.productTypes || []).join(", "),
+    ]);
+    const csv = [header, ...body].map((line) => line.map(escapeCsv).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "landlinq-deals.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const refreshDeals = async () => {
+    setRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/deals"] });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const rentText = (deal: DealRecord) => {
     if (profile?.rentMetric === "per_unit") {
@@ -300,62 +359,166 @@ export default function DeveloperDashboard() {
   return (
     <div className="min-h-screen bg-slate-50">
       <DeveloperNavigation />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <main className="mx-auto max-w-[1600px] px-3 py-5 sm:px-5 lg:px-6">
+        <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em]" style={{ color: secondaryColor }}>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: secondaryColor }}>
               Investment Company Portal
             </p>
-            <h1 className="mt-1 text-3xl font-bold text-slate-950">Deal Dashboard</h1>
-            <p className="mt-2 text-slate-500">Review every deal shared with {profile?.companyName || "your company"}.</p>
+            <h1 className="mt-1 text-2xl font-bold text-slate-950">Deal Dashboard</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Review, analyze, and manage deals shared with {profile?.companyName || "your company"}.
+            </p>
           </div>
-          <Button
-            onClick={() => setImportOpen(true)}
-            className="text-white shadow-sm"
-            style={{ backgroundColor: primaryColor }}
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            Import Deals
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={() => setImportOpen(true)} className="text-white shadow-sm" style={{ backgroundColor: primaryColor }}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Import Deals
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportDeals} className="border-[#4A90E2] text-[#2f73bb]">
+              <Download className="mr-1.5 h-3.5 w-3.5" />
+              Export CSV
+            </Button>
+            <Button size="sm" variant="outline" onClick={refreshDeals} disabled={refreshing}>
+              <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
 
-        <div className="mb-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { label: "All deals", value: counts.total, icon: Building2, tone: "text-slate-700 bg-slate-100" },
-            { label: "Review", value: counts.review, icon: Search, tone: "text-amber-700 bg-amber-100" },
-            { label: "Passed", value: counts.passed, icon: CheckCircle2, tone: "text-blue-700 bg-blue-100" },
-            { label: "Pursuing", value: counts.pursuing, icon: Star, tone: "text-emerald-700 bg-emerald-100" },
+            { label: "All deals", value: counts.total, icon: Building2, tone: "text-slate-700 bg-slate-100", filter: "all" },
+            { label: "Review", value: counts.review, icon: Search, tone: "text-amber-700 bg-amber-100", filter: "review" },
+            { label: "Passed", value: counts.passed, icon: CheckCircle2, tone: "text-blue-700 bg-blue-100", filter: "passed" },
+            { label: "Pursuing", value: counts.pursuing, icon: Star, tone: "text-emerald-700 bg-emerald-100", filter: "pursuing" },
           ].map(({ label, value, icon: Icon, tone }) => (
-            <Card key={label} className="border-slate-200 shadow-sm">
-              <CardContent className="flex items-center justify-between p-5">
+            <button
+              key={label}
+              type="button"
+              onClick={() => setStatusFilter(statusFilter === label.toLowerCase() ? "all" : label.toLowerCase())}
+              className={`flex items-center justify-between rounded-md border bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-[#4A90E2] ${
+                statusFilter === label.toLowerCase() ? "border-[#4A90E2] ring-1 ring-[#4A90E2]/20" : "border-slate-200"
+              }`}
+            >
+              <CardContent className="flex w-full items-center justify-between p-0">
                 <div>
-                  <p className="text-sm font-medium text-slate-500">{label}</p>
-                  <p className="mt-1 text-3xl font-bold text-slate-950">{value}</p>
+                  <p className="text-xs font-medium text-slate-500">{label}</p>
+                  <p className="mt-0.5 text-2xl font-bold text-slate-950">{value}</p>
                 </div>
-                <div className={`rounded-xl p-3 ${tone}`}><Icon className="h-5 w-5" /></div>
+                <div className={`rounded-lg p-2 ${tone}`}><Icon className="h-4 w-4" /></div>
               </CardContent>
-            </Card>
+            </button>
           ))}
         </div>
 
-        <Card className="overflow-hidden border-slate-200 shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="font-semibold text-slate-900">Your deal inbox</h2>
-              <p className="text-sm text-slate-500">Most recently shared deals appear first.</p>
+        <Card className="overflow-hidden border-slate-300 shadow-sm">
+          <div className="border-b border-slate-300 bg-white p-2">
+            <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+              <div className="relative min-w-0 flex-1 xl:max-w-md">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search deals, brokers, locations..."
+                  className="h-9 pl-8 text-xs"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { value: "table" as const, label: "Table", icon: Table2 },
+                  { value: "pipeline" as const, label: "Pipeline", icon: SlidersHorizontal },
+                  { value: "map" as const, label: "Map", icon: MapIcon },
+                ].map(({ value, label, icon: Icon }) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    size="sm"
+                    variant={viewMode === value ? "default" : "outline"}
+                    onClick={() => setViewMode(value)}
+                    className={`h-8 px-2.5 text-xs ${viewMode === value ? "bg-[#4A90E2] text-white" : ""}`}
+                  >
+                    <Icon className="mr-1 h-3 w-3" />
+                    {label}
+                  </Button>
+                ))}
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-8 w-[108px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All status</SelectItem>
+                    <SelectItem value="review">Review</SelectItem>
+                    <SelectItem value="passed">Passed</SelectItem>
+                    <SelectItem value="pursuing">Pursuing</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={productTypeFilter} onValueChange={setProductTypeFilter}>
+                  <SelectTrigger className="h-8 w-[124px] text-xs"><SelectValue placeholder="Product type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All types</SelectItem>
+                    {productTypeOptions.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button type="button" size="sm" variant="outline" className="h-8 px-2.5 text-xs" onClick={() => setShowColumns((open) => !open)}>
+                  <Columns3 className="mr-1 h-3 w-3" />
+                  Columns
+                </Button>
+              </div>
             </div>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search address or market"
-                className="pl-9"
-              />
-            </div>
+            {showColumns && (
+              <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-2 text-xs text-slate-500">
+                <Columns3 className="h-3.5 w-3.5" />
+                Showing Property, Market, Acreage, Rent, Status, and Action columns
+              </div>
+            )}
           </div>
 
-          {dealsQuery.isLoading ? (
+          {viewMode === "pipeline" ? (
+            <div className="grid gap-3 bg-slate-50 p-3 md:grid-cols-3">
+              {[
+                { key: "review", label: "Review", tone: "border-amber-200 bg-amber-50" },
+                { key: "passed", label: "Passed", tone: "border-blue-200 bg-blue-50" },
+                { key: "pursuing", label: "Pursuing", tone: "border-emerald-200 bg-emerald-50" },
+              ].map((stage) => {
+                const stageRows = filteredRows.filter((row) =>
+                  stage.key === "pursuing"
+                    ? row.greenFlaggedByDeveloper
+                    : stage.key === "review"
+                      ? row.classification === "review" && !row.greenFlaggedByDeveloper
+                      : row.classification !== "review" && !row.greenFlaggedByDeveloper,
+                );
+                return (
+                  <div key={stage.key} className={`min-h-48 rounded-md border p-3 ${stage.tone}`}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-slate-800">{stage.label}</h3>
+                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{stageRows.length}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {stageRows.slice(0, 12).map((row) => (
+                        <div key={row.id} className="rounded border border-white/80 bg-white p-2 text-xs shadow-sm">
+                          <p className="font-medium text-slate-900">{row.deal.address}</p>
+                          <p className="mt-1 text-slate-500">{[row.deal.city, row.deal.state].filter(Boolean).join(", ") || "Market unavailable"}</p>
+                        </div>
+                      ))}
+                      {stageRows.length > 12 && <p className="pt-1 text-center text-xs text-slate-500">Showing first 12 deals</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : viewMode === "map" ? (
+            <div className="flex min-h-64 flex-col items-center justify-center bg-slate-50 px-6 text-center">
+              <MapIcon className="mb-3 h-9 w-9 text-slate-300" />
+              <h3 className="font-semibold text-slate-800">Market view</h3>
+              <p className="mt-1 max-w-md text-sm text-slate-500">
+                Deal locations are shown below by market. Map coordinates are not available for every Investment Company deal yet.
+              </p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {Array.from(new Set(filteredRows.map((row) => [row.deal.city, row.deal.state].filter(Boolean).join(", ")).filter(Boolean))).slice(0, 12).map((market) => (
+                  <span key={market} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">{market}</span>
+                ))}
+              </div>
+            </div>
+          ) : dealsQuery.isLoading ? (
             <div className="flex min-h-64 items-center justify-center">
               <Loader2 className="h-7 w-7 animate-spin" style={{ color: primaryColor }} />
             </div>
@@ -364,47 +527,47 @@ export default function DeveloperDashboard() {
           ) : filteredRows.length === 0 ? (
             <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
               <FileSpreadsheet className="mb-3 h-10 w-10 text-slate-300" />
-              <h3 className="font-semibold text-slate-800">{search ? "No matching deals" : "No deals yet"}</h3>
+              <h3 className="font-semibold text-slate-800">{search || statusFilter !== "all" || productTypeFilter !== "all" ? "No matching deals" : "No deals yet"}</h3>
               <p className="mt-1 max-w-md text-sm text-slate-500">
-                {search ? "Try a different address or market." : "Shared and imported deals will appear here."}
+                {search || statusFilter !== "all" || productTypeFilter !== "all" ? "Try clearing a filter or changing your search." : "Shared and imported deals will appear here."}
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50">
-                    <TableHead>Property</TableHead>
-                    <TableHead>Market</TableHead>
-                    <TableHead>Acreage</TableHead>
-                    <TableHead>Rent</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                <TableHeader className="bg-slate-50">
+                  <TableRow className="border-slate-300 hover:bg-slate-50">
+                    <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Property</TableHead>
+                    <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Market</TableHead>
+                    <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Acreage</TableHead>
+                    <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Rent</TableHead>
+                    <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Status</TableHead>
+                    <TableHead className="h-9 whitespace-nowrap text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredRows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>
-                        <div className="font-medium text-slate-900">{row.deal.address}</div>
-                        {row.deal.city && <div className="mt-1 text-xs text-slate-500">{row.deal.city}</div>}
+                    <TableRow key={row.id} className="border-slate-300 hover:bg-blue-50/30">
+                      <TableCell className="py-2.5">
+                        <div className="text-sm font-semibold text-slate-900">{row.deal.address}</div>
+                        {row.deal.city && <div className="mt-0.5 text-xs text-slate-500">{row.deal.city}</div>}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5 text-slate-700">
-                          <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                      <TableCell className="py-2.5">
+                        <div className="flex max-w-48 items-center gap-1.5 text-xs text-slate-700">
+                          <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                           {[row.deal.county, row.deal.state].filter(Boolean).join(", ") || "—"}
                         </div>
                       </TableCell>
-                      <TableCell>{row.deal.sizeAcres ? `${Number(row.deal.sizeAcres).toLocaleString()} ac` : "—"}</TableCell>
-                      <TableCell>{rentText(row.deal)}</TableCell>
-                      <TableCell><DealStatus row={row} /></TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.sizeAcres ? `${Number(row.deal.sizeAcres).toLocaleString()} ac` : "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap py-2.5 text-xs">{rentText(row.deal)}</TableCell>
+                      <TableCell className="py-2.5"><DealStatus row={row} /></TableCell>
+                      <TableCell className="py-2.5 text-right">
                         <Button
                           size="sm"
                           variant={row.greenFlaggedByDeveloper ? "outline" : "default"}
                           disabled={row.greenFlaggedByDeveloper || pursueMutation.isPending}
                           onClick={() => pursueMutation.mutate(row.id)}
-                          className={row.greenFlaggedByDeveloper ? "" : "text-white"}
+                          className={`h-7 whitespace-nowrap px-2.5 text-[11px] ${row.greenFlaggedByDeveloper ? "" : "text-white"}`}
                           style={row.greenFlaggedByDeveloper ? undefined : { backgroundColor: primaryColor }}
                         >
                           {row.greenFlaggedByDeveloper ? "Pursuing" : "Mark as Pursuing"}
