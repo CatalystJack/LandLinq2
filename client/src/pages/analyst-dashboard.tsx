@@ -105,11 +105,7 @@ interface DealWithBroker extends Omit<Deal, 'publicListings'> {
 const ALL_COLUMNS = [
   { key: 'id', label: 'ID', defaultVisible: true },
   { key: 'colStatus', label: 'Status', defaultVisible: true },
-  { key: 'colApex', label: 'Apex', defaultVisible: true },
-  { key: 'colApexNotes', label: 'Apex Notes', defaultVisible: true },
   { key: 'colPriority', label: 'Priority', defaultVisible: true },
-  { key: 'colNext', label: 'Next', defaultVisible: true },
-  { key: 'colStep', label: 'Step', defaultVisible: true },
   { key: 'propertyAddress', label: 'Property Address', defaultVisible: true },
   { key: 'name', label: 'Name', defaultVisible: true },
   { key: 'yieldOnCost', label: 'YOC', defaultVisible: true },
@@ -129,6 +125,7 @@ const ALL_COLUMNS = [
   { key: 'qct', label: 'QCT', defaultVisible: true },
   { key: 'dda', label: 'DDA', defaultVisible: true },
   { key: 'oz', label: 'OZ', defaultVisible: true },
+  { key: 'fema', label: 'FEMA', defaultVisible: true },
   { key: 'floodZone', label: 'Flood Zone', defaultVisible: true },
   { key: 'wetlands', label: 'Wetlands', defaultVisible: true },
   { key: 'environmental', label: 'Environmental', defaultVisible: true },
@@ -158,12 +155,12 @@ type ColumnKey = typeof ALL_COLUMNS[number]['key'];
 
 // Fixed columns always shown first, not user-reorderable
 const FIXED_COLUMN_KEYS: readonly ColumnKey[] = [
-  'id', 'colStatus', 'colApex', 'colApexNotes', 'colPriority', 'colNext', 'colStep', 'propertyAddress'
+  'id', 'colStatus', 'colPriority', 'propertyAddress'
 ] as const;
 
 // Reorderable columns — everything not in the fixed set
 const REORDERABLE_COLUMNS = ALL_COLUMNS.filter(c => !(FIXED_COLUMN_KEYS as readonly string[]).includes(c.key));
-type ReorderableColumnKey = Exclude<ColumnKey, 'id'|'colStatus'|'colApex'|'colApexNotes'|'colPriority'|'colNext'|'colStep'|'propertyAddress'>;
+type ReorderableColumnKey = Exclude<ColumnKey, 'id'|'colStatus'|'colPriority'|'propertyAddress'>;
 
 function getDefaultColumnOrder(): ReorderableColumnKey[] {
   try {
@@ -237,12 +234,12 @@ const BUILT_IN_COLUMN_PRESETS: ColumnPreset[] = [
     name: 'Compliance',
     builtIn: true,
     visibleColumns: presetVisibleColumns([
-       'lihtc', 'qct', 'dda', 'oz', 'floodZone', 'wetlands', 'environmental', 'comps',
+       'lihtc', 'qct', 'dda', 'oz', 'fema', 'floodZone', 'wetlands', 'environmental', 'comps',
       'zoning', 'entitlements', 'wetlandNotes', 'sewer',
       'netDevelopableAcres', 'dua', 'maxUnitsZoning',
     ]),
     columnOrder: presetColumnOrder([
-      'lihtc', 'qct', 'dda', 'oz', 'comps',
+       'lihtc', 'qct', 'dda', 'oz', 'fema', 'floodZone', 'comps',
       'zoning', 'entitlements', 'wetlandNotes', 'sewer',
       'netDevelopableAcres', 'dua', 'maxUnitsZoning',
     ]),
@@ -722,11 +719,7 @@ export default function AnalystDashboard() {
     const STICKY_COLS = [
       { key: 'id', width: 40 },
       { key: 'colStatus', width: 50 },
-      { key: 'colApex', width: 45 },
-      { key: 'colApexNotes', width: 140 },
       { key: 'colPriority', width: 55 },
-      { key: 'colNext', width: 90 },
-      { key: 'colStep', width: 100 },
     ] as const;
     const result: Record<string, number> = {};
     let left = 0;
@@ -5274,6 +5267,7 @@ export default function AnalystDashboard() {
       case 'qct': return <th key={key} className={`${thBase} min-w-[45px]`} style={{display: vis?'':'none'}}>{sortBtn('QCT','qctStatus')}</th>;
       case 'dda': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}><button onClick={() => handleSort('ddaStatus')} className="flex items-center space-x-1 hover:text-[#07172A]" title="Difficult Development Area (HUD 2026) — MDDA = Metropolitan, NMDDA = Non-Metropolitan"><span>DDA</span><ArrowUpDown size={12} /></button></th>;
       case 'oz': return <th key={key} className={`${thBase} min-w-[45px]`} style={{display: vis?'':'none'}}>{sortBtn('OZ','ozStatus')}</th>;
+      case 'fema': return <th key={key} className={`${thBase} min-w-[58px]`} style={{display: vis?'':'none'}}><span>FEMA</span></th>;
       case 'floodZone': return <th key={key} className={`${thBase} min-w-[72px]`} style={{display: vis?'':'none'}}><span>Flood Zone</span></th>;
       case 'wetlands': return <th key={key} className={`${thBase} min-w-[68px]`} style={{display: vis?'':'none'}}><span>Wetlands</span></th>;
       case 'environmental': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}><span>Environmental</span></th>;
@@ -5533,15 +5527,35 @@ export default function AnalystDashboard() {
           )}
         </td>
       );
+      case 'fema': return (
+        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+          {(() => {
+            const constraints = d.environmentalConstraints && typeof d.environmentalConstraints === 'object'
+              ? d.environmentalConstraints as any : null;
+            const fema = constraints?.fema || d.floodZoneData || d.siteEvaluation?.floodZone;
+            if (!fema) return <span className="text-gray-400" aria-label="FEMA data not available">—</span>;
+            const inFloodZone = fema.isInFloodZone ?? fema.is_in_flood_zone;
+            return (
+              <Badge
+                variant="outline"
+                className={`text-xs px-2 py-0 ${inFloodZone ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}
+                title={fema.description || fema.floodZoneDescription || undefined}
+              >
+                {inFloodZone ? 'Flag' : 'Clear'}
+              </Badge>
+            );
+          })()}
+        </td>
+      );
       case 'floodZone': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           {(() => {
             const constraints = d.environmentalConstraints && typeof d.environmentalConstraints === 'object'
               ? d.environmentalConstraints as any : null;
-            const fema = constraints?.fema;
+            const fema = constraints?.fema || d.floodZoneData || d.siteEvaluation?.floodZone;
             return fema ? (
               <span className={`font-medium ${fema.isInFloodZone ? 'text-red-700' : 'text-gray-600'}`} title={fema.description || undefined}>
-                {fema.zoneCode || '—'}
+                {fema.zoneCode || fema.floodZone || fema.flood_zone || '—'}
               </span>
             ) : <span className="text-gray-400" aria-label="Flood zone not available">—</span>;
           })()}
@@ -6985,12 +6999,6 @@ export default function AnalystDashboard() {
                             <ArrowUpDown size={12} />
                           </button>
                         </th>
-                        <th className="text-center px-1 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[45px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colApex') ? '' : 'none', position: 'sticky', left: stickyLeft['colApex']}}>
-                          <span>Apex</span>
-                        </th>
-                        <th className="text-left px-2 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[140px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colApexNotes') ? '' : 'none', position: 'sticky', left: stickyLeft['colApexNotes']}}>
-                          <span>Apex Notes</span>
-                        </th>
                         <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[55px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colPriority') ? '' : 'none', position: 'sticky', left: stickyLeft['colPriority']}}>
                           <button
                             onClick={() => handleSort('priority')}
@@ -6999,12 +7007,6 @@ export default function AnalystDashboard() {
                             <span>Priority</span>
                             <ArrowUpDown size={12} />
                           </button>
-                        </th>
-                        <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[90px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colNext') ? '' : 'none', position: 'sticky', left: stickyLeft['colNext']}}>
-                          <span>Next</span>
-                        </th>
-                        <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[100px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colStep') ? '' : 'none', position: 'sticky', left: stickyLeft['colStep']}}>
-                          <span>Step</span>
                         </th>
                         <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[160px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('propertyAddress') ? '' : 'none', position: 'sticky', left: stickyLeft['propertyAddress']}}>
                           <button
@@ -7703,29 +7705,7 @@ export default function AnalystDashboard() {
                             )}
                           </td>
                           
-                          {/* 3. Apex flag */}
-                          <td className="px-1 py-1 text-center border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colApex') ? '' : 'none', position: 'sticky', left: stickyLeft['colApex']}}>
-                            <input
-                              type="checkbox"
-                              checked={!!deal.apex}
-                              onChange={(e) => cellUpdateMutation.mutate({ dealId: deal.id, apex: e.target.checked })}
-                              className="h-4 w-4 accent-[#4A90E2]"
-                              aria-label={`Apex deal ${deal.dealNumber || deal.id}`}
-                            />
-                          </td>
-                          {/* 4. Apex notes */}
-                          <td className="px-1 py-1 border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colApexNotes') ? '' : 'none', position: 'sticky', left: stickyLeft['colApexNotes']}}>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-2 text-xs bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border-[#4A90E2]"
-                              onClick={() => setApexNotesModal({ dealId: deal.id, address: deal.address || 'Property', notes: deal.apexNotes || '', isEditing: false })}
-                            >
-                              {deal.apexNotes ? 'Notes' : 'Add'}
-                            </Button>
-                          </td>
-                          {/* 5. Priority Dropdown - Sticky after Classification */}
+                          {/* 3. Priority Dropdown - Sticky after Classification */}
                           <td className="px-1 py-1 text-xs border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colPriority') ? '' : 'none', position: 'sticky', left: stickyLeft['colPriority']}}>
                             <Select 
                               value={deal.priority || ''} 
@@ -7752,34 +7732,7 @@ export default function AnalystDashboard() {
                             </Select>
                           </td>
                           
-                          {/* 6. Next assignee */}
-                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colNext') ? '' : 'none', position: 'sticky', left: stickyLeft['colNext']}}>
-                            <Select
-                              value={deal.nextAssignee || 'none'}
-                              onValueChange={(value) => cellUpdateMutation.mutate({ dealId: deal.id, nextAssignee: value === 'none' ? null : value })}
-                            >
-                              <SelectTrigger className="h-7 w-[86px] px-1 text-[11px]"><SelectValue placeholder="—" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">—</SelectItem>
-                                {analysts.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
-                                {developers.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          {/* 7. Deal step */}
-                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colStep') ? '' : 'none', position: 'sticky', left: stickyLeft['colStep']}}>
-                            <Select
-                              value={deal.dealStep || 'none'}
-                              onValueChange={(value) => cellUpdateMutation.mutate({ dealId: deal.id, dealStep: value === 'none' ? null : value })}
-                            >
-                              <SelectTrigger className="h-7 w-[96px] px-1 text-[11px]"><SelectValue placeholder="—" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">—</SelectItem>
-                                {["Initial Analysis", "LOI", "Initial UW", "Full UW", "UW", "Call Broker/Owner", "UW - Reviewing"].map(step => <SelectItem key={step} value={step}>{step}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          {/* 8. Property Address - Sticky after Step */}
+                          {/* 4. Property Address - Sticky after Priority */}
                           <td className="px-1 py-1 text-xs border-r border-gray-200 font-medium text-gray-900 bg-white z-10 shadow-lg" style={{display: isVisible('propertyAddress') ? '' : 'none', position: 'sticky', left: stickyLeft['propertyAddress'], maxWidth: '200px'}}>
                             {editingCell?.dealId === deal.id && editingCell?.field === 'address' ? (
                               <div className="flex items-center gap-1">

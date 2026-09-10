@@ -23,6 +23,7 @@ import {
   users,
   brokers,
   developerProfiles,
+  partnerDevelopers,
   partnerDeveloperSends,
   communications,
   apiCallLogs,
@@ -2842,6 +2843,105 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     next();
   });
 
+  // Investment Company deal isolation. The historical analyst dashboard uses
+  // shared /api/deals endpoints, so enforce the tenant boundary before any
+  // deal-by-id handler can read or mutate a record.
+  app.use('/api/deals/:id', async (req: any, res: any, next: any) => {
+    const role = String(req.user?.role || '').toUpperCase();
+    if (role !== 'DEVELOPER') return next();
+
+    // Collection/action routes also match the /:id middleware prefix.
+    const collectionRouteIds = new Set([
+      'batch',
+      'enrich',
+      'export',
+      'flagged',
+      'flagging-stats',
+      'import',
+      'pipeline',
+      'public-listing-batch',
+      'rename-file',
+      'score-batch',
+      'scoring-config',
+      'stats',
+      'submit',
+      'upload',
+      'upload-url',
+      'verify-zip-codes',
+    ]);
+    if (collectionRouteIds.has(String(req.params.id || '').toLowerCase())) return next();
+
+    const developerProfileId = getDeveloperProfileId(req, res);
+    if (!developerProfileId) return;
+    if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+    try {
+      const [visibleDeal] = await db
+        .select({ id: deals.id })
+        .from(deals)
+        .innerJoin(partnerDeveloperSends, eq(partnerDeveloperSends.dealId, deals.id))
+        .leftJoin(partnerDevelopers, eq(partnerDeveloperSends.developerId, partnerDevelopers.id))
+        .where(and(
+          eq(deals.id, String(req.params.id)),
+          or(
+            eq(partnerDeveloperSends.developerProfileId, developerProfileId),
+            eq(partnerDevelopers.developerProfileId, developerProfileId),
+          ),
+        ))
+        .limit(1);
+
+      if (!visibleDeal) {
+        return res.status(404).json({ error: 'Deal not found for this Investment Company' });
+      }
+      next();
+    } catch (error) {
+      console.error('[developer deal isolation] Error:', error);
+      return res.status(500).json({ error: 'Unable to verify deal access' });
+    }
+  });
+
+  // Broker records are tenant-owned CRM contacts for Investment Company users.
+  // Keep admin/global CRM access unchanged while blocking cross-company
+  // contact reads and mutations through the legacy broker routes.
+  app.use('/api/brokers/:id', async (req: any, res: any, next: any) => {
+    const role = String(req.user?.role || '').toUpperCase();
+    if (role !== 'DEVELOPER') return next();
+
+    const collectionRouteIds = new Set([
+      'batch',
+      'deduplicate',
+      'deduplicate-email',
+      'duplicates',
+      'merge',
+      'opt-out',
+      'search',
+    ]);
+    if (collectionRouteIds.has(String(req.params.id || '').toLowerCase())) return next();
+
+    const developerProfileId = getDeveloperProfileId(req, res);
+    if (!developerProfileId) return;
+    if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+    try {
+      const [ownedBroker] = await db
+        .select({ id: brokers.id })
+        .from(brokers)
+        .where(and(
+          eq(brokers.id, String(req.params.id)),
+          eq(brokers.ownerDeveloperProfileId, developerProfileId),
+          isNonDemoBroker(),
+        ))
+        .limit(1);
+      if (!ownedBroker) {
+        return res.status(404).json({ error: 'Contact not found for this Investment Company' });
+      }
+      next();
+    } catch (error) {
+      console.error('[developer broker isolation] Error:', error);
+      return res.status(500).json({ error: 'Unable to verify contact access' });
+    }
+  });
+
   // Development login endpoint (only works on localhost) - AFTER auth setup
   app.post("/api/dev-login", async (req, res) => {
     const isProduction = process.env.REPLIT_DEPLOYMENT === '1' || process.env.NODE_ENV === 'production';
@@ -3366,6 +3466,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // Broker registration
   app.post("/api/brokers", authLimiter, async (req, res) => {
     try {
+      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
+        return res.status(403).json({ error: "Investment Company contacts must be created through the tenant CRM." });
+      }
       const brokerData = insertBrokerSchema.parse(req.body);
       
       // Normalize marketsCovered if present
@@ -3469,6 +3572,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // Batch operations for brokers
   app.post("/api/brokers/batch", isAuthenticated, async (req, res) => {
     try {
+      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
+        return res.status(403).json({ error: "Investment Company contacts must be managed through the tenant CRM." });
+      }
       const { operation, brokers, data } = req.body;
       
       if (!operation) {
@@ -3590,8 +3696,17 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         }
         return res.json([]);
       }
-      const brokers = await storage.getAllBrokers();
-      res.json(brokers);
+      let allBrokers = await storage.getAllBrokers();
+      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        allBrokers = allBrokers.filter((broker) =>
+          broker.ownerDeveloperProfileId === developerProfileId &&
+          (broker as any).userId !== '20974d7b-e103-4fc7-b42f-7a13d41041fb',
+        );
+      }
+      res.json(allBrokers);
     } catch (error) {
       console.error("Error fetching brokers:", error);
       res.status(500).json({ message: "Failed to fetch brokers" });
@@ -3848,7 +3963,16 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         return res.json([]);
       }
       
-      const allBrokers = await storage.getAllBrokers();
+      let allBrokers = await storage.getAllBrokers();
+      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        allBrokers = allBrokers.filter((broker) =>
+          broker.ownerDeveloperProfileId === developerProfileId &&
+          (broker as any).userId !== '20974d7b-e103-4fc7-b42f-7a13d41041fb',
+        );
+      }
       const searchLower = query.toLowerCase();
       
       // Filter brokers by email, name, or phone
@@ -6623,6 +6747,16 @@ Provide your analysis in this exact JSON format:
 
       let allDeals = await storage.getDealsWithBrokers();
 
+      // Developer dashboard requests must only include deals routed to the
+      // authenticated Investment Company profile.
+      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
+        allDeals = allDeals.filter((deal) => visibleDealIds.has(deal.id));
+      }
+
       // Demo sandbox: scope to demo user's deals only
       const reqUserEmail = ((req as any).user?.claims?.email || (req as any).user?.email || '').toLowerCase();
       if (reqUserEmail === 'demo@catalystcp.com') {
@@ -6807,7 +6941,14 @@ Provide your analysis in this exact JSON format:
         ipAddress: req.ip
       });
 
-      const deals = await storage.getDealsWithBrokers();
+      let deals = await storage.getDealsWithBrokers();
+      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
+        deals = deals.filter((deal) => visibleDealIds.has(deal.id));
+      }
 
       const fmt = (v: any) => (v == null ? '' : String(v).replace(/"/g, '""'));
       const fmtDollar = (v: any) => v == null ? '' : `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -7591,8 +7732,17 @@ Provide your analysis in this exact JSON format:
   // Get deals statistics (used by launchpad dashboard)
   app.get('/api/deals/stats', isAuthenticated, async (req, res) => {
     try {
-      const deals = await storage.getAllDeals();
-      const brokers = await storage.getAllBrokers();
+      let deals = await storage.getAllDeals();
+      let brokers = await storage.getAllBrokers();
+      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
+        deals = deals.filter((deal) => visibleDealIds.has(deal.id));
+        const visibleBrokerIds = new Set(deals.map((deal) => deal.brokerId).filter(Boolean));
+        brokers = brokers.filter((broker) => visibleBrokerIds.has(broker.id));
+      }
       
       const totalValue = deals.reduce((sum, deal) => sum + (parseFloat(deal.askingPrice?.toString() || '0') || 0), 0);
       const highPriorityDeals = deals.filter(d => d.classification === 'high_priority' || d.status === 'approved').length;
@@ -7621,7 +7771,14 @@ Provide your analysis in this exact JSON format:
   // Get deals with pipeline tracking data
   app.get("/api/deals/pipeline", isAuthenticated, async (req, res) => {
     try {
-      const deals = await storage.getAllDealsWithBrokers();
+      let deals = await storage.getAllDealsWithBrokers();
+      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
+        deals = deals.filter((deal) => visibleDealIds.has(deal.id));
+      }
       
       // Enhanced pipeline data for each deal
       const pipelineDeals = deals.map((deal: any) => {
@@ -7653,7 +7810,14 @@ Provide your analysis in this exact JSON format:
   // Get pipeline analytics and bottleneck analysis
   app.get("/api/deals/pipeline/analytics", isAuthenticated, async (req, res) => {
     try {
-      const deals = await storage.getAllDealsWithBrokers();
+      let deals = await storage.getAllDealsWithBrokers();
+      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
+        deals = deals.filter((deal) => visibleDealIds.has(deal.id));
+      }
       
       // Calculate stage analytics
       const stageAnalytics = Array.from({ length: 7 }, (_, i) => {
@@ -7722,8 +7886,9 @@ Provide your analysis in this exact JSON format:
     try {
       const user = req.user as any;
       const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
+      const isDeveloper = String(user?.role || '').toUpperCase() === 'DEVELOPER';
       
-      if (!isAnalyst) {
+      if (!isAnalyst && !isDeveloper) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
       }
 
@@ -7740,6 +7905,13 @@ Provide your analysis in this exact JSON format:
 
       // Build query conditions
       const conditions = [eq(deals.flagged, true)];
+      if (isDeveloper) {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
+        conditions.push(visibleDealIds.size ? inArray(deals.id, Array.from(visibleDealIds)) : sql`1 = 0`);
+      }
       
       if (riskLevel && riskLevel !== 'all') {
         conditions.push(eq(deals.riskLevel, riskLevel as any));
@@ -12800,6 +12972,18 @@ RULES:
     return developerProfileId;
   }
 
+  async function getDeveloperVisibleDealIds(developerProfileId: string): Promise<Set<string>> {
+    const rows = await db
+      .select({ dealId: partnerDeveloperSends.dealId })
+      .from(partnerDeveloperSends)
+      .leftJoin(partnerDevelopers, eq(partnerDeveloperSends.developerId, partnerDevelopers.id))
+      .where(or(
+        eq(partnerDeveloperSends.developerProfileId, developerProfileId),
+        eq(partnerDevelopers.developerProfileId, developerProfileId),
+      ));
+    return new Set(rows.map((row) => row.dealId));
+  }
+
   function escapeEmailHtml(value: string): string {
     return value.replace(/[&<>"']/g, (character) => ({
       '&': '&amp;',
@@ -12942,7 +13126,7 @@ RULES:
     if (!contactId || !stageId) throw adminRequestError(400, "Contact and stage are required");
     const [contact] = await database.select({ id: brokers.id }).from(brokers).where(and(
       eq(brokers.id, contactId),
-      or(eq(brokers.ownerDeveloperProfileId, developerProfileId), isNull(brokers.ownerDeveloperProfileId)),
+      eq(brokers.ownerDeveloperProfileId, developerProfileId),
       isNonDemoBroker(),
     )).limit(1);
     if (!contact) throw adminRequestError(400, "Contact is not available to this Investment Company");
@@ -13003,7 +13187,7 @@ RULES:
             email: brokers.email, phone: brokers.phone, brokerage: brokers.brokerage,
             ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
           }).from(brokers).where(and(
-            or(eq(brokers.ownerDeveloperProfileId, profile.id), isNull(brokers.ownerDeveloperProfileId)),
+            eq(brokers.ownerDeveloperProfileId, profile.id),
             isNonDemoBroker(),
           )).orderBy(desc(brokers.createdAt)),
           db.select().from(pipelineStages).where(and(
@@ -13367,10 +13551,7 @@ RULES:
         createdAt: brokers.createdAt,
       }).from(brokers)
         .where(and(
-          or(
-            eq(brokers.ownerDeveloperProfileId, developerProfileId),
-            isNull(brokers.ownerDeveloperProfileId),
-          ),
+          eq(brokers.ownerDeveloperProfileId, developerProfileId),
           isNonDemoBroker(),
         ))
         .orderBy(desc(brokers.createdAt));
@@ -13578,7 +13759,7 @@ RULES:
         ))
         .innerJoin(brokers, and(
           eq(brokers.id, pipelineOpportunities.contactId),
-          or(eq(brokers.ownerDeveloperProfileId, developerProfileId), isNull(brokers.ownerDeveloperProfileId)),
+          eq(brokers.ownerDeveloperProfileId, developerProfileId),
           isNonDemoBroker(),
         ))
         .where(and(...conditions))
@@ -13613,7 +13794,7 @@ RULES:
         const contactId = String(req.body.contactId || "").trim();
         const [contact] = await db.select({ id: brokers.id }).from(brokers).where(and(
           eq(brokers.id, contactId),
-          or(eq(brokers.ownerDeveloperProfileId, developerProfileId), isNull(brokers.ownerDeveloperProfileId)),
+          eq(brokers.ownerDeveloperProfileId, developerProfileId),
           isNonDemoBroker(),
         )).limit(1);
         if (!contact) return res.status(400).json({ error: "Contact is not available to this Investment Company" });
@@ -17505,12 +17686,20 @@ RULES:
       // Check if user is a Catalyst analyst
       const user = req.user as any;
       const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
+      const isDeveloper = String(user?.role || '').toUpperCase() === 'DEVELOPER';
       
-      if (!isAnalyst) {
+      if (!isAnalyst && !isDeveloper) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
       }
 
       let deals = await storage.getAllDealsWithBrokers();
+      if (isDeveloper) {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
+        deals = deals.filter((deal: any) => visibleDealIds.has(deal.id));
+      }
 
       // Demo user: filter to only deals whose broker belongs to demo@catalystcp.com
       const reqUser2 = req.user as any;
@@ -18124,10 +18313,17 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.claims?.email || user?.email || '';
       const isAnalyst = isPlatformAdminEmail(userEmail);
+      const isDeveloper = String(user?.role || '').toUpperCase() === 'DEVELOPER';
+      let developerProfileId: string | null = null;
+      if (isDeveloper) {
+        developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      }
       
       console.log(`📋 [QUICK-DEAL] Auth check - User email: ${userEmail}, isAnalyst: ${isAnalyst}`);
       
-      if (!isAnalyst) {
+      if (!isAnalyst && !isDeveloper) {
         console.warn(`⚠️ [QUICK-DEAL] ACCESS DENIED for user: ${userEmail}`);
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
       }
@@ -18202,7 +18398,7 @@ RULES:
             // Priority 0: Direct broker ID from autocomplete selection — most reliable, skip all guessing
             if (brokerData.existingBrokerId) {
               const directBroker = await storage.getBrokerById(brokerData.existingBrokerId);
-              if (directBroker) {
+              if (directBroker && (!developerProfileId || directBroker.ownerDeveloperProfileId === developerProfileId)) {
                 console.log('✅ [QUICK-DEAL] Linked to selected broker directly by ID:', directBroker.id, `(${directBroker.firstName} ${directBroker.lastName})`);
                 brokerId = directBroker.id;
                 // If the analyst also provided updated contact info, patch the broker record
@@ -18219,7 +18415,13 @@ RULES:
             // Priority 1: Try to find by email if provided
             if (!brokerId && hasEmail) {
               console.log('📧 [QUICK-DEAL] Attempting to find broker with email:', brokerData.email);
-              const existingBroker = await storage.getBrokerByEmail(brokerData.email);
+              const existingBroker = developerProfileId
+                ? (await db.select().from(brokers).where(and(
+                    sql`LOWER(${brokers.email}) = ${String(brokerData.email).toLowerCase()}`,
+                    eq(brokers.ownerDeveloperProfileId, developerProfileId),
+                    isNonDemoBroker(),
+                  )).limit(1))[0]
+                : await storage.getBrokerByEmail(brokerData.email);
               if (existingBroker) {
                 console.log('✅ [QUICK-DEAL] Found existing broker by email:', existingBroker.id);
                 brokerId = existingBroker.id;
@@ -18229,7 +18431,13 @@ RULES:
             // Priority 2: Try to find by phone if provided and not found by email
             if (!brokerId && hasPhone) {
               console.log('📱 [QUICK-DEAL] Attempting to find broker with phone:', brokerData.phone);
-              const existingBroker = await storage.getBrokerByPhone(brokerData.phone);
+              const existingBroker = developerProfileId
+                ? (await db.select().from(brokers).where(and(
+                    eq(brokers.phone, brokerData.phone),
+                    eq(brokers.ownerDeveloperProfileId, developerProfileId),
+                    isNonDemoBroker(),
+                  )).limit(1))[0]
+                : await storage.getBrokerByPhone(brokerData.phone);
               if (existingBroker) {
                 console.log('✅ [QUICK-DEAL] Found existing broker by phone:', existingBroker.id);
                 brokerId = existingBroker.id;
@@ -18254,6 +18462,7 @@ RULES:
                 phone: hasPhone ? brokerData.phone : null, // Only if provided
                 companyName: brokerData.companyName || null,
                 marketsCovered: brokerData.marketsCovered ? [brokerData.marketsCovered] : [], // Empty array if not provided
+                ...(developerProfileId ? { ownerDeveloperProfileId: developerProfileId } : {}),
               } as any);
               brokerId = newBroker.id;
               console.log('✅ [QUICK-DEAL] Created new broker:', brokerId, `(${firstName} ${lastName})`);
@@ -18368,6 +18577,49 @@ RULES:
       };
 
       const newDeal = await storage.createDeal(dealData as any);
+
+      // A company-created deal must have the same tenant link as routed deals,
+      // otherwise it would disappear from that company's scoped dashboard.
+      if (developerProfileId) {
+        let [recipient] = await db
+          .select({ id: partnerDevelopers.id })
+          .from(partnerDevelopers)
+          .where(eq(partnerDevelopers.developerProfileId, developerProfileId))
+          .limit(1);
+
+        if (!recipient) {
+          const [profile] = await db
+            .select({
+              companyName: developerProfiles.companyName,
+              slug: developerProfiles.slug,
+            })
+            .from(developerProfiles)
+            .where(eq(developerProfiles.id, developerProfileId))
+            .limit(1);
+          if (!profile) {
+            return res.status(403).json({ error: 'Investment Company profile is unavailable' });
+          }
+
+          const contactName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || profile.companyName;
+          [recipient] = await db.insert(partnerDevelopers).values({
+            developerProfileId,
+            companyName: profile.companyName,
+            contactName,
+            email: userEmail || `${profile.slug}@landlinq.ai`,
+            isActive: true,
+            autoSendEnabled: false,
+          } as any).returning({ id: partnerDevelopers.id });
+        }
+
+        await db.insert(partnerDeveloperSends).values({
+          developerId: recipient.id,
+          developerProfileId,
+          dealId: newDeal.id,
+          address: newDeal.address || null,
+          status: 'sent',
+          matchedAt: new Date(),
+        }).onConflictDoNothing();
+      }
       
       // PERFORMANCE OPTIMIZATION: Return deal IMMEDIATELY, run classification in background
       const isAcquisitionDeal = dealType === 'acquisition';

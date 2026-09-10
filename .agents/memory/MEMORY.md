@@ -14,6 +14,7 @@
 - [Developer import address dedup](developer-import-address-dedup.md) — reuse global address matches, but only mutate canonical deal fields when the importing profile already owns that deal relationship.
 - [Broker contact tenant identity](broker-contact-tenant-identity.md) — developer contacts dedupe within their owner profile; legacy email/phone lookups must only resolve shared NULL-owner brokers.
 - [Developer analytics tenant scope](developer-analytics-tenant-scope.md) — deal status is send-profile-specific; outreach totals must be jointly scoped through both an owned sender and campaign.
+- [Investment Company tenant boundary](investment-company-tenant-boundary.md) — legacy CRM/dashboard routes must enforce the persisted developer profile boundary, including direct IDs, exports, searches, and mutations.
 - [VM HTTPS readiness probes](vm-https-readiness-probes.md) — production HTTPS redirects must exempt loopback hosts or Replit VM promotion follows TLS to the app's plain HTTP port and times out.
 - [Production admin provisioning](production-admin-provisioning.md) — development users do not backfill production; provision the first Apex admin during its authenticated login, never blocking startup.
 - [Apex email authorization migration](apex-email-authorization.md) — internal domain checks use strict @apexresi.com matching; preserve legacy Catalyst demo, data, and delivery references unless separately migrated.
