@@ -105,10 +105,15 @@ interface DealWithBroker extends Omit<Deal, 'publicListings'> {
 const ALL_COLUMNS = [
   { key: 'id', label: 'ID', defaultVisible: true },
   { key: 'colStatus', label: 'Status', defaultVisible: true },
+  { key: 'colApex', label: 'Apex', defaultVisible: true },
+  { key: 'colApexNotes', label: 'Apex Notes', defaultVisible: true },
   { key: 'colPriority', label: 'Priority', defaultVisible: true },
+  { key: 'colNext', label: 'Next', defaultVisible: true },
+  { key: 'colStep', label: 'Step', defaultVisible: true },
   { key: 'propertyAddress', label: 'Property Address', defaultVisible: true },
   { key: 'name', label: 'Name', defaultVisible: true },
   { key: 'yieldOnCost', label: 'YOC', defaultVisible: true },
+  { key: 'automatedYoc', label: 'Auto YOC', defaultVisible: true },
   { key: 'irr', label: 'IRR', defaultVisible: true },
   { key: 'excelModel', label: 'Excel', defaultVisible: true },
   { key: 'reason', label: 'AI Reason', defaultVisible: true },
@@ -140,6 +145,7 @@ const ALL_COLUMNS = [
   { key: 'dua', label: 'DUA', defaultVisible: false },
   { key: 'zoning', label: 'Zoning', defaultVisible: false },
   { key: 'wetlandNotes', label: 'Wetland/Environmental Notes', defaultVisible: false },
+  { key: 'developerSummary', label: 'Developer Summary', defaultVisible: false },
   { key: 'entitlements', label: 'Entitlements', defaultVisible: false },
   { key: 'pricePerUnit', label: 'Price/Unit', defaultVisible: false },
   { key: 'sewer', label: 'Sewer', defaultVisible: false },
@@ -152,12 +158,12 @@ type ColumnKey = typeof ALL_COLUMNS[number]['key'];
 
 // Fixed columns always shown first, not user-reorderable
 const FIXED_COLUMN_KEYS: readonly ColumnKey[] = [
-  'id', 'colStatus', 'colPriority', 'propertyAddress'
+  'id', 'colStatus', 'colApex', 'colApexNotes', 'colPriority', 'colNext', 'colStep', 'propertyAddress'
 ] as const;
 
 // Reorderable columns — everything not in the fixed set
 const REORDERABLE_COLUMNS = ALL_COLUMNS.filter(c => !(FIXED_COLUMN_KEYS as readonly string[]).includes(c.key));
-type ReorderableColumnKey = Exclude<ColumnKey, 'id'|'colStatus'|'colPriority'|'propertyAddress'>;
+type ReorderableColumnKey = Exclude<ColumnKey, 'id'|'colStatus'|'colApex'|'colApexNotes'|'colPriority'|'colNext'|'colStep'|'propertyAddress'>;
 
 function getDefaultColumnOrder(): ReorderableColumnKey[] {
   try {
@@ -716,7 +722,11 @@ export default function AnalystDashboard() {
     const STICKY_COLS = [
       { key: 'id', width: 40 },
       { key: 'colStatus', width: 50 },
+      { key: 'colApex', width: 45 },
+      { key: 'colApexNotes', width: 140 },
       { key: 'colPriority', width: 55 },
+      { key: 'colNext', width: 90 },
+      { key: 'colStep', width: 100 },
     ] as const;
     const result: Record<string, number> = {};
     let left = 0;
