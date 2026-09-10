@@ -5,6 +5,18 @@ export type MapTileProvider = "MapTiler" | "OpenStreetMap";
 
 const mapTilerKey = String(import.meta.env.VITE_MAPTILER_API_KEY || "").trim();
 
+export function getOpenStreetMapTileConfig(): {
+  provider: "OpenStreetMap";
+  url: string;
+  attribution: string;
+} {
+  return {
+    provider: "OpenStreetMap",
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>',
+  };
+}
+
 export function getMapTileConfig(): {
   provider: MapTileProvider;
   url: string;
@@ -18,11 +30,7 @@ export function getMapTileConfig(): {
     };
   }
 
-  return {
-    provider: "OpenStreetMap",
-    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>',
-  };
+  return getOpenStreetMapTileConfig();
 }
 
 export function trackMapUsage(

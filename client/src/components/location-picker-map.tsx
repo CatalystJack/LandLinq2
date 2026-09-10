@@ -13,6 +13,7 @@ import {
 import {
   addTrackedTileEvents,
   getMapTileConfig,
+  getOpenStreetMapTileConfig,
   trackMapSession,
 } from "@/lib/map-tiles";
 
@@ -80,6 +81,20 @@ export function LocationPickerMap({
       }).addTo(map);
       addTrackedTileEvents(tileLayer, tileConfig.provider);
       trackMapSession(tileConfig.provider);
+      // Keep the picker usable when a configured MapTiler key is invalid.
+      if (tileConfig.provider === "MapTiler") {
+        tileLayer.once("tileerror", () => {
+          if (cancelled || !map.hasLayer(tileLayer)) return;
+          map.removeLayer(tileLayer);
+          const fallbackConfig = getOpenStreetMapTileConfig();
+          const fallbackLayer = L.tileLayer(fallbackConfig.url, {
+            attribution: fallbackConfig.attribution,
+            maxZoom: 19,
+          }).addTo(map);
+          addTrackedTileEvents(fallbackLayer, fallbackConfig.provider);
+          trackMapSession(fallbackConfig.provider);
+        });
+      }
 
       const updatePosition = (lat: number, lng: number) => {
         setSelectedPosition({ lat, lng });

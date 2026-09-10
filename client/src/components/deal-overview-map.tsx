@@ -3,6 +3,7 @@ import type L from "leaflet";
 import {
   addTrackedTileEvents,
   getMapTileConfig,
+  getOpenStreetMapTileConfig,
   trackMapSession,
 } from "@/lib/map-tiles";
 
@@ -109,13 +110,28 @@ export function DealOverviewMap({ deals, onDealClick }: DealOverviewMapProps) {
       const map = L.map(container, { zoomControl: true });
       mapRef.current = map;
 
-       const tileConfig = getMapTileConfig();
-       const tileLayer = L.tileLayer(tileConfig.url, {
+        const tileConfig = getMapTileConfig();
+        const tileLayer = L.tileLayer(tileConfig.url, {
          attribution: tileConfig.attribution,
          maxZoom: 20,
        }).addTo(map);
        addTrackedTileEvents(tileLayer, tileConfig.provider);
        trackMapSession(tileConfig.provider);
+        // A stale or invalid MapTiler key should not leave the dashboard unusable.
+        // Fall back to the public OSM tiles after the first MapTiler tile error.
+        if (tileConfig.provider === "MapTiler") {
+          tileLayer.once("tileerror", () => {
+            if (cancelled || !map.hasLayer(tileLayer)) return;
+            map.removeLayer(tileLayer);
+            const fallbackConfig = getOpenStreetMapTileConfig();
+            const fallbackLayer = L.tileLayer(fallbackConfig.url, {
+              attribution: fallbackConfig.attribution,
+              maxZoom: 19,
+            }).addTo(map);
+            addTrackedTileEvents(fallbackLayer, fallbackConfig.provider);
+            trackMapSession(fallbackConfig.provider);
+          });
+        }
 
       const latLngs: L.LatLngTuple[] = [];
 
