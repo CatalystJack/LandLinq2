@@ -1,6 +1,10 @@
 import { useEffect, useRef } from "react";
 import type L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import {
+  addTrackedTileEvents,
+  getMapTileConfig,
+  trackMapSession,
+} from "@/lib/map-tiles";
 
 export interface DealForMap {
   id: string;
@@ -105,10 +109,13 @@ export function DealOverviewMap({ deals, onDealClick }: DealOverviewMapProps) {
       const map = L.map(container, { zoomControl: true });
       mapRef.current = map;
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 18,
-      }).addTo(map);
+       const tileConfig = getMapTileConfig();
+       const tileLayer = L.tileLayer(tileConfig.url, {
+         attribution: tileConfig.attribution,
+         maxZoom: 20,
+       }).addTo(map);
+       addTrackedTileEvents(tileLayer, tileConfig.provider);
+       trackMapSession(tileConfig.provider);
 
       const latLngs: L.LatLngTuple[] = [];
 

@@ -15,6 +15,7 @@ import {
   Clock, 
   DollarSign,
   Mail, 
+  Map as MapIcon,
   RefreshCw,
   TrendingUp,
   Zap
@@ -351,6 +352,51 @@ export default function ApiMonitoring() {
                         No API calls made yet this month - costs will appear here when you start using the platform
                       </p>
                     )}
+                  </div>
+
+                  {/* Cost Breakdown by Service */}
+                  <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-5 shadow-sm">
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="rounded bg-blue-100 p-2">
+                        <MapIcon className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-[#081729]">Map Free-Tier Usage</h3>
+                        <p className="text-xs text-slate-600">Monthly MapTiler sessions and Mapillary requests</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                      <div>
+                        <p className="text-sm text-slate-600">MapTiler Sessions</p>
+                        <p className="text-2xl font-bold text-[#081729]">
+                          {monthlyCosts?.mapUsage?.mapTilerSessions || 0}
+                          <span className="text-sm font-normal text-slate-500"> / {monthlyCosts?.mapUsage?.freeTierSessionCap || 5000}</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600">Tile Requests</p>
+                        <p className="text-2xl font-bold text-[#4A90E2]">{monthlyCosts?.mapUsage?.mapTilerTiles || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600">Mapillary Requests</p>
+                        <p className="text-2xl font-bold text-[#081729]">{monthlyCosts?.mapUsage?.mapillaryCalls || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600">Usage</p>
+                        <p className="text-2xl font-bold text-green-600">
+                          {(monthlyCosts?.mapUsage?.freeTierPercentUsed || 0).toFixed(2)}%
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
+                      <div
+                        className="h-full rounded-full bg-[#4A90E2] transition-all"
+                        style={{ width: `${Math.min(monthlyCosts?.mapUsage?.freeTierPercentUsed || 0, 100)}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">
+                      OpenStreetMap fallback tiles: {monthlyCosts?.mapUsage?.openStreetMapTiles || 0}
+                    </p>
                   </div>
 
                   {/* Cost Breakdown by Service */}

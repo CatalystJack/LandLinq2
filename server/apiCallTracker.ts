@@ -8,7 +8,7 @@ import { db } from './db.js';
 import { apiCallLogs } from '../shared/schema.js';
 
 interface ApiCallLog {
-  service: 'HelloData' | 'ArcGIS' | 'Geocodio' | 'SendGrid' | 'Twilio' | 'OpenAI' | 'Other';
+  service: 'HelloData' | 'ArcGIS' | 'Geocodio' | 'SendGrid' | 'Twilio' | 'OpenAI' | 'MapTiler' | 'Mapillary' | 'OpenStreetMap' | 'Other';
   endpoint: string;
   timestamp: Date;
   dealId?: string;
@@ -35,6 +35,9 @@ class ApiCallTracker {
     SendGrid: 0.04,     // $0.0004/email - 50k/month tier
     Twilio: 0.75,       // $0.0075/SMS - US outbound
     OpenAI: 2.19,       // $0.0219/call - GPT-5 ~1.5k input + 2k output tokens
+    MapTiler: 0,         // Free-tier usage monitoring only
+    Mapillary: 0,        // Free-tier usage monitoring only
+    OpenStreetMap: 0,    // Public tile fallback usage monitoring only
     Other: 0.0
   };
 

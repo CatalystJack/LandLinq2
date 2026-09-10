@@ -1,0 +1,35 @@
+Wire the free mapping/street-view stack into the app properly, building on what 
+already exists rather than assuming everything needs replacing.
+
+TASK 1 — Fix the existing Leaflet map's tile source (quick, low-risk)
+client/src/components/deal-overview-map.tsx (powers the "Map" tab in the analyst 
+dashboard) already uses Leaflet correctly, but pulls tiles directly from raw 
+OpenStreetMap servers (tile.openstreetmap.org), which their own usage policy 
+discourages for real commercial traffic. Swap this tile URL for a MapTiler tile 
+endpoint using the MAPTILER_API_KEY set up in the earlier task. No other changes 
+needed to this file — it's already correctly built otherwise.
+
+TASK 2 — Complete the replacement of the three Google-based components
+(As previously scoped) google-map.tsx, location-picker-map.tsx, and 
+comparables-map.tsx still load the paid Google Maps JavaScript API. Replace each 
+with Leaflet + the same MapTiler tile source now used in deal-overview-map.tsx, 
+so all four map components in this app are consistent and built the same way.
+
+TASK 3 — Add an embedded map AND street view to the deal detail page
+client/src/pages/deal-details.tsx currently has no embedded map or street-level 
+imagery at all — only a plain outbound link (getGoogleMapsUrl, ~line 225) that 
+opens Google Maps in a new tab. Add:
+  - A small embedded Leaflet map (using deal-overview-map.tsx's pattern as a 
+    reference) showing a single pin at the deal's location, directly on this page
+  - The Mapillary street-view panel (from the earlier task) showing street-level 
+    imagery for this specific property's coordinates, with the "no imagery 
+    available" fallback for locations where Mapillary has no coverage
+Place these in a sensible spot on the existing deal detail layout — likely near 
+the address/location information already shown on this page. Keep the existing 
+outbound Google Maps link as a secondary option (useful as a fallback/double-check 
+for the user), rather than removing it entirely.
+
+Verify: confirm the "Map" tab in the analyst dashboard still shows all deal pins 
+correctly with the new tile source, confirm all three replaced components render 
+correctly, and confirm a real deal's detail page now shows both an embedded map 
+and Street View (or the graceful fallback) for that specific property.

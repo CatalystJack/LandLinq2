@@ -15,6 +15,7 @@ import { formatDateEST } from "@/utils/timezone";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
+import { PropertyLocationMap } from "@/components/property-location-map";
 import { 
   ArrowLeft, 
   MapPin, 
@@ -670,6 +671,12 @@ Best regards`;
                   )}
                 </CardContent>
               </Card>
+
+              <PropertyLocationMap
+                address={deal.address}
+                latitude={deal.latitude}
+                longitude={deal.longitude}
+              />
 
               {/* Broker Information */}
               {deal.broker && (

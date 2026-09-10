@@ -215,6 +215,7 @@ import { UnifiedDealPipeline } from "./unifiedDealPipeline";
 import { ResolutionService } from "./resolutionService";
 import { apiCallTracker } from './apiCallTracker.js';
 import { geocodioService } from './geocodioService.js';
+import { searchMapillaryImages } from './mapillaryService.js';
 // Dynamic import for test functions to prevent loading during production deployment
 // import { setupSMSTestRoutes } from "./testSMSEndpoints";
 import { dataQualityMonitoringService } from "./dataQualityMonitoringService";
@@ -26335,6 +26336,51 @@ RULES:
     }
   });
 
+  // Client-side map events are reported here so free-tier usage is visible
+  // alongside the existing external API cost tracking.
+  app.post('/api/tracking/map-usage', isAuthenticated, async (req, res) => {
+    try {
+      const allowedServices = new Set(['MapTiler', 'Mapillary', 'OpenStreetMap']);
+      const service = String(req.body?.service || '');
+      const endpoint = String(req.body?.endpoint || '').slice(0, 120);
+      const success = req.body?.success !== false;
+      const responseTime = Math.max(0, Math.min(Number(req.body?.responseTime) || 0, 120_000));
+
+      if (!allowedServices.has(service) || !endpoint) {
+        return res.status(400).json({ error: 'Invalid map usage event' });
+      }
+
+      apiCallTracker.logCall(
+        service as 'MapTiler' | 'Mapillary' | 'OpenStreetMap',
+        endpoint,
+        success,
+        responseTime,
+      );
+      res.status(204).end();
+    } catch (error) {
+      console.error('❌ Error recording map usage:', error);
+      res.status(500).json({ error: 'Failed to record map usage' });
+    }
+  });
+
+  app.get('/api/mapillary/images', isAuthenticated, async (req, res) => {
+    const latitude = Number(req.query.lat);
+    const longitude = Number(req.query.lng);
+    const radius = Number(req.query.radius) || 100;
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({ error: 'Valid lat and lng are required' });
+    }
+
+    try {
+      const result = await searchMapillaryImages(latitude, longitude, radius);
+      res.json(result);
+    } catch (error) {
+      console.error('❌ Error searching Mapillary imagery:', error);
+      res.status(502).json({ error: 'Failed to search Mapillary imagery' });
+    }
+  });
+
   // Monthly API Cost Tracking - Query from database for accurate totals
   app.get('/api/tracking/monthly-costs', isAuthenticated, async (req, res) => {
     try {
@@ -26401,6 +26447,11 @@ RULES:
       
       // Calculate API-only total (convert from cents to dollars)
       const apiOnlyTotal = totalCost / 100;
+      const mapTilerCalls = monthlyCalls.filter(call => call.service === 'MapTiler');
+      const mapillaryCalls = monthlyCalls.filter(call => call.service === 'Mapillary');
+      const openStreetMapCalls = monthlyCalls.filter(call => call.service === 'OpenStreetMap');
+      const mapTilerSessions = mapTilerCalls.filter(call => call.endpoint === 'session').length;
+      const mapTilerTiles = mapTilerCalls.filter(call => call.endpoint === 'tile').length;
       
       // CRITICAL: Only show REAL costs - no mock/hardcoded infrastructure costs
       // User preference: NO MOCK DATA under any circumstances
@@ -26422,6 +26473,15 @@ RULES:
         // Legacy fields for backwards compatibility
         totalCost: `$${apiOnlyTotal.toFixed(2)}`,
         totalCostRaw: apiOnlyTotal,
+
+        mapUsage: {
+          mapTilerSessions,
+          mapTilerTiles,
+          mapillaryCalls: mapillaryCalls.length,
+          openStreetMapTiles: openStreetMapCalls.filter(call => call.endpoint === 'tile').length,
+          freeTierSessionCap: 5000,
+          freeTierPercentUsed: Number(((mapTilerSessions / 5000) * 100).toFixed(2)),
+        },
         
         byService: Object.entries(byService).map(([service, data]) => ({
           service,
