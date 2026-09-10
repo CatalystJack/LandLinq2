@@ -449,6 +449,11 @@ setTimeout(() => {
           );
           CREATE INDEX IF NOT EXISTS market_comp_cache_active_lookup_idx
             ON market_comp_cache (product_type, expires_at);
+          CREATE TABLE IF NOT EXISTS market_comp_lookup_metrics (
+            lookup_date DATE PRIMARY KEY DEFAULT CURRENT_DATE,
+            cache_hits INTEGER NOT NULL DEFAULT 0,
+            cache_misses INTEGER NOT NULL DEFAULT 0
+          );
           CREATE TABLE IF NOT EXISTS zoning_agenda_items (
             id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
             market VARCHAR NOT NULL,

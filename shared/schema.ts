@@ -143,6 +143,14 @@ export const insertMarketCompCacheSchema = createInsertSchema(marketCompCache).o
 export type InsertMarketCompCache = z.infer<typeof insertMarketCompCacheSchema>;
 export type MarketCompCache = typeof marketCompCache.$inferSelect;
 
+// Daily aggregate of qualifying-comparable warehouse lookups.
+// A single row per day keeps the analytics query small and increments race-safe.
+export const marketCompLookupMetrics = pgTable("market_comp_lookup_metrics", {
+  lookupDate: date("lookup_date").primaryKey().default(sql`CURRENT_DATE`),
+  cacheHits: integer("cache_hits").notNull().default(0),
+  cacheMisses: integer("cache_misses").notNull().default(0),
+});
+
 export const insertDeveloperProfileSchema = createInsertSchema(developerProfiles).omit({
   id: true, createdAt: true, updatedAt: true,
 });

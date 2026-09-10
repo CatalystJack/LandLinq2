@@ -215,21 +215,21 @@ export default function MarketingHome() {
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10" aria-label="Main navigation">
           <a href="/" aria-label="LandLinq home"><img src="/assets/landlinq-white-logo.png" alt="LandLinq" className="h-7 w-auto" /></a>
           <div className="hidden items-center gap-8 md:flex"><a href="#platform" className="text-sm text-white/65 hover:text-white">Platform</a><a href="#company" className="text-sm text-white/65 hover:text-white">Company</a><Link href="/login" className="rounded-full border border-white/35 px-4 py-2 text-sm font-semibold text-white hover:bg-white hover:text-primary">Log In</Link></div>
-          <button type="button" aria-label={menuOpen ? "Close menu" : "Open menu"} onClick={() => setMenuOpen(!menuOpen)} className="rounded-full p-2 text-primary-foreground md:hidden">{menuOpen ? <X /> : <Menu />}</button>
-          {menuOpen && <div className="absolute inset-x-4 top-16 rounded-2xl border border-white/15 bg-primary p-4 shadow-xl md:hidden"><div className="flex flex-col gap-1">{[["Platform", "#platform"], ["Company", "#company"]].map(([label, href]) => <a key={label} href={href} onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/80">{label}</a>)}<Link href="/login" className="mt-2 rounded-lg bg-white px-3 py-3 text-center text-sm font-semibold text-primary">Log In</Link></div></div>}
+           <button type="button" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} className="inline-flex h-11 w-11 items-center justify-center rounded-full text-primary-foreground md:hidden">{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
+           {menuOpen && <div className="absolute inset-x-4 top-20 rounded-2xl border border-white/15 bg-primary p-4 shadow-xl md:hidden"><div className="flex flex-col gap-1">{[["Platform", "#platform"], ["Company", "#company"]].map(([label, href]) => <a key={label} href={href} onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/80">{label}</a>)}<Link href="/login" onClick={() => setMenuOpen(false)} className="mt-2 rounded-lg bg-white px-3 py-3 text-center text-sm font-semibold text-primary">Log In</Link></div></div>}
         </nav>
       </header>
 
       <main>
-        <section className="relative bg-primary px-5 pb-16 pt-28 text-primary-foreground sm:px-8 sm:pb-24 sm:pt-32 lg:px-10">
+         <section className="relative bg-primary px-4 pb-12 pt-24 text-primary-foreground sm:px-8 sm:pb-24 sm:pt-32 lg:px-10">
           <div className="ll-grid absolute inset-0 opacity-20" /><div className="relative mx-auto max-w-7xl">
-            <div className="flex flex-col items-center gap-10 lg:gap-12">
+             <div className="flex flex-col items-center gap-8 sm:gap-10 lg:gap-12">
               <div className="max-w-5xl text-center">
-                <h1 className="ll-reveal text-balance text-5xl font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[4.5rem]">Your supercharged<br /><span className="text-[#55C3E9]">acquisitions operating system.</span></h1>
-                <p className="ll-reveal ll-delay-2 mx-auto mt-6 max-w-lg text-lg leading-7 text-white/68">LandLinq opens the lead funnel wide, screens opportunities against your criteria, and keeps outreach moving, so lean teams can do more with less.</p>
-                <div className="ll-reveal ll-delay-3 mt-7 flex flex-wrap justify-center gap-3"><Button>Get in touch</Button><Link href="/login" className="inline-flex min-h-12 items-center rounded-full border border-white/30 px-5 text-sm font-semibold hover:border-white">Log In</Link></div>
+                 <h1 className="ll-reveal text-balance text-[clamp(2.65rem,12vw,3.75rem)] font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[4.5rem]">Your supercharged<br /><span className="text-[#55C3E9]">acquisitions operating system.</span></h1>
+                 <p className="ll-reveal ll-delay-2 mx-auto mt-5 max-w-lg text-base leading-6 text-white/68 sm:mt-6 sm:text-lg sm:leading-7">LandLinq opens the lead funnel wide, screens opportunities against your criteria, and keeps outreach moving, so lean teams can do more with less.</p>
+                 <div className="ll-reveal ll-delay-3 mt-6 flex w-full max-w-xs flex-col justify-center gap-3 sm:mt-7 sm:max-w-none sm:flex-row"><Button>Get in touch</Button><Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/30 px-5 text-sm font-semibold hover:border-white">Log In</Link></div>
               </div>
-              <div className="ll-reveal ll-delay-2 relative w-full max-w-[1120px]">
+               <div className="ll-reveal ll-delay-2 ll-hero-dashboard relative w-full max-w-[1120px]">
                 <div className="absolute -inset-5 rounded-[1.5rem] bg-white/5 blur-2xl" />
                 <DealOpsMachine />
               </div>
@@ -239,9 +239,9 @@ export default function MarketingHome() {
 
         <HeroStats />
 
-         <section id="workflow" data-reveal className="ll-scroll-reveal ll-focus-section px-5 py-24 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-7xl"><div className="ll-focus-intro"><div><div className="ll-focus-kicker">A QUIETER OPERATING RHYTHM</div><h2 className="text-4xl font-semibold leading-[1.02] tracking-[-0.05em] sm:text-6xl">Your funnel is wide.<br /><em>Your attention should not be.</em></h2></div><p className="mt-7 max-w-xl text-lg leading-8 text-muted-foreground">Manual screening, one-off follow-up, and disconnected deal notes make good opportunities easy to miss. LandLinq gives every lead a path forward.</p></div></div></section>
+       <section id="workflow" data-reveal className="ll-scroll-reveal ll-focus-section px-4 py-16 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-7xl"><div className="ll-focus-intro"><div><div className="ll-focus-kicker">A QUIETER OPERATING RHYTHM</div><h2 className="text-4xl font-semibold leading-[1.02] tracking-[-0.05em] sm:text-6xl">Your funnel is wide.<br /><em>Your attention should not be.</em></h2></div><p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground sm:mt-7 sm:text-lg sm:leading-8">Manual screening, one-off follow-up, and disconnected deal notes make good opportunities easy to miss. LandLinq gives every lead a path forward.</p></div></div></section>
 
-        <section id="platform" data-reveal className="ll-scroll-reveal ll-journey bg-background px-5 py-24 sm:px-8 sm:py-32 lg:px-10 lg:py-40">
+         <section id="platform" data-reveal className="ll-scroll-reveal ll-journey bg-background px-4 py-16 sm:px-8 sm:py-32 lg:px-10 lg:py-40">
           <div className="mx-auto max-w-7xl">
             <div className="ll-journey-intro">
               <div><div className="ll-eyebrow">THE OPERATING SYSTEM IN MOTION</div><h2 className="max-w-2xl text-4xl font-semibold leading-[1.02] tracking-[-0.05em] sm:text-6xl">The work moves.<br />Your team moves up.</h2></div>
@@ -268,15 +268,15 @@ export default function MarketingHome() {
           </div>
         </section>
 
-        <section id="company" data-reveal className="ll-scroll-reveal bg-background px-5 py-24 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-3xl"><div className="mb-14"><h2 className="text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">Know what you're getting.</h2></div><div className="divide-y divide-border border-y border-border">{faqs.map(([question, answer], i) => <div key={question}><button type="button" onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i} className="flex w-full items-center justify-between gap-5 py-6 text-left text-base font-semibold sm:text-lg"><span>{question}</span><ChevronDown className={`h-5 w-5 shrink-0 text-primary transition-transform duration-300 ${openFaq === i ? "rotate-180" : ""}`} /></button><div className={`grid transition-[grid-template-rows,opacity] duration-300 ${openFaq === i ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}><div className="overflow-hidden"><p className="max-w-2xl pb-6 leading-7 text-muted-foreground">{answer}</p></div></div></div>)}</div></div></section>
+         <section id="company" data-reveal className="ll-scroll-reveal bg-background px-4 py-16 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-3xl"><div className="mb-10 sm:mb-14"><h2 className="text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">Know what you're getting.</h2></div><div className="divide-y divide-border border-y border-border">{faqs.map(([question, answer], i) => <div key={question}><button type="button" onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i} className="flex w-full items-center justify-between gap-4 py-5 text-left text-base font-semibold sm:gap-5 sm:py-6 sm:text-lg"><span>{question}</span><ChevronDown className={`h-5 w-5 shrink-0 text-primary transition-transform duration-300 ${openFaq === i ? "rotate-180" : ""}`} /></button><div className={`grid transition-[grid-template-rows,opacity] duration-300 ${openFaq === i ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}><div className="overflow-hidden"><p className="max-w-2xl pb-6 leading-7 text-muted-foreground">{answer}</p></div></div></div>)}</div></div></section>
 
-        <section id="contact" data-reveal className="ll-scroll-reveal bg-muted/40 px-5 py-24 sm:px-8 sm:py-32 lg:px-10">
-          <div className="mx-auto max-w-7xl rounded-3xl bg-primary p-8 text-primary-foreground sm:p-14 lg:p-20">
+         <section id="contact" data-reveal className="ll-scroll-reveal bg-muted/40 px-4 py-16 sm:px-8 sm:py-32 lg:px-10">
+           <div className="mx-auto max-w-7xl rounded-3xl bg-primary p-5 text-primary-foreground sm:p-14 lg:p-20">
             <div className="grid gap-12 lg:grid-cols-[1fr_0.72fr] lg:items-end">
               <div>
                 <p className="mb-6 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">Make the next decision faster</p>
-                <h2 className="max-w-3xl text-5xl font-semibold leading-[0.98] tracking-[-0.06em] sm:text-7xl">See what a supercharged acquisitions team looks like.</h2>
-                <p className="mt-7 max-w-xl text-base leading-7 text-white/65">Tell us a little about what your team is trying to solve. We’ll be in touch.</p>
+                 <h2 className="max-w-3xl text-[clamp(2.65rem,12vw,3.75rem)] font-semibold leading-[0.98] tracking-[-0.06em] sm:text-7xl">See what a supercharged acquisitions team looks like.</h2>
+                 <p className="mt-6 max-w-xl text-base leading-7 text-white/65 sm:mt-7">Tell us a little about what your team is trying to solve. We’ll be in touch.</p>
               </div>
               <form onSubmit={async (event) => {
                 event.preventDefault();
@@ -295,7 +295,7 @@ export default function MarketingHome() {
                   setContactStatus("error");
                   setContactError(error instanceof Error ? error.message : "We could not send your message.");
                 }
-              }} className="rounded-2xl border border-white/20 p-6">
+               }} className="rounded-2xl border border-white/20 p-4 sm:p-6">
                 {contactStatus === "success" ? <p className="text-lg font-semibold text-white">Thanks — we’ll be in touch.</p> : <>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <input aria-label="Your name" required value={contactForm.name} onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })} placeholder="Your name" className="h-12 rounded-full border border-white/25 bg-transparent px-5 text-base text-white outline-none placeholder:text-white/40" />

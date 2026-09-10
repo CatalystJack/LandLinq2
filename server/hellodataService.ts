@@ -498,32 +498,10 @@ interface HelloDataProperty {
   stories?: number;
 }
 
-interface ComparableSearchParams {
-  address: string;
-  latitude?: number;
-  longitude?: number;
-  propertyType?: string;
-  radiusMiles: number;
-  yearBuiltMin: number;
-  limit: number;
-  sourceDeveloperProfileId?: string;
-}
-
-interface ComparableSearchResult {
-  success: boolean;
-  comparables: HelloDataComparable[];
-  averagePricePerSqFt: number;
-  medianPricePerSqFt: number;
-  comparableCount: number;
-  searchRadius: number;
-  error?: string;
-  suggestedAddress?: string; // Dec 11, 2025: Closest address from HelloData when exact match not found
-}
-
-type CompWarehouseResultKind = 'searchComparables' | 'searchQualifyingComparables';
+const COMP_WAREHOUSE_CACHE_KIND = 'searchQualifyingComparables' as const;
 
 interface CompWarehouseEnvelope {
-  cacheKind: CompWarehouseResultKind;
+  cacheKind: typeof COMP_WAREHOUSE_CACHE_KIND;
   result: any;
 }
 
@@ -544,7 +522,6 @@ export async function checkCompWarehouse(
   longitude: number,
   radiusMiles: number,
   productType?: string,
-  cacheKind?: CompWarehouseResultKind,
 ): Promise<any | null> {
   if (![latitude, longitude, radiusMiles].every(Number.isFinite) || radiusMiles <= 0) {
     return null;
@@ -593,24 +570,38 @@ export async function checkCompWarehouse(
         }
       }
 
-      if (cacheKind) {
-        if (!payload || payload.cacheKind !== cacheKind) continue;
-        console.log(
-          `📦 [HELLODATA-WAREHOUSE] HIT ${cacheKind}: cached center ${centerDistance.toFixed(2)} miles away, radius ${cachedRadius} miles`,
-        );
-        return payload.result;
-      }
-
+      // Only qualifying-comparable envelopes are valid. This deliberately
+      // excludes entries written by the removed searchComparables workflow.
+      if (!payload || payload.cacheKind !== COMP_WAREHOUSE_CACHE_KIND) continue;
       console.log(
-        `📦 [HELLODATA-WAREHOUSE] HIT: cached center ${centerDistance.toFixed(2)} miles away, radius ${cachedRadius} miles`,
+        `📦 [HELLODATA-WAREHOUSE] HIT ${COMP_WAREHOUSE_CACHE_KIND}: cached center ${centerDistance.toFixed(2)} miles away, radius ${cachedRadius} miles`,
       );
-      return payload?.result ?? payload;
+      await recordCompWarehouseLookup('hit');
+      return payload.result;
     }
   } catch (error) {
     console.warn(`⚠️ [HELLODATA-WAREHOUSE] Lookup unavailable; using live API: ${error}`);
   }
 
+  // A missing row, unusable legacy payload, or warehouse error all lead to
+  // the live HelloData fallback and are therefore recorded as misses.
+  await recordCompWarehouseLookup('miss');
   return null;
+}
+
+async function recordCompWarehouseLookup(outcome: 'hit' | 'miss'): Promise<void> {
+  const column = outcome === 'hit' ? sql`cache_hits` : sql`cache_misses`;
+  try {
+    await db.execute(sql`
+      INSERT INTO market_comp_lookup_metrics (lookup_date, ${column})
+      VALUES (CURRENT_DATE, 1)
+      ON CONFLICT (lookup_date) DO UPDATE
+      SET ${column} = market_comp_lookup_metrics.${column} + 1
+    `);
+  } catch (error) {
+    // Metrics must never prevent a live HelloData lookup from completing.
+    console.warn(`⚠️ [HELLODATA-WAREHOUSE] Could not record ${outcome}: ${error}`);
+  }
 }
 
 async function storeCompWarehouse(
@@ -618,11 +609,10 @@ async function storeCompWarehouse(
   longitude: number,
   radiusMiles: number,
   productType: string | undefined,
-  cacheKind: CompWarehouseResultKind,
   result: any,
   sourceDeveloperProfileId?: string,
 ): Promise<void> {
-  const envelope: CompWarehouseEnvelope = { cacheKind, result };
+  const envelope: CompWarehouseEnvelope = { cacheKind: COMP_WAREHOUSE_CACHE_KIND, result };
   const avgRentPsf = Number(result.avgRentPSF ?? result.averagePricePerSqFt);
   const avgRentPerUnit = Number(result.avgRentPerUnit);
 
@@ -652,7 +642,7 @@ async function storeCompWarehouse(
         ${sourceDeveloperProfileId || null}
       )
     `);
-    console.log(`💾 [HELLODATA-WAREHOUSE] Stored ${cacheKind} live result for 3 months`);
+    console.log(`💾 [HELLODATA-WAREHOUSE] Stored ${COMP_WAREHOUSE_CACHE_KIND} live result for 3 months`);
   } catch (error) {
     console.warn(`⚠️ [HELLODATA-WAREHOUSE] Could not store live result: ${error}`);
   }
@@ -1192,179 +1182,6 @@ export class HelloDataService {
   }
 
   /**
-   * Search for comparable properties using correct API workflow
-   */
-  async searchComparables(params: ComparableSearchParams): Promise<ComparableSearchResult> {
-    try {
-      console.log(`🔍 HelloData: Searching comparables for ${params.address}`);
-      console.log(`   Parameters:`, {
-        radius: params.radiusMiles,
-        yearBuiltMin: params.yearBuiltMin,
-        propertyType: params.propertyType,
-        latitude: params.latitude,
-        longitude: params.longitude,
-        limit: params.limit
-      });
-
-      if (!this.apiKey) {
-        throw new Error('HelloData API key not configured');
-      }
-
-      // CRITICAL FIX (Dec 4, 2025): Geocode address first to get city/state
-      // This prevents addresses like "10333 Robinson church rd" from being geocoded as "Robinson, TX"
-      // when the intended location is "Charlotte, NC"
-      console.log(`📍 [HELLODATA] Geocoding address for location validation...`);
-      const geocoded = await this.geocodioService.geocodeAddress(params.address);
-      const geocodedCity = geocoded.success ? geocoded.city : undefined;
-      const geocodedState = geocoded.success ? geocoded.state : undefined;
-      
-      if (geocoded.success) {
-        console.log(`✅ [HELLODATA] Geocoded to: ${geocoded.latitude}, ${geocoded.longitude}`);
-        console.log(`   City: ${geocodedCity}, State: ${geocodedState}, ZIP: ${geocoded.zipCode}`);
-      }
-
-      // CRITICAL FIX (Dec 29, 2025): Always use Geocodio coordinates for comparable search
-      // HelloData's searchProperty often returns wrong properties (e.g., "500 Ceret Alley" for "6260 Nolensville Pike")
-      // Trust Geocodio's coordinates which are accurate, not HelloData's property search
-      let searchLat = params.latitude || (geocoded.success ? geocoded.latitude : undefined);
-      let searchLng = params.longitude || (geocoded.success ? geocoded.longitude : undefined);
-      const searchZip = geocoded.success ? geocoded.zipCode : undefined;
-      
-      // Log which coordinates we're using
-      console.log(`📍 [HELLODATA] Using coordinates for search:`);
-      console.log(`   Latitude: ${searchLat}, Longitude: ${searchLng}`);
-      console.log(`   Source: ${params.latitude ? 'caller-provided' : (geocoded.success ? 'Geocodio' : 'none')}`);
-      
-      if (!searchLat || !searchLng) {
-        console.log(`⚠️ [HELLODATA] No valid coordinates available for comparable search`);
-        return {
-          success: false,
-          comparables: [],
-          averagePricePerSqFt: 0,
-          medianPricePerSqFt: 0,
-          comparableCount: 0,
-          searchRadius: params.radiusMiles,
-          error: `Could not geocode address: ${params.address}`
-        };
-      }
-
-      const warehouseResult = await checkCompWarehouse(
-        searchLat,
-        searchLng,
-        params.radiusMiles,
-        params.propertyType,
-        'searchComparables',
-      );
-      if (warehouseResult) return warehouseResult as ComparableSearchResult;
-
-      console.log(`🌐 [HELLODATA-WAREHOUSE] MISS searchComparables; calling live HelloData API`);
-
-      // Step 3: Find comparables using coordinates-based search with apartment filters
-      // CRITICAL FIX (Dec 29, 2025): Use Geocodio coordinates directly, skip HelloData's searchProperty
-      // which was returning incorrect subject properties
-      let rawComparables: any[] = [];
-      
-      // Use coordinates-based search with proper apartment filters
-      rawComparables = await this.findComparablesWithCoordinates(
-        searchLat,
-        searchLng,
-        searchZip,
-        params.limit,
-        params.radiusMiles
-      );
-      
-      if (rawComparables.length === 0) {
-        return {
-          success: false,
-          comparables: [],
-          averagePricePerSqFt: 0,
-          medianPricePerSqFt: 0,
-          comparableCount: 0,
-          searchRadius: params.radiusMiles,
-          error: `No multifamily comparables found within ${params.radiusMiles || 3}-mile radius. The area may lack qualifying rental properties.`
-        };
-      }
-
-      // Parse comparables
-      const comparables = this.parseComparables(rawComparables);
-      
-      // Filter comparables that have required data (price and sqft)
-      const validComparables = comparables.filter(comp => 
-        comp.salePrice > 0 && comp.buildingSize > 0 && comp.pricePerSqFt > 0
-      );
-
-      // Apply filters
-      let filteredComparables = validComparables;
-      
-      // Apply year built filter if specified
-      if (params.yearBuiltMin) {
-        filteredComparables = filteredComparables.filter(comp => comp.yearBuilt >= params.yearBuiltMin);
-      }
-      
-      // Apply property type filter if specified
-      if (params.propertyType) {
-        const targetType = params.propertyType.toLowerCase();
-        filteredComparables = filteredComparables.filter(comp => 
-          comp.propertyType.toLowerCase().includes(targetType) || 
-          targetType.includes(comp.propertyType.toLowerCase())
-        );
-      }
-
-      if (filteredComparables.length === 0) {
-        console.log(`⚠️ No valid comparables found with price/sqft data`);
-        return {
-          success: false,
-          comparables: [],
-          averagePricePerSqFt: 0,
-          medianPricePerSqFt: 0,
-          comparableCount: 0,
-          searchRadius: params.radiusMiles,
-          error: `Found comparables but none had complete pricing data. Unable to calculate market rent estimates.`
-        };
-      }
-
-      // Calculate metrics - MUST sort for accurate median
-      const pricesPerSqFt = filteredComparables.map(c => c.pricePerSqFt).sort((a, b) => a - b);
-      const averagePricePerSqFt = pricesPerSqFt.reduce((sum, p) => sum + p, 0) / pricesPerSqFt.length;
-      const medianPricePerSqFt = pricesPerSqFt[Math.floor(pricesPerSqFt.length / 2)];
-
-      console.log(`✅ Found ${filteredComparables.length} valid comparables`);
-      console.log(`   Average price/sqft: $${averagePricePerSqFt.toFixed(2)}`);
-      console.log(`   Median price/sqft: $${medianPricePerSqFt.toFixed(2)}`);
-
-      const result: ComparableSearchResult = {
-        success: true,
-        comparables: filteredComparables,
-        averagePricePerSqFt,
-        medianPricePerSqFt,
-        comparableCount: filteredComparables.length,
-        searchRadius: params.radiusMiles
-      };
-      await storeCompWarehouse(
-        searchLat,
-        searchLng,
-        params.radiusMiles,
-        params.propertyType,
-        'searchComparables',
-        result,
-        params.sourceDeveloperProfileId,
-      );
-      return result;
-    } catch (error) {
-      console.error('❌ HelloData comparable search failed:', error);
-      return {
-        success: false,
-        comparables: [],
-        averagePricePerSqFt: 0,
-        medianPricePerSqFt: 0,
-        comparableCount: 0,
-        searchRadius: params.radiusMiles,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
-
-  /**
    * NEW CLASSIFICATION WORKFLOW: Search for multifamily properties meeting specific criteria
    * - Rent per sqft >= $1.75  (REQUIRES property details API call)
    * - Vintage year >= 2020
@@ -1545,7 +1362,6 @@ export class HelloDataService {
         geocoded.lng!,
         searchRadius,
         options?.productType,
-        'searchQualifyingComparables',
       );
       if (warehouseResult) return warehouseResult;
 
@@ -2015,7 +1831,6 @@ export class HelloDataService {
           geocoded.lng!,
           searchRadius,
           options?.productType,
-          'searchQualifyingComparables',
           result,
           options?.sourceDeveloperProfileId,
         );
@@ -2512,7 +2327,6 @@ export class HelloDataService {
         geocoded.lng!,
         searchRadius,
         options?.productType,
-        'searchQualifyingComparables',
         result,
         options?.sourceDeveloperProfileId,
       );

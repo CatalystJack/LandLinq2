@@ -11018,6 +11018,41 @@ RULES:
     }
   });
 
+  // Aggregate qualifying-comparable warehouse performance for the current calendar month.
+  app.get("/api/analytics/comp-warehouse-performance", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+        return res.status(403).json({ message: "Platform administrator access required." });
+      }
+
+      const result = await db.execute(sql`
+        SELECT
+          date_trunc('month', CURRENT_DATE)::date AS month_start,
+          COALESCE(SUM(cache_hits), 0)::int AS cache_hits,
+          COALESCE(SUM(cache_misses), 0)::int AS cache_misses
+        FROM market_comp_lookup_metrics
+        WHERE lookup_date >= date_trunc('month', CURRENT_DATE)::date
+          AND lookup_date < (date_trunc('month', CURRENT_DATE) + INTERVAL '1 month')::date
+      `);
+      const row = result.rows[0] as any;
+      const cacheHits = Number(row?.cache_hits || 0);
+      const cacheMisses = Number(row?.cache_misses || 0);
+      const totalLookups = cacheHits + cacheMisses;
+
+      return res.json({
+        monthStart: row?.month_start,
+        cacheHits,
+        cacheMisses,
+        totalLookups,
+        hitPercentage: totalLookups > 0 ? (cacheHits / totalLookups) * 100 : 0,
+      });
+    } catch (error) {
+      console.error("Comparable warehouse performance analytics error:", error);
+      return res.status(500).json({ message: "Failed to load comparable warehouse performance analytics" });
+    }
+  });
+
   // Get analytics dashboard data with proper authentication
   app.get("/api/analytics/dashboard", isAuthenticated, async (req, res) => {
     try {

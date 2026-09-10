@@ -54,6 +54,14 @@ interface EmailIntakePerformance {
   manualReviewReasons: Array<{ reason: string; count: number }>;
 }
 
+interface CompWarehousePerformance {
+  monthStart: string;
+  cacheHits: number;
+  cacheMisses: number;
+  totalLookups: number;
+  hitPercentage: number;
+}
+
 // Team members for dropdowns
 const teamMembers = [
   "Austin Blondell",
@@ -144,6 +152,16 @@ export default function AdminDashboard() {
     queryFn: async () => {
       const response = await fetch('/api/analytics/email-intake-performance', { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to load intake performance');
+      return response.json();
+    },
+    enabled: user?.role === 'SUPER_ADMIN',
+  });
+
+  const { data: compWarehousePerformance, isLoading: compWarehousePerformanceLoading } = useQuery<CompWarehousePerformance>({
+    queryKey: ['/api/analytics/comp-warehouse-performance'],
+    queryFn: async () => {
+      const response = await fetch('/api/analytics/comp-warehouse-performance', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to load comparable warehouse performance');
       return response.json();
     },
     enabled: user?.role === 'SUPER_ADMIN',
@@ -1930,6 +1948,35 @@ export default function AdminDashboard() {
                       <Card key={label}><CardContent className="p-5"><p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p><p className="mt-2 text-3xl font-bold text-[#07172A]">{value}</p></CardContent></Card>
                     ))}
                   </div>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">Comparable warehouse</h3>
+                          <p className="mt-1 text-sm text-gray-500">
+                            {compWarehousePerformance?.monthStart
+                              ? `Cache performance since ${new Date(compWarehousePerformance.monthStart).toLocaleDateString()}`
+                              : 'Current calendar month'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            Served from cache this month
+                          </p>
+                          <p className="mt-1 text-3xl font-bold text-[#07172A]">
+                            {compWarehousePerformanceLoading
+                              ? '—'
+                              : `${(compWarehousePerformance?.hitPercentage ?? 0).toFixed(1)}%`}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="mt-4 text-sm text-gray-600">
+                        {compWarehousePerformanceLoading
+                          ? 'Loading lookup totals…'
+                          : `${compWarehousePerformance?.cacheHits ?? 0} cache hits / ${compWarehousePerformance?.totalLookups ?? 0} total lookups`}
+                      </p>
+                    </CardContent>
+                  </Card>
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="text-lg font-semibold text-gray-900">Manual-review reasons</h3>
