@@ -1,0 +1,39 @@
+Apply font and color refinements across the app, with one explicit exception: 
+do NOT change the existing red/yellow/green status button colors anywhere 
+(the D/R/X classification badges, Passed/Review/Pursuing indicators, and any 
+other red/yellow/green status coding in analyst-dashboard.tsx or elsewhere) — 
+these stay exactly as currently implemented, unchanged.
+
+TASK 1 — Add a serif font for headlines and big numbers only
+Add "Fraunces" via Google Fonts (or self-hosted if preferred) as a new font 
+option, defined as --font-serif in client/src/index.css and added to 
+tailwind.config.ts fontFamily as "serif". Apply this serif font ONLY to: page 
+titles (e.g. "Deal Dashboard," "Analytics," "Pipeline"), large summary stat 
+numbers (deal counts, dollar figures, percentages shown prominently on Analytics 
+pages), and the Company page headlines already built. Do NOT apply it to buttons, 
+table headers, filter labels, form inputs, or any functional UI element — Inter 
+remains the font for everything else, including the status/classification 
+badges specifically excluded above.
+
+TASK 2 — Introduce a warm neutral background
+Add a new warm off-white background color (e.g. a soft cream/ivory, not pure 
+white) as a new CSS variable, and apply it as the main content background across 
+key pages (analyst dashboard, developer dashboard, developer pipeline, developer 
+analytics, admin pages). Keep existing card/panel backgrounds and the status 
+button colors completely unaffected by this change.
+
+TASK 3 — Restrain blue usage to one primary action per screen
+Audit each major page for how many elements currently use full-strength brand 
+blue (#4A90E2) as a solid fill. Identify the single most important action per 
+screen (e.g. "Send Outreach," "Save," "Mark as Pursuing") and keep that one in 
+full-strength blue. Convert other blue-filled buttons/elements on the same 
+screen to either an outlined/ghost blue style, or a light blue tint background 
+with blue text, rather than a solid fill. Explicitly exclude the red/yellow/green 
+status buttons from this task — they are not blue and are not affected by this 
+change regardless of how prominent they are on a given screen.
+
+Verify: take before/after screenshots of the analyst dashboard, developer 
+dashboard, and Company page. Confirm the red/yellow/green status buttons are 
+pixel-identical to before this change on every page checked. Confirm the new 
+serif font only appears on titles and big stat numbers, never on buttons or 
+status badges.
