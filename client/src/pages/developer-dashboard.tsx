@@ -353,11 +353,11 @@ export default function DeveloperDashboard() {
   };
 
   if (isGeneralSales) {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">Redirecting to CRM…</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-warm text-sm text-slate-500">Redirecting to CRM…</div>;
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
       <main className="mx-auto max-w-[1600px] px-3 py-5 sm:px-5 lg:px-6">
         <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
@@ -365,7 +365,7 @@ export default function DeveloperDashboard() {
             <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: secondaryColor }}>
               Investment Company Portal
             </p>
-            <h1 className="mt-1 text-2xl font-bold text-slate-950">Deal Dashboard</h1>
+            <h1 className="mt-1 font-serif text-3xl font-normal text-slate-950">Deal Dashboard</h1>
             <p className="mt-1 text-sm text-slate-500">
               Review, analyze, and manage deals shared with {profile?.companyName || "your company"}.
             </p>
@@ -404,7 +404,7 @@ export default function DeveloperDashboard() {
               <CardContent className="flex w-full items-center justify-between p-0">
                 <div>
                   <p className="text-xs font-medium text-slate-500">{label}</p>
-                  <p className="mt-0.5 text-2xl font-bold text-slate-950">{value}</p>
+                  <p className="mt-0.5 font-serif text-3xl font-normal text-slate-950">{value}</p>
                 </div>
                 <div className={`rounded-lg p-2 ${tone}`}><Icon className="h-4 w-4" /></div>
               </CardContent>

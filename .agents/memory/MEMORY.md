@@ -37,3 +37,4 @@
 - [HelloData metrics smoke tests](hellodata-metrics-smoke.md) — direct tsx service imports can keep the database pool open; close the process or pool after one-off assertions.
 - [USFWS NWI query behavior](usfws-nwi-query.md) — public wetlands ArcGIS queries can time out; keep them bounded and never let failure block intake.
 - [Public marketing route allowlist](public-marketing-route-allowlist.md) — new unauthenticated pages need both client routing and server document access or direct visits redirect home.
+- [Development Passport sessions](development-passport-sessions.md) — development login must use Passport req.login and save the session; hand-written passport user objects cannot be deserialized.

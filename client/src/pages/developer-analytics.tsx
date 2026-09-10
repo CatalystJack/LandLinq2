@@ -123,10 +123,10 @@ export default function DeveloperAnalytics() {
   }, [filteredDeals]);
 
   if (!isAuthenticated || String((user as any)?.role || "").toUpperCase() !== "DEVELOPER") {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-50"><div className="text-center"><Shield className="mx-auto mb-4 h-14 w-14 text-slate-300" /><h1 className="text-2xl font-bold">Access Restricted</h1><p className="mt-2 text-slate-500">Analytics are only available to Investment Company users.</p></div></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-warm"><div className="text-center"><Shield className="mx-auto mb-4 h-14 w-14 text-slate-300" /><h1 className="font-serif text-3xl font-normal">Access Restricted</h1><p className="mt-2 text-slate-500">Analytics are only available to Investment Company users.</p></div></div>;
   }
-  if (isLoading) return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">Loading analytics...</div>;
-  if (isError) return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">Unable to load analytics right now.</div>;
+  if (isLoading) return <div className="flex min-h-screen items-center justify-center bg-warm text-slate-500">Loading analytics...</div>;
+  if (isError) return <div className="flex min-h-screen items-center justify-center bg-warm text-slate-500">Unable to load analytics right now.</div>;
 
   const uniqueCities = Array.from(new Set(deals.map(cityName)));
   const uniqueBrokers = Array.from(new Set(deals.map(brokerName))).filter((broker) => broker !== "Unknown Broker");
@@ -145,11 +145,11 @@ export default function DeveloperAnalytics() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div><h1 className="flex items-center gap-3 text-3xl font-bold text-catalyst-gray-900"><BarChart3 className="h-8 w-8 text-catalyst-gold" />Analytics Dashboard</h1><p className="mt-2 text-lg text-catalyst-gray-600">Your company’s deal flow, markets, brokers, and outreach performance</p></div>
+          <div><h1 className="flex items-center gap-3 font-serif text-4xl font-normal text-catalyst-gray-900"><BarChart3 className="h-8 w-8 text-catalyst-gold" />Analytics Dashboard</h1><p className="mt-2 text-lg text-catalyst-gray-600">Your company’s deal flow, markets, brokers, and outreach performance</p></div>
           <div className="flex gap-2">
             <Dialog open={showFilters} onOpenChange={setShowFilters}><DialogTrigger asChild><Button variant="outline" size="sm"><Filter className="mr-2 h-4 w-4" />Filters</Button></DialogTrigger><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Filter Analytics Data</DialogTitle></DialogHeader><div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 items-center gap-4"><Label>Status:</Label><Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}><SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All Statuses</SelectItem>{["Passed", "Review", "Pursuing"].map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent></Select></div>
@@ -167,7 +167,7 @@ export default function DeveloperAnalytics() {
             ["Total Pipeline Value", `$${(analytics.totalValue / 1000000).toFixed(1)}M`, "Based on filtered data", DollarSign],
             ["Avg Deal Size", `$${(analytics.avgDealSize / 1000000).toFixed(1)}M`, "Based on filtered data", Target],
             ["Conversion Rate", `${analytics.conversionRate.toFixed(1)}%`, "Pursuing / total deals", TrendingUp],
-          ].map(([label, value, help, Icon]) => <Card key={String(label)}><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-catalyst-gray-500">{label}</p><p className="text-3xl font-bold text-catalyst-navy">{value}</p><p className="mt-1 text-xs text-catalyst-gray-500">{help}</p></div><Icon className="h-8 w-8 text-catalyst-gray-400" /></div></CardContent></Card>)}
+         ].map(([label, value, help, Icon]) => <Card key={String(label)}><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-catalyst-gray-500">{label}</p><p className="font-serif text-4xl font-normal text-catalyst-navy">{value}</p><p className="mt-1 text-xs text-catalyst-gray-500">{help}</p></div><Icon className="h-8 w-8 text-catalyst-gray-400" /></div></CardContent></Card>)}
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">

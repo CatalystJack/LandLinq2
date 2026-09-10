@@ -7,6 +7,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ["Inter", "sans-serif"],
+        serif: ["Fraunces", "Georgia", "serif"],
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -15,6 +16,7 @@ export default {
       },
       colors: {
         background: "var(--background)",
+        warm: "var(--background-warm)",
         foreground: "var(--foreground)",
         card: {
           DEFAULT: "var(--card)",

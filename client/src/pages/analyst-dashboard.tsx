@@ -5821,7 +5821,7 @@ export default function AnalystDashboard() {
         keywords="deal management, analyst dashboard, land deal review, property analysis, development tracking, deal classification"
         url="https://landlinq.ai/analyst-dashboard"
       />
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
+      <div className="min-h-screen bg-warm">
         <Navigation />
       
       <main className="pt-20 pb-16 px-4">
@@ -5830,7 +5830,7 @@ export default function AnalystDashboard() {
           <header className="mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-[#07172A] tracking-tight">
+                <h1 className="font-serif text-3xl md:text-4xl font-normal text-[#07172A] tracking-tight">
                   Analyst Dashboard
                 </h1>
               </div>
@@ -5847,7 +5847,8 @@ export default function AnalystDashboard() {
                   <Button
                     onClick={() => exportToExcelMutation.mutate()}
                     disabled={exportToExcelMutation.isPending}
-                    className="font-bold uppercase tracking-wider bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] hover:border-[#4A90E2] transition-all duration-200"
+                    variant="outline"
+                    className="font-bold uppercase tracking-wider border-[#4A90E2] text-[#2f73bb] hover:bg-[#4A90E2] hover:text-white transition-all duration-200"
                     data-testid="button-export-excel"
                   >
                     <Download size={16} className="mr-2" />

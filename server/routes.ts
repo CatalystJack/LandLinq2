@@ -2961,23 +2961,23 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      if (req.session) {
-        (req.session as any).passport = { user: { 
-          id: user.id, 
-          email: user.email, 
-          role: user.role,
-          firstName: user.firstName,
-          lastName: user.lastName
-        }};
-      }
-
-      res.json({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        firstName: user.firstName,
-        lastName: user.lastName
-      });
+       req.login(user, (loginError: any) => {
+         if (loginError) {
+           return res.status(500).json({ message: "Login failed" });
+         }
+         req.session.save((saveError: any) => {
+           if (saveError) {
+             return res.status(500).json({ message: "Login failed" });
+           }
+           return res.json({
+             id: user.id,
+             email: user.email,
+             role: user.role,
+             firstName: user.firstName,
+             lastName: user.lastName
+           });
+         });
+       });
     } catch (error) {
       res.status(500).json({ message: "Login failed" });
     }
@@ -12866,6 +12866,192 @@ RULES:
     } catch (error: any) {
       console.error("[admin investment companies PATCH] Error:", error);
       return res.status(400).json({ error: error.message || "Failed to update Investment Company profile" });
+    }
+  });
+
+  app.delete("/api/admin/investment-companies/:profileId", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    const profileId = String(req.params.profileId || "");
+    const confirmation = String(req.body?.confirmation || "").trim();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const profileResult = await client.query(
+        "SELECT id, company_name, is_active FROM developer_profiles WHERE id = $1 FOR UPDATE",
+        [profileId],
+      );
+      const profile = profileResult.rows[0];
+      if (!profile) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Investment Company profile not found" });
+      }
+      if (profile.is_active) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({ error: "Deactivate the company before permanently deleting it" });
+      }
+      if (confirmation !== profile.company_name) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ error: "Type the exact company name to confirm permanent deletion" });
+      }
+
+      const userResult = await client.query(
+        "SELECT id FROM users WHERE developer_profile_id = $1",
+        [profileId],
+      );
+      const userIds = userResult.rows.map((row) => row.id).filter(Boolean);
+
+      const counts = {
+        users: userIds.length,
+        pipelineOpportunities: 0,
+        partnerSends: 0,
+        outreachCampaigns: 0,
+        outreachSenders: 0,
+        developerImports: 0,
+        stagedListings: 0,
+        retainedContacts: 0,
+      };
+
+      const pipelineResult = await client.query(
+        "DELETE FROM pipeline_opportunities WHERE developer_profile_id = $1",
+        [profileId],
+      );
+      counts.pipelineOpportunities = pipelineResult.rowCount || 0;
+
+      const legacySendsResult = await client.query(
+        `DELETE FROM partner_developer_sends AS sends
+         USING partner_developers AS partners
+         WHERE sends.developer_id = partners.id
+           AND partners.developer_profile_id = $1
+           AND sends.developer_profile_id IS NULL`,
+        [profileId],
+      );
+      const sendsResult = await client.query(
+        "DELETE FROM partner_developer_sends WHERE developer_profile_id = $1",
+        [profileId],
+      );
+      counts.partnerSends = (legacySendsResult.rowCount || 0) + (sendsResult.rowCount || 0);
+      await client.query("DELETE FROM partner_developers WHERE developer_profile_id = $1", [profileId]);
+
+      const campaignResult = await client.query(
+        "DELETE FROM outreach_campaigns WHERE developer_profile_id = $1",
+        [profileId],
+      );
+      counts.outreachCampaigns = campaignResult.rowCount || 0;
+
+      const senderResult = await client.query(
+        `DELETE FROM outreach_senders
+         WHERE developer_profile_id = $1
+         RETURNING id`,
+        [profileId],
+      );
+      counts.outreachSenders = senderResult.rowCount || 0;
+
+      const importResult = await client.query(
+        "DELETE FROM developer_deal_imports WHERE developer_profile_id = $1",
+        [profileId],
+      );
+      counts.developerImports = importResult.rowCount || 0;
+      const stagedResult = await client.query(
+        "DELETE FROM loopnet_staged_listings WHERE developer_profile_id = $1",
+        [profileId],
+      );
+      counts.stagedListings = stagedResult.rowCount || 0;
+
+      await client.query("DELETE FROM analyst_profile_assignments WHERE developer_profile_id = $1", [profileId]);
+
+      if (userIds.length) {
+        await client.query(
+          "DELETE FROM sessions WHERE sess #>> '{passport,user,id}' = ANY($1::text[])",
+          [userIds],
+        );
+        await client.query("DELETE FROM password_reset_tokens WHERE user_id = ANY($1::varchar[])", [userIds]);
+        await client.query("UPDATE brokers SET user_id = NULL WHERE user_id = ANY($1::varchar[])", [userIds]);
+
+        const userForeignKeys = await client.query(
+          `SELECT ns.nspname AS schema_name, cls.relname AS table_name, attr.attname AS column_name, attr.attnotnull
+           FROM pg_constraint constraint_row
+           JOIN pg_class cls ON cls.oid = constraint_row.conrelid
+           JOIN pg_namespace ns ON ns.oid = cls.relnamespace
+           JOIN pg_attribute attr
+             ON attr.attrelid = cls.oid
+            AND attr.attnum = constraint_row.conkey[1]
+           WHERE constraint_row.contype = 'f'
+             AND constraint_row.confrelid = 'public.users'::regclass
+             AND constraint_row.conrelid <> 'public.users'::regclass
+             AND array_length(constraint_row.conkey, 1) = 1`,
+        );
+        for (const foreignKey of userForeignKeys.rows) {
+          const tableIdentifier = `"${String(foreignKey.schema_name).replace(/"/g, '""')}"."${String(foreignKey.table_name).replace(/"/g, '""')}"`;
+          const columnIdentifier = `"${String(foreignKey.column_name).replace(/"/g, '""')}"`;
+          if (foreignKey.attnotnull) {
+            await client.query(
+              `DELETE FROM ${tableIdentifier} WHERE ${columnIdentifier} = ANY($1::varchar[])`,
+              [userIds],
+            );
+          } else {
+            await client.query(
+              `UPDATE ${tableIdentifier} SET ${columnIdentifier} = NULL WHERE ${columnIdentifier} = ANY($1::varchar[])`,
+              [userIds],
+            );
+          }
+        }
+        await client.query("DELETE FROM users WHERE id = ANY($1::varchar[])", [userIds]);
+      }
+
+      const conflictingContactResult = await client.query(
+        `SELECT COUNT(*)::int AS count
+         FROM brokers AS owned
+         WHERE owned.owner_developer_profile_id = $1
+           AND owned.email IS NOT NULL
+           AND EXISTS (
+             SELECT 1
+             FROM brokers AS shared
+             WHERE shared.owner_developer_profile_id IS NULL
+               AND LOWER(shared.email) = LOWER(owned.email)
+               AND shared.id <> owned.id
+           )`,
+        [profileId],
+      );
+      await client.query(
+        `UPDATE brokers AS owned
+         SET email = NULL
+         WHERE owned.owner_developer_profile_id = $1
+           AND owned.email IS NOT NULL
+           AND EXISTS (
+             SELECT 1
+             FROM brokers AS shared
+             WHERE shared.owner_developer_profile_id IS NULL
+               AND LOWER(shared.email) = LOWER(owned.email)
+               AND shared.id <> owned.id
+           )`,
+        [profileId],
+      );
+      const retainedContactsResult = await client.query(
+        "UPDATE brokers SET owner_developer_profile_id = NULL WHERE owner_developer_profile_id = $1",
+        [profileId],
+      );
+      counts.retainedContacts = retainedContactsResult.rowCount || 0;
+
+      await client.query("DELETE FROM developer_profiles WHERE id = $1", [profileId]);
+      await client.query("COMMIT");
+      return res.json({
+        deleted: true,
+        companyName: profile.company_name,
+        counts: {
+          ...counts,
+          contactsWithDuplicateEmail: Number(conflictingContactResult.rows[0]?.count || 0),
+        },
+        preserved: {
+          canonicalDeals: true,
+          sharedContacts: true,
+          comparableCache: true,
+        },
+      });
+    } catch (error: any) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      console.error("[admin investment company DELETE] Error:", error);
+      return res.status(409).json({ error: error.message || "Unable to permanently delete Investment Company profile" });
+    } finally {
+      client.release();
     }
   });
 

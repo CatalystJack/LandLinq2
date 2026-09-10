@@ -84,6 +84,7 @@ input, select, textarea {
 
 :root {
   --background: hsl(0 0% 100%);
+  --background-warm: #f7f4ee;
   --foreground: hsl(210 25% 7.8431%);
   --card: hsl(180 6.6667% 97.0588%);
   --card-foreground: hsl(210 25% 7.8431%);
@@ -136,6 +137,7 @@ input, select, textarea {
   --catalyst-gray-900: hsl(210 29% 6%);
   
   --font-sans: 'Inter', sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
 }
 
 /* Responsive Design Utilities */
