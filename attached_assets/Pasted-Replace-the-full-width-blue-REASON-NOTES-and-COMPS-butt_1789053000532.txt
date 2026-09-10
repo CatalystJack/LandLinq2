@@ -1,0 +1,38 @@
+Replace the full-width blue "REASON," "NOTES," and "COMPS" buttons in the analyst 
+deal table (client/src/pages/analyst-dashboard.tsx, the cell rendering around 
+lines 5170, 5233, and 5326 for the 'reason', 'notes', and 'comps' column cases) 
+with compact icon buttons, to free up horizontal space in this already-dense 
+53-column table.
+
+TASK 1 — Replace each with a small icon button
+Change each of the three button renderers from a full-width text button to a 
+small, square icon-only button (reuse whatever icon-button styling pattern already 
+exists elsewhere in this app, e.g. lucide-react icons at a small size like h-4 w-4 
+inside a compact button). Suggested icons:
+  - Reason → a message-square or info-circle icon
+  - Notes → a sticky-note or file-text icon  
+  - Comps → a bar-chart or building icon
+Keep each button's existing onClick behavior and functionality completely 
+unchanged — this is a purely visual/sizing change, not a behavior change.
+
+TASK 2 — Add a tooltip on hover
+Since removing the text label reduces clarity about what each icon does, add a 
+simple tooltip (reuse the Tooltip component already used elsewhere in this app, 
+per the shadcn/ui pattern) showing "Reason," "Notes," or "Comps" on hover.
+
+TASK 3 — Reduce column width accordingly
+Update the corresponding <th> column width definitions (lines ~5079, 5085, 5095) 
+to match the new, much narrower icon-button size, rather than the current 
+min-w-[80px]/w-[70px] widths sized for full-width text buttons — reclaim that 
+space for the actual data columns competing for room in this table.
+
+TASK 4 — Preserve any existing visual state indicators
+If any of these buttons currently change appearance based on state (e.g., a 
+different color/badge when a reason/note/comp actually exists vs. is empty — 
+check the existing code at each case block for this), preserve that same 
+state-based visual difference in the new icon version, just applied to the 
+smaller icon instead of the full button.
+
+Verify: confirm all three buttons still trigger their existing functionality 
+correctly when clicked, confirm tooltips appear on hover, and confirm the table 
+now has visibly more room for other columns given the reduced width of these three.

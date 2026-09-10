@@ -1,0 +1,42 @@
+Add saved column-visibility presets to the analyst deal table 
+(client/src/pages/analyst-dashboard.tsx), building on the existing ALL_COLUMNS / 
+visibleColumns / saveColumnOrder infrastructure already in place. Currently there's 
+only one column-visibility state per user (persisted via getDefaultVisibleColumns/ 
+localStorage) — this adds the ability to save and switch between multiple named 
+sets of visible columns.
+
+TASK 1 — Ship three built-in presets
+Define three starter presets as sets of column keys from ALL_COLUMNS:
+  - "Financial": YOC, Top Rent/Unit, Top Rent PSF, Acres, and any other 
+    price/financial columns in ALL_COLUMNS
+  - "Compliance": QCT, DDA, Comps, and any other compliance-related columns
+  - "Broker": Broker Name, Broker Notes, and any other broker-contact columns
+Match these to whatever the actual column keys are named in ALL_COLUMNS — report 
+back the final column list chosen for each preset before finalizing, since the 
+exact right columns per preset should be confirmed rather than guessed.
+
+TASK 2 — Let users save their own custom presets
+Add a "Save current view as..." option in the existing columns dropdown/picker UI. 
+When used, prompt for a name and store the current visibleColumns set (and column 
+order, reusing the existing REORDERABLE_COLUMNS ordering already saved via 
+saveColumnOrder) as a new named preset, persisted the same way existing column 
+preferences are already persisted (localStorage, or a real backend endpoint if 
+column preferences are already stored server-side — check which is currently 
+used and stay consistent).
+
+TASK 3 — Add a preset switcher to the UI
+Add a dropdown or button group near the existing "COLUMNS X/Y" control showing all 
+available presets (the 3 built-in ones plus any user-saved ones). Selecting one 
+immediately applies that preset's visibleColumns (and column order) — one click, 
+no manual re-toggling. Include a way to delete a user-saved preset, but not the 
+three built-in ones.
+
+TASK 4 — Keep manual toggling available alongside presets
+Selecting a preset should be a convenient starting point, not a lock — the 
+existing manual column show/hide picker should remain fully available afterward, 
+so someone can pick "Financial" and then still toggle one extra column on top of 
+it if they want.
+
+Verify: confirm each built-in preset shows exactly the right columns when selected, 
+confirm a custom saved preset persists correctly after a page refresh, and confirm 
+manually toggling a column after selecting a preset still works normally.

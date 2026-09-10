@@ -183,6 +183,100 @@ function getDefaultVisibleColumns(): Set<ColumnKey> {
   return new Set(ALL_COLUMNS.filter(c => c.defaultVisible).map(c => c.key));
 }
 
+type ColumnPreset = {
+  id: string;
+  name: string;
+  builtIn: boolean;
+  visibleColumns: ColumnKey[];
+  columnOrder: ReorderableColumnKey[];
+};
+
+const COLUMN_PRESETS_STORAGE_KEY = 'deal-table-column-presets';
+
+function presetVisibleColumns(keys: readonly ColumnKey[]): ColumnKey[] {
+  return Array.from(new Set([...FIXED_COLUMN_KEYS, ...keys]));
+}
+
+function presetColumnOrder(keys: readonly ReorderableColumnKey[]): ReorderableColumnKey[] {
+  const requested = new Set(keys);
+  return [
+    ...keys,
+    ...REORDERABLE_COLUMNS
+      .map(column => column.key as ReorderableColumnKey)
+      .filter(key => !requested.has(key)),
+  ];
+}
+
+// The fixed ID/status/priority/address context stays available in every preset.
+// The category-specific columns below are the actual keys from ALL_COLUMNS.
+const BUILT_IN_COLUMN_PRESETS: ColumnPreset[] = [
+  {
+    id: 'financial',
+    name: 'Financial',
+    builtIn: true,
+    visibleColumns: presetVisibleColumns([
+      'yieldOnCost', 'irr', 'topRentPerUnit', 'topRentPSF',
+      'price', 'pricePerUnit', 'acres', 'units',
+    ]),
+    columnOrder: presetColumnOrder([
+      'yieldOnCost', 'irr', 'topRentPerUnit', 'topRentPSF',
+      'price', 'pricePerUnit', 'acres', 'units',
+    ]),
+  },
+  {
+    id: 'compliance',
+    name: 'Compliance',
+    builtIn: true,
+    visibleColumns: presetVisibleColumns([
+      'lihtc', 'qct', 'dda', 'oz', 'comps',
+      'zoning', 'entitlements', 'wetlandNotes', 'sewer',
+      'netDevelopableAcres', 'dua', 'maxUnitsZoning',
+    ]),
+    columnOrder: presetColumnOrder([
+      'lihtc', 'qct', 'dda', 'oz', 'comps',
+      'zoning', 'entitlements', 'wetlandNotes', 'sewer',
+      'netDevelopableAcres', 'dua', 'maxUnitsZoning',
+    ]),
+  },
+  {
+    id: 'broker',
+    name: 'Broker',
+    builtIn: true,
+    visibleColumns: presetVisibleColumns([
+      'brokerName', 'brokerEmail', 'brokerPhone', 'notes', 'brokerDocs',
+    ]),
+    columnOrder: presetColumnOrder([
+      'brokerName', 'brokerEmail', 'brokerPhone', 'notes', 'brokerDocs',
+    ]),
+  },
+];
+
+function getSavedColumnPresets(): ColumnPreset[] {
+  try {
+    const saved = localStorage.getItem(COLUMN_PRESETS_STORAGE_KEY);
+    if (!saved) return [];
+    const parsed = JSON.parse(saved) as Partial<ColumnPreset>[];
+    const validColumnKeys = new Set(ALL_COLUMNS.map(column => column.key));
+    const validReorderableKeys = new Set(REORDERABLE_COLUMNS.map(column => column.key));
+    return parsed
+      .filter(preset => preset && typeof preset.name === 'string' && preset.name.trim() && !preset.builtIn)
+      .map(preset => ({
+        id: typeof preset.id === 'string' && preset.id ? preset.id : `custom-${Date.now()}`,
+        name: preset.name!.trim(),
+        builtIn: false,
+        visibleColumns: Array.from(new Set((preset.visibleColumns || []).filter((key): key is ColumnKey => validColumnKeys.has(key)))),
+        columnOrder: [
+          ...(preset.columnOrder || []).filter((key): key is ReorderableColumnKey => validReorderableKeys.has(key)),
+          ...REORDERABLE_COLUMNS
+            .map(column => column.key as ReorderableColumnKey)
+            .filter(key => !(preset.columnOrder || []).includes(key)),
+        ],
+      }));
+  } catch {
+    return [];
+  }
+}
+
 // Team members for dropdowns by role
 const analysts = [
   "Austin Blondell"
@@ -607,6 +701,7 @@ export default function AnalystDashboard() {
   // Column visibility state - persisted to localStorage
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(() => getDefaultVisibleColumns());
   const [colPickerOpen, setColPickerOpen] = useState(false);
+  const [customColumnPresets, setCustomColumnPresets] = useState<ColumnPreset[]>(() => getSavedColumnPresets());
   // Column order state - persisted to localStorage
   const [columnOrder, setColumnOrder] = useState<ReorderableColumnKey[]>(() => getDefaultColumnOrder());
   const [dragColIdx, setDragColIdx] = useState<number | null>(null);
@@ -662,6 +757,52 @@ export default function AnalystDashboard() {
     setVisibleColumns(defaults);
     try { localStorage.setItem('deal-table-visible-columns', JSON.stringify([...defaults])); } catch {}
     resetColumnOrder();
+  };
+
+  const persistCustomColumnPresets = (presets: ColumnPreset[]) => {
+    setCustomColumnPresets(presets);
+    try { localStorage.setItem(COLUMN_PRESETS_STORAGE_KEY, JSON.stringify(presets)); } catch {}
+  };
+
+  const applyColumnPreset = (preset: ColumnPreset) => {
+    const nextVisible = new Set(preset.visibleColumns);
+    setVisibleColumns(nextVisible);
+    try { localStorage.setItem('deal-table-visible-columns', JSON.stringify([...nextVisible])); } catch {}
+    saveColumnOrder(preset.columnOrder);
+    toast({ title: `${preset.name} view applied`, description: `${nextVisible.size} columns are now visible.` });
+  };
+
+  const saveCurrentColumnPreset = () => {
+    const enteredName = window.prompt('Name this column view');
+    const name = enteredName?.trim();
+    if (!name) return;
+
+    const existingBuiltIn = BUILT_IN_COLUMN_PRESETS.some(preset => preset.name.toLowerCase() === name.toLowerCase());
+    if (existingBuiltIn) {
+      toast({ title: 'Choose a different name', description: 'Built-in views cannot be overwritten.', variant: 'destructive' });
+      return;
+    }
+
+    const existingCustom = customColumnPresets.find(preset => preset.name.toLowerCase() === name.toLowerCase());
+    if (existingCustom && !window.confirm(`Replace the saved "${existingCustom.name}" view?`)) return;
+
+    const nextPreset: ColumnPreset = {
+      id: existingCustom?.id || `custom-${Date.now()}`,
+      name,
+      builtIn: false,
+      visibleColumns: [...visibleColumns],
+      columnOrder: [...columnOrder],
+    };
+    const nextPresets = existingCustom
+      ? customColumnPresets.map(preset => preset.id === existingCustom.id ? nextPreset : preset)
+      : [...customColumnPresets, nextPreset];
+    persistCustomColumnPresets(nextPresets);
+    toast({ title: 'Column view saved', description: `"${name}" is now available in Saved views.` });
+  };
+
+  const deleteCustomColumnPreset = (preset: ColumnPreset) => {
+    persistCustomColumnPresets(customColumnPresets.filter(savedPreset => savedPreset.id !== preset.id));
+    toast({ title: 'Saved view deleted', description: `"${preset.name}" was removed.` });
   };
 
   // Map view toggle state
@@ -5076,13 +5217,13 @@ export default function AnalystDashboard() {
       case 'yieldOnCost': return <th key={key} className={thBase} style={{display: vis?'':'none'}}>{sortBtn('YOC','yieldOnCost')}</th>;
       case 'irr': return <th key={key} className={`${thBase} min-w-[90px]`} style={{display: vis?'':'none'}}>{sortBtn('IRR','irr')}</th>;
       case 'excelModel': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}><span>Excel</span></th>;
-      case 'reason': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}><span>Reason</span></th>;
+      case 'reason': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}><span className="sr-only">Reason</span></th>;
       case 'dealType': return <th key={key} className={`${thBase} w-[70px] min-w-[70px]`} style={{display: vis?'':'none'}}>{sortBtn('Deal','dealType')}</th>;
       case 'productTypes': return <th key={key} className={thBase} style={{display: vis?'':'none'}}>{sortBtn('Type','productTypes')}</th>;
       case 'analystNotes': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}><span>Analyst Notes</span></th>;
       case 'dealSummary': return <th key={key} className={`${thBase} min-w-[160px]`} style={{display: vis?'':'none'}}><span>Summary</span></th>;
       case 'developerNotes': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}><span>Dev Notes</span></th>;
-      case 'notes': return <th key={key} className={`${thBase} w-[70px] max-w-[70px]`} style={{display: vis?'':'none'}}><span>Broker Notes</span></th>;
+      case 'notes': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}><span className="sr-only">Broker Notes</span></th>;
       case 'topRentPerUnit': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{sortBtn('Top Rent/Unit','topRentPerUnit')}</th>;
       case 'topRentPSF': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{sortBtn('Top Rent PSF','topRentPSF')}</th>;
       case 'lihtc': return <th key={key} className={`${thBase} min-w-[60px]`} style={{display: vis?'':'none'}}>{sortBtn('LIHTC','lihtcScoreTotal')}</th>;
@@ -5092,7 +5233,7 @@ export default function AnalystDashboard() {
       case 'date': return <th key={key} className={`${thBase} min-w-[65px]`} style={{display: vis?'':'none'}}>{sortBtn('Date','createdAt')}</th>;
       case 'brokerDocs': return <th key={key} className={`${thBase} ${expandedBrokerDocs.size>0?'w-[260px]':'w-[110px] max-w-[110px]'}`} style={{display: vis?'':'none'}}><span>Broker Docs</span></th>;
       case 'analystDocs': return <th key={key} className={`${thBase} ${expandedAnalystDocs.size>0?'w-[260px]':'w-[130px] max-w-[130px]'}`} style={{display: vis?'':'none'}}><span>Analyst Docs</span></th>;
-      case 'comps': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}><span>Comps</span></th>;
+      case 'comps': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}><span className="sr-only">Comps</span></th>;
       case 'price': return <th key={key} className={`${thBase} min-w-[100px]`} style={{display: vis?'':'none'}}>{sortBtn('Price','askingPrice')}</th>;
       case 'units': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{sortBtn('Units','unitCount')}</th>;
       case 'maxUnitsZoning': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}><span>Max Zoning</span></th>;
@@ -5168,12 +5309,26 @@ export default function AnalystDashboard() {
         </td>
       );
       case 'reason': return (
-        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+        <td key={key} className="w-[38px] max-w-[38px] px-1 py-1 text-xs border-r border-gray-200 text-gray-700 text-center" style={{display: vis?'':'none'}}>
           {(deal.aiExplanatoryNotes||deal.rejectionReason) ? (
-            <Button variant="outline" size="sm" className={`h-7 px-3 text-xs border transition-colors ${deal.status==='rejected'?'bg-red-500 text-white hover:bg-white hover:text-red-600 border-red-500':'bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border-[#4A90E2]'}`} title={deal.aiExplanatoryNotes||deal.rejectionReason||''} onClick={() => { setReasonDialogOpen(true); setReasonDialogContent({title:deal.status==='rejected'?`Rejection Reason — ${deal.address}`:`AI Notes — ${deal.address}`,content:deal.aiExplanatoryNotes||deal.rejectionReason||'',type:deal.status==='rejected'?'rejection':'acceptance'}); }}>Reason</Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Reason" className={`h-7 w-7 border transition-colors ${deal.status==='rejected'?'bg-red-500 text-white hover:bg-white hover:text-red-600 border-red-500':'bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border-[#4A90E2]'}`} title={deal.aiExplanatoryNotes||deal.rejectionReason||''} onClick={() => { setReasonDialogOpen(true); setReasonDialogContent({title:deal.status==='rejected'?`Rejection Reason — ${deal.address}`:`AI Notes — ${deal.address}`,content:deal.aiExplanatoryNotes||deal.rejectionReason||'',type:deal.status==='rejected'?'rejection':'acceptance'}); }}>
+                  <MessageSquare className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Reason</TooltipContent>
+            </Tooltip>
           ) : (!deal.classification||deal.classification==='unclassified') ? (
-            <Button variant="outline" size="sm" className="h-7 px-2 text-[10px] border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 hover:border-gray-400 transition-colors" title="Click to see why this deal is unclassified" onClick={() => { setReasonDialogOpen(true); setReasonDialogDeal(deal); setReasonDialogContent({title:`Why is this deal unclassified? — ${deal.address}`,content:getUnclassifiedReason(deal),type:'rejection'}); }}>Why?</Button>
-          ) : <span className="text-gray-300 text-[10px]">—</span>}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Why is this deal unclassified?" className="h-7 w-7 border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 hover:border-gray-400 transition-colors" title="Click to see why this deal is unclassified" onClick={() => { setReasonDialogOpen(true); setReasonDialogDeal(deal); setReasonDialogContent({title:`Why is this deal unclassified? — ${deal.address}`,content:getUnclassifiedReason(deal),type:'rejection'}); }}>
+                  <Info className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Reason</TooltipContent>
+            </Tooltip>
+          ) : <span className="text-gray-400 text-sm" aria-label="No reason">—</span>}
         </td>
       );
       case 'dealType': return (
@@ -5206,7 +5361,14 @@ export default function AnalystDashboard() {
       case 'analystNotes': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           {deal.analystNotes ? (
-            <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] hover:scale-100 transform-gpu" onClick={() => setAnalystNotesModal({dealId:deal.id,address:deal.address||'Property',notes:deal.analystNotes||'',isEditing:false})} data-testid={`button-view-analyst-notes-${deal.id}`}><FileText size={12} />Notes</Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Notes" className="h-7 w-7 bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] transition-colors" onClick={() => setAnalystNotesModal({dealId:deal.id,address:deal.address||'Property',notes:deal.analystNotes||'',isEditing:false})} data-testid={`button-view-analyst-notes-${deal.id}`}>
+                  <FileText className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Notes</TooltipContent>
+            </Tooltip>
           ) : (
             <div className="text-gray-400 italic text-xs cursor-pointer px-1" onClick={() => setAnalystNotesModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true})} data-testid={`button-add-analyst-notes-${deal.id}`}>Click to add...</div>
           )}
@@ -5231,22 +5393,29 @@ export default function AnalystDashboard() {
         </td>
       );
       case 'notes': return (
-        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700 bg-gray-50 w-[70px] max-w-[70px]" style={{display: vis?'':'none'}}>
+        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700 bg-gray-50 w-[38px] min-w-[38px] max-w-[38px] text-center" style={{display: vis?'':'none'}}>
           {deal.brokerNotes ? (
-            <Button variant="outline" size="sm" className="h-7 px-2 text-xs bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] transition-colors" onClick={() => setBrokerNotesModal({dealId:deal.id,address:deal.address||'Property',notes:deal.brokerNotes||'',isEditing:false})} data-testid={`button-view-broker-notes-${deal.id}`}>Notes</Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Broker notes" className="h-7 w-7 bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] transition-colors" onClick={() => setBrokerNotesModal({dealId:deal.id,address:deal.address||'Property',notes:deal.brokerNotes||'',isEditing:false})} data-testid={`button-view-broker-notes-${deal.id}`}>
+                  <FileText className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Notes</TooltipContent>
+            </Tooltip>
           ) : (
-            <span className="text-gray-400 italic text-xs" data-testid={`text-broker-notes-empty-${deal.id}`}>No notes</span>
+            <span className="text-gray-400 text-sm" aria-label="No broker notes" data-testid={`text-broker-notes-empty-${deal.id}`}>—</span>
           )}
         </td>
       );
       case 'topRentPerUnit': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          <div className={!deal.topRentPerUnit||Number(deal.topRentPerUnit)===0?'text-gray-400':''}>{deal.topRentPerUnit&&Number(deal.topRentPerUnit)>0?`$${Math.round(Number(deal.topRentPerUnit))}/mo`:'-'}</div>
+          <div className={!deal.topRentPerUnit||Number(deal.topRentPerUnit)===0?'text-gray-400':''}>{deal.topRentPerUnit&&Number(deal.topRentPerUnit)>0?`$${Math.round(Number(deal.topRentPerUnit))}/mo`:'—'}</div>
         </td>
       );
       case 'topRentPSF': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          <div className={!deal.topRentPSF?'text-gray-400':''}>{deal.topRentPSF?`$${Number(deal.topRentPSF).toFixed(2)}`:'-'}</div>
+          <div className={!deal.topRentPSF||Number(deal.topRentPSF)===0?'text-gray-400':''}>{deal.topRentPSF&&Number(deal.topRentPSF)>0?`$${Number(deal.topRentPSF).toFixed(2)}`:'—'}</div>
         </td>
       );
       case 'lihtc': return (
@@ -5329,7 +5498,7 @@ export default function AnalystDashboard() {
             const notes=deal.comparableNotes||''; const notesLC=notes.toLowerCase(); let parsedCompsJson: any[]|undefined;
             if(deal.comparablesJson){try{const raw=typeof deal.comparablesJson==='string'?JSON.parse(deal.comparablesJson):deal.comparablesJson; parsedCompsJson=Array.isArray(raw)?raw:undefined;}catch{}}
             const hasData=notes.trim().length>0||(parsedCompsJson&&parsedCompsJson.length>0);
-            if(!hasData) return <span className="text-xs text-gray-400" data-testid={`text-no-comparables-${deal.id}`}>No comparables data</span>;
+            if(!hasData) return <span className="text-sm text-gray-400" aria-label="No comparables data" data-testid={`text-no-comparables-${deal.id}`}>—</span>;
             const isZipCenter=notesLC.includes('[zip center]');
             const isError=!isZipCenter&&((notesLC.includes('error')&&!notesLC.includes('no qualifying'))||notesLC.includes('unavailable')||(notesLC.includes('failed')&&!notesLC.includes('no qualifying'))||notesLC.includes('unable to geocode')||notesLC.includes('api failure'));
             const isOnlyAiPrefix=notes.startsWith('SUBJECT PROPERTY:')&&!notes.includes('QUALIFIES')&&!notes.includes('Found ')&&!notes.includes('ALL CANDIDATES')&&!(parsedCompsJson&&parsedCompsJson.length>0);
@@ -5408,7 +5577,7 @@ export default function AnalystDashboard() {
       );
       case 'dua': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          <div className="text-center">{deal.unitCount&&deal.sizeAcres&&parseFloat(deal.sizeAcres.toString())>0?(parseInt(deal.unitCount.toString())/parseFloat(deal.sizeAcres.toString())).toFixed(1):'--'}</div>
+              <div className="text-center">{deal.unitCount&&deal.sizeAcres&&parseFloat(deal.sizeAcres.toString())>0?(parseInt(deal.unitCount.toString())/parseFloat(deal.sizeAcres.toString())).toFixed(1):<span className="text-gray-400">—</span>}</div>
         </td>
       );
       case 'zoning': return (
@@ -5454,7 +5623,7 @@ export default function AnalystDashboard() {
       );
       case 'pricePerUnit': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          <div className="text-center">{d.askingPrice&&deal.unitCount?formatPrice((parseFloat(d.askingPrice.toString())/parseInt(deal.unitCount.toString())).toString()):'--'}</div>
+              <div className="text-center">{d.askingPrice&&deal.unitCount?formatPrice((parseFloat(d.askingPrice.toString())/parseInt(deal.unitCount.toString())).toString()):<span className="text-gray-400">—</span>}</div>
         </td>
       );
       case 'sewer': return (
@@ -5715,6 +5884,62 @@ export default function AnalystDashboard() {
                                 </div>
                               );
                             })}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                      {/* Saved column-visibility presets */}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5 text-xs font-medium border-gray-300 text-gray-700 hover:border-[#4A90E2] hover:text-[#4A90E2] transition-colors"
+                            data-testid="button-column-presets"
+                          >
+                            <Save className="h-3.5 w-3.5" />
+                            Views
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-64 p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <p className="text-xs font-semibold text-gray-700">Saved views</p>
+                              <p className="text-[10px] text-gray-400">Apply a starting column layout</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={saveCurrentColumnPreset}
+                              className="text-[11px] font-medium text-[#4A90E2] hover:underline"
+                              data-testid="button-save-column-preset"
+                            >
+                              Save current
+                            </button>
+                          </div>
+                          <div className="space-y-1">
+                            {[...BUILT_IN_COLUMN_PRESETS, ...customColumnPresets].map(preset => (
+                              <div key={preset.id} className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => applyColumnPreset(preset)}
+                                  className="flex min-w-0 flex-1 items-center justify-between rounded px-2 py-1.5 text-left text-xs text-gray-700 hover:bg-blue-50 hover:text-[#2563a5]"
+                                  data-testid={`button-apply-column-preset-${preset.id}`}
+                                >
+                                  <span className="truncate">{preset.name}</span>
+                                  <span className="ml-2 shrink-0 text-[10px] text-gray-400">{preset.visibleColumns.length}</span>
+                                </button>
+                                {!preset.builtIn && (
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteCustomColumnPreset(preset)}
+                                    className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                                    aria-label={`Delete ${preset.name} saved view`}
+                                    data-testid={`button-delete-column-preset-${preset.id}`}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </PopoverContent>
                       </Popover>
