@@ -20,8 +20,8 @@ interface LocationPickerMapProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (lat: number, lng: number, reason: string) => void;
-  currentLatitude?: number | null;
-  currentLongitude?: number | null;
+  currentLatitude?: number | string | null;
+  currentLongitude?: number | string | null;
   address: string;
   isSaving?: boolean;
 }
@@ -63,9 +63,11 @@ export function LocationPickerMap({
       mapInstanceRef.current?.remove();
       markerRef.current = null;
 
-      const hasCurrentPosition = Number.isFinite(currentLatitude) && Number.isFinite(currentLongitude);
-      const initialLat = hasCurrentPosition ? Number(currentLatitude) : 35.5;
-      const initialLng = hasCurrentPosition ? Number(currentLongitude) : -80;
+      const numericLatitude = Number(currentLatitude);
+      const numericLongitude = Number(currentLongitude);
+      const hasCurrentPosition = Number.isFinite(numericLatitude) && Number.isFinite(numericLongitude);
+      const initialLat = hasCurrentPosition ? numericLatitude : 35.5;
+      const initialLng = hasCurrentPosition ? numericLongitude : -80;
       const map = L.map(container, { zoomControl: true }).setView(
         [initialLat, initialLng],
         hasCurrentPosition ? 15 : 8,
@@ -126,7 +128,10 @@ export function LocationPickerMap({
 
   const hasPositionChanged = Boolean(
     selectedPosition
-    && (selectedPosition.lat !== currentLatitude || selectedPosition.lng !== currentLongitude),
+    && (
+      selectedPosition.lat !== Number(currentLatitude)
+      || selectedPosition.lng !== Number(currentLongitude)
+    ),
   );
 
   return (
