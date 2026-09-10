@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -310,11 +310,13 @@ export default function AuthPage() {
                 <>
                 <Card className="max-w-full overflow-hidden rounded-xl border border-[#dce3ec] bg-white shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
                   <CardHeader className="px-6 pb-2 pt-6 sm:px-8 sm:pt-7">
-                    <img
-                      src="/assets/landlinq-color-logo.png"
-                      alt="LandLinq"
-                      className="mx-auto mb-5 h-8 w-auto max-w-[170px] object-contain object-center"
-                    />
+                    <Link href="/" className="mx-auto mb-5 flex w-fit" aria-label="LandLinq home">
+                      <img
+                        src="/assets/landlinq-color-logo.png"
+                        alt="LandLinq"
+                        className="h-8 w-auto max-w-[170px] object-contain object-center"
+                      />
+                    </Link>
                     <CardTitle className="text-xl font-bold text-slate-900">Sign In</CardTitle>
                     <CardDescription className="mt-1 text-[15px] leading-6 text-slate-500">
                       Sign in to access your account.

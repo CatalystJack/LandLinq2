@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useRoute } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { Eye, EyeOff, Loader2, LogIn, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -201,13 +201,17 @@ export default function DeveloperLogin() {
           <div className="h-2" style={{ backgroundColor: secondaryColor }} />
           <div className="p-8 sm:p-10">
             <div className="mb-8 text-center">
-              <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slate-200">
+              <Link
+                href="/"
+                className="mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slate-200"
+                aria-label={`${branding.companyName} home`}
+              >
                 {branding.logoUrl ? (
                   <img src={branding.logoUrl} alt={`${branding.companyName} logo`} className="h-full w-full object-contain p-2" />
                 ) : (
                   <img src="/assets/landlinq-white-icon.png" alt="LandLinq" className="h-full w-full object-contain p-3" />
                 )}
-              </div>
+              </Link>
               <h1 className="text-2xl font-bold text-slate-900">{branding.companyName}</h1>
               <p className="mt-2 text-sm text-slate-500">Sign in to access your investment dashboard</p>
             </div>
