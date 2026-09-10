@@ -1,0 +1,38 @@
+Simplify internal team access: eliminate the "Analyst" role as a distinct, 
+company-scoped tier. Every genuine internal LandLinq/Apex team member 
+(@apexresi.com/@landlinq.ai) should have full access to everything, with no 
+per-company restriction. Only Super Admin (the two named addresses) remains a 
+separate, narrower tier above Platform Admin for the most sensitive actions 
+(account deletion, etc.) — that distinction stays as-is.
+
+TASK 1 — Update the People page categorization (from the recent redesign)
+Remove the "Analyst" category and its "assigned to: X, Y" display entirely. Any 
+account that isn't a DEVELOPER, BROKER, or the demo account, and has a real 
+@apexresi.com/@landlinq.ai email, should simply show as "Platform Admin" (or 
+"Super Admin" for the two named addresses) — full stop, no scoping detail needed 
+since there's nothing to scope anymore.
+
+TASK 2 — Update the listing review access gate to drop analyst company-scoping
+Find the listing review permission check built earlier (the one specifically 
+restricting analysts to only their assigned Investment Companies via 
+analystProfileAssignments). Simplify this to a straightforward Platform Admin 
+check — any @apexresi.com/@landlinq.ai account can now review any company's 
+staging queue, with no per-company restriction.
+
+TASK 3 — Search for any other place using ANALYST role or analystProfileAssignments 
+for access scoping
+Report every other location in the codebase that checks role === 'ANALYST' or 
+queries analystProfileAssignments for permission purposes, so we can confirm 
+whether each one should also simplify to a plain Platform Admin check. Do not 
+change anything else yet — just report back the full list first.
+
+TASK 4 — Leave the underlying data structures alone for now
+Do not drop the ANALYST role value or the analystProfileAssignments table from 
+the schema — leave them in place as unused/dormant rather than risk removing 
+something without full confidence nothing else depends on it. This task is about 
+no longer ENFORCING scoped access, not deleting the underlying data.
+
+Verify: confirm any real internal team account can now access the full listing 
+review queue for every Investment Company, not just previously-assigned ones, and 
+confirm the People page no longer shows any "Analyst" badges — every genuine 
+internal account shows Platform Admin or Super Admin only.
