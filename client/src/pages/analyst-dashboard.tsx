@@ -6924,6 +6924,12 @@ export default function AnalystDashboard() {
                             <ArrowUpDown size={12} />
                           </button>
                         </th>
+                        <th className="text-center px-1 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[45px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colApex') ? '' : 'none', position: 'sticky', left: stickyLeft['colApex']}}>
+                          <span>Apex</span>
+                        </th>
+                        <th className="text-left px-2 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[140px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colApexNotes') ? '' : 'none', position: 'sticky', left: stickyLeft['colApexNotes']}}>
+                          <span>Apex Notes</span>
+                        </th>
                         <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[55px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colPriority') ? '' : 'none', position: 'sticky', left: stickyLeft['colPriority']}}>
                           <button
                             onClick={() => handleSort('priority')}
@@ -6932,6 +6938,12 @@ export default function AnalystDashboard() {
                             <span>Priority</span>
                             <ArrowUpDown size={12} />
                           </button>
+                        </th>
+                        <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[90px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colNext') ? '' : 'none', position: 'sticky', left: stickyLeft['colNext']}}>
+                          <span>Next</span>
+                        </th>
+                        <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[100px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('colStep') ? '' : 'none', position: 'sticky', left: stickyLeft['colStep']}}>
+                          <span>Step</span>
                         </th>
                         <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[160px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('propertyAddress') ? '' : 'none', position: 'sticky', left: stickyLeft['propertyAddress']}}>
                           <button
