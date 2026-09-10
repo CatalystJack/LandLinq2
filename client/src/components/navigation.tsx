@@ -157,7 +157,9 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
                 ? [{ name: "CRM", href: "/crm", description: "Contact management & campaign outreach" }]
                 : []
           ),
-          { name: "Data Hub", href: "/data-hub", description: "Market intelligence & insights" },
+          ...(userRole === UserRole.DEVELOPER
+            ? []
+            : [{ name: "Data Hub", href: "/data-hub", description: "Market intelligence & insights" }]),
           { name: "Analytics", href: "/analytics", description: "Performance metrics" },
         );
         // Show outreach features for specific users

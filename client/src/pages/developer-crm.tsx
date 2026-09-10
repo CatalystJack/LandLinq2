@@ -170,9 +170,11 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
         <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
-            <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: secondaryColor }}>
-              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: secondaryColor }} /> Relationship management
-            </div>
+            {adminMode ? (
+              <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: secondaryColor }}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: secondaryColor }} /> Relationship management
+              </div>
+            ) : null}
             <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[#10283b] sm:text-4xl">Company contacts</h1>
             <p className="mt-2 max-w-xl text-sm text-[#6e8192]">A focused directory for the relationships your team is building across the LandLinq network.</p>
           </div>
