@@ -2825,6 +2825,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       '/privacy',
       '/terms',
       '/contact',
+      '/company',
       '/unsubscribe',
       '/sms-opt-in',
     ];

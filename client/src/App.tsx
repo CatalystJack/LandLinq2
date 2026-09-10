@@ -24,6 +24,7 @@ import NotFound from "@/pages/not-found";
 import ErrorPage from "@/pages/error-page";
 import Landing from "@/pages/landing";
 import MarketingHome from "@/pages/marketing-home";
+import CompanyPage from "@/pages/company";
 import PasswordResetPage from "@/pages/password-reset";
 
 // Lazy load ALL other pages to reduce initial bundle size
@@ -32,7 +33,6 @@ const MySubmissions = lazy(() => import("@/pages/my-submissions"));
 const Privacy = lazy(() => import("@/pages/privacy"));
 const Terms = lazy(() => import("@/pages/terms"));
 const ContactPage = lazy(() => import("@/pages/contact"));
-const CompanyPage = lazy(() => import("@/pages/company"));
 const DealDetails = lazy(() => import("@/pages/deal-details"));
 const UnsubscribePage = lazy(() => import("@/pages/unsubscribe"));
 const SMSOptIn = lazy(() => import("@/pages/sms-opt-in"));
@@ -768,10 +768,10 @@ function App() {
 
   // Keep the marketing homepage fully public: mounting it outside Router avoids
   // initializing the authentication hook or making an auth request at "/".
-  if (location === "/") {
+  if (location === "/" || location === "/company") {
     return (
       <ErrorBoundary>
-        <MarketingHome />
+        {location === "/" ? <MarketingHome /> : <CompanyPage />}
       </ErrorBoundary>
     );
   }
