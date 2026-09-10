@@ -4102,6 +4102,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         crmNotes: (brokers as any).crmNotes,
         lastContactedAt: (brokers as any).lastContactedAt,
         stateRegion: (brokers as any).stateRegion,
+        ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
         createdAt: brokers.createdAt,
       }).from(brokers).orderBy(desc(brokers.createdAt));
 

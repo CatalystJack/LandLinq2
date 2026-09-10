@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
 import { Building2, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, SlidersHorizontal } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
+import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -47,13 +48,24 @@ async function requestJson(url: string, options?: RequestInit) {
   return data;
 }
 
-export default function DeveloperCrm() {
+type DeveloperCrmProps = {
+  adminMode?: boolean;
+};
+
+export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const profile = (user as any)?.developerProfile;
   const primaryColor = profile?.primaryColor || "#0A2B4A";
   const secondaryColor = profile?.secondaryColor || "#4A90E2";
+  const contactsQueryKey = adminMode ? "/api/crm/contacts" : "/api/developer-profile/me/contacts";
+  const contactsEndpoint = adminMode
+    ? "/api/crm/contacts?page=1&limit=9999"
+    : "/api/developer-profile/me/contacts";
+  const importEndpoint = adminMode
+    ? "/api/crm/import-contacts"
+    : "/api/developer-profile/me/import-contacts";
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [importOpen, setImportOpen] = useState(false);
@@ -65,12 +77,12 @@ export default function DeveloperCrm() {
   const [result, setResult] = useState<{ inserted: number; updated: number } | null>(null);
 
   const contactsQuery = useQuery<{ contacts: Contact[] }>({
-    queryKey: ["/api/developer-profile/me/contacts"],
-    queryFn: () => requestJson("/api/developer-profile/me/contacts"),
+    queryKey: [contactsQueryKey],
+    queryFn: () => requestJson(contactsEndpoint),
   });
 
   const importMutation = useMutation({
-    mutationFn: () => requestJson("/api/developer-profile/me/import-contacts", {
+    mutationFn: () => requestJson(importEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -81,7 +93,7 @@ export default function DeveloperCrm() {
     }),
     onSuccess: (data) => {
       setResult(data);
-      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/contacts"] });
+      queryClient.invalidateQueries({ queryKey: [contactsQueryKey] });
       toast({ title: "Contacts imported", description: `${data.inserted} inserted, ${data.updated} updated.` });
     },
     onError: (error: Error) => toast({ title: "Import failed", description: error.message, variant: "destructive" }),
@@ -154,7 +166,7 @@ export default function DeveloperCrm() {
 
   return (
     <div className="min-h-[100dvh] bg-[#f3f6f9] text-[#172b3d]">
-      <DeveloperNavigation />
+      {adminMode ? <Navigation /> : <DeveloperNavigation />}
       <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
         <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>

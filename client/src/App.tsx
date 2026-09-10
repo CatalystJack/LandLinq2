@@ -286,7 +286,7 @@ function Router() {
           <Route path="/outreach-analytics" component={OutreachAnalytics} />
           <Route path="/outreach-onboarding" component={OutreachOnboarding} />
           <Route path="/broker-management" component={BrokerManagement} />
-          <Route path="/crm" component={CRMPage} />
+          <Route path="/crm" component={() => <DeveloperCrm adminMode />} />
           <Route path="/partner-developers" component={() => (
             <Suspense fallback={<LoadingFallback />}>
               <PartnerDevelopersAdmin />
