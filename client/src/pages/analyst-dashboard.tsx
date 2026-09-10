@@ -2826,6 +2826,30 @@ export default function AnalystDashboard() {
     },
   });
 
+  const [qctOzRunning, setQctOzRunning] = useState(false);
+  const [qctOzResult, setQctOzResult] = useState<string | null>(null);
+
+  const backfillQctOzMutation = useMutation({
+    mutationFn: async () => {
+      setQctOzRunning(true);
+      setQctOzResult(null);
+      const qctData = await apiRequest("POST", "/api/admin/backfill-qct-status", {}).then(r => r.json());
+      const ozData = await apiRequest("POST", "/api/admin/backfill-oz-status", {}).then(r => r.json());
+      return { qct: qctData, oz: ozData };
+    },
+    onSuccess: (data: any) => {
+      setQctOzRunning(false);
+      setQctOzResult(`QCT: ${data?.qct?.message || 'done'} | OZ: ${data?.oz?.message || 'done'}`);
+      queryClient.invalidateQueries({ queryKey: ['/api/deals'] });
+      setTimeout(() => setQctOzResult(null), 8000);
+    },
+    onError: (err: any) => {
+      setQctOzRunning(false);
+      setQctOzResult(err?.message ? `Backfill failed: ${err.message}` : 'Backfill failed — check console');
+      setTimeout(() => setQctOzResult(null), 8000);
+    },
+  });
+
   const exportToExcelMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch('/api/deals/export/csv', {
