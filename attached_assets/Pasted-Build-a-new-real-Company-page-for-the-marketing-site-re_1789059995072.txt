@@ -1,0 +1,43 @@
+Build a new, real "Company" page for the marketing site, replacing the dead/ 
+unregistered client/src/pages/about.tsx entirely (delete its old content — it 
+contained placeholder/aspirational partner logos, confirmed not real, that must 
+not appear anywhere on the site). Route it at /company, and update the existing 
+"Company" nav link in client/src/pages/marketing-home.tsx (currently an in-page 
+anchor to #company) to link to this real page instead.
+
+Apply the design direction already established for the marketing site: a serif 
+typeface for headlines and big stats, sentence case throughout (no all-caps 
+labels anywhere on this page), a warm neutral background rather than stark white, 
+and the existing navy/blue brand colors.
+
+CONTENT — use only the real copy and confirmed real numbers below. Do not invent 
+additional claims, statistics, or partner names.
+
+1. Hero section:
+   Big serif stat: "15+" with "years of average multifamily real estate 
+   experience" as the supporting label beneath it, in sentence case.
+   Headline: something like "Built by investors, not developers watching from 
+   the outside" (refine wording as needed, staying true to the source material).
+   Supporting line: "With an average of 15+ years of multifamily real estate 
+   experience, our team brings deep expertise in development, acquisitions, 
+   capital markets, and investment sales."
+
+2. Track record stat bar (confirmed real numbers — adapt into the serif/
+   sentence-case style, NOT the original bold-sans/all-caps treatment):
+   Four stats in a row, each with the number in large serif type and a 
+   sentence-case label beneath:
+     18,000+ — Units developed
+     12 — Projects under development
+     $1.5B — In development
+     $5.5B — In real estate transactions
+
+3. Founding story section:
+   Headline: "We're investors first, technologists second"
+   Body copy, using the provided text directly: "We built LandLinq because we 
+   lived the frustrations of traditional deal flow — the endless emails, the 
+   weeks of waiting, the missed opportunities. Now we're solving it with 
+   AI-powered automation that respects the human relationships at the heart of 
+   every deal."
+
+4. Closing CTA section:
+   Reuse the same closing CTA pattern already established on the

@@ -100,7 +100,7 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
     if (!isAuthenticated) {
       publicItems.push(
         { name: "Home", href: "/", description: "Welcome to LandLinq" },
-        { name: "About", href: "/about", description: "Learn about our platform" },
+               { name: "Company", href: "/company", description: "Meet the LandLinq team" },
         { name: "Process", href: "/process", description: "Our deal evaluation process" },
         { name: "Criteria", href: "/criteria", description: "What we look for in deals" },
         { name: "Blogs", href: "https://landlinq.ai/blog", description: "Read our blog posts", external: true },

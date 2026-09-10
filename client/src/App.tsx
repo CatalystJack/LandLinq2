@@ -32,6 +32,7 @@ const MySubmissions = lazy(() => import("@/pages/my-submissions"));
 const Privacy = lazy(() => import("@/pages/privacy"));
 const Terms = lazy(() => import("@/pages/terms"));
 const ContactPage = lazy(() => import("@/pages/contact"));
+const CompanyPage = lazy(() => import("@/pages/company"));
 const DealDetails = lazy(() => import("@/pages/deal-details"));
 const UnsubscribePage = lazy(() => import("@/pages/unsubscribe"));
 const SMSOptIn = lazy(() => import("@/pages/sms-opt-in"));
@@ -343,6 +344,7 @@ function Router() {
         <Route path="/privacy" component={Privacy} />
         <Route path="/terms" component={Terms} />
         <Route path="/contact" component={ContactPage} />
+        <Route path="/company" component={CompanyPage} />
         <Route path="/deals/:id" component={DealDetails} />
         <Route path="/unsubscribe" component={UnsubscribePage} />
         <Route path="/sms-opt-in" component={SMSOptIn} />
