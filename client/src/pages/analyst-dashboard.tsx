@@ -6015,11 +6015,14 @@ export default function AnalystDashboard() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 gap-1.5 text-xs font-medium border-gray-300 text-gray-700 hover:border-[#4A90E2] hover:text-[#4A90E2] transition-colors"
+                             className="font-semibold transition-all duration-200 min-w-[140px] justify-between border-gray-300 text-gray-700 hover:border-[#4A90E2] hover:text-[#4A90E2]"
                             data-testid="button-column-presets"
                           >
-                            <Save className="h-3.5 w-3.5" />
-                            Views
+                             <span className="flex items-center gap-1">
+                               <Save className="h-3 w-3" />
+                               Views
+                             </span>
+                             <ChevronDown className="h-3 w-3 ml-1" />
                           </Button>
                         </PopoverTrigger>
                          <PopoverContent
