@@ -5793,7 +5793,7 @@ export default function AnalystDashboard() {
                     </div>
 
                     {/* Column Visibility Picker - only shown in table mode */}
-                    {viewMode === 'table' && (
+                    {viewMode === 'table' && (<>
                       <Popover open={colPickerOpen} onOpenChange={setColPickerOpen}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-medium border-[#4A90E2] text-[#4A90E2] hover:bg-[#4A90E2] hover:text-white transition-colors">
@@ -5943,7 +5943,7 @@ export default function AnalystDashboard() {
                           </div>
                         </PopoverContent>
                       </Popover>
-                    )}
+                    </>)}
                     
                     <div className="flex flex-wrap items-center gap-2">
                       {/* Classification Multi-Select Dropdown */}

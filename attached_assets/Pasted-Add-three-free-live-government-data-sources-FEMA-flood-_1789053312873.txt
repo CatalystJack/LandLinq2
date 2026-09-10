@@ -1,0 +1,62 @@
+Add three free, live government data sources — FEMA flood zones, USFWS wetlands, 
+and EPA environmental contamination screening — to the deal pipeline, and surface 
+them as new columns in the analyst deal table.
+
+Follow the existing pattern already established in server/usdaSoilService.ts: a 
+live, public, keyless government API call, a clean typed result interface, and a 
+derived simple summary field alongside the raw data.
+
+TASK 1 — FEMA flood zone service
+New file server/femaFloodService.ts. Query FEMA's National Flood Hazard Layer 
+(NFHL) ArcGIS REST feature service by latitude/longitude, no API key required. 
+Return: whether the point falls in a mapped flood zone, the specific zone code 
+(e.g. "AE", "X"), and a human-readable description. Reuse the existing dormant 
+schema fields on the deals table (floodZone, and the separate floodZoneCode/ 
+floodZoneDescription/floodZoneIsInFloodZone fields if those turn out to be the 
+correct target — confirm which table/fields are the right ones to write to before 
+implementing, since both exist in shared/schema.ts and only one set should be used 
+per deal).
+
+TASK 2 — USFWS wetlands service
+New file server/wetlandsService.ts. Query the USFWS National Wetlands Inventory 
+ArcGIS REST service by latitude/longitude, no API key required. Return: whether a 
+mapped wetland is present on or near the site, and basic classification info if 
+available. Write to the existing dormant `wetlands` boolean field on deals, and 
+add a new `wetlandsDetail` text/jsonb field if the existing schema doesn't already 
+have somewhere to store the descriptive detail.
+
+TASK 3 — EPA environmental contamination screening service
+New file server/epaEnvironmentalService.ts. Query EPA's free Envirofacts and ECHO 
+APIs by latitude/longitude or address, no API key required. Check for nearby 
+Superfund/NPL sites, brownfields, and underground storage tank facilities within a 
+reasonable screening distance. Reuse the existing dormant `environmentalConstraints` 
+jsonb field on deals to store the result.
+
+TASK 4 — Wire all three into the automated deal pipeline
+In server/automatedDealEmailPipeline.ts, alongside the existing comp-pull step, 
+call all three new services using the deal's already-geocoded coordinates, and 
+save their results to the deal record before classification runs. These are 
+informational only — do not let a positive flood/wetland/contamination flag block 
+or fail deal creation; if any service call fails or times out, log it and continue 
+without that specific enrichment rather than failing the whole intake.
+
+TASK 5 — Add corresponding columns to the analyst deal table
+In client/src/pages/analyst-dashboard.tsx, add to ALL_COLUMNS: "Flood Zone" 
+(showing the zone code, or "—" if not in a flood zone), "Wetlands" (Yes/No badge, 
+matching the existing QCT/DDA/OZ badge styling already used in this table), and 
+"Environmental" (a simple flag/badge if any contamination site was found nearby, 
+with a way to see the detail on hover or click — reuse whatever pattern the 
+existing "Comps" column uses for showing more detail). Follow the same empty-state 
+standardization already applied elsewhere in this table (a plain "—" for 
+computed/non-editable fields, not "$0.00"-style or inconsistent text).
+
+TASK 6 — Add these to the existing bulk backfill pattern if one exists
+Check whether there's an existing admin backfill job for QCT/DDA/OZ status 
+(mentioned in earlier work) — if so, add equivalent backfill actions for these 
+three new checks, so existing deals that predate this feature can be retroactively 
+populated, not just new ones.
+
+Verify: run a real deal through the automated pipeline and confirm all three new 
+fields populate correctly, confirm the new dashboard columns display correctly 
+with the standardized empty-state treatment, and confirm a failure in any one of 
+the three external API calls doesn't block deal creation or classification.
