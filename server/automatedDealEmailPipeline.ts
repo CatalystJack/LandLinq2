@@ -8,6 +8,7 @@ import { db } from './db.js';
 import { GeocodioService } from './geocodioService.js';
 import { HelloDataService } from './hellodataService.js';
 import { classifyDealForProfile } from './developerClassificationService.js';
+import { enrichDealWithGovernmentData } from './governmentDataEnrichment.js';
 import {
   brokers, deals, developerProductTypes, developerProfiles, emailIntakeQueue, partnerDeveloperSends,
   type DeveloperProfile,
@@ -362,6 +363,11 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
       lastResubmittedAt: new Date(),
       ingestionNotes: `${duplicate.ingestionNotes || ''}\nResubmitted from intake ${intake.id}.`.trim(),
     }).where(eq(deals.id, duplicate.id));
+    await enrichDealWithGovernmentData({
+      dealId: duplicate.id,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    }).catch(error => console.warn(`⚠️ [GOVERNMENT-ENRICHMENT] Duplicate deal ${duplicate.id} skipped:`, error));
     await db.update(emailIntakeQueue).set({
       status: 'approved', dealId: duplicate.id, reviewedAt: new Date(),
       routingReason: 'duplicate_address_or_coordinates',
@@ -398,6 +404,13 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
     topRentPSF: comps.topRentPSF === undefined ? null : String(comps.topRentPSF), avgRentPSF: comps.avgRentPSF === undefined ? null : String(comps.avgRentPSF),
     topRentPerUnit: comps.topRentPerUnit === undefined ? null : String(comps.topRentPerUnit), avgRentPerUnit: comps.avgRentPerUnit === undefined ? null : String(comps.avgRentPerUnit),
   }).where(eq(deals.id, deal.id));
+  // These are informational enrichments. Each service is independently
+  // failure-tolerant and cannot block creation or classification.
+  await enrichDealWithGovernmentData({
+    dealId: deal.id,
+    latitude: location.latitude,
+    longitude: location.longitude,
+  }).catch(error => console.warn(`⚠️ [GOVERNMENT-ENRICHMENT] Deal ${deal.id} skipped:`, error));
   const classifiedDeal = { ...deal, topRentPSF: comps.topRentPSF, avgRentPerUnit: comps.avgRentPerUnit, county: location.county, state: location.state };
   const classification = classifyDealForProfile(classifiedDeal, profile as DeveloperProfile, activeTypes);
   await db.insert(partnerDeveloperSends).values({

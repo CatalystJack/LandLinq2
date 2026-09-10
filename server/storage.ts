@@ -1854,7 +1854,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDealsWithBrokers(): Promise<(Deal & { broker: Broker })[]> {
-    return await db
+    const dealRows = await db
       .select({
         // All Deal fields that actually exist in schema
         id: deals.id,
@@ -2054,6 +2054,21 @@ export class DatabaseStorage implements IStorage {
       .from(deals)
       .leftJoin(brokers, eq(deals.brokerId, brokers.id))
       .orderBy(desc(deals.createdAt));
+    const propertyRows = await db.select({
+      dealId: propertyData.dealId,
+      floodZone: propertyData.floodZone,
+      wetlands: propertyData.wetlands,
+      environmentalConstraints: propertyData.environmentalConstraints,
+    }).from(propertyData);
+    const propertyByDeal = new Map(
+      propertyRows
+        .filter(row => row.dealId)
+        .map(row => [row.dealId as string, row]),
+    );
+    return dealRows.map(deal => ({
+      ...deal,
+      ...(propertyByDeal.get(deal.id) || {}),
+    })) as (Deal & { broker: Broker })[];
   }
 
   async getAllDealsWithBrokers(): Promise<(Deal & { broker: Broker })[]> {

@@ -124,6 +124,9 @@ const ALL_COLUMNS = [
   { key: 'qct', label: 'QCT', defaultVisible: true },
   { key: 'dda', label: 'DDA', defaultVisible: true },
   { key: 'oz', label: 'OZ', defaultVisible: true },
+  { key: 'floodZone', label: 'Flood Zone', defaultVisible: true },
+  { key: 'wetlands', label: 'Wetlands', defaultVisible: true },
+  { key: 'environmental', label: 'Environmental', defaultVisible: true },
   { key: 'date', label: 'Date', defaultVisible: true },
   { key: 'brokerDocs', label: 'Broker Docs', defaultVisible: false },
   { key: 'analystDocs', label: 'Analyst Docs', defaultVisible: false },
@@ -228,7 +231,7 @@ const BUILT_IN_COLUMN_PRESETS: ColumnPreset[] = [
     name: 'Compliance',
     builtIn: true,
     visibleColumns: presetVisibleColumns([
-      'lihtc', 'qct', 'dda', 'oz', 'comps',
+       'lihtc', 'qct', 'dda', 'oz', 'floodZone', 'wetlands', 'environmental', 'comps',
       'zoning', 'entitlements', 'wetlandNotes', 'sewer',
       'netDevelopableAcres', 'dua', 'maxUnitsZoning',
     ]),
@@ -5230,6 +5233,9 @@ export default function AnalystDashboard() {
       case 'qct': return <th key={key} className={`${thBase} min-w-[45px]`} style={{display: vis?'':'none'}}>{sortBtn('QCT','qctStatus')}</th>;
       case 'dda': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}><button onClick={() => handleSort('ddaStatus')} className="flex items-center space-x-1 hover:text-[#07172A]" title="Difficult Development Area (HUD 2026) — MDDA = Metropolitan, NMDDA = Non-Metropolitan"><span>DDA</span><ArrowUpDown size={12} /></button></th>;
       case 'oz': return <th key={key} className={`${thBase} min-w-[45px]`} style={{display: vis?'':'none'}}>{sortBtn('OZ','ozStatus')}</th>;
+      case 'floodZone': return <th key={key} className={`${thBase} min-w-[72px]`} style={{display: vis?'':'none'}}><span>Flood Zone</span></th>;
+      case 'wetlands': return <th key={key} className={`${thBase} min-w-[68px]`} style={{display: vis?'':'none'}}><span>Wetlands</span></th>;
+      case 'environmental': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}><span>Environmental</span></th>;
       case 'date': return <th key={key} className={`${thBase} min-w-[65px]`} style={{display: vis?'':'none'}}>{sortBtn('Date','createdAt')}</th>;
       case 'brokerDocs': return <th key={key} className={`${thBase} ${expandedBrokerDocs.size>0?'w-[260px]':'w-[110px] max-w-[110px]'}`} style={{display: vis?'':'none'}}><span>Broker Docs</span></th>;
       case 'analystDocs': return <th key={key} className={`${thBase} ${expandedAnalystDocs.size>0?'w-[260px]':'w-[130px] max-w-[130px]'}`} style={{display: vis?'':'none'}}><span>Analyst Docs</span></th>;
@@ -5465,6 +5471,51 @@ export default function AnalystDashboard() {
               <Badge variant="outline" className={`text-xs px-2 py-0 ${d.ozStatus==='YES'?'bg-amber-50 text-amber-700 border-amber-300':d.ozStatus==='NO'?'bg-gray-50 text-gray-500 border-gray-200':'bg-gray-100 text-gray-400'}`}>{d.ozStatus||'N/A'}</Badge>
             </div>
           )}
+        </td>
+      );
+      case 'floodZone': return (
+        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+          {(() => {
+            const constraints = d.environmentalConstraints && typeof d.environmentalConstraints === 'object'
+              ? d.environmentalConstraints as any : null;
+            const fema = constraints?.fema;
+            return fema ? (
+              <span className={`font-medium ${fema.isInFloodZone ? 'text-red-700' : 'text-gray-600'}`} title={fema.description || undefined}>
+                {fema.zoneCode || '—'}
+              </span>
+            ) : <span className="text-gray-400" aria-label="Flood zone not available">—</span>;
+          })()}
+        </td>
+      );
+      case 'wetlands': return (
+        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+          {d.wetlands === true || d.wetlands === false ? (
+            <Badge variant="outline" className={`text-xs px-2 py-0 ${d.wetlands ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+              {d.wetlands ? 'Yes' : 'No'}
+            </Badge>
+          ) : <span className="text-gray-400" aria-label="Wetlands data not available">—</span>}
+        </td>
+      );
+      case 'environmental': return (
+        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+          {(() => {
+            const constraints = d.environmentalConstraints && typeof d.environmentalConstraints === 'object'
+              ? d.environmentalConstraints as any : null;
+            const epa = constraints?.epa;
+            if (!epa) return <span className="text-gray-400" aria-label="Environmental data not available">—</span>;
+            const sites = Array.isArray(epa.nearbySites) ? epa.nearbySites : [];
+            const detail = epa.note || (sites.length ? sites.map((site: any) => site.name).join(', ') : 'No nearby EPA facilities found.');
+            return (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className={`cursor-help text-xs px-2 py-0 ${epa.contaminationFlag ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`} title={detail}>
+                    {epa.contaminationFlag ? 'Flag' : 'Clear'}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs">{detail}</TooltipContent>
+              </Tooltip>
+            );
+          })()}
         </td>
       );
       case 'date': return (

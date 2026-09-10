@@ -35,6 +35,7 @@ import {
   pipelineStages,
   pipelineOpportunities,
   emailIntakeQueue,
+  propertyData,
 } from "@shared/schema";
 import { or, like, ilike, eq, ne, desc, gte, lte, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
 import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
@@ -9451,6 +9452,53 @@ Provide your analysis in this exact JSON format:
     } catch (error) {
       console.error('❌ [DDA-BACKFILL] Error:', error);
       res.status(500).json({ message: 'Failed to backfill DDA status', error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // ADMIN: Populate FEMA, USFWS wetlands, and EPA screening data for existing deals.
+  app.post("/api/admin/backfill-government-data", isAuthenticated, async (req, res) => {
+    try {
+      const { enrichDealWithGovernmentData } = await import('./governmentDataEnrichment');
+      const force = req.body?.force === true;
+      const rows = await db.select({
+        id: deals.id,
+        latitude: deals.latitude,
+        longitude: deals.longitude,
+        property: propertyData,
+      }).from(deals).leftJoin(propertyData, eq(propertyData.dealId, deals.id));
+      const candidates = force
+        ? rows
+        : rows.filter(row => !row.property?.environmentalConstraints ||
+          !(row.property.environmentalConstraints as any)?.epa);
+      let updated = 0;
+      let skipped = 0;
+      const failures: Array<{ dealId: string; failed: string[] }> = [];
+      for (const row of candidates) {
+        const result = await enrichDealWithGovernmentData({
+          dealId: row.id,
+          latitude: row.latitude,
+          longitude: row.longitude,
+        });
+        if (result.failures.includes('missing_coordinates')) skipped++;
+        else {
+          updated++;
+          if (result.failures.length) failures.push({ dealId: row.id, failed: result.failures });
+        }
+      }
+      res.json({
+        message: `Government-data backfill complete: ${updated} processed, ${skipped} skipped`,
+        updated,
+        skipped,
+        failures,
+        total: candidates.length,
+        force,
+      });
+    } catch (error) {
+      console.error('❌ [GOVERNMENT-BACKFILL] Error:', error);
+      res.status(500).json({
+        message: 'Failed to backfill government data',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   });
 
