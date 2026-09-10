@@ -1,0 +1,65 @@
+Replace the three components currently loading the paid Google Maps JavaScript API 
+with a free, no-billing-account alternative: Leaflet + OpenStreetMap tiles (via 
+MapTiler's free tier) for map display, and Mapillary for street-level imagery. 
+Add basic usage tracking so we get advance warning before ever hitting the free 
+tier's monthly cap, rather than the map silently failing.
+
+Files to replace:
+  client/src/components/google-map.tsx
+  client/src/components/location-picker-map.tsx
+  client/src/components/comparables-map.tsx
+
+TASK 1 — Install Leaflet
+Add the `leaflet` and `react-leaflet` packages (or a similarly well-maintained 
+React wrapper for Leaflet). No API key required for the library itself.
+
+TASK 2 — Set up MapTiler free tier for tile hosting
+Sign up is required to get a free API key from MapTiler (no credit card needed for 
+their free tier, but confirm this directly on their signup flow before assuming — 
+report back if a card is unexpectedly required). Store the key as a new environment 
+variable, e.g. MAPTILER_API_KEY. Use MapTiler's tile URL as the tile layer source 
+in Leaflet instead of Google's map rendering.
+
+TASK 3 — Rebuild each component using Leaflet
+  - google-map.tsx: replace the Google Maps JS initialization with a Leaflet map 
+    using the MapTiler tile layer, preserving whatever markers/interactions this 
+    component currently provides.
+  - location-picker-map.tsx: same replacement, preserving the click-to-select-
+    location behavior currently implemented with Google's API.
+  - comparables-map.tsx: same replacement, preserving the multi-marker display of 
+    comparable properties.
+For any usage of the Google "places" library (address autocomplete) in these 
+files specifically, replace it with the app's existing Geocodio integration if 
+one of these components currently relies on Places autocomplete for search — 
+report which component(s) actually need this before implementing, since not all 
+three may use it.
+
+TASK 4 — Add Mapillary street-level imagery
+Add a new component (e.g. street-view-panel.tsx) that queries Mapillary's public 
+API for imagery near a given lat/lng (using their documented "Image Radius Search" 
+endpoint) and displays it using MapillaryJS if imagery is found. If no imagery 
+exists within a reasonable radius (e.g. 50-100 meters) of the given location, show 
+a clear "No street-level imagery available for this location" message instead of 
+an empty or broken viewer — do not assume imagery will always be present, since 
+Mapillary's coverage is crowdsourced and can be sparse in rural areas.
+
+TASK 5 — Add basic usage tracking for the free tier
+Add a simple counter (reuse any existing API-call-tracking pattern already in this 
+codebase, e.g. apiCallTracker, if one exists) that logs every MapTiler tile request 
+and Mapillary API call made by the app. Surface a simple running monthly count 
+somewhere in the existing admin analytics/monitoring area, so usage trending toward 
+MapTiler's free-tier cap (5,000 map sessions/month) is visible well before it's 
+actually hit, rather than discovered only when maps stop loading.
+
+TASK 6 — Remove the Google Maps dependency once confirmed working
+Once all three components are verified working with the new stack, remove the 
+GOOGLE_MAPS_API_KEY / VITE_GOOGLE_MAPS_API_KEY usage from these three files 
+specifically. Do not remove the Google Maps key from other parts of the codebase 
+if it's used elsewhere for something unrelated (e.g. geocoding) — check for other 
+usages first and report them before touching anything outside these three files.
+
+Verify: load each of the three replaced components and confirm the map renders 
+correctly with real tiles, confirm the Mapillary panel shows real street-level 
+imagery for at least one urban test address and gracefully shows the "not 
+available" message for a rural test address, and confirm the usage counter 
+increments on real requests.
