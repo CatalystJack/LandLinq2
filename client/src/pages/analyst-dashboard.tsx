@@ -7075,6 +7075,24 @@ export default function AnalystDashboard() {
                               </SelectContent>
                             </Select>
                           </td>
+                          <td className="px-1 py-1 text-center text-xs border-r border-gray-200 bg-blue-50 z-10 shadow-lg">
+                            <input type="checkbox" checked={!!editData.apex} onChange={(e) => setEditData({...editData, apex: e.target.checked})} className="h-4 w-4 accent-[#4A90E2]" aria-label="Apex deal" />
+                          </td>
+                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-blue-50 z-10 shadow-lg">
+                            <Input value={editData.apexNotes || ''} onChange={(e) => setEditData({...editData, apexNotes: e.target.value})} className="h-8 text-xs" placeholder="Apex notes..." />
+                          </td>
+                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-blue-50 z-10 shadow-lg">
+                            <Select value={editData.priority || 'none'} onValueChange={(value) => setEditData({...editData, priority: value === 'none' ? null : value})}>
+                              <SelectTrigger className="h-8 w-[50px] px-1 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectContent><SelectItem value="none">—</SelectItem>{['1','2','3','4','5'].map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-blue-50 z-10 shadow-lg">
+                            <Input value={editData.nextAssignee || ''} onChange={(e) => setEditData({...editData, nextAssignee: e.target.value})} className="h-8 text-xs" placeholder="Next..." />
+                          </td>
+                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-blue-50 z-10 shadow-lg">
+                            <Input value={editData.dealStep || ''} onChange={(e) => setEditData({...editData, dealStep: e.target.value})} className="h-8 text-xs" placeholder="Step..." />
+                          </td>
                           <td className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700 sticky left-[90px] bg-blue-50 z-10 shadow-lg">
                             <Input
                               value={editData.address || ''}
@@ -7559,7 +7577,7 @@ export default function AnalystDashboard() {
                               );
                             })()}
                           </td>
-                          
+
                           {/* 2. Classification */}
                           <td className="px-1 py-1 text-xs border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colStatus') ? '' : 'none', position: 'sticky', left: stickyLeft['colStatus']}}> 
                             {editingRow === deal.id ? (
@@ -7685,7 +7703,29 @@ export default function AnalystDashboard() {
                             )}
                           </td>
                           
-                          {/* 3. Priority Dropdown - Sticky after Classification */}
+                          {/* 3. Apex flag */}
+                          <td className="px-1 py-1 text-center border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colApex') ? '' : 'none', position: 'sticky', left: stickyLeft['colApex']}}>
+                            <input
+                              type="checkbox"
+                              checked={!!deal.apex}
+                              onChange={(e) => cellUpdateMutation.mutate({ dealId: deal.id, apex: e.target.checked })}
+                              className="h-4 w-4 accent-[#4A90E2]"
+                              aria-label={`Apex deal ${deal.dealNumber || deal.id}`}
+                            />
+                          </td>
+                          {/* 4. Apex notes */}
+                          <td className="px-1 py-1 border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colApexNotes') ? '' : 'none', position: 'sticky', left: stickyLeft['colApexNotes']}}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border-[#4A90E2]"
+                              onClick={() => setApexNotesModal({ dealId: deal.id, address: deal.address || 'Property', notes: deal.apexNotes || '', isEditing: false })}
+                            >
+                              {deal.apexNotes ? 'Notes' : 'Add'}
+                            </Button>
+                          </td>
+                          {/* 5. Priority Dropdown - Sticky after Classification */}
                           <td className="px-1 py-1 text-xs border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colPriority') ? '' : 'none', position: 'sticky', left: stickyLeft['colPriority']}}>
                             <Select 
                               value={deal.priority || ''} 
@@ -7712,7 +7752,34 @@ export default function AnalystDashboard() {
                             </Select>
                           </td>
                           
-                          {/* 4. Property Address - Sticky after Priority */}
+                          {/* 6. Next assignee */}
+                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colNext') ? '' : 'none', position: 'sticky', left: stickyLeft['colNext']}}>
+                            <Select
+                              value={deal.nextAssignee || 'none'}
+                              onValueChange={(value) => cellUpdateMutation.mutate({ dealId: deal.id, nextAssignee: value === 'none' ? null : value })}
+                            >
+                              <SelectTrigger className="h-7 w-[86px] px-1 text-[11px]"><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">—</SelectItem>
+                                {analysts.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+                                {developers.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          {/* 7. Deal step */}
+                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('colStep') ? '' : 'none', position: 'sticky', left: stickyLeft['colStep']}}>
+                            <Select
+                              value={deal.dealStep || 'none'}
+                              onValueChange={(value) => cellUpdateMutation.mutate({ dealId: deal.id, dealStep: value === 'none' ? null : value })}
+                            >
+                              <SelectTrigger className="h-7 w-[96px] px-1 text-[11px]"><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">—</SelectItem>
+                                {["Initial Analysis", "LOI", "Initial UW", "Full UW", "UW", "Call Broker/Owner", "UW - Reviewing"].map(step => <SelectItem key={step} value={step}>{step}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          {/* 8. Property Address - Sticky after Step */}
                           <td className="px-1 py-1 text-xs border-r border-gray-200 font-medium text-gray-900 bg-white z-10 shadow-lg" style={{display: isVisible('propertyAddress') ? '' : 'none', position: 'sticky', left: stickyLeft['propertyAddress'], maxWidth: '200px'}}>
                             {editingCell?.dealId === deal.id && editingCell?.field === 'address' ? (
                               <div className="flex items-center gap-1">
