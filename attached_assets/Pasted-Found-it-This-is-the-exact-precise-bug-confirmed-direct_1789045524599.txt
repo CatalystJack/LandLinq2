@@ -1,0 +1,39 @@
+Found it. This is the exact, precise bug — confirmed directly in the code myself.
+
+Look at this closely:
+
+javascript
+const isDocumentRequest =
+  !req.path.includes('.') &&
+  !req.path.startsWith('/@') &&
+  !req.path.startsWith('/src/') &&
+  !req.path.startsWith('/node_modules/');
+
+This correctly calculates whether a request looks like a real page versus an asset file — exactly the check needed. But it's never actually used. The real redirect logic right below it is:
+
+javascript
+if (role === 'DEVELOPER' && !DEVELOPER_ALLOWED_PAGE_PATHS.has(req.path) && !isDeveloperLoginPath) {
+  return res.redirect(await getDeveloperHomePath(req.user));
+}
+
+isDocumentRequest is computed, then completely ignored. A request for /assets/index-CQOjNzDn.js isn't in the allowed pages list (since that list only contains real page routes, not asset files), so this condition evaluates to true and redirects it to the dashboard — exactly matching what was found. And since this entire block only runs if (req.isAuthenticated?.()), it perfectly explains why this only broke for logged-in users, never anonymous ones.
+
+The exact, one-line fix
+server/routes.ts (~line 2801): the isDocumentRequest check is calculated but never 
+applied to the actual redirect condition, causing authenticated asset requests 
+(JS/CSS files) to be redirected to the dashboard instead of served.
+
+Change:
+  if (role === 'DEVELOPER' && !DEVELOPER_ALLOWED_PAGE_PATHS.has(req.path) && !isDeveloperLoginPath) {
+
+To:
+  if (role === 'DEVELOPER' && isDocumentRequest && !DEVELOPER_ALLOWED_PAGE_PATHS.has(req.path) && !isDeveloperLoginPath) {
+
+This ensures the redirect only ever applies to actual page navigations, never to 
+asset requests (anything containing a "." or matching the other exclusions already 
+being computed but unused).
+
+Verify: log in as the same real developer/investment company account, fetch the 
+current JS bundle directly while authenticated, and confirm it returns real 
+JavaScript, not the dashboard's HTML. Then load /developer/dashboard and confirm 
+it renders real content.
