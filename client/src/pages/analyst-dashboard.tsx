@@ -1524,6 +1524,8 @@ export default function AnalystDashboard() {
   const debouncedMutationRefs = useRef<{ [key: string]: NodeJS.Timeout }>({});
   // Tracks which deal IDs have already had Auto YOC computed this session (avoids duplicate mutations)
   const autoYocProcessedRef = useRef<Set<string>>(new Set());
+  const [yocRefreshKey, setYocRefreshKey] = useState(0);
+  const [yocRefreshing, setYocRefreshing] = useState(false);
 
   // ─── Underwriting Presets (validated from actual analyst Excel models) ───
   // softCostPct: 15% for all types
@@ -2628,7 +2630,10 @@ export default function AnalystDashboard() {
       return canCalculate || hasStaleNegative;
     });
 
-    if (pending.length === 0) return;
+    if (pending.length === 0) {
+      if (yocRefreshing) setYocRefreshing(false);
+      return;
+    }
 
     // Stagger mutations 600ms apart to avoid rate-limit collisions with manual edits.
     // Skip saving if the computed value matches what's already stored — most refreshes
@@ -2671,7 +2676,7 @@ export default function AnalystDashboard() {
         }
       }, idx * 600);
     });
-  }, [deals]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [deals, yocRefreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // ─────────────────────────────────────────────────────────────────────────────
 
   // Full deal update mutation for complete row saves (resets editing state)
@@ -5250,6 +5255,8 @@ export default function AnalystDashboard() {
       </button>
     );
     switch (key) {
+      case 'automatedYoc': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}><span>Auto YOC</span></th>;
+      case 'developerSummary': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}><span>Developer Summary</span></th>;
       case 'name': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}><span>Name</span></th>;
       case 'yieldOnCost': return <th key={key} className={thBase} style={{display: vis?'':'none'}}>{sortBtn('YOC','yieldOnCost')}</th>;
       case 'irr': return <th key={key} className={`${thBase} min-w-[90px]`} style={{display: vis?'':'none'}}>{sortBtn('IRR','irr')}</th>;
@@ -5297,6 +5304,25 @@ export default function AnalystDashboard() {
     const vis = isVisible(key);
     const d = deal as any;
     switch (key) {
+      case 'automatedYoc': return (
+        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+          <button
+            type="button"
+            className="rounded px-1 py-0.5 text-left text-[11px] font-medium text-emerald-700 hover:bg-emerald-50"
+            title="View Auto YOC breakdown"
+            onClick={() => { setYocBreakdownDeal(deal); setYocOverrides(deal.yocOverrides ? (() => { try { return JSON.parse(deal.yocOverrides); } catch { return {}; } })() : {}); }}
+          >
+            {d.automatedYoc || <span className="text-gray-300 italic">—</span>}
+          </button>
+        </td>
+      );
+      case 'developerSummary': return (
+        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+          <div className="max-w-[220px] cursor-pointer whitespace-pre-wrap hover:bg-gray-100" onClick={() => startCellEdit(deal.id, 'developerSummary', d.developerSummary || '')}>
+            {d.developerSummary || <span className="text-gray-400 italic">Click to add...</span>}
+          </div>
+        </td>
+      );
       case 'name': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           {editingCell?.dealId === deal.id && editingCell?.field === 'propertyName' ? (
