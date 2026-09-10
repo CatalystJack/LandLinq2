@@ -5843,6 +5843,41 @@ export default function AnalystDashboard() {
                     {exportToExcelMutation.isPending ? 'Exporting...' : 'Export CSV'}
                   </Button>
                 </div>
+                <div className="hidden lg:block">
+                  <Button
+                    onClick={() => {
+                      autoYocProcessedRef.current.clear();
+                      setYocRefreshing(true);
+                      setYocRefreshKey(k => k + 1);
+                    }}
+                    disabled={yocRefreshing}
+                    variant="outline"
+                    className="font-bold uppercase tracking-wider border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition-all duration-200"
+                    title="Recalculate Auto YOC for all deals using the current formula rules"
+                    data-testid="button-refresh-auto-yoc"
+                  >
+                    <RefreshCw size={16} className={`mr-2 ${yocRefreshing ? 'animate-spin' : ''}`} />
+                    {yocRefreshing ? 'Recalculating…' : 'Refresh Auto YOC'}
+                  </Button>
+                </div>
+                <div className="hidden lg:block relative">
+                  <Button
+                    onClick={() => backfillQctOzMutation.mutate()}
+                    disabled={qctOzRunning}
+                    variant="outline"
+                    className="font-bold uppercase tracking-wider border-purple-300 text-purple-600 hover:bg-purple-50 hover:text-purple-800 transition-all duration-200"
+                    title="Run QCT and OZ lookup for deals missing these values"
+                    data-testid="button-run-qct-oz"
+                  >
+                    <RefreshCw size={16} className={`mr-2 ${qctOzRunning ? 'animate-spin' : ''}`} />
+                    {qctOzRunning ? 'Running…' : 'Run QCT + OZ'}
+                  </Button>
+                  {qctOzResult && (
+                    <div className="absolute top-full right-0 z-50 mt-1 max-w-xs rounded border border-gray-200 bg-white p-2 text-xs text-gray-600 shadow-lg">
+                      {qctOzResult}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </header>
