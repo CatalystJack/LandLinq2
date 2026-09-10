@@ -13,6 +13,7 @@ import {
   Upload,
 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
+import Footer from "@/components/footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -521,6 +522,8 @@ export default function DeveloperDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Footer />
     </div>
   );
 }

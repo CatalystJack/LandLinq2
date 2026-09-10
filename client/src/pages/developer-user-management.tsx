@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Mail, ShieldCheck, Users, Loader2 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
+import Footer from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,6 +92,7 @@ export default function DeveloperUserManagement() {
         </Card>
       </main>
 
+      <Footer />
     </div>
   );
 }

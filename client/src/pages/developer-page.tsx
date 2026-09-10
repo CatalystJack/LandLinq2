@@ -1,4 +1,5 @@
 import DeveloperNavigation from "@/components/developer-navigation";
+import Footer from "@/components/footer";
 
 interface DeveloperPageProps {
   title: string;
@@ -18,6 +19,7 @@ export default function DeveloperPage({ title, description }: DeveloperPageProps
           <p className="mt-2 text-slate-500">{description}</p>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

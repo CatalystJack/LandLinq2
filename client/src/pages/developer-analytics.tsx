@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DeveloperNavigation from "@/components/developer-navigation";
+import Footer from "@/components/footer";
 import AnalyticsDashboard from "@/components/analytics-dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -182,6 +183,8 @@ export default function DeveloperAnalytics() {
           <TabsContent value="trends"><Card><CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5" />Market Trends & Forecasting</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-6 md:grid-cols-3">{[["Deal Velocity", `${analytics.totalDeals} deals`, "Total deals processed", Zap], ["Price Trends", `$${(analytics.avgDealSize / 1000000).toFixed(1)}M`, "Based on deal data analysis", DollarSign], ["Success Rate", `${analytics.conversionRate.toFixed(1)}%`, "Deals conversion rate", Target]].map(([label, value, help, Icon]) => <div key={String(label)} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"><div className="mb-3 flex items-center gap-2"><Icon className="h-5 w-5 text-blue-600" /><h3 className="font-semibold">{label}</h3></div><p className="mb-1 text-2xl font-bold">{value}</p><p className="text-sm text-gray-600">{help}</p></div>)}</CardContent></Card></TabsContent>
         </Tabs>
       </div>
+
+      <Footer />
     </div>
   );
 }

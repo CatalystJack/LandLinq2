@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
+import Footer from "@/components/footer";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -350,6 +351,7 @@ export default function DeveloperCriteriaSettings() {
       <div className="min-h-screen bg-slate-50">
         <DeveloperNavigation />
         <div className="flex min-h-96 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-slate-500" /></div>
+        <Footer />
       </div>
     );
   }
@@ -358,6 +360,7 @@ export default function DeveloperCriteriaSettings() {
       <div className="min-h-screen bg-slate-50">
         <DeveloperNavigation />
         <div className="mx-auto max-w-3xl px-6 py-16 text-center text-red-600">{(profileQuery.error as Error).message}</div>
+        <Footer />
       </div>
     );
   }
@@ -544,6 +547,7 @@ export default function DeveloperCriteriaSettings() {
         </div>
       </main>
 
+      <Footer />
     </div>
   );
 }

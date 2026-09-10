@@ -21,6 +21,7 @@ export default function DeveloperNavigation() {
   const primaryColor = profile?.primaryColor || "#0A2B4A";
   const secondaryColor = profile?.secondaryColor || "#4A90E2";
   const companyName = profile?.companyName || "LandLinq";
+  const logoUrl = profile?.logoUrl || "/assets/landlinq-color-logo.png";
 
   return (
     <header
@@ -29,17 +30,12 @@ export default function DeveloperNavigation() {
     >
       <div className="mx-auto flex min-h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 shrink-0 items-center gap-3" aria-label={companyName}>
-          {profile?.logoUrl ? (
-            <img
-              src={profile.logoUrl}
-              alt={companyName}
-              className="max-h-9 w-auto max-w-40 object-contain"
-            />
-          ) : (
-            <span className="truncate text-lg font-bold" style={{ color: primaryColor }}>
-              {companyName}
-            </span>
-          )}
+          <img
+            src={logoUrl}
+            alt={profile?.logoUrl ? `${companyName} logo` : "LandLinq"}
+            className="max-h-9 w-auto max-w-40 object-contain"
+            data-testid="developer-header-logo"
+          />
         </div>
 
         <nav className="flex min-w-0 flex-1 items-center justify-end gap-1 overflow-x-auto" aria-label="Developer navigation">
