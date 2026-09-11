@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import Navigation from "@/components/navigation";
+import DeveloperNavigation from "@/components/developer-navigation";
 import SEO from "@/components/SEO";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5251,7 +5252,7 @@ export default function AnalystDashboard() {
       case 'date': return <th key={key} className={`${thBase} min-w-[65px]`} style={{display: vis?'':'none'}}>{sortBtn('Date','createdAt')}</th>;
       case 'brokerDocs': return <th key={key} className={`${thBase} ${expandedBrokerDocs.size>0?'w-[260px]':'w-[110px] max-w-[110px]'}`} style={{display: vis?'':'none'}}><span>Broker Docs</span></th>;
       case 'analystDocs': return <th key={key} className={`${thBase} ${expandedAnalystDocs.size>0?'w-[260px]':'w-[130px] max-w-[130px]'}`} style={{display: vis?'':'none'}}><span>Analyst Docs</span></th>;
-      case 'comps': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}><span className="sr-only">Comps</span></th>;
+      case 'comps': return <th key={key} className={`${thBase} min-w-[72px]`} style={{display: vis?'':'none'}}><span>Comps</span></th>;
       case 'price': return <th key={key} className={`${thBase} min-w-[100px]`} style={{display: vis?'':'none'}}>{sortBtn('Price','askingPrice')}</th>;
       case 'units': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{sortBtn('Units','unitCount')}</th>;
       case 'maxUnitsZoning': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}><span>Max Zoning</span></th>;
@@ -5799,7 +5800,11 @@ export default function AnalystDashboard() {
         url="https://landlinq.ai/analyst-dashboard"
       />
       <div className="min-h-screen bg-warm">
-        <Navigation />
+        {String((user as any)?.role || "").toUpperCase() === "DEVELOPER" ? (
+          <DeveloperNavigation />
+        ) : (
+          <Navigation />
+        )}
       
       <main className="pt-20 pb-16 px-4">
         <div className="max-w-[2200px] mx-auto">
