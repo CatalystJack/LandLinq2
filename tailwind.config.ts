@@ -61,6 +61,9 @@ export default {
         'landlinq-sky': "var(--landlinq-sky)",
         'landlinq-blue': "var(--landlinq-blue)",
         'catalyst-gold': "var(--catalyst-gold)",
+        'status-red': "var(--status-red)",
+        'status-yellow': "var(--status-yellow)",
+        'status-green': "var(--status-green)",
         'catalyst-gray': {
           50: "var(--catalyst-gray-50)",
           100: "var(--catalyst-gray-100)",

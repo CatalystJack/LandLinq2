@@ -12,7 +12,7 @@ const buttonVariants = cva(
         default: "bg-[#498EDE] text-[#081729] border-[#498EDE] hover:bg-white hover:text-[#498EDE] hover:border-[#498EDE]",
         brand: "bg-[#498EDE] text-[#081729] border-[#498EDE] hover:bg-white hover:text-[#498EDE] hover:border-[#498EDE]",
         white: "bg-white text-[#081729] border-white hover:bg-[#498EDE] hover:text-[#081729] hover:border-[#498EDE]",
-        destructive: "bg-red-600 text-white border-red-600 hover:bg-white hover:text-red-600 hover:border-red-600",
+        destructive: "bg-status-red text-white border-status-red hover:bg-white hover:text-status-red hover:border-status-red",
         outline: "bg-white text-[#081729] border-[#b8c9d8] hover:bg-[#498EDE] hover:text-[#081729] hover:border-[#498EDE]",
         secondary: "bg-[#081729] text-white border-[#081729] hover:bg-white hover:text-[#081729] hover:border-[#081729]",
         ghost: "bg-transparent text-[#081729] border-transparent hover:bg-white hover:text-[#498EDE] hover:border-[#498EDE]",
