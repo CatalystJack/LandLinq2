@@ -75,7 +75,6 @@ export default function DeveloperOutreach() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const profile = (user as any)?.developerProfile;
-  const primaryColor = profile?.primaryColor || "#0A2B4A";
   const secondaryColor = profile?.secondaryColor || "#4A90E2";
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Campaign | null>(null);
@@ -244,11 +243,10 @@ export default function DeveloperOutreach() {
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em]" style={{ color: secondaryColor }}>Email Outreach</p>
-            <h1 className="mt-1 text-3xl font-bold text-slate-950">Campaigns</h1>
+            <h1 className="text-3xl font-bold text-slate-950">Campaigns</h1>
             <p className="mt-2 text-slate-500">Build drip campaigns for your approved contact audience.</p>
           </div>
-          <Button onClick={openCreate} disabled={!sender?.outlookConnected} style={{ backgroundColor: primaryColor }} className="text-white">
+          <Button variant="brand" onClick={openCreate} disabled={!sender?.outlookConnected}>
             <Plus className="mr-2 h-4 w-4" />New Campaign
           </Button>
         </div>
@@ -265,7 +263,7 @@ export default function DeveloperOutreach() {
               ) : (
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                   <div><p className="font-semibold text-slate-900">Connect your Outlook account</p><p className="mt-1 text-sm text-slate-500">You must connect your own mailbox before creating or launching campaigns.</p></div>
-                  <Button onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending} style={{ backgroundColor: primaryColor }} className="text-white">{connectMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Connect Outlook</Button>
+                  <Button variant="brand" onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending}>{connectMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Connect Outlook</Button>
                 </div>
               )}
             </CardContent>
@@ -289,7 +287,7 @@ export default function DeveloperOutreach() {
                     <p className="mt-1 text-sm text-slate-500">{campaign.subject}</p>
                     <p className="mt-2 text-xs text-slate-400">{campaign.enrollmentCount || 0} enrolled · starts {campaign.dayNumber ? `after ${campaign.dayNumber} day${campaign.dayNumber === 1 ? "" : "s"}` : "immediately"}</p>
                   </div>
-                  <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEdit(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Edit</Button><Button size="sm" onClick={() => launchMutation.mutate(campaign.id)} disabled={launchMutation.isPending || !sender?.outlookConnected} style={{ backgroundColor: primaryColor }} className="text-white"><Rocket className="mr-1.5 h-4 w-4" />Launch</Button></div>
+                  <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEdit(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Edit</Button><Button variant="brand" size="sm" onClick={() => launchMutation.mutate(campaign.id)} disabled={launchMutation.isPending || !sender?.outlookConnected}><Rocket className="mr-1.5 h-4 w-4" />Launch</Button></div>
                 </div>
               ))}</div>
             )}
@@ -335,7 +333,7 @@ export default function DeveloperOutreach() {
                         <p className="mt-1 line-clamp-2 text-sm font-medium text-slate-900">{aiSuggestedDraft.subject}</p>
                         <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs text-slate-600">{aiSuggestedDraft.content}</p>
                         <div className="mt-3 flex flex-wrap gap-2">
-                          <Button type="button" size="sm" onClick={() => insertSuggestedDraft(false)} style={{ backgroundColor: primaryColor }} className="text-white">Insert into email</Button>
+                          <Button type="button" variant="brand" size="sm" onClick={() => insertSuggestedDraft(false)}>Insert into email</Button>
                           <Button type="button" size="sm" variant="outline" onClick={() => insertSuggestedDraft(true)}>Replace draft</Button>
                         </div>
                       </div>
@@ -355,7 +353,7 @@ export default function DeveloperOutreach() {
                         className="min-h-20 resize-none bg-white"
                         disabled={aiDraftMutation.isPending}
                       />
-                      <Button type="button" size="icon" onClick={submitAiMessage} disabled={!aiInput.trim() || aiDraftMutation.isPending} style={{ backgroundColor: primaryColor }} className="shrink-0 text-white" aria-label="Send to writing assistant">
+                      <Button type="button" variant="brand" size="icon" onClick={submitAiMessage} disabled={!aiInput.trim() || aiDraftMutation.isPending} className="shrink-0" aria-label="Send to writing assistant">
                         {aiDraftMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                       </Button>
                     </div>
@@ -365,7 +363,7 @@ export default function DeveloperOutreach() {
               </CardContent>
             </Card>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.name.trim() || !form.subject.trim() || !form.content.trim()} style={{ backgroundColor: primaryColor }} className="text-white">{saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Campaign</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button variant="brand" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.name.trim() || !form.subject.trim() || !form.content.trim()}>{saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Campaign</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

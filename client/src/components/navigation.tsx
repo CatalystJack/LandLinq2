@@ -121,7 +121,6 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
                 { section: "Platform" },
                 { name: "Platform Overview", href: "/dashboard", description: "Parent view across all Investment Companies and developers" },
                 { name: "Master Pipeline", href: "/admin/master-pipeline", description: "View deal activity across every Investment Company" },
-                { name: "Sales Pipeline", href: "/admin/sales-pipeline", description: "Manage prospective LandLinq companies and follow-ups" },
                 { name: "Investment Companies", href: "/admin/investment-companies", description: "Create company portals, criteria, and initial logins" },
                 { section: "Data & Insights" },
                 { name: "Data Warehouse", href: "/data-hub", description: "Market intelligence, deal data, and broker analytics" },

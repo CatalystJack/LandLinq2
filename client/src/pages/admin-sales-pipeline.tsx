@@ -146,11 +146,11 @@ export default function AdminSalesPipeline() {
   };
 
   if (!isPlatformAdmin) {
-    return <div className="min-h-screen bg-[#f6f2eb]"><Navigation /><main className="mx-auto max-w-xl px-6 py-24 text-center"><Building2 className="mx-auto mb-4 h-12 w-12 text-slate-300" /><h1 className="text-2xl font-bold text-[#102d4c]">Platform administrators only</h1><p className="mt-2 text-slate-500">This workspace is restricted to LandLinq platform administrators.</p></main></div>;
+    return <div className="min-h-screen bg-[#fbfaf8]"><Navigation /><main className="mx-auto max-w-xl px-6 py-24 text-center"><Building2 className="mx-auto mb-4 h-12 w-12 text-slate-300" /><h1 className="text-2xl font-bold text-[#102d4c]">Platform administrators only</h1><p className="mt-2 text-slate-500">This workspace is restricted to LandLinq platform administrators.</p></main></div>;
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f2eb]">
+    <div className="min-h-screen bg-[#fbfaf8]">
       <Navigation />
       <main className="mx-auto max-w-[1700px] px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">

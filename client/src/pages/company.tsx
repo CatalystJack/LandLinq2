@@ -11,7 +11,7 @@ const trackRecord = [
 
 export default function CompanyPage() {
   return (
-    <div className="min-h-[100dvh] bg-[#f5f1ea] text-[#173047]">
+    <div className="min-h-[100dvh] bg-[#fbfaf8] text-[#173047]">
       <SEO
         title="Company"
         description="LandLinq is built by investors with an average of 15+ years of multifamily real estate experience."
@@ -20,7 +20,7 @@ export default function CompanyPage() {
       <Navigation hideSubmitDeal />
 
       <main>
-        <section className="relative overflow-hidden border-b border-[#ded8ce] bg-[#f5f1ea] px-5 py-16 sm:px-8 sm:py-24 lg:px-10 lg:py-32">
+        <section className="relative overflow-hidden border-b border-[#e8e5df] bg-[#fbfaf8] px-5 py-16 sm:px-8 sm:py-24 lg:px-10 lg:py-32">
           <div className="absolute -right-32 -top-40 h-[30rem] w-[30rem] rounded-full bg-[#55c3e9]/10 blur-3xl" />
           <div className="absolute -bottom-48 -left-32 h-[26rem] w-[26rem] rounded-full bg-[#173047]/5 blur-3xl" />
           <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1fr_0.72fr] lg:items-end lg:gap-20">
@@ -42,7 +42,7 @@ export default function CompanyPage() {
           </div>
         </section>
 
-        <section className="border-b border-[#ded8ce] bg-[#fbfaf7] px-5 py-12 sm:px-8 lg:px-10 lg:py-16" aria-label="LandLinq track record">
+        <section className="border-b border-[#e8e5df] bg-[#fdfcfb] px-5 py-12 sm:px-8 lg:px-10 lg:py-16" aria-label="LandLinq track record">
           <div className="mx-auto grid max-w-7xl gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
             {trackRecord.map(([value, label], index) => (
               <div
@@ -72,7 +72,7 @@ export default function CompanyPage() {
           </div>
         </section>
 
-        <section id="founders" className="border-y border-[#ded8ce] bg-[#fbfaf7] px-5 py-16 sm:px-8 sm:py-24 lg:px-10">
+        <section id="founders" className="border-y border-[#e8e5df] bg-[#fdfcfb] px-5 py-16 sm:px-8 sm:py-24 lg:px-10">
           <div className="mx-auto max-w-7xl">
             <h2 className="font-serif text-4xl leading-[1.02] tracking-[-0.04em] text-[#173047] sm:text-5xl">
               Founders

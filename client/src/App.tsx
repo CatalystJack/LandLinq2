@@ -82,7 +82,6 @@ const MarketIntelligence = lazy(() => import("@/pages/market-intelligence"));
 const ApiKeysAdmin = lazy(() => import("@/pages/api-keys-admin"));
 const AdminInvestmentCompanies = lazy(() => import("@/pages/admin-investment-companies"));
 const MasterPipeline = lazy(() => import("@/pages/master-pipeline"));
-const AdminSalesPipeline = lazy(() => import("@/pages/admin-sales-pipeline"));
 const DeveloperCrm = lazy(() => import("@/pages/developer-crm"));
 const DeveloperOutreach = lazy(() => import("@/pages/developer-outreach"));
 const DeveloperAnalytics = lazy(() => import("@/pages/developer-analytics"));
@@ -198,14 +197,13 @@ function Router() {
     isAuthenticated &&
     user &&
     isPlatformAdminEmail(authenticatedEmail) &&
-    ["/admin/investment-companies", "/admin/master-pipeline", "/admin/sales-pipeline"].includes(window.location.pathname)
+    ["/admin/investment-companies", "/admin/master-pipeline"].includes(window.location.pathname)
   ) {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <Switch>
           <Route path="/admin/investment-companies" component={AdminInvestmentCompanies} />
           <Route path="/admin/master-pipeline" component={MasterPipeline} />
-          <Route path="/admin/sales-pipeline" component={AdminSalesPipeline} />
         </Switch>
       </Suspense>
     );
