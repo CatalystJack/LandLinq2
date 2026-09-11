@@ -20,7 +20,7 @@ const faqs = [
 
 function Button({ children, href = "/contact", dark = false }: { children: ReactNode; href?: string; dark?: boolean }) {
   return (
-    <a href={href} className={`group inline-flex min-h-12 items-center justify-center gap-3 rounded-full border px-5 text-sm font-semibold transition-all duration-300 ${dark ? "border-primary bg-primary text-white hover:border-landlinq-sky hover:bg-white hover:text-landlinq-blue" : "border-landlinq-sky bg-landlinq-sky text-primary hover:border-landlinq-blue hover:bg-white hover:text-landlinq-blue"}`}>
+    <a href={href} className={`group inline-flex min-h-12 items-center justify-center gap-3 rounded-full border px-5 text-sm font-semibold transition-all duration-300 ${dark ? "border-white bg-white text-landlinq-blue hover:border-white hover:bg-white hover:text-landlinq-blue" : "border-landlinq-sky bg-landlinq-sky text-white hover:border-landlinq-blue hover:bg-white hover:text-landlinq-blue"}`}>
       {children}<ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
     </a>
   );
@@ -214,9 +214,9 @@ export default function MarketingHome() {
       <header className="absolute inset-x-0 top-0 z-30">
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10" aria-label="Main navigation">
           <a href="/" aria-label="LandLinq home"><img src="/assets/landlinq-white-logo.png" alt="LandLinq" className="h-7 w-auto" /></a>
-          <div className="hidden items-center gap-8 md:flex"><a href="#platform" className="text-sm text-white/65 hover:text-white">Platform</a><Link href="/company" className="text-sm text-white/65 hover:text-white">Company</Link><Link href="/login" className="rounded-full border border-white/35 px-4 py-2 text-sm font-semibold text-white hover:bg-white hover:text-primary">Log In</Link></div>
+          <div className="hidden items-center gap-8 md:flex"><a href="#platform" className="text-sm text-white/65 hover:text-white">Platform</a><Link href="/company" className="text-sm text-white/65 hover:text-white">Company</Link><Link href="/login" className="rounded-full border border-white bg-white px-4 py-2 text-sm font-semibold text-landlinq-blue hover:border-white hover:bg-white hover:text-landlinq-blue">Log In</Link></div>
            <button type="button" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} className="inline-flex h-11 w-11 items-center justify-center rounded-full text-primary-foreground md:hidden">{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
-            {menuOpen && <div className="absolute inset-x-4 top-20 rounded-2xl border border-white/15 bg-primary p-4 shadow-xl md:hidden"><div className="flex flex-col gap-1"><a href="#platform" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/80">Platform</a><Link href="/company" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/80">Company</Link><Link href="/login" onClick={() => setMenuOpen(false)} className="mt-2 rounded-lg bg-white px-3 py-3 text-center text-sm font-semibold text-primary">Log In</Link></div></div>}
+            {menuOpen && <div className="absolute inset-x-4 top-20 rounded-2xl border border-white/15 bg-primary p-4 shadow-xl md:hidden"><div className="flex flex-col gap-1"><a href="#platform" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/80">Platform</a><Link href="/company" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/80">Company</Link><Link href="/login" onClick={() => setMenuOpen(false)} className="mt-2 rounded-lg bg-white px-3 py-3 text-center text-sm font-semibold text-landlinq-blue">Log In</Link></div></div>}
         </nav>
       </header>
 
@@ -227,7 +227,7 @@ export default function MarketingHome() {
               <div className="max-w-5xl text-center">
                  <h1 className="ll-reveal text-balance text-[clamp(2.65rem,12vw,3.75rem)] font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[4.5rem]">Your supercharged<br /><span className="text-[#498EDE]">acquisitions operating system.</span></h1>
                  <p className="ll-reveal ll-delay-2 mx-auto mt-5 max-w-lg text-base leading-6 text-white/68 sm:mt-6 sm:text-lg sm:leading-7">LandLinq opens the lead funnel wide, screens opportunities against your criteria, and keeps outreach moving, so lean teams can do more with less.</p>
-                 <div className="ll-reveal ll-delay-3 mt-6 flex w-full max-w-xs flex-col justify-center gap-3 sm:mt-7 sm:max-w-none sm:flex-row"><Button>Get in touch</Button><Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/30 px-5 text-sm font-semibold hover:border-white">Log In</Link></div>
+                 <div className="ll-reveal ll-delay-3 mt-6 flex w-full max-w-xs flex-col justify-center gap-3 sm:mt-7 sm:max-w-none sm:flex-row"><Button dark>Get in touch</Button><Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white bg-white px-5 text-sm font-semibold text-landlinq-blue hover:border-white hover:bg-white hover:text-landlinq-blue">Log In</Link></div>
               </div>
                <div className="ll-reveal ll-delay-2 ll-hero-dashboard relative w-full max-w-[1120px]">
                 <div className="absolute -inset-5 rounded-[1.5rem] bg-white/5 blur-2xl" />

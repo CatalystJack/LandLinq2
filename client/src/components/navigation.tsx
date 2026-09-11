@@ -45,7 +45,7 @@ function PublicNavigation({ hideSubmitDeal = false }: Pick<NavigationProps, "hid
             {!hideSubmitDeal && (
               <Link href="/contact" className="text-sm text-white/65 transition-colors hover:text-white">Contact</Link>
             )}
-            <Link href="/login" className="rounded-full border border-white/35 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-landlinq-sky hover:bg-white hover:text-landlinq-blue">
+            <Link href="/login" className="rounded-full border border-white bg-white px-4 py-2 text-sm font-semibold text-landlinq-blue transition-colors hover:border-white hover:bg-white hover:text-landlinq-blue">
               Log in
             </Link>
             {!hideSubmitDeal && (
@@ -314,7 +314,7 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
                   <Button
                     key={item.name}
                     onClick={onOpenSlideForm}
-                    className="bg-white hover:bg-[#081729] text-[#081729] hover:text-cyan-300 border-2 border-white hover:border-white font-semibold transition-all duration-300"
+                    className="bg-white text-[#498EDE] border-2 border-white hover:bg-white hover:text-[#498EDE] hover:border-white font-semibold transition-all duration-300"
                     size="sm"
                     data-testid={`nav-button-${item.name.toLowerCase().replace(/ /g, "-")}`}
                     title={item.description}
@@ -326,7 +326,7 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
                 return (
                   <Link key={item.name} href={item.href}>
                     <Button
-                      className="bg-white hover:bg-[#081729] text-[#081729] hover:text-cyan-300 border-2 border-white hover:border-white font-semibold transition-all duration-300"
+                      className="bg-white text-[#498EDE] border-2 border-white hover:bg-white hover:text-[#498EDE] hover:border-white font-semibold transition-all duration-300"
                       size="sm"
                       data-testid={`nav-button-${item.name.toLowerCase().replace(/ /g, "-")}`}
                       title={item.description}
@@ -455,6 +455,7 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
                 <Button
                   onClick={handleLogout}
                   data-testid="button-logout"
+                  variant="white"
                   size="sm"
                 >
                   <span className="hidden lg:inline">Sign Out</span>
@@ -462,7 +463,8 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
                 </Button>
               </div>
             ) : (
-              <Button
+                <Button
+                  variant="white"
                 size="sm"
                 onClick={() => setIsAuthModalOpen(true)}
                 data-testid="button-auth"
@@ -527,7 +529,7 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
                         setIsMobileMenuOpen(false);
                         onOpenSlideForm();
                       }}
-                      className="w-full bg-white hover:bg-[#4A90E2] text-[#4A90E2] hover:text-cyan-300 border-2 border-white hover:border-white font-semibold transition-all duration-300"
+                      className="w-full bg-white text-[#498EDE] border-2 border-white hover:bg-white hover:text-[#498EDE] hover:border-white font-semibold transition-all duration-300"
                       data-testid={`mobile-nav-button-${item.name.toLowerCase().replace(/ /g, "-")}`}
                     >
                       {item.name}
@@ -537,7 +539,7 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
                   return (
                     <Link key={item.name} href={item.href} className="w-full">
                       <Button
-                        className="w-full bg-white hover:bg-[#4A90E2] text-[#4A90E2] hover:text-cyan-300 border-2 border-white hover:border-white font-semibold transition-all duration-300"
+                        className="w-full bg-white text-[#498EDE] border-2 border-white hover:bg-white hover:text-[#498EDE] hover:border-white font-semibold transition-all duration-300"
                         data-testid={`mobile-nav-button-${item.name.toLowerCase().replace(/ /g, "-")}`}
                         onClick={() => setIsMobileMenuOpen(false)}
                       >
@@ -587,6 +589,7 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
                 {isAuthenticated ? (
                   <div className="space-y-3">
                     <Button
+                      variant="white"
                       onClick={handleLogout}
                       className="w-full"
                       data-testid="mobile-button-logout"
@@ -596,6 +599,7 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
                   </div>
                 ) : (
                   <Button
+                    variant="white"
                     className="w-full"
                     data-testid="mobile-button-auth"
                     onClick={() => {

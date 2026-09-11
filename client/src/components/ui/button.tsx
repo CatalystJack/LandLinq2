@@ -9,12 +9,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-[#498EDE] text-[#081729] border-[#498EDE] hover:bg-white hover:text-[#498EDE] hover:border-[#498EDE]",
-        brand: "bg-[#498EDE] text-[#081729] border-[#498EDE] hover:bg-white hover:text-[#498EDE] hover:border-[#498EDE]",
-        white: "bg-white text-[#081729] border-white hover:bg-[#498EDE] hover:text-[#081729] hover:border-[#498EDE]",
+        default: "bg-[#498EDE] text-white border-[#498EDE] hover:bg-white hover:text-[#498EDE] hover:border-[#498EDE]",
+        brand: "bg-[#498EDE] text-white border-[#498EDE] hover:bg-white hover:text-[#498EDE] hover:border-[#498EDE]",
+        white: "bg-white text-[#498EDE] border-white hover:bg-white hover:text-[#498EDE] hover:border-white",
         destructive: "bg-status-red text-white border-status-red hover:bg-white hover:text-status-red hover:border-status-red",
         outline: "bg-white text-[#081729] border-[#b8c9d8] hover:bg-[#498EDE] hover:text-[#081729] hover:border-[#498EDE]",
-        secondary: "bg-[#081729] text-white border-[#081729] hover:bg-white hover:text-[#081729] hover:border-[#081729]",
+        secondary: "bg-[#498EDE] text-white border-[#498EDE] hover:bg-white hover:text-[#498EDE] hover:border-[#498EDE]",
         ghost: "bg-transparent text-[#081729] border-transparent hover:bg-white hover:text-[#498EDE] hover:border-[#498EDE]",
         link: "border-transparent bg-transparent text-[#498EDE] underline-offset-4 hover:translate-y-0 hover:bg-transparent hover:text-[#498EDE] hover:underline hover:shadow-none",
       },

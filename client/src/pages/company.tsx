@@ -103,7 +103,7 @@ export default function CompanyPage() {
               </div>
               <a
                 href="/contact"
-                 className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#498EDE] bg-[#498EDE] px-6 text-sm font-semibold text-[#081729] transition-all hover:border-[#498EDE] hover:bg-white hover:text-[#498EDE]"
+                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-white bg-white px-6 text-sm font-semibold text-[#498EDE] transition-all hover:border-white hover:bg-white hover:text-[#498EDE]"
               >
                 Get in touch
               </a>
