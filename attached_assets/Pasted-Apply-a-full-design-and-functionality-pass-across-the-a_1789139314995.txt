@@ -1,0 +1,197 @@
+Apply a full design and functionality pass across the app. Work through the 
+sections in order, since later sections depend on the design tokens established 
+in Section 1. Do NOT touch the existing red/yellow/green classification status 
+colors anywhere in the app — these stay exactly as-is throughout every section 
+below.
+
+=====================================================================
+SECTION 1 — FOUNDATION: colors, typography, big stats, tab style
+=====================================================================
+
+1a. New color tokens
+In client/src/index.css, add: --color-dark-blue (deep navy), --color-cream (warm 
+off-white, not stark white), --color-light-blue (soft pale blue). Apply 
+dark-blue to sidebar/nav backgrounds, cream to main content area backgrounds 
+across key pages (analyst dashboard, developer dashboard, pipeline, analytics, 
+CRM), and light-blue exclusively for active/selected states and hover 
+highlights — not as a general-purpose fill color.
+
+1b. New headline typeface
+Add "Space Grotesk" via Google Fonts as --font-headline in index.css and as a 
+new "headline" entry in tailwind.config.ts fontFamily. Apply to page titles and 
+section headings only (note: developer-analytics.tsx currently uses font-serif 
+at ~line 152 — replace with font-headline). Inter remains for all body text, 
+table data, buttons, and form inputs.
+
+1c. Big-number stat treatment
+Wherever a key summary number appears prominently (deal counts, dollar totals, 
+percentages — e.g. developer-analytics.tsx's stat cards, developer-pipeline.tsx's 
+opportunity count), render the number large (text-4xl or larger) in the new 
+headline font, with its label in small, muted Inter text beneath.
+
+1d. Pill/segmented tab style
+Replace filled-button tab switchers — starting with the Table/Pipeline/Map view 
+switcher in analyst-dashboard.tsx (~line 5830) — with a rounded pill/segmented 
+control: a soft light-blue background on the active tab within a rounded 
+container, not a solid filled button. Apply this same pill style to any other 
+tab groups in developer-dashboard.tsx or developer-pipeline.tsx.
+
+Verify Section 1: screenshot before/after on analyst dashboard, developer 
+dashboard, and analytics page. Confirm red/yellow/green status colors are 
+pixel-identical to before. Confirm new fonts only appear on titles/big numbers, 
+never on buttons, table data, or status badges.
+
+=====================================================================
+SECTION 2 — Deal detail activity panel
+=====================================================================
+
+Add a right-side activity/history panel to client/src/pages/deal-details.tsx: a 
+persistent sidebar showing a chronological feed of what's happened to this 
+deal — classification changes, notes added, comp pulls, status updates — each 
+with a short description and relative timestamp (e.g. "4m," "1d," "1w"). Source 
+this from existing tracked data (classification history, the email-intake audit 
+trail if applicable, existing notes/comments) rather than building new logging. 
+Use the Section 1 cream/light-blue tokens for this panel's styling.
+
+Verify: confirm the panel shows real historical events for an existing deal, and 
+shows a graceful "No activity yet" empty state otherwise.
+
+=====================================================================
+SECTION 3 — CRM contact rows + avatar stack
+=====================================================================
+
+developer-crm.tsx already uses a table structure, not cards — this is a styling 
+refinement, not a rebuild.
+
+3a. Apply the new cream background and generous row spacing to the contact 
+table. Replace the current hover state with the new light-blue tint.
+
+3b. Add a small colored circular initial avatar (or stack, if multiple people 
+are associated) next to each contact row, showing who's engaged with or owns 
+that contact relationship, using existing user/contact data already available.
+
+Verify: confirm the contact table still functions identically (search, click- 
+through, edit), only the visual treatment changed.
+
+=====================================================================
+SECTION 4 — Pipeline stat row
+=====================================================================
+
+Replace the plain "{opportunities.length} opportunities" CardTitle in 
+client/src/pages/developer-pipeline.tsx (~line 230) with 2-3 stats in the 
+Section 1 big-number style: total opportunity count, total value (sum of the 
+value field), and optionally count of opportunities in the final/won stage. Use 
+the existing pipelineOpportunities data already queried — no new backend work.
+
+Verify: confirm stats update correctly when opportunities are added, moved 
+between stages, or deleted.
+
+=====================================================================
+SECTION 5 — Chart recoloring + standardized empty states
+=====================================================================
+
+5a. In developer-analytics.tsx, for any chart NOT tied to Passed/Review/Pursuing 
+classification (market breakdowns, outreach performance, etc.), recolor using 
+the new dark-blue/cream/light-blue palette instead of default chart-library 
+colors. Leave classification-tied colors (~line 176, the status dots) untouched.
+
+5b. Across analyst-dashboard.tsx and developer-pipeline.tsx, replace 
+inconsistent empty-state renderings (plain "-", "$0.00" for zero-vs-missing, "No 
+comparables data" text) with one consistent treatment: a muted light-blue em 
+dash ("—") for non-editable/computed fields. Keep "Click to add..." for 
+genuinely editable fields as already established.
+
+Verify: confirm no functional data changed, only visual treatment, and confirm 
+classification-tied colors are unaffected.
+
+=====================================================================
+SECTION 6 — Confirm before destructive actions, audited app-wide
+=====================================================================
+
+6a. Search for every delete/remove mutation across developer-crm.tsx, 
+developer-pipeline.tsx, developer-user-management.tsx, admin-investment-companies.tsx, 
+and any other developer-facing or admin page. Report the full list found before 
+making changes.
+
+6b. For each one found without confirmation already in place, add a 
+confirmation dialog (reuse the existing AlertDialog pattern already used for 
+pipeline stage deletion) — clear message naming what will be deleted, explicit 
+Confirm/Cancel buttons, styled with the new design tokens.
+
+Verify: attempt to delete a contact, remove a teammate, and any other found 
+destructive action — confirm each requires explicit confirmation before 
+executing, and Cancel correctly aborts with no changes made.
+
+=====================================================================
+SECTION 7 — Collapsible icon-only sidebar
+=====================================================================
+
+Convert client/src/components/navigation.tsx and 
+client/src/components/developer-navigation.tsx to a collapsed-by-default, 
+icon-only style, expanding to show labels on hover or explicit toggle. Use the 
+new dark-blue background token. Preserve all existing navigation links and 
+behavior exactly — this is layout only.
+
+Verify: confirm every nav link works correctly in both collapsed and expanded 
+states, and any notification badge remains visible when collapsed.
+
+=====================================================================
+SECTION 8 — Clean pagination
+=====================================================================
+
+Review how analyst-dashboard.tsx currently handles large result sets and 
+replace with a clean pagination bar: result count ("142 deals"), a "Load more" 
+button or page navigation, and a rows-per-page selector (25/50/100), styled with 
+the new tokens. Apply the same pattern to developer-dashboard.tsx and 
+developer-crm.tsx if they lack equivalent pagination.
+
+Verify: confirm large result sets load correctly in pages, and changing 
+rows-per-page updates the displayed count correctly.
+
+=====================================================================
+SECTION 9 — AI data/action assistant (floating widget)
+=====================================================================
+
+Build a floating AI chat assistant available on every Investment Company 
+dashboard page, letting them ask questions about their own data and take a 
+limited set of safe actions. Reuse the exact tenant-isolation pattern already 
+used everywhere else (getDeveloperProfileId helper) — the assistant can only 
+ever see/act on the logged-in company's own data.
+
+9a. Safe, curated query functions (read side): build a fixed set of backend 
+functions the AI can call, each internally scoped to req.user.developerProfileId — 
+getMyDeals(filters), getMyPipelineSummary(), getMyContacts(search), 
+getCompsForDeal(dealId), getMyCriteria(). Do NOT let the AI generate or execute 
+its own database queries directly — it may only call these predefined functions 
+and explain results in natural language.
+
+9b. Limited, safe actions (write side): allow ONLY: marking a deal as Pursuing, 
+adding a tag to a CRM contact, creating a new pipeline opportunity. Do NOT allow 
+deletion, criteria changes, sending outreach emails, or any other action through 
+chat in this version.
+
+9c. Require in-chat confirmation before any action executes: present a clear 
+confirmation ("I'll mark [deal address] as Pursuing — confirm?") with explicit 
+Yes/Cancel buttons in the chat UI, matching the same confirm-before-acting 
+discipline from Section 6. No action executes without this explicit click.
+
+9d. Floating widget UI: small floating chat bubble in the bottom corner of every 
+developer-facing page, expanding into a chat panel when clicked, styled with the 
+Section 1 design tokens.
+
+9e. Reuse the same AI provider/model already integrated for email parsing 
+(aiEmailParser.ts) rather than adding a new AI vendor relationship.
+
+Verify: confirm a test account can ask "how many deals do I have in Review" and 
+get a correct answer scoped to only their own data. Confirm marking a deal as 
+Pursuing via chat requires the confirmation click and correctly updates the deal.
+
+=====================================================================
+FINAL VERIFICATION
+=====================================================================
+
+After all sections are complete, do a final pass confirming: red/yellow/green 
+classification colors are unchanged everywhere, all existing functionality 
+(navigation, CRM, pipeline, analytics, deal actions) works identically to before 
+this pass, and the new design tokens (dark blue, cream, light blue, Space 
+Grotesk headlines) are applied consistently across every page touched.
