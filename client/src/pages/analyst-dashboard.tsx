@@ -10839,6 +10839,7 @@ export default function AnalystDashboard() {
       {viewMode === 'table' && (
         <div 
           ref={stickyScrollbarRef}
+          className="table-scroll-container"
           style={{
             position: 'fixed',
             bottom: 0,

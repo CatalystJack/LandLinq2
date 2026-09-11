@@ -57,27 +57,31 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Keep the table's vertical scrollbar visible for long deal lists.
-   Horizontal scrolling remains available through the fixed scrollbar below. */
-.table-scroll-container::-webkit-scrollbar {
-  width: 12px;
-  height: 0;
-}
-
+/* Shared scrollbar for every horizontally scrollable table.
+   Keep both axes visible: long deal lists need a vertical scrollbar and wide
+   tables need a discoverable horizontal scrollbar at the bottom. */
 .table-scroll-container {
+  overflow-x: auto;
+  overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #9ca3af #f3f4f6;
-  -ms-overflow-style: none;
+  -ms-overflow-style: auto;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 14px;
 }
 
 .table-scroll-container::-webkit-scrollbar-track {
   background: #f3f4f6;
+  border-radius: 8px;
 }
 
 .table-scroll-container::-webkit-scrollbar-thumb {
   background: #9ca3af;
-  border-radius: 8px;
   border: 2px solid #f3f4f6;
+  border-radius: 8px;
 }
 
 .table-scroll-container::-webkit-scrollbar-thumb:hover {
@@ -980,117 +984,6 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
     right: -8px;
     bottom: -8px;
   }
-}
-
-/* Sticky Horizontal Scrollbar Styles */
-.sticky-scrollbar-container {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 20px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(4px);
-  border-top: 1px solid #e5e7eb;
-  z-index: 1000;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s ease, visibility 0.2s ease;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.sticky-scrollbar-container.visible {
-  opacity: 1;
-  visibility: visible;
-}
-
-.sticky-scrollbar {
-  width: 100%;
-  height: 20px;
-  overflow-x: scroll;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: #9ca3af #f3f4f6;
-}
-
-.sticky-scrollbar::-webkit-scrollbar {
-  height: 20px;
-  background: transparent;
-}
-
-.sticky-scrollbar::-webkit-scrollbar-track {
-  background: #f3f4f6;
-  border-radius: 0;
-}
-
-.sticky-scrollbar::-webkit-scrollbar-thumb {
-  background: #9ca3af;
-  border-radius: 10px;
-  border: 3px solid #f3f4f6;
-  transition: background 0.2s ease;
-}
-
-.sticky-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
-}
-
-.sticky-scrollbar-content {
-  height: 1px;
-  pointer-events: none;
-}
-
-/* Enhanced table scroll container to work with sticky scrollbar */
-.enhanced-table-scroll-container {
-  overflow-x: auto;
-  overflow-y: visible;
-  position: relative;
-  scrollbar-width: thin;
-  scrollbar-color: #9ca3af #f3f4f6;
-}
-
-.enhanced-table-scroll-container::-webkit-scrollbar {
-  height: 16px;
-  background: transparent;
-}
-
-.enhanced-table-scroll-container::-webkit-scrollbar-track {
-  background: #f3f4f6;
-  border-radius: 8px;
-  margin: 2px;
-}
-
-.enhanced-table-scroll-container::-webkit-scrollbar-thumb {
-  background: #9ca3af;
-  border-radius: 8px;
-  border: 2px solid #f3f4f6;
-  transition: background 0.2s ease;
-}
-
-.enhanced-table-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
-}
-
-/* Dark mode sticky scrollbar */
-.dark .sticky-scrollbar-container {
-  background: rgba(17, 24, 39, 0.95);
-  border-top: 1px solid #374151;
-}
-
-.dark .sticky-scrollbar::-webkit-scrollbar-track {
-  background: #374151;
-}
-
-.dark .sticky-scrollbar::-webkit-scrollbar-thumb {
-  background: #6b7280;
-  border: 3px solid #374151;
-}
-
-.dark .sticky-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
-
-.dark .sticky-scrollbar {
-  scrollbar-color: #6b7280 #374151;
 }
 
 /* Scrolling Stats Animations */
