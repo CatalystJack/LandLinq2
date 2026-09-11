@@ -5874,10 +5874,10 @@ export default function AnalystDashboard() {
                   
                   <div className="flex items-center gap-2">
                     {/* Table/Cards/Map Toggle */}
-                    <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-0.5 rounded-full border border-[#d7e5f4] bg-[#f3f8fe] p-1">
                       <button
                         onClick={() => setViewMode('table')}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors ${viewMode === 'table' ? 'bg-[#4A90E2] text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                        className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${viewMode === 'table' ? 'bg-[#dcecff] text-[#2f73bb] shadow-sm' : 'bg-transparent text-gray-500 hover:bg-white/70 hover:text-[#2f73bb]'}`}
                         data-testid="toggle-table"
                       >
                         <Table2 className="h-3.5 w-3.5" />
@@ -5885,7 +5885,7 @@ export default function AnalystDashboard() {
                       </button>
                       <button
                         onClick={() => setViewMode('cards')}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border-x border-gray-300 transition-colors ${viewMode === 'cards' ? 'bg-[#4A90E2] text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                        className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${viewMode === 'cards' ? 'bg-[#dcecff] text-[#2f73bb] shadow-sm' : 'bg-transparent text-gray-500 hover:bg-white/70 hover:text-[#2f73bb]'}`}
                         data-testid="toggle-cards"
                       >
                         <List className="h-3.5 w-3.5" />
@@ -5893,7 +5893,7 @@ export default function AnalystDashboard() {
                       </button>
                       <button
                         onClick={() => setViewMode('map')}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors ${viewMode === 'map' ? 'bg-[#4A90E2] text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                        className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${viewMode === 'map' ? 'bg-[#dcecff] text-[#2f73bb] shadow-sm' : 'bg-transparent text-gray-500 hover:bg-white/70 hover:text-[#2f73bb]'}`}
                         data-testid="toggle-map"
                       >
                         <Map className="h-3.5 w-3.5" />

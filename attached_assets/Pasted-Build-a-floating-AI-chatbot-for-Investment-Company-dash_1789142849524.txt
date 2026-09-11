@@ -1,0 +1,100 @@
+Build a floating AI chatbot for Investment Company dashboard users, giving them 
+conversational access to their own company's deals, CRM contacts, pipeline, drip 
+campaigns, and comp data — and the ability to take a limited set of safe actions. 
+This chatbot must NEVER be able to see or affect another company's data under any 
+circumstances — treat this with the same seriousness as the tenant-isolation 
+security work already done elsewhere in this app, since a mistake here would 
+expose an entire company's private deal/contact data to another company.
+
+=====================================================================
+TASK 1 — Safe, scoped data access (read side)
+=====================================================================
+
+Build a fixed set of backend functions the AI can call — it must NEVER generate 
+or execute its own database queries directly. Every function must be scoped 
+internally to req.user.developerProfileId, using the exact same pattern 
+(getDeveloperProfileId) already used correctly throughout the rest of this app:
+
+  - getMyDeals(filters) — deals routed to this company, with status/classification
+  - getMyPipelineSummary() — opportunity counts, stages, total value
+  - getMyContacts(search) — this company's own CRM contacts only
+  - getMyCampaigns() — this company's own drip campaigns and their steps
+  - getCompsForDeal(dealId) — comp data for a specific deal, verified to belong 
+    to this company before returning anything
+  - getMyCriteria() — this company's own acquisition criteria and branding
+
+Each function must verify the requested record (a specific deal ID, contact ID, 
+etc.) actually belongs to the calling company's developerProfileId before 
+returning any data — never trust an ID passed in without checking ownership 
+first, the same discipline already required elsewhere in this codebase.
+
+=====================================================================
+TASK 2 — Limited, safe actions (write side)
+=====================================================================
+
+Allow ONLY these specific actions in this version, each requiring explicit 
+in-chat confirmation before executing (a clear "I'll do X — confirm?" message 
+with Yes/Cancel buttons, no silent execution):
+
+  - Mark a deal as Pursuing
+  - Add a tag to a CRM contact
+  - Create a new pipeline opportunity
+  - Draft or refine a drip campaign email (see Task 3)
+
+Do NOT allow deletion of anything, changes to acquisition criteria, or sending 
+outreach emails directly through chat in this version.
+
+=====================================================================
+TASK 3 — Drip campaign writing assistance
+=====================================================================
+
+When helping draft or refine campaign email content, use this company's own 
+branding and acquisition criteria (target counties/states, rent thresholds, 
+product types) to personalize the writing. Support conversational refinement 
+("make it shorter," "more formal," "add a line about our rent threshold"). Any 
+drafted email content must be explicitly inserted by the user into the actual 
+campaign editor — never silently overwrite an existing draft.
+
+=====================================================================
+TASK 4 — Floating widget UI
+=====================================================================
+
+Add a floating chat bubble in the bottom-right corner of every developer-facing 
+page (reuse the existing DeveloperNavigation-wrapped page layout so it appears 
+consistently everywhere a logged-in Investment Company user goes). Clicking it 
+expands into a chat panel. Use the existing app design tokens/colors for styling.
+
+=====================================================================
+TASK 5 — Reuse existing AI infrastructure
+=====================================================================
+
+Use the same AI provider/model already integrated for email parsing 
+(aiEmailParser.ts) rather than adding a new AI vendor relationship.
+
+=====================================================================
+TASK 6 — Conversation persistence
+=====================================================================
+
+Persist chat history per user session so context isn't lost on navigation within 
+the same session. This does not need to be a fully durable, cross-session 
+history for this first version — in-session memory is sufficient.
+
+=====================================================================
+VERIFICATION — REQUIRED, WITH REAL EVIDENCE
+=====================================================================
+
+This is a security-sensitive feature. Do not report this as complete without all 
+of the following, demonstrated with actual output, not a description of the code:
+
+1. Using a real Company A test account, ask the chatbot "how many deals do I 
+   have" and confirm the answer matches Company A's actual real data.
+2. Using that same Company A session, explicitly try to ask about or reference 
+   Company B's data (by name, by a guessed deal ID, or any other means) and 
+   confirm the chatbot correctly returns nothing about Company B — paste the 
+   actual response.
+3. Confirm marking a deal as Pursuing via chat requires the explicit confirmation 
+   click, and correctly updates only that company's own deal.
+4. Confirm the chat widget appears on every developer-facing page tested.
+
+Report back specifically confirming all four verification steps were performed, 
+with their actual results — not just that the code was written.

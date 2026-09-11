@@ -178,7 +178,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
             <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[#10283b] sm:text-4xl">Company contacts</h1>
             <p className="mt-2 max-w-xl text-sm text-[#6e8192]">A focused directory for the relationships your team is building across the LandLinq network.</p>
           </div>
-          <Button onClick={() => setImportOpen(true)} style={{ backgroundColor: primaryColor }} className="h-10 rounded-lg px-4 text-white shadow-sm hover:opacity-90">
+          <Button onClick={() => setImportOpen(true)} style={{ backgroundColor: primaryColor }} className="h-10 rounded-full px-4 text-white shadow-sm hover:opacity-90">
             <Upload className="mr-2 h-4 w-4" />Import Contacts
           </Button>
         </div>

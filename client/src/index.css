@@ -57,16 +57,31 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Table container scrollbar - hidden (use sticky scrollbar at bottom of page instead) */
+/* Keep the table's vertical scrollbar visible for long deal lists.
+   Horizontal scrolling remains available through the fixed scrollbar below. */
 .table-scroll-container::-webkit-scrollbar {
-  display: none;
+  width: 12px;
   height: 0;
-  width: 0;
 }
 
 .table-scroll-container {
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #f3f4f6;
   -ms-overflow-style: none;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 8px;
+  border: 2px solid #f3f4f6;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 /* Interactive Tour Styles */
