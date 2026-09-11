@@ -9,7 +9,6 @@ const realEstateTabs = [
   { label: "Deal Dashboard", href: "/developer/dashboard" },
   { label: "CRM", href: "/developer/crm" },
   { label: "Outreach", href: "/developer/outreach" },
-  { label: "Pipeline", href: "/developer/pipeline" },
   { label: "Analytics", href: "/developer/analytics" },
   { label: "Settings", href: "/developer/settings" },
 ];

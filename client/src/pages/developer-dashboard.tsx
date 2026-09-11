@@ -14,7 +14,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  SlidersHorizontal,
   Star,
   Table2,
   Upload,
@@ -141,7 +140,7 @@ export default function DeveloperDashboard() {
   const [importStep, setImportStep] = useState<"select" | "map">("select");
   const [parsing, setParsing] = useState(false);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
-  const [viewMode, setViewMode] = useState<"table" | "pipeline" | "map">("table");
+  const [viewMode, setViewMode] = useState<"table" | "map">("table");
   const [statusFilter, setStatusFilter] = useState("all");
   const [productTypeFilter, setProductTypeFilter] = useState("all");
   const [showColumns, setShowColumns] = useState(false);
@@ -427,7 +426,6 @@ export default function DeveloperDashboard() {
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
                   { value: "table" as const, label: "Table", icon: Table2 },
-                  { value: "pipeline" as const, label: "Pipeline", icon: SlidersHorizontal },
                   { value: "map" as const, label: "Map", icon: MapIcon },
                 ].map(({ value, label, icon: Icon }) => (
                   <Button
@@ -472,40 +470,7 @@ export default function DeveloperDashboard() {
             )}
           </div>
 
-          {viewMode === "pipeline" ? (
-            <div className="grid gap-3 bg-slate-50 p-3 md:grid-cols-3">
-              {[
-                { key: "review", label: "Review", tone: "border-amber-200 bg-amber-50" },
-                { key: "passed", label: "Passed", tone: "border-blue-200 bg-blue-50" },
-                { key: "pursuing", label: "Pursuing", tone: "border-emerald-200 bg-emerald-50" },
-              ].map((stage) => {
-                const stageRows = filteredRows.filter((row) =>
-                  stage.key === "pursuing"
-                    ? row.greenFlaggedByDeveloper
-                    : stage.key === "review"
-                      ? row.classification === "review" && !row.greenFlaggedByDeveloper
-                      : row.classification !== "review" && !row.greenFlaggedByDeveloper,
-                );
-                return (
-                  <div key={stage.key} className={`min-h-48 rounded-md border p-3 ${stage.tone}`}>
-                    <div className="mb-2 flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-slate-800">{stage.label}</h3>
-                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{stageRows.length}</span>
-                    </div>
-                    <div className="space-y-2">
-                      {stageRows.slice(0, 12).map((row) => (
-                        <div key={row.id} className="rounded border border-white/80 bg-white p-2 text-xs shadow-sm">
-                          <p className="font-medium text-slate-900">{row.deal.address}</p>
-                          <p className="mt-1 text-slate-500">{[row.deal.city, row.deal.state].filter(Boolean).join(", ") || "Market unavailable"}</p>
-                        </div>
-                      ))}
-                      {stageRows.length > 12 && <p className="pt-1 text-center text-xs text-slate-500">Showing first 12 deals</p>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : viewMode === "map" ? (
+          {viewMode === "map" ? (
             <div className="flex min-h-64 flex-col items-center justify-center bg-slate-50 px-6 text-center">
               <MapIcon className="mb-3 h-9 w-9 text-slate-300" />
               <h3 className="font-semibold text-slate-800">Market view</h3>

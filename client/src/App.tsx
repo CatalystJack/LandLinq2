@@ -84,7 +84,6 @@ const AdminInvestmentCompanies = lazy(() => import("@/pages/admin-investment-com
 const MasterPipeline = lazy(() => import("@/pages/master-pipeline"));
 const DeveloperCrm = lazy(() => import("@/pages/developer-crm"));
 const DeveloperOutreach = lazy(() => import("@/pages/developer-outreach"));
-const DeveloperPipeline = lazy(() => import("@/pages/developer-pipeline"));
 const DeveloperAnalytics = lazy(() => import("@/pages/developer-analytics"));
 const DeveloperUserManagement = lazy(() => import("@/pages/developer-user-management"));
 const DeveloperCriteriaSettings = lazy(() => import("@/pages/developer-criteria-settings"));
@@ -241,7 +240,6 @@ function Router() {
           <Route path="/developer/dashboard" component={AnalystDashboard} />
           <Route path="/developer/crm" component={DeveloperCrm} />
           <Route path="/developer/outreach" component={DeveloperOutreach} />
-          <Route path="/developer/pipeline" component={DeveloperPipeline} />
           <Route path="/developer/analytics" component={DeveloperAnalytics} />
            <Route path="/analytics" component={DeveloperAnalytics} />
            <Route path="/outreach-analytics" component={DeveloperAnalytics} />

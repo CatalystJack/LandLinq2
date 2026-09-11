@@ -223,37 +223,39 @@ export default function UserManagement() {
 
   const users = usersData?.users || [];
 
+  const getRoleKey = (user: User) => {
+    const role = String(user.role || "").toUpperCase();
+    if (role === "DEVELOPER") return "developer";
+    if (role === "ADMIN" || role === "SUPER_ADMIN" || isPlatformAdminEmail(user.email)) return "admin";
+    if (role === "ANALYST" || user.email.toLowerCase().endsWith("@catalystcp.com")) return "analyst";
+    return "broker";
+  };
+
+  const getRoleLabel = (user: User) => {
+    switch (getRoleKey(user)) {
+      case "developer":
+        return "Investment Company Team";
+      case "admin":
+        return "Admin Team";
+      case "analyst":
+        return "LandLinq Team";
+      default:
+        return "Broker";
+    }
+  };
+
   // Filter users based on search and role
   const filteredUsers = users.filter((user: User) => {
     const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    let userRole = "team";
-    if (isSuperAdminEmail(user.email)) {
-      userRole = "super_admin";
-    } else if (isPlatformAdminEmail(user.email)) {
-      userRole = "admin";
-    } else if (user.email.endsWith("@catalystcp.com")) {
-      userRole = "analyst";
-    } else {
-      userRole = "broker";
-    }
-    
-    const matchesRole = selectedRole === "all" || userRole === selectedRole;
+
+    const matchesRole = selectedRole === "all" || getRoleKey(user) === selectedRole;
     return matchesSearch && matchesRole;
   });
 
-  const getRoleFromEmail = (email: string) => {
-    if (isSuperAdminEmail(email)) return "Super Admin";
-    if (isPlatformAdminEmail(email)) return "Admin";
-    if (email.endsWith("@catalystcp.com")) return "LandLinq Team";
-    return "Broker";
-  };
-
-  const getRoleBadgeVariant = (email: string) => {
-    if (isSuperAdminEmail(email)) return "destructive";
-    if (isPlatformAdminEmail(email)) return "default";
-    if (email.endsWith("@catalystcp.com")) return "default";
+  const getRoleBadgeVariant = (user: User) => {
+    if (getRoleKey(user) === "admin") return "default";
+    if (getRoleKey(user) === "analyst") return "default";
     return "secondary";
   };
 
@@ -391,8 +393,9 @@ export default function UserManagement() {
                       <SelectContent>
                         <SelectItem value="all">All Roles</SelectItem>
                         <SelectItem value="super_admin">Super Admin</SelectItem>
-                        <SelectItem value="admin">Admins</SelectItem>
+                        <SelectItem value="admin">Admin Team</SelectItem>
                         <SelectItem value="analyst">LandLinq Team</SelectItem>
+                        <SelectItem value="developer">Investment Company Team</SelectItem>
                         <SelectItem value="broker">Brokers</SelectItem>
                       </SelectContent>
                     </Select>
@@ -570,8 +573,8 @@ export default function UserManagement() {
                           </div>
                         </div>
                         <div className="flex items-center space-x-3">
-                          <Badge variant={getRoleBadgeVariant(user.email)}>
-                            {getRoleFromEmail(user.email)}
+                        <Badge variant={getRoleBadgeVariant(user)}>
+                          {getRoleLabel(user)}
                           </Badge>
                           <Badge variant="default" className="bg-green-100 text-green-800">
                             <UserCheck className="h-3 w-3 mr-1" />
@@ -670,18 +673,22 @@ export default function UserManagement() {
                   <div className="space-y-2">
                     <Label htmlFor="editUserType">Access Role</Label>
                     <Select
-                      value={editingUser.role || 'ANALYST'}
+                      value={editingUser.role === "SUPER_ADMIN" ? "ADMIN" : (editingUser.role || "ANALYST")}
                       onValueChange={(value) => setEditingUser({ ...editingUser, role: value })}
+                      disabled={editingUser.role === "SUPER_ADMIN"}
                     >
                       <SelectTrigger data-testid="edit-user-type">
                         <SelectValue placeholder="Select user type" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ANALYST">LandLinq Team</SelectItem>
-                        <SelectItem value="ADMIN">Admin</SelectItem>
-                        <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                        <SelectItem value="ADMIN">Admin Team</SelectItem>
+                        <SelectItem value="DEVELOPER">Investment Company Team</SelectItem>
                       </SelectContent>
                     </Select>
+                    {editingUser.role === "SUPER_ADMIN" && (
+                      <p className="text-xs text-slate-500">This protected system administrator account retains its existing authority.</p>
+                    )}
                   </div>
 
                   <div className="flex gap-2 pt-4">

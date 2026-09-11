@@ -614,7 +614,6 @@ export default function AnalystDashboard() {
   const [filterDealTypes, setFilterDealTypes] = useState<string[]>([]);
   const [filterApex, setFilterApex] = useState<string[]>([]);
   const [filterNextAssignees, setFilterNextAssignees] = useState<string[]>([]);
-  const [filterDealSteps, setFilterDealSteps] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -707,6 +706,7 @@ export default function AnalystDashboard() {
   // Column visibility state - persisted to localStorage
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(() => getDefaultVisibleColumns());
   const [colPickerOpen, setColPickerOpen] = useState(false);
+  const [columnPresetOpen, setColumnPresetOpen] = useState(false);
   const [customColumnPresets, setCustomColumnPresets] = useState<ColumnPreset[]>(() => getSavedColumnPresets());
   // Column order state - persisted to localStorage
   const [columnOrder, setColumnOrder] = useState<ReorderableColumnKey[]>(() => getDefaultColumnOrder());
@@ -1357,22 +1357,6 @@ export default function AnalystDashboard() {
           return prev.filter(a => a !== assignee);
         } else {
           return [...prev, assignee];
-        }
-      });
-    }
-    setCurrentPage(1);
-  };
-
-  // Deal Step filter handler
-  const handleDealStepFilter = (step: string) => {
-    if (step === "all") {
-      setFilterDealSteps([]);
-    } else {
-      setFilterDealSteps(prev => {
-        if (prev.includes(step)) {
-          return prev.filter(s => s !== step);
-        } else {
-          return [...prev, step];
         }
       });
     }
@@ -4455,7 +4439,7 @@ export default function AnalystDashboard() {
     return deals.map((deal: DealWithBroker) => getDealWithOptimisticUpdates(deal));
   }, [deals, getDealWithOptimisticUpdates]);
 
-  // Apply client-side filters for Next Assignee and Deal Step (server handles other filters)
+  // Apply client-side filters for Next Assignee (server handles other filters)
   const filteredAndSortedDeals = useMemo(() => {
     let result = optimizedDeals || [];
     
@@ -4466,13 +4450,6 @@ export default function AnalystDashboard() {
       );
     }
     
-    // Filter by Deal Step
-    if (filterDealSteps.length > 0) {
-      result = result.filter((deal: DealWithBroker) => 
-        deal.dealStep && filterDealSteps.includes(deal.dealStep)
-      );
-    }
-
     // Filter by Auto YOC range (client-side, since automatedYoc is stored as text)
     if (autoYocMin !== '' || autoYocMax !== '') {
       const min = autoYocMin !== '' ? parseFloat(autoYocMin) : -Infinity;
@@ -4488,7 +4465,7 @@ export default function AnalystDashboard() {
     }
     
     return result;
-  }, [optimizedDeals, filterNextAssignees, filterDealSteps, autoYocMin, autoYocMax]);
+  }, [optimizedDeals, filterNextAssignees, autoYocMin, autoYocMax]);
 
   const formatPrice = (price: string | null) => {
     if (!price) return 'N/A';
@@ -6011,17 +5988,21 @@ export default function AnalystDashboard() {
                         </PopoverContent>
                       </Popover>
                       {/* Saved column-visibility presets */}
-                      <Popover>
+                      <Popover open={columnPresetOpen} onOpenChange={setColumnPresetOpen}>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
                             size="sm"
-                             className="font-semibold transition-all duration-200 min-w-[140px] justify-between border-gray-300 text-gray-700 hover:border-[#4A90E2] hover:text-[#4A90E2]"
+                            className={`font-semibold transition-all duration-200 min-w-[140px] justify-between cursor-pointer ${
+                              columnPresetOpen
+                                ? "bg-[#07172A] text-white border-[#07172A]"
+                                : "border-gray-300 text-gray-700 hover:bg-[#4A90E2] hover:text-white hover:border-[#4A90E2]"
+                            }`}
                             data-testid="button-column-presets"
                           >
                              <span className="flex items-center gap-1">
                                <Save className="h-3 w-3" />
-                               Views
+                               View
                              </span>
                              <ChevronDown className="h-3 w-3 ml-1" />
                           </Button>
@@ -6355,53 +6336,6 @@ export default function AnalystDashboard() {
                       </PopoverContent>
                     </Popover>
 
-                    {/* Deal Step Multi-Select Dropdown */}
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={`font-semibold transition-all duration-200 min-w-[90px] justify-between ${
-                            filterDealSteps.length > 0 
-                              ? "bg-gray-700 text-white border-gray-700" 
-                              : "border-gray-300 text-gray-700"
-                          }`}
-                          data-testid="dropdown-step-filter"
-                        >
-                          <span className="flex items-center gap-1">
-                            Step {filterDealSteps.length > 0 && `(${filterDealSteps.length})`}
-                          </span>
-                          <ChevronDown className="h-3 w-3 ml-1" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-44 p-2" align="start">
-                        <div className="space-y-1">
-                          <div 
-                            className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer"
-                            onClick={() => handleDealStepFilter("all")}
-                          >
-                            <Checkbox 
-                              checked={filterDealSteps.length === 0} 
-                              className="pointer-events-none"
-                            />
-                            <span className="text-sm font-medium">All</span>
-                          </div>
-                          {["Initial Analysis", "LOI", "Initial UW", "Full UW", "UW", "Call Broker/Owner", "UW - Reviewing"].map((step) => (
-                            <div 
-                              key={step}
-                              className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded cursor-pointer"
-                              onClick={() => handleDealStepFilter(step)}
-                            >
-                              <Checkbox 
-                                checked={filterDealSteps.includes(step)} 
-                                className="pointer-events-none border-gray-500 data-[state=checked]:bg-gray-500"
-                              />
-                              <span className="text-sm font-medium text-gray-700">{step}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
                   </div>
                 </div>
               </div>
@@ -6887,9 +6821,6 @@ export default function AnalystDashboard() {
                                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase shrink-0 ${deal.priority === 'urgent' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
                                         {deal.priority}
                                       </span>
-                                    )}
-                                    {deal.dealStep && (
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#07172A] text-white font-semibold shrink-0">{deal.dealStep}</span>
                                     )}
                                   </div>
                                   <div className="text-[11px] text-gray-400 truncate mt-0.5">
@@ -8393,7 +8324,7 @@ export default function AnalystDashboard() {
               </div>
 
               {/* Assignment */}
-              {(pipelinePanel.nextAssignee || pipelinePanel.dealStep || pipelinePanel.priority) && (
+              {(pipelinePanel.nextAssignee || pipelinePanel.priority) && (
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Assignment</p>
                   <div className="bg-gray-50 rounded-lg px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-2">
@@ -8401,12 +8332,6 @@ export default function AnalystDashboard() {
                       <div className="flex justify-between">
                         <span className="text-xs text-gray-500">Assignee</span>
                         <span className="text-xs font-semibold text-[#07172A]">{pipelinePanel.nextAssignee}</span>
-                      </div>
-                    )}
-                    {pipelinePanel.dealStep && (
-                      <div className="flex justify-between">
-                        <span className="text-xs text-gray-500">Step</span>
-                        <span className="text-xs font-semibold text-[#07172A]">{pipelinePanel.dealStep}</span>
                       </div>
                     )}
                     {pipelinePanel.priority && (
