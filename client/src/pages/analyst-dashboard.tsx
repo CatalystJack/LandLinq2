@@ -661,6 +661,10 @@ export default function AnalystDashboard() {
   // Pipeline view proper state (replaces window-global hack)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [pipelineDragDealId, setPipelineDragDealId] = useState<string | null>(null);
+  // Keep the dragged deal ID outside React state as well. Drag/drop events can
+  // arrive before the state update from dragstart is committed.
+  const pipelineDraggedDealIdRef = useRef<string | null>(null);
+  const [pipelineDragSavingDealId, setPipelineDragSavingDealId] = useState<string | null>(null);
   const [pipelineDragOverColumn, setPipelineDragOverColumn] = useState<string | null>(null);
   const [pipelineSort, setPipelineSort] = useState<{ col: string; dir: 'asc' | 'desc' }>({ col: 'createdAt', dir: 'desc' });
   const [pipelineSearch, setPipelineSearch] = useState('');
@@ -6520,6 +6524,42 @@ export default function AnalystDashboard() {
                 : classification === 'potential' ? 'yellow'
                 : classification === 'clear_no' ? 'red'
                 : classification || 'unclassified';
+             const handlePipelineDrop = (event: React.DragEvent<HTMLDivElement>, classification: string) => {
+               event.preventDefault();
+               event.stopPropagation();
+
+               const draggedId =
+                 event.dataTransfer.getData('text/plain') ||
+                 pipelineDraggedDealIdRef.current ||
+                 pipelineDragDealId;
+               if (!draggedId) return;
+
+               const deal = pipelineDeals.find(d => d.id === draggedId);
+               if (!deal) return;
+
+               const currentClassification = canonicalClassification(deal.classification as string | null | undefined);
+               if (currentClassification === classification) {
+                 pipelineDraggedDealIdRef.current = null;
+                 setPipelineDragDealId(null);
+                 setPipelineDragOverColumn(null);
+                 return;
+               }
+
+               // The PATCH mutation is the source of truth. Its success handler
+               // updates the active query cache and invalidates other deal queries.
+               setPipelineDragSavingDealId(deal.id);
+               cellUpdateMutation.mutate(
+                 { dealId: deal.id, classification },
+                 {
+                   onSettled: () => {
+                     setPipelineDragSavingDealId(currentSavingId => currentSavingId === deal.id ? null : currentSavingId);
+                   },
+                 },
+               );
+               pipelineDraggedDealIdRef.current = null;
+               setPipelineDragDealId(null);
+               setPipelineDragOverColumn(null);
+             };
 
             const counts = pipelineGroups.map(group =>
               filteredDeals.filter(d => group.keys.includes((d.classification || 'unclassified') as never)).length
@@ -6569,18 +6609,10 @@ export default function AnalystDashboard() {
                       return (
                         <div
                           key={group.label}
-                          onDragOverCapture={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setPipelineDragOverColumn(group.classification); }}
-                          onDragEnterCapture={e => { e.preventDefault(); setPipelineDragOverColumn(group.classification); }}
+                          onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setPipelineDragOverColumn(group.classification); }}
+                          onDragEnter={e => { e.preventDefault(); setPipelineDragOverColumn(group.classification); }}
                           onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPipelineDragOverColumn(null); }}
-                          onDropCapture={e => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const draggedId = e.dataTransfer.getData('text/plain') || pipelineDragDealId;
-                            const deal = pipelineDeals.find(d => d.id === draggedId);
-                            if (deal) classifyDeal(deal, group.classification);
-                            setPipelineDragDealId(null);
-                            setPipelineDragOverColumn(null);
-                          }}
+                          onDrop={e => handlePipelineDrop(e, group.classification)}
                           className={`flex w-[250px] shrink-0 flex-col rounded border bg-[#fbfcfd] transition-colors duration-150 ${isOver ? 'border-[#4A90E2] bg-[#eef6ff] ring-2 ring-[#4A90E2]/20' : 'border-[#dbe2ea]'}`}
                           aria-label={`${group.label} column`}
                         >
@@ -6607,14 +6639,19 @@ export default function AnalystDashboard() {
                                 key={deal.id}
                                 draggable
                                 onDragStart={e => {
-                                   e.stopPropagation();
+                                  e.stopPropagation();
+                                  pipelineDraggedDealIdRef.current = deal.id;
                                   e.dataTransfer.setData('text/plain', deal.id);
                                   e.dataTransfer.effectAllowed = 'move';
                                   setPipelineDragDealId(deal.id);
                                 }}
-                                onDragEnd={() => { setPipelineDragDealId(null); setPipelineDragOverColumn(null); }}
+                                onDragEnd={() => {
+                                  pipelineDraggedDealIdRef.current = null;
+                                  setPipelineDragDealId(null);
+                                  setPipelineDragOverColumn(null);
+                                }}
                                 onClick={() => setPipelinePanel(deal)}
-                                className={`group cursor-pointer rounded border bg-white p-3 shadow-[0_1px_2px_rgba(15,35,60,0.04)] transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:border-[#9fb9d5] hover:shadow-[0_3px_10px_rgba(15,35,60,0.08)] focus-within:border-[#4A90E2] ${pipelineDragDealId === deal.id ? 'border-[#4A90E2] opacity-60' : 'border-[#e0e6ed]'}`}
+                                className={`group cursor-grab rounded border bg-white p-3 shadow-[0_1px_2px_rgba(15,35,60,0.04)] transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:border-[#9fb9d5] hover:shadow-[0_3px_10px_rgba(15,35,60,0.08)] focus-within:border-[#4A90E2] active:cursor-grabbing ${pipelineDragDealId === deal.id ? 'border-[#4A90E2] opacity-60' : 'border-[#e0e6ed]'}`}
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="min-w-0">
@@ -6638,6 +6675,9 @@ export default function AnalystDashboard() {
                                   <div><p className="text-[9px] uppercase tracking-wide text-[#93a0af]">Ask</p><p className="text-xs font-semibold text-[#35465d]">{deal.askingPrice ? `$${(Number(deal.askingPrice) / 1000000).toFixed(1)}M` : '—'}</p></div>
                                 </div>
                                 <div className="mt-2 flex items-center gap-2">
+                                  {pipelineDragSavingDealId === deal.id && (
+                                    <span className="shrink-0 text-[10px] font-medium text-[#4A90E2]" role="status">Saving…</span>
+                                  )}
                                   <label htmlFor={`classification-${deal.id}`} className="sr-only">Classification</label>
                                   <select
                                     id={`classification-${deal.id}`}
