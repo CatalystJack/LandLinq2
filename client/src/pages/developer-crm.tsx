@@ -30,6 +30,44 @@ type Contact = {
   createdAt: string | null;
 };
 
+type ContactAvatarPerson = {
+  label: string;
+  role: string;
+};
+
+const AVATAR_COLORS = ["#4A90E2", "#6B7FD7", "#3B9C8A", "#B7794B", "#8B6FB3"];
+
+function getInitials(label: string) {
+  const initials = label
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
+  return initials || "?";
+}
+
+function getContactAvatarPeople(contact: Contact): ContactAvatarPerson[] {
+  const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unknown contact";
+  const people: ContactAvatarPerson[] = [{ label: contactName, role: "Contact" }];
+
+  if (contact.assignedTo?.trim()) {
+    people.push({ label: contact.assignedTo.trim(), role: "Assigned relationship owner" });
+  }
+  if (contact.ownerDeveloperProfileId) {
+    people.push({ label: "You", role: "Company-owned relationship" });
+  }
+
+  const seen = new Set<string>();
+  return people.filter((person) => {
+    const key = person.label.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 const FIELDS = [
   { key: "firstName", label: "First Name", patterns: [/first.*name/, /^first$/] },
   { key: "lastName", label: "Last Name", patterns: [/last.*name/, /^last$/] },
@@ -224,7 +262,29 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                 <TableHeader><TableRow className="border-[#e3e9ee] bg-[#f8fafb] hover:bg-[#f8fafb]"><TableHead className="h-11 pl-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Name</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Email</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Phone</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Brokerage</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Region</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source</TableHead></TableRow></TableHeader>
                 <TableBody>{filteredContacts.map((contact) => (
                   <TableRow key={contact.id} className="border-[#e8edf1] transition-colors hover:bg-[#f4f8fa]">
-                    <TableCell className="pl-5"><div className="flex items-center gap-3"><div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>{(contact.firstName?.[0] || "").toUpperCase()}{(contact.lastName?.[0] || "").toUpperCase()}</div><span className="font-semibold text-[#21394c]">{[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unknown"}</span></div></TableCell>
+                    <TableCell className="pl-5">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="flex shrink-0 items-center -space-x-2"
+                          aria-label={getContactAvatarPeople(contact).map((person) => `${person.role}: ${person.label}`).join(", ")}
+                        >
+                          {getContactAvatarPeople(contact).map((person, index) => (
+                            <div
+                              key={`${person.label}-${person.role}`}
+                              className="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#fbfcfd] text-[10px] font-bold text-white shadow-sm"
+                              style={{
+                                backgroundColor: index === 0 ? `${secondaryColor}` : AVATAR_COLORS[(index - 1) % AVATAR_COLORS.length],
+                                zIndex: getContactAvatarPeople(contact).length - index,
+                              }}
+                              title={`${person.role}: ${person.label}`}
+                            >
+                              {getInitials(person.label)}
+                            </div>
+                          ))}
+                        </div>
+                        <span className="font-semibold text-[#21394c]">{[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unknown"}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm text-[#5f7382]">{contact.email || "—"}</TableCell>
                     <TableCell className="text-sm text-[#5f7382]">{contact.phone || "—"}</TableCell>
                     <TableCell className="max-w-[210px] text-sm text-[#5f7382]">

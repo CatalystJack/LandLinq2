@@ -4,7 +4,7 @@ import DeveloperNavigation from "@/components/developer-navigation";
 import Footer from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,8 +78,8 @@ export default function DeveloperPipeline() {
     queryFn: () => apiRequest("/api/developer-profile/me/pipeline/stages"),
   });
   const opportunitiesQuery = useQuery<{ opportunities: Opportunity[] }>({
-    queryKey: ["/api/developer-profile/me/pipeline/opportunities", stageFilter, sort],
-    queryFn: () => apiRequest(`/api/developer-profile/me/pipeline/opportunities?sort=${encodeURIComponent(sort)}${stageFilter !== "all" ? `&stageId=${encodeURIComponent(stageFilter)}` : ""}`),
+    queryKey: ["/api/developer-profile/me/pipeline/opportunities", sort],
+    queryFn: () => apiRequest(`/api/developer-profile/me/pipeline/opportunities?sort=${encodeURIComponent(sort)}`),
   });
   const contactsQuery = useQuery<{ contacts: Contact[] }>({
     queryKey: ["/api/developer-profile/me/contacts"],
@@ -88,7 +88,21 @@ export default function DeveloperPipeline() {
 
   const stages = stagesQuery.data?.stages || [];
   const activeStages = stages.filter((stage) => stage.isActive);
-  const opportunities = opportunitiesQuery.data?.opportunities || [];
+  const allOpportunities = opportunitiesQuery.data?.opportunities || [];
+  const opportunities = useMemo(
+    () => stageFilter === "all"
+      ? allOpportunities
+      : allOpportunities.filter((opportunity) => opportunity.stageId === stageFilter),
+    [allOpportunities, stageFilter],
+  );
+  const pipelineStats = useMemo(() => ({
+    totalCount: allOpportunities.length,
+    totalValue: allOpportunities.reduce((sum, opportunity) => {
+      const value = Number(opportunity.value);
+      return Number.isFinite(value) ? sum + value : sum;
+    }, 0),
+    wonCount: allOpportunities.filter((opportunity) => /(?:won|final)/i.test(opportunity.stageName || "")).length,
+  }), [allOpportunities]);
   const contacts = contactsQuery.data?.contacts || [];
   const filteredContacts = useMemo(() => {
     const search = contactSearch.trim().toLowerCase();
@@ -226,9 +240,22 @@ export default function DeveloperPipeline() {
         </div>
 
         <Card className="border-slate-200 shadow-sm">
-          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>{opportunities.length} {opportunities.length === 1 ? "opportunity" : "opportunities"}</CardTitle>
-            <div className="flex flex-wrap gap-2">
+          <CardHeader className="flex flex-col gap-5">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-2xl font-bold tracking-tight text-[#0A2B4A]">{pipelineStats.totalCount}</p>
+                <p className="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">Total opportunities</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-2xl font-bold tracking-tight text-[#0A2B4A]">{money(pipelineStats.totalValue.toString())}</p>
+                <p className="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">Total value</p>
+              </div>
+              <div className="col-span-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:col-span-1">
+                <p className="text-2xl font-bold tracking-tight text-[#0A2B4A]">{pipelineStats.wonCount}</p>
+                <p className="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">Final / won</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
               <Select value={stageFilter} onValueChange={setStageFilter}>
                 <SelectTrigger className="w-[180px]"><SelectValue placeholder="All stages" /></SelectTrigger>
                 <SelectContent><SelectItem value="all">All stages</SelectItem>{activeStages.map((stage) => <SelectItem key={stage.id} value={stage.id}>{stage.name}</SelectItem>)}</SelectContent>
