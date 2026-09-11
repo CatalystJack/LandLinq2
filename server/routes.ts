@@ -14590,31 +14590,44 @@ RULES:
         || String(req.user?.name || email.split('@')[0] || 'Investment Company Sender');
       if (!email) return res.status(400).json({ error: 'Your account does not have an email address' });
 
-      const existing = await db.execute(sql`
+      const ownedResult = await db.execute(sql`
         SELECT id, developer_profile_id
         FROM outreach_senders
-        WHERE LOWER(email) = ${email}
+        WHERE developer_profile_id = ${developerProfileId}
+          AND LOWER(email) = ${email}
+        ORDER BY created_at DESC
         LIMIT 1
       `);
-      const sender = existing.rows?.[0] as any;
-      if (sender && sender.developer_profile_id !== developerProfileId) {
+      const sender = ownedResult.rows?.[0] as any;
+      if (sender) {
+        const owned = await db.execute(sql`
+          SELECT id, name, email, outlook_connected as "outlookConnected", is_active as "isActive"
+          FROM outreach_senders
+          WHERE id = ${sender.id} AND developer_profile_id = ${developerProfileId}
+        `);
+        return res.json({ sender: owned.rows?.[0] });
+      }
+
+      const conflicting = await db.execute(sql`
+        SELECT id
+        FROM outreach_senders
+        WHERE developer_profile_id IS NOT NULL
+          AND developer_profile_id <> ${developerProfileId}
+          AND LOWER(email) = ${email}
+        LIMIT 1
+      `);
+      if (conflicting.rows?.[0]) {
         return res.status(409).json({ error: 'This email is already connected to another outreach sender' });
       }
-      if (!sender) {
-        const created = await db.execute(sql`
-          INSERT INTO outreach_senders
-            (developer_profile_id, name, email, role, delivery_method, sms_followup_enabled, is_active)
-          VALUES
-            (${developerProfileId}, ${name}, ${email}, 'developer', 'email', false, true)
-          RETURNING id, name, email, outlook_connected as "outlookConnected", is_active as "isActive"
-        `);
-        return res.status(201).json({ sender: created.rows?.[0] });
-      }
-      const owned = await db.execute(sql`
-        SELECT id, name, email, outlook_connected as "outlookConnected", is_active as "isActive"
-        FROM outreach_senders WHERE id = ${sender.id} AND developer_profile_id = ${developerProfileId}
+
+      const created = await db.execute(sql`
+        INSERT INTO outreach_senders
+          (developer_profile_id, name, email, role, delivery_method, sms_followup_enabled, is_active)
+        VALUES
+          (${developerProfileId}, ${name}, ${email}, 'developer', 'email', false, true)
+        RETURNING id, name, email, outlook_connected as "outlookConnected", is_active as "isActive"
       `);
-      return res.json({ sender: owned.rows?.[0] });
+      return res.status(201).json({ sender: created.rows?.[0] });
     } catch (error) {
       console.error('[developer outreach sender create] Error:', error);
       return res.status(500).json({ error: 'Failed to prepare email connection' });

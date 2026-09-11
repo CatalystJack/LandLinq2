@@ -2767,7 +2767,7 @@ export const outreachSenders = pgTable("outreach_senders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id),
   name: varchar("name").notNull(), // e.g., "AJ Klenk", "Brian Ford"
-  email: varchar("email").notNull().unique(), // aj@catalystcp.com, ford@catalystcp.com
+  email: varchar("email").notNull(), // aj@catalystcp.com, ford@catalystcp.com
   role: varchar("role").default("partner"), // partner, analyst, etc.
   // Microsoft Graph API OAuth tokens (encrypted at rest)
   outlookConnected: boolean("outlook_connected").default(false),
@@ -2805,6 +2805,7 @@ export const outreachSenders = pgTable("outreach_senders", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
+  unique("outreach_senders_profile_email_unique").on(table.developerProfileId, table.email),
   index("outreach_senders_email_idx").on(table.email),
   index("outreach_senders_active_idx").on(table.isActive),
 ]);

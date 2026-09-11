@@ -90,7 +90,7 @@ input, select, textarea {
   --card-foreground: hsl(210 25% 7.8431%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(210 25% 7.8431%);
-  --primary: hsl(210 100% 12%);
+  --primary: hsl(214 67% 9%);
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(210 24% 16%);
   --secondary-foreground: hsl(0 0% 100%);
@@ -112,17 +112,17 @@ input, select, textarea {
   
   /* Catalyst Brand Colors - Official */
   --catalyst-navy: #081729;
-  --catalyst-blue: #4A90E2;
-  --landlinq-sky: #55C3E9;
-  --landlinq-blue: #3286C8;
-  --catalyst-gold: #d4af37;
+  --catalyst-blue: #498EDE;
+  --landlinq-sky: #498EDE;
+  --landlinq-blue: #498EDE;
+  --catalyst-gold: #498EDE;
   --catalyst-white: #FDFFFF;
   
   /* AI/Tech Colors */
-  --ai-cyan: #00D4FF;
-  --ai-blue: #0070F3;
-  --ai-purple: #7C3AED;
-  --ai-teal: #14B8A6;
+  --ai-cyan: #498EDE;
+  --ai-blue: #498EDE;
+  --ai-purple: #498EDE;
+  --ai-teal: #498EDE;
   --ai-gradient: linear-gradient(135deg, var(--ai-cyan) 0%, var(--ai-blue) 50%, var(--ai-purple) 100%);
   --tech-gradient: linear-gradient(90deg, rgba(0,212,255,0.1) 0%, rgba(0,112,243,0.1) 50%, rgba(124,58,237,0.1) 100%);
   --catalyst-gray-50: hsl(210 20% 98%);
@@ -1687,12 +1687,6 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   .ll-command-track::after { animation: none; }
 }
 
-.ll-grid {
-  background-image: linear-gradient(hsl(var(--primary-foreground) / 0.08) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary-foreground) / 0.08) 1px, transparent 1px);
-  background-size: 52px 52px;
-  mask-image: linear-gradient(to bottom, black, transparent 75%);
-}
-
 .ll-reveal {
   animation: ll-fade-up 800ms cubic-bezier(.2,.7,.2,1) both;
 }
@@ -2422,16 +2416,6 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   position: relative;
   overflow: hidden;
   background: #f5f8fa;
-}
-.ll-journey::before {
-  position: absolute;
-  inset: 0;
-  content: "";
-  pointer-events: none;
-  opacity: .52;
-  background-image: radial-gradient(#b9cbd6 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: linear-gradient(to bottom, black, transparent 42%);
 }
 .ll-journey > div { position: relative; }
 .ll-journey-intro {

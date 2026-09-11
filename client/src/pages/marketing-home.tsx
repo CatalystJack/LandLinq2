@@ -222,10 +222,10 @@ export default function MarketingHome() {
 
       <main>
          <section className="relative bg-primary px-4 pb-12 pt-24 text-primary-foreground sm:px-8 sm:pb-24 sm:pt-32 lg:px-10">
-          <div className="ll-grid absolute inset-0 opacity-20" /><div className="relative mx-auto max-w-7xl">
+          <div className="relative mx-auto max-w-7xl">
              <div className="flex flex-col items-center gap-8 sm:gap-10 lg:gap-12">
               <div className="max-w-5xl text-center">
-                 <h1 className="ll-reveal text-balance text-[clamp(2.65rem,12vw,3.75rem)] font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[4.5rem]">Your supercharged<br /><span className="text-[#55C3E9]">acquisitions operating system.</span></h1>
+                 <h1 className="ll-reveal text-balance text-[clamp(2.65rem,12vw,3.75rem)] font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[4.5rem]">Your supercharged<br /><span className="text-[#498EDE]">acquisitions operating system.</span></h1>
                  <p className="ll-reveal ll-delay-2 mx-auto mt-5 max-w-lg text-base leading-6 text-white/68 sm:mt-6 sm:text-lg sm:leading-7">LandLinq opens the lead funnel wide, screens opportunities against your criteria, and keeps outreach moving, so lean teams can do more with less.</p>
                  <div className="ll-reveal ll-delay-3 mt-6 flex w-full max-w-xs flex-col justify-center gap-3 sm:mt-7 sm:max-w-none sm:flex-row"><Button>Get in touch</Button><Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/30 px-5 text-sm font-semibold hover:border-white">Log In</Link></div>
               </div>

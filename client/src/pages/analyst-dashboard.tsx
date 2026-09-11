@@ -6569,12 +6569,14 @@ export default function AnalystDashboard() {
                       return (
                         <div
                           key={group.label}
-                          onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setPipelineDragOverColumn(group.classification); }}
-                          onDragEnter={e => { e.preventDefault(); setPipelineDragOverColumn(group.classification); }}
+                          onDragOverCapture={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setPipelineDragOverColumn(group.classification); }}
+                          onDragEnterCapture={e => { e.preventDefault(); setPipelineDragOverColumn(group.classification); }}
                           onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setPipelineDragOverColumn(null); }}
-                          onDrop={e => {
+                          onDropCapture={e => {
                             e.preventDefault();
-                            const deal = pipelineDeals.find(d => d.id === (e.dataTransfer.getData('text/plain') || pipelineDragDealId));
+                            e.stopPropagation();
+                            const draggedId = e.dataTransfer.getData('text/plain') || pipelineDragDealId;
+                            const deal = pipelineDeals.find(d => d.id === draggedId);
                             if (deal) classifyDeal(deal, group.classification);
                             setPipelineDragDealId(null);
                             setPipelineDragOverColumn(null);
@@ -6605,6 +6607,7 @@ export default function AnalystDashboard() {
                                 key={deal.id}
                                 draggable
                                 onDragStart={e => {
+                                   e.stopPropagation();
                                   e.dataTransfer.setData('text/plain', deal.id);
                                   e.dataTransfer.effectAllowed = 'move';
                                   setPipelineDragDealId(deal.id);

@@ -332,6 +332,19 @@ setTimeout(() => {
         );
         CREATE INDEX IF NOT EXISTS developer_outreach_ai_conversations_campaign_idx
           ON developer_outreach_ai_conversations(campaign_id);
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE conrelid = 'outreach_senders'::regclass
+              AND conname = 'outreach_senders_email_key'
+          ) THEN
+            ALTER TABLE outreach_senders DROP CONSTRAINT outreach_senders_email_key;
+          END IF;
+        END $$;
+        CREATE UNIQUE INDEX IF NOT EXISTS outreach_senders_profile_email_lower_unique
+          ON outreach_senders (developer_profile_id, LOWER(email));
       `);
       log("✅ Email intake reliability schema ready");
     

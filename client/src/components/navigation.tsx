@@ -22,6 +22,8 @@ interface NavigationProps {
 
 function PublicNavigation({ hideSubmitDeal = false }: Pick<NavigationProps, "hideSubmitDeal">) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [location] = useLocation();
+  const isCompanyPage = location === "/company";
 
   return (
     <nav className="sticky top-0 z-50 border-b border-white/10 bg-primary shadow-sm" aria-label="Public navigation">
@@ -33,8 +35,16 @@ function PublicNavigation({ hideSubmitDeal = false }: Pick<NavigationProps, "hid
 
           <div className="hidden items-center gap-7 md:flex">
             <a href="/#platform" className="text-sm text-white/65 transition-colors hover:text-white">Platform</a>
-            <a href="/#company" className="text-sm text-white/65 transition-colors hover:text-white">Company</a>
-            <Link href="/contact" className="text-sm text-white/65 transition-colors hover:text-white">Contact</Link>
+            <Link
+              href="/company"
+              className={`text-sm transition-colors hover:text-white ${isCompanyPage ? "font-semibold text-white" : "text-white/65"}`}
+              aria-current={isCompanyPage ? "page" : undefined}
+            >
+              Company
+            </Link>
+            {!hideSubmitDeal && (
+              <Link href="/contact" className="text-sm text-white/65 transition-colors hover:text-white">Contact</Link>
+            )}
             <Link href="/login" className="rounded-full border border-white/35 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-landlinq-sky hover:bg-white hover:text-landlinq-blue">
               Log in
             </Link>
@@ -60,8 +70,17 @@ function PublicNavigation({ hideSubmitDeal = false }: Pick<NavigationProps, "hid
           <div className="border-t border-white/10 py-3 md:hidden">
             <div className="flex flex-col gap-1 pb-2">
               <a href="/#platform" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/75 hover:bg-white/10 hover:text-white">Platform</a>
-              <a href="/#company" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/75 hover:bg-white/10 hover:text-white">Company</a>
-              <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/75 hover:bg-white/10 hover:text-white">Contact</Link>
+              <Link
+                href="/company"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`rounded-lg px-3 py-3 text-sm hover:bg-white/10 hover:text-white ${isCompanyPage ? "font-semibold text-white" : "text-white/75"}`}
+                aria-current={isCompanyPage ? "page" : undefined}
+              >
+                Company
+              </Link>
+              {!hideSubmitDeal && (
+                <Link href="/contact" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg px-3 py-3 text-sm text-white/75 hover:bg-white/10 hover:text-white">Contact</Link>
+              )}
               <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="mt-2 rounded-lg border border-white/25 px-3 py-3 text-center text-sm font-semibold text-white hover:bg-white hover:text-primary">Log in</Link>
               {!hideSubmitDeal && (
                 <Link href="/submit-deal" onClick={() => setIsMobileMenuOpen(false)} className="rounded-lg bg-landlinq-sky px-3 py-3 text-center text-sm font-semibold text-primary hover:bg-white">Submit a deal</Link>
