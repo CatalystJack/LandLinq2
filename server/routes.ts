@@ -35,10 +35,16 @@ import {
   offMarketImports,
   pipelineStages,
   pipelineOpportunities,
+  salesPipelineStages,
+  salesProspects,
+  salesProspectActivities,
+  salesProspectDocuments,
+  salesPipelineEmailTemplates,
+  salesProspectEmails,
   emailIntakeQueue,
   propertyData,
 } from "@shared/schema";
-import { or, like, ilike, eq, ne, desc, gte, lte, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
+import { or, like, ilike, eq, ne, desc, asc, gte, lte, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
 import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
@@ -12347,6 +12353,364 @@ RULES:
     } catch (error: any) {
       console.error("[admin master pipeline GET] Error:", error);
       return res.status(500).json({ error: "Failed to load the master pipeline" });
+    }
+  });
+
+  const salesTemplateValue = (value: unknown) => String(value ?? "")
+    .replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[character] || character));
+
+  const renderSalesTemplate = (template: string, prospect: any) => template
+    .replace(/\{\{\s*companyName\s*\}\}/gi, prospect.companyName || "")
+    .replace(/\{\{\s*contactName\s*\}\}/gi, prospect.contactName || "")
+    .replace(/\{\{\s*website\s*\}\}/gi, prospect.website || "")
+    .replace(/\{\{\s*nextFollowUp\s*\}\}/gi, prospect.nextFollowUpAt ? new Date(prospect.nextFollowUpAt).toLocaleDateString("en-US") : "");
+
+  app.get("/api/admin/sales-pipeline", isAuthenticated, requirePlatformAdmin, async (_req: any, res) => {
+    try {
+      const [stages, prospects, templates, owners] = await Promise.all([
+        db.select().from(salesPipelineStages).orderBy(asc(salesPipelineStages.sortOrder)),
+        db.select({
+          id: salesProspects.id,
+          companyName: salesProspects.companyName,
+          website: salesProspects.website,
+          industry: salesProspects.industry,
+          contactName: salesProspects.contactName,
+          contactEmail: salesProspects.contactEmail,
+          contactPhone: salesProspects.contactPhone,
+          stageId: salesProspects.stageId,
+          estimatedValue: salesProspects.estimatedValue,
+          nextFollowUpAt: salesProspects.nextFollowUpAt,
+          lastContactedAt: salesProspects.lastContactedAt,
+          notes: salesProspects.notes,
+          createdAt: salesProspects.createdAt,
+          updatedAt: salesProspects.updatedAt,
+          stageName: salesPipelineStages.name,
+          ownerId: salesProspects.ownerId,
+          ownerFirstName: users.firstName,
+          ownerLastName: users.lastName,
+        })
+          .from(salesProspects)
+          .leftJoin(salesPipelineStages, eq(salesPipelineStages.id, salesProspects.stageId))
+          .leftJoin(users, eq(users.id, salesProspects.ownerId))
+          .orderBy(desc(salesProspects.updatedAt)),
+        db.select().from(salesPipelineEmailTemplates).where(eq(salesPipelineEmailTemplates.isActive, true)).orderBy(asc(salesPipelineEmailTemplates.name)),
+        db.select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        }).from(users).where(and(
+          isNull(users.developerProfileId),
+          inArray(users.role, ["ADMIN", "SUPER_ADMIN", "ANALYST", "admin", "super_admin", "analyst"]),
+        )).orderBy(asc(users.firstName), asc(users.lastName)),
+      ]);
+      const value = (prospects as any[]).reduce((sum, prospect) => sum + (Number(prospect.estimatedValue) || 0), 0);
+      return res.json({
+        stages,
+        prospects,
+        templates,
+        owners,
+        stats: {
+          total: prospects.length,
+          open: (prospects as any[]).filter((prospect) => !/closed (won|lost)/i.test(prospect.stageName || "")).length,
+          followUpsDue: (prospects as any[]).filter((prospect) => prospect.nextFollowUpAt && new Date(prospect.nextFollowUpAt).getTime() <= Date.now()).length,
+          estimatedValue: value,
+        },
+      });
+    } catch (error: any) {
+      console.error("[admin sales pipeline GET] Error:", error);
+      return res.status(500).json({ error: "Failed to load the sales pipeline" });
+    }
+  });
+
+  app.post("/api/admin/sales-pipeline/stages", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const name = String(req.body?.name || "").trim();
+      if (!name) return res.status(400).json({ error: "Stage name is required" });
+      const [lastStage] = await db.select({ sortOrder: salesPipelineStages.sortOrder }).from(salesPipelineStages).orderBy(desc(salesPipelineStages.sortOrder)).limit(1);
+      const [stage] = await db.insert(salesPipelineStages).values({
+        name,
+        sortOrder: Number(lastStage?.sortOrder || 0) + 1,
+      }).returning();
+      return res.status(201).json({ stage });
+    } catch (error: any) {
+      console.error("[admin sales pipeline stage POST] Error:", error);
+      return res.status(500).json({ error: "Failed to create sales stage" });
+    }
+  });
+
+  app.patch("/api/admin/sales-pipeline/stages/:id", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      if (req.body?.name !== undefined) updates.name = String(req.body.name || "").trim();
+      if (req.body?.isActive !== undefined) updates.isActive = Boolean(req.body.isActive);
+      const [stage] = await db.update(salesPipelineStages).set(updates).where(eq(salesPipelineStages.id, req.params.id)).returning();
+      if (!stage) return res.status(404).json({ error: "Sales stage not found" });
+      return res.json({ stage });
+    } catch (error: any) {
+      console.error("[admin sales pipeline stage PATCH] Error:", error);
+      return res.status(500).json({ error: "Failed to update sales stage" });
+    }
+  });
+
+  app.get("/api/admin/sales-pipeline/prospects/:id", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const [prospect] = await db.select({
+        id: salesProspects.id,
+        companyName: salesProspects.companyName,
+        website: salesProspects.website,
+        industry: salesProspects.industry,
+        contactName: salesProspects.contactName,
+        contactEmail: salesProspects.contactEmail,
+        contactPhone: salesProspects.contactPhone,
+        stageId: salesProspects.stageId,
+        estimatedValue: salesProspects.estimatedValue,
+        nextFollowUpAt: salesProspects.nextFollowUpAt,
+        lastContactedAt: salesProspects.lastContactedAt,
+        notes: salesProspects.notes,
+        createdAt: salesProspects.createdAt,
+        updatedAt: salesProspects.updatedAt,
+        stageName: salesPipelineStages.name,
+      }).from(salesProspects)
+        .leftJoin(salesPipelineStages, eq(salesPipelineStages.id, salesProspects.stageId))
+        .where(eq(salesProspects.id, req.params.id)).limit(1);
+      if (!prospect) return res.status(404).json({ error: "Sales prospect not found" });
+      const [activities, documents, emails] = await Promise.all([
+        db.select().from(salesProspectActivities).where(eq(salesProspectActivities.prospectId, prospect.id)).orderBy(desc(salesProspectActivities.createdAt)),
+        db.select().from(salesProspectDocuments).where(eq(salesProspectDocuments.prospectId, prospect.id)).orderBy(desc(salesProspectDocuments.updatedAt)),
+        db.select().from(salesProspectEmails).where(eq(salesProspectEmails.prospectId, prospect.id)).orderBy(desc(salesProspectEmails.sentAt)),
+      ]);
+      return res.json({ prospect, activities, documents, emails });
+    } catch (error: any) {
+      console.error("[admin sales pipeline prospect GET] Error:", error);
+      return res.status(500).json({ error: "Failed to load the sales prospect" });
+    }
+  });
+
+  app.post("/api/admin/sales-pipeline/prospects", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const body = req.body || {};
+      const companyName = String(body.companyName || "").trim();
+      if (!companyName) return res.status(400).json({ error: "Company name is required" });
+      let stageId = String(body.stageId || "").trim();
+      if (!stageId) {
+        const [firstStage] = await db.select({ id: salesPipelineStages.id }).from(salesPipelineStages).where(eq(salesPipelineStages.isActive, true)).orderBy(asc(salesPipelineStages.sortOrder)).limit(1);
+        stageId = firstStage?.id || "";
+      }
+      if (!stageId) return res.status(400).json({ error: "Create an active sales stage first" });
+      const [stage] = await db.select({ id: salesPipelineStages.id }).from(salesPipelineStages).where(and(eq(salesPipelineStages.id, stageId), eq(salesPipelineStages.isActive, true))).limit(1);
+      if (!stage) return res.status(400).json({ error: "Active sales stage not found" });
+      const userId = String(req.user?.id || "");
+      const [prospect] = await db.insert(salesProspects).values({
+        companyName,
+        website: String(body.website || "").trim() || null,
+        industry: String(body.industry || "").trim() || null,
+        contactName: String(body.contactName || "").trim() || null,
+        contactEmail: String(body.contactEmail || "").trim().toLowerCase() || null,
+        contactPhone: String(body.contactPhone || "").trim() || null,
+        stageId,
+        ownerId: String(body.ownerId || "").trim() || null,
+        estimatedValue: body.estimatedValue === "" || body.estimatedValue === null || body.estimatedValue === undefined ? null : String(body.estimatedValue),
+        nextFollowUpAt: body.nextFollowUpAt ? new Date(body.nextFollowUpAt) : null,
+        notes: String(body.notes || "").trim() || null,
+        createdBy: userId || null,
+      }).returning();
+      await db.insert(salesProspectActivities).values({
+        prospectId: prospect.id,
+        type: "note",
+        subject: "Prospect added",
+        body: "Prospect added to the internal sales pipeline.",
+        createdBy: userId || null,
+      });
+      return res.status(201).json({ prospect });
+    } catch (error: any) {
+      console.error("[admin sales pipeline prospect POST] Error:", error);
+      return res.status(500).json({ error: "Failed to create the sales prospect" });
+    }
+  });
+
+  app.patch("/api/admin/sales-pipeline/prospects/:id", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const current = await db.select().from(salesProspects).where(eq(salesProspects.id, req.params.id)).limit(1);
+      if (!current.length) return res.status(404).json({ error: "Sales prospect not found" });
+      const body = req.body || {};
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      for (const key of ["companyName", "website", "industry", "contactName", "contactPhone", "notes", "ownerId"]) {
+        if (key in body) updates[key] = String(body[key] || "").trim() || null;
+      }
+      if ("contactEmail" in body) updates.contactEmail = String(body.contactEmail || "").trim().toLowerCase() || null;
+      if ("estimatedValue" in body) updates.estimatedValue = body.estimatedValue === "" || body.estimatedValue === null ? null : String(body.estimatedValue);
+      if ("nextFollowUpAt" in body) updates.nextFollowUpAt = body.nextFollowUpAt ? new Date(body.nextFollowUpAt) : null;
+      if (body.stageId) {
+        const [stage] = await db.select({ id: salesPipelineStages.id, name: salesPipelineStages.name }).from(salesPipelineStages).where(eq(salesPipelineStages.id, String(body.stageId))).limit(1);
+        if (!stage) return res.status(400).json({ error: "Sales stage not found" });
+        updates.stageId = stage.id;
+        if (stage.id !== current[0].stageId) {
+          await db.insert(salesProspectActivities).values({
+            prospectId: req.params.id,
+            type: "stage_change",
+            subject: "Stage changed",
+            body: `Moved to ${stage.name}.`,
+            createdBy: String(req.user?.id || "") || null,
+          });
+        }
+      }
+      const [prospect] = await db.update(salesProspects).set(updates).where(eq(salesProspects.id, req.params.id)).returning();
+      return res.json({ prospect });
+    } catch (error: any) {
+      console.error("[admin sales pipeline prospect PATCH] Error:", error);
+      return res.status(500).json({ error: "Failed to update the sales prospect" });
+    }
+  });
+
+  app.post("/api/admin/sales-pipeline/prospects/:id/activities", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const [prospect] = await db.select({ id: salesProspects.id }).from(salesProspects).where(eq(salesProspects.id, req.params.id)).limit(1);
+      if (!prospect) return res.status(404).json({ error: "Sales prospect not found" });
+      const type = String(req.body?.type || "note").trim();
+      const [activity] = await db.insert(salesProspectActivities).values({
+        prospectId: prospect.id,
+        type,
+        subject: String(req.body?.subject || "").trim() || null,
+        body: String(req.body?.body || "").trim() || null,
+        metadata: req.body?.metadata || null,
+        createdBy: String(req.user?.id || "") || null,
+      }).returning();
+      await db.update(salesProspects).set({
+        updatedAt: new Date(),
+        ...(type === "call" || type === "meeting" || type === "email" ? { lastContactedAt: new Date() } : {}),
+      }).where(eq(salesProspects.id, prospect.id));
+      return res.status(201).json({ activity });
+    } catch (error: any) {
+      console.error("[admin sales pipeline activity POST] Error:", error);
+      return res.status(500).json({ error: "Failed to add activity" });
+    }
+  });
+
+  app.post("/api/admin/sales-pipeline/prospects/:id/documents", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const [prospect] = await db.select({ id: salesProspects.id }).from(salesProspects).where(eq(salesProspects.id, req.params.id)).limit(1);
+      if (!prospect) return res.status(404).json({ error: "Sales prospect not found" });
+      const name = String(req.body?.name || "").trim();
+      if (!name) return res.status(400).json({ error: "Document name is required" });
+      const [document] = await db.insert(salesProspectDocuments).values({
+        prospectId: prospect.id,
+        name,
+        documentType: String(req.body?.documentType || "agreement").trim(),
+        url: String(req.body?.url || "").trim() || null,
+        status: "draft",
+        createdBy: String(req.user?.id || "") || null,
+      }).returning();
+      await db.insert(salesProspectActivities).values({
+        prospectId: prospect.id,
+        type: "document",
+        subject: "Document added",
+        body: `${name} was added for tracking.`,
+        metadata: { documentId: document.id },
+        createdBy: String(req.user?.id || "") || null,
+      });
+      return res.status(201).json({ document });
+    } catch (error: any) {
+      console.error("[admin sales pipeline document POST] Error:", error);
+      return res.status(500).json({ error: "Failed to add document" });
+    }
+  });
+
+  app.patch("/api/admin/sales-pipeline/documents/:id", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const status = String(req.body?.status || "").trim();
+      if (!["draft", "sent", "viewed", "signed", "declined"].includes(status)) return res.status(400).json({ error: "Invalid document status" });
+      const [document] = await db.update(salesProspectDocuments).set({
+        status,
+        url: req.body?.url === undefined ? undefined : String(req.body.url || "").trim() || null,
+        sentAt: status === "sent" ? new Date() : undefined,
+        signedAt: status === "signed" ? new Date() : undefined,
+        updatedAt: new Date(),
+      }).where(eq(salesProspectDocuments.id, req.params.id)).returning();
+      if (!document) return res.status(404).json({ error: "Document not found" });
+      await db.insert(salesProspectActivities).values({
+        prospectId: document.prospectId,
+        type: "document",
+        subject: "Document status updated",
+        body: `${document.name} marked ${status}.`,
+        metadata: { documentId: document.id, status },
+        createdBy: String(req.user?.id || "") || null,
+      });
+      return res.json({ document });
+    } catch (error: any) {
+      console.error("[admin sales pipeline document PATCH] Error:", error);
+      return res.status(500).json({ error: "Failed to update document" });
+    }
+  });
+
+  app.post("/api/admin/sales-pipeline/templates", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const name = String(req.body?.name || "").trim();
+      const subject = String(req.body?.subject || "").trim();
+      const body = String(req.body?.body || "").trim();
+      if (!name || !subject || !body) return res.status(400).json({ error: "Template name, subject, and body are required" });
+      const [template] = await db.insert(salesPipelineEmailTemplates).values({
+        name, subject, body, createdBy: String(req.user?.id || "") || null,
+      }).returning();
+      return res.status(201).json({ template });
+    } catch (error: any) {
+      console.error("[admin sales pipeline template POST] Error:", error);
+      return res.status(500).json({ error: "Failed to create email template" });
+    }
+  });
+
+  app.post("/api/admin/sales-pipeline/prospects/:id/send-email", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const [prospect] = await db.select().from(salesProspects).where(eq(salesProspects.id, req.params.id)).limit(1);
+      if (!prospect) return res.status(404).json({ error: "Sales prospect not found" });
+      const [template] = await db.select().from(salesPipelineEmailTemplates).where(and(eq(salesPipelineEmailTemplates.id, String(req.body?.templateId || "")), eq(salesPipelineEmailTemplates.isActive, true))).limit(1);
+      if (!template) return res.status(404).json({ error: "Email template not found" });
+      const toEmail = String(prospect.contactEmail || "").trim().toLowerCase();
+      if (!toEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) return res.status(400).json({ error: "Add a valid contact email before sending" });
+      const subject = renderSalesTemplate(template.subject, prospect);
+      const body = renderSalesTemplate(template.body, prospect);
+      const html = renderBrandedEmail({
+        title: salesTemplateValue(subject),
+        preheader: salesTemplateValue(subject),
+        bodyHtml: `<div style="white-space:pre-wrap;font-size:15px;line-height:24px;color:#334E68;">${salesTemplateValue(body)}</div>`,
+      });
+      const sent = await sendNotificationEmail({
+        to: toEmail,
+        subject,
+        text: body,
+        html,
+        type: "sales-pipeline-follow-up",
+        priority: "normal",
+      });
+      if (!sent) return res.status(502).json({ error: "The email service did not accept the message" });
+      const userId = String(req.user?.id || "") || null;
+      const [email] = await db.insert(salesProspectEmails).values({
+        prospectId: prospect.id,
+        templateId: template.id,
+        toEmail,
+        subject,
+        body,
+        sentBy: userId,
+      }).returning();
+      await db.insert(salesProspectActivities).values({
+        prospectId: prospect.id,
+        type: "email",
+        subject,
+        body: `Sent to ${toEmail} using ${template.name}.`,
+        metadata: { emailId: email.id, templateId: template.id },
+        createdBy: userId,
+      });
+      await db.update(salesProspects).set({ lastContactedAt: new Date(), updatedAt: new Date() }).where(eq(salesProspects.id, prospect.id));
+      return res.json({ email });
+    } catch (error: any) {
+      console.error("[admin sales pipeline send email] Error:", error);
+      return res.status(500).json({ error: "Failed to send sales follow-up email" });
     }
   });
 

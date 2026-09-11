@@ -384,6 +384,122 @@ export const initialMigrations: Migration[] = [
       await db.execute(sql`ALTER TABLE communications DROP COLUMN IF EXISTS is_archived`);
       await db.execute(sql`ALTER TABLE communications DROP COLUMN IF EXISTS archived_at`);
     }
+  },
+
+  {
+    id: '2026-09-11_003_add_internal_sales_pipeline',
+    name: 'Add internal sales pipeline',
+    async up(db) {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS sales_pipeline_stages (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name VARCHAR NOT NULL,
+          sort_order INTEGER NOT NULL,
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS sales_prospects (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          company_name VARCHAR NOT NULL,
+          website VARCHAR,
+          industry VARCHAR,
+          contact_name VARCHAR,
+          contact_email VARCHAR,
+          contact_phone VARCHAR,
+          stage_id VARCHAR NOT NULL REFERENCES sales_pipeline_stages(id),
+          owner_id VARCHAR REFERENCES users(id),
+          estimated_value NUMERIC,
+          next_follow_up_at TIMESTAMP,
+          last_contacted_at TIMESTAMP,
+          notes TEXT,
+          created_by VARCHAR REFERENCES users(id),
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS sales_prospect_activities (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          prospect_id VARCHAR NOT NULL REFERENCES sales_prospects(id) ON DELETE CASCADE,
+          type VARCHAR NOT NULL,
+          subject VARCHAR,
+          body TEXT,
+          metadata JSONB,
+          created_by VARCHAR REFERENCES users(id),
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS sales_prospect_documents (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          prospect_id VARCHAR NOT NULL REFERENCES sales_prospects(id) ON DELETE CASCADE,
+          name VARCHAR NOT NULL,
+          document_type VARCHAR DEFAULT 'agreement',
+          status VARCHAR NOT NULL DEFAULT 'draft',
+          url TEXT,
+          sent_at TIMESTAMP,
+          signed_at TIMESTAMP,
+          created_by VARCHAR REFERENCES users(id),
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS sales_pipeline_email_templates (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          name VARCHAR NOT NULL,
+          subject VARCHAR NOT NULL,
+          body TEXT NOT NULL,
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_by VARCHAR REFERENCES users(id),
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS sales_prospect_emails (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          prospect_id VARCHAR NOT NULL REFERENCES sales_prospects(id) ON DELETE CASCADE,
+          template_id VARCHAR REFERENCES sales_pipeline_email_templates(id),
+          to_email VARCHAR NOT NULL,
+          subject VARCHAR NOT NULL,
+          body TEXT NOT NULL,
+          status VARCHAR NOT NULL DEFAULT 'sent',
+          sent_by VARCHAR REFERENCES users(id),
+          sent_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS sales_prospects_stage_idx ON sales_prospects(stage_id)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS sales_prospects_follow_up_idx ON sales_prospects(next_follow_up_at)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS sales_activities_prospect_idx ON sales_prospect_activities(prospect_id, created_at)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS sales_documents_prospect_idx ON sales_prospect_documents(prospect_id)`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS sales_emails_prospect_idx ON sales_prospect_emails(prospect_id, sent_at)`);
+      await db.execute(sql`
+        INSERT INTO sales_pipeline_stages (name, sort_order)
+        SELECT stage.name, stage.sort_order
+        FROM (VALUES
+          ('New Lead', 1),
+          ('Discovery', 2),
+          ('Demo / Evaluation', 3),
+          ('Proposal', 4),
+          ('Negotiation', 5),
+          ('Closed Won', 6),
+          ('Closed Lost', 7)
+        ) AS stage(name, sort_order)
+        WHERE NOT EXISTS (SELECT 1 FROM sales_pipeline_stages)
+      `);
+    },
+    async down(db) {
+      await db.execute(sql`DROP TABLE IF EXISTS sales_prospect_emails`);
+      await db.execute(sql`DROP TABLE IF EXISTS sales_pipeline_email_templates`);
+      await db.execute(sql`DROP TABLE IF EXISTS sales_prospect_documents`);
+      await db.execute(sql`DROP TABLE IF EXISTS sales_prospect_activities`);
+      await db.execute(sql`DROP TABLE IF EXISTS sales_prospects`);
+      await db.execute(sql`DROP TABLE IF EXISTS sales_pipeline_stages`);
+    }
   }
 ];
 

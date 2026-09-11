@@ -1,0 +1,45 @@
+Build a conversational AI writing assistant to help Investment Companies draft 
+and refine their outreach/drip campaign emails, integrated directly into the 
+campaign step editor in client/src/pages/developer-outreach.tsx (find the exact 
+email body editor component for a campaign step — likely a Textarea or rich-text 
+editor where campaign email content is composed — and add this assistant 
+alongside it).
+
+TASK 1 — Personalized context for the AI
+When generating or refining email copy, give the AI access to this specific 
+company's own data: their company name and branding, their acquisition criteria 
+(target counties/states, rent thresholds, product types), and optionally which 
+contact tag this campaign is targeting (e.g. "broker" vs "architect" — tone 
+should differ appropriately). Fetch this the same way other developer-scoped 
+data is fetched elsewhere (via getDeveloperProfileId), so the AI always writes in 
+context of the correct company, never generic or mixed up with another company's 
+data.
+
+TASK 2 — Conversational chat interface
+Add a chat panel next to (or toggleable alongside) the email body editor — not a 
+one-shot generate button, but a real back-and-forth conversation. Support 
+requests like: "write an email introducing us to brokers in our target 
+counties," "make it shorter," "make it more formal," "add a line about our rent 
+threshold." Each response updates a live draft the user can review.
+
+TASK 3 — Explicit "Insert" action, never silent overwrite
+The AI's draft should NOT automatically overwrite whatever's currently in the 
+email body editor. Show the AI's suggested draft clearly in the chat panel with 
+an explicit "Insert into email" or "Replace draft" button — the user decides 
+when to actually apply it, protecting any manual edits they may have already 
+made.
+
+TASK 4 — Reuse existing AI infrastructure
+Use the same AI provider/model already integrated for email parsing 
+(aiEmailParser.ts) rather than adding a new AI vendor relationship.
+
+TASK 5 — Keep conversation history per campaign step
+Persist the chat conversation for a given campaign step (at least for the current 
+editing session, ideally saved so they can return to refine it later) so context 
+isn't lost if they navigate away and come back.
+
+Verify: confirm a test company can ask for a draft referencing their own real 
+target counties and rent threshold, confirm iterative refinement requests 
+("make it shorter") work correctly on the existing draft rather than starting 
+over, and confirm nothing is inserted into the actual email until the user 
+explicitly clicks to apply it.

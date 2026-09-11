@@ -280,6 +280,105 @@ export const insertPipelineOpportunitySchema = createInsertSchema(pipelineOpport
 export type PipelineOpportunity = typeof pipelineOpportunities.$inferSelect;
 export type InsertPipelineOpportunity = z.infer<typeof insertPipelineOpportunitySchema>;
 
+// Internal LandLinq sales pipeline. This is intentionally separate from the
+// tenant-scoped Investment Company opportunity pipeline above.
+export const salesPipelineStages = pgTable("sales_pipeline_stages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const salesProspects = pgTable("sales_prospects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: varchar("company_name").notNull(),
+  website: varchar("website"),
+  industry: varchar("industry"),
+  contactName: varchar("contact_name"),
+  contactEmail: varchar("contact_email"),
+  contactPhone: varchar("contact_phone"),
+  stageId: varchar("stage_id").references(() => salesPipelineStages.id).notNull(),
+  ownerId: varchar("owner_id").references(() => users.id),
+  estimatedValue: decimal("estimated_value"),
+  nextFollowUpAt: timestamp("next_follow_up_at"),
+  lastContactedAt: timestamp("last_contacted_at"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("sales_prospects_stage_idx").on(table.stageId),
+  index("sales_prospects_owner_idx").on(table.ownerId),
+  index("sales_prospects_follow_up_idx").on(table.nextFollowUpAt),
+]);
+
+export const salesProspectActivities = pgTable("sales_prospect_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  prospectId: varchar("prospect_id").references(() => salesProspects.id, { onDelete: "cascade" }).notNull(),
+  type: varchar("type").notNull(), // note, call, meeting, email, stage_change, document
+  subject: varchar("subject"),
+  body: text("body"),
+  metadata: jsonb("metadata"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("sales_activities_prospect_idx").on(table.prospectId, table.createdAt),
+]);
+
+export const salesProspectDocuments = pgTable("sales_prospect_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  prospectId: varchar("prospect_id").references(() => salesProspects.id, { onDelete: "cascade" }).notNull(),
+  name: varchar("name").notNull(),
+  documentType: varchar("document_type").default("agreement"),
+  status: varchar("status").default("draft").notNull(), // draft, sent, viewed, signed, declined
+  url: text("url"),
+  sentAt: timestamp("sent_at"),
+  signedAt: timestamp("signed_at"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("sales_documents_prospect_idx").on(table.prospectId),
+]);
+
+export const salesPipelineEmailTemplates = pgTable("sales_pipeline_email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  subject: varchar("subject").notNull(),
+  body: text("body").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const salesProspectEmails = pgTable("sales_prospect_emails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  prospectId: varchar("prospect_id").references(() => salesProspects.id, { onDelete: "cascade" }).notNull(),
+  templateId: varchar("template_id").references(() => salesPipelineEmailTemplates.id),
+  toEmail: varchar("to_email").notNull(),
+  subject: varchar("subject").notNull(),
+  body: text("body").notNull(),
+  status: varchar("status").default("sent").notNull(),
+  sentBy: varchar("sent_by").references(() => users.id),
+  sentAt: timestamp("sent_at").defaultNow(),
+}, (table) => [
+  index("sales_emails_prospect_idx").on(table.prospectId, table.sentAt),
+]);
+
+export const insertSalesPipelineStageSchema = createInsertSchema(salesPipelineStages).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type SalesPipelineStage = typeof salesPipelineStages.$inferSelect;
+export type InsertSalesPipelineStage = z.infer<typeof insertSalesPipelineStageSchema>;
+export type SalesProspect = typeof salesProspects.$inferSelect;
+export type SalesProspectActivity = typeof salesProspectActivities.$inferSelect;
+export type SalesProspectDocument = typeof salesProspectDocuments.$inferSelect;
+export type SalesPipelineEmailTemplate = typeof salesPipelineEmailTemplates.$inferSelect;
+export type SalesProspectEmail = typeof salesProspectEmails.$inferSelect;
+
 // Deal status values: pending_review, pending_info, under_review, approved, rejected,
 // clear_no, potentially, high_priority, initial_review, due_diligence, financial_analysis,
 // final_review, contract_negotiation, closing, completed
