@@ -317,6 +317,21 @@ setTimeout(() => {
         );
         ALTER TABLE email_intake_volume_alert_state
           ADD COLUMN IF NOT EXISTS alert_spike_id varchar;
+        CREATE TABLE IF NOT EXISTS developer_outreach_ai_conversations (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          developer_profile_id VARCHAR NOT NULL REFERENCES developer_profiles(id) ON DELETE CASCADE,
+          campaign_id VARCHAR NOT NULL REFERENCES outreach_campaigns(id) ON DELETE CASCADE,
+          step_key VARCHAR NOT NULL DEFAULT '0',
+          messages JSONB NOT NULL DEFAULT '[]'::jsonb,
+          suggested_subject TEXT,
+          suggested_content TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW(),
+          CONSTRAINT developer_outreach_ai_conversations_scope_unique
+            UNIQUE (developer_profile_id, campaign_id, step_key)
+        );
+        CREATE INDEX IF NOT EXISTS developer_outreach_ai_conversations_campaign_idx
+          ON developer_outreach_ai_conversations(campaign_id);
       `);
       log("✅ Email intake reliability schema ready");
     

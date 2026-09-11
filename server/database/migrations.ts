@@ -500,6 +500,34 @@ export const initialMigrations: Migration[] = [
       await db.execute(sql`DROP TABLE IF EXISTS sales_prospects`);
       await db.execute(sql`DROP TABLE IF EXISTS sales_pipeline_stages`);
     }
+  },
+  {
+    id: '2026-09-11_004_add_developer_outreach_ai_conversations',
+    name: 'Add Investment Company outreach AI conversations',
+    async up(db) {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS developer_outreach_ai_conversations (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          developer_profile_id VARCHAR NOT NULL REFERENCES developer_profiles(id) ON DELETE CASCADE,
+          campaign_id VARCHAR NOT NULL REFERENCES outreach_campaigns(id) ON DELETE CASCADE,
+          step_key VARCHAR NOT NULL DEFAULT '0',
+          messages JSONB NOT NULL DEFAULT '[]'::jsonb,
+          suggested_subject TEXT,
+          suggested_content TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW(),
+          CONSTRAINT developer_outreach_ai_conversations_scope_unique
+            UNIQUE (developer_profile_id, campaign_id, step_key)
+        )
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS developer_outreach_ai_conversations_campaign_idx
+        ON developer_outreach_ai_conversations(campaign_id)
+      `);
+    },
+    async down(db) {
+      await db.execute(sql`DROP TABLE IF EXISTS developer_outreach_ai_conversations`);
+    }
   }
 ];
 

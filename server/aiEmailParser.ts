@@ -6,6 +6,115 @@ import { apiCallTracker } from './apiCallTracker.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+export interface OutreachEmailDraftContext {
+  companyName: string;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  targetStates: string[];
+  targetCounties: string[];
+  rentMetric: string;
+  minRentPsf?: string | null;
+  minRentPerUnit?: string | null;
+  productTypes: Array<{
+    name: string;
+    minAcres?: string | null;
+    maxAcres?: string | null;
+    minRentPsf?: string | null;
+    minRentPerUnit?: string | null;
+  }>;
+  triggerTag?: string | null;
+  campaignName: string;
+  stepNumber: number;
+  currentSubject: string;
+  currentContent: string;
+}
+
+export interface OutreachEmailDraftResult {
+  reply: string;
+  suggestedSubject: string;
+  suggestedContent: string;
+}
+
+/**
+ * Draft and refine an Investment Company outreach email using the same
+ * OpenAI client/model as property intake. The caller is responsible for
+ * filtering conversation history and supplying only tenant-owned context.
+ */
+export async function draftOutreachEmailWithAI(
+  context: OutreachEmailDraftContext,
+  conversation: Array<{ role: "user" | "assistant"; content: string }>,
+  userMessage: string,
+): Promise<OutreachEmailDraftResult> {
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: `You are a thoughtful email writing assistant for an Investment Company using LandLinq.
+You help a company write professional, concise outreach to real estate brokers.
+Work conversationally: answer the user's request briefly, then return a complete suggested
+subject and email body. Use {{firstName}} for the recipient's first name when helpful.
+Never claim the recipient opted in, never invent a specific property or deal, and do not
+reveal internal criteria unless the user asks for a general explanation. Keep the tone
+credible and human, not salesy. Preserve useful content from the current draft unless the
+user asks for a rewrite. The suggested body must be plain text with normal paragraphs,
+no HTML, no markdown headings, and no signature placeholder beyond a simple closing.
+
+Company context (use only to make the email relevant):
+${JSON.stringify({
+  companyName: context.companyName,
+  branding: {
+    logoUrl: context.logoUrl || null,
+    primaryColor: context.primaryColor || null,
+    secondaryColor: context.secondaryColor || null,
+  },
+  targetStates: context.targetStates,
+  targetCounties: context.targetCounties,
+  rentMetric: context.rentMetric,
+  minimumRent: context.rentMetric === "psf" ? context.minRentPsf || null : context.minRentPerUnit || null,
+  productTypes: context.productTypes,
+  campaignName: context.campaignName,
+  stepNumber: context.stepNumber,
+  triggerTag: context.triggerTag || null,
+})}
+
+Current email draft:
+Subject: ${context.currentSubject || "(blank)"}
+Body:
+${context.currentContent || "(blank)"}
+
+Respond as JSON with exactly these fields:
+{
+  "reply": "A short conversational explanation of what you changed or recommend.",
+  "suggestedSubject": "The complete suggested subject line.",
+  "suggestedContent": "The complete suggested plain-text email body."
+}`,
+      },
+      ...conversation.map((message) => ({
+        role: message.role as "user" | "assistant",
+        content: message.content,
+      })),
+      { role: "user" as const, content: userMessage },
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 1800,
+  });
+
+  const result = response.choices[0]?.message?.content;
+  if (!result) throw new Error("Empty response from OpenAI");
+
+  const parsed = JSON.parse(result) as Partial<OutreachEmailDraftResult>;
+  const reply = String(parsed.reply || "").trim();
+  const suggestedSubject = String(parsed.suggestedSubject || "").trim();
+  const suggestedContent = String(parsed.suggestedContent || "").trim();
+  if (!reply || !suggestedSubject || !suggestedContent) {
+    throw new Error("OpenAI returned an incomplete email draft");
+  }
+
+  return { reply, suggestedSubject, suggestedContent };
+}
+
 export interface ParsedPropertyData {
   address: string | null;
   city: string | null;

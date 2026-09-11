@@ -41,6 +41,7 @@ import {
   salesProspectDocuments,
   salesPipelineEmailTemplates,
   salesProspectEmails,
+  developerProductTypes,
   emailIntakeQueue,
   propertyData,
 } from "@shared/schema";
@@ -64,6 +65,7 @@ import { PropertySearchService } from "./propertySearchService";
 import { alertSystem } from "./alertSystem";
 import { competitiveIntelligence } from "./competitiveIntelligence";
 import { realPropertyDataService } from "./propertyDataService";
+import { draftOutreachEmailWithAI } from "./aiEmailParser";
 
 const DEFAULT_PIPELINE_STAGES = [
   { name: "New Lead", sortOrder: 1 },
@@ -14895,6 +14897,230 @@ RULES:
     } catch (error) {
       console.error('[developer outreach campaign launch] Error:', error);
       return res.status(500).json({ error: 'Failed to launch campaign' });
+    }
+  });
+
+  const developerAiStepKeySchema = z.string()
+    .trim()
+    .min(1)
+    .max(80)
+    .regex(/^[a-zA-Z0-9_-]+$/, "Step key may only contain letters, numbers, hyphens, and underscores");
+  const developerAiMessageSchema = z.object({
+    role: z.enum(["user", "assistant"]),
+    content: z.string().trim().min(1).max(12000),
+  });
+  const developerAiMessagesSchema = z.array(developerAiMessageSchema).max(24);
+  const developerAiDraftSchema = z.object({
+    subject: z.string().trim().max(240),
+    content: z.string().trim().max(50000),
+  });
+
+  async function getOwnedDeveloperCampaignForAi(campaignId: string, developerProfileId: string) {
+    const result = await db.execute(sql`
+      SELECT c.id, c.name, c.broker_filter,
+        COALESCE(s.subject, '') AS subject,
+        COALESCE(s.content, '') AS content,
+        COALESCE(ct.hubspot_trigger_tag, '') AS trigger_tag
+      FROM outreach_campaigns c
+      LEFT JOIN outreach_campaign_templates ct
+        ON ct.id = (c.broker_filter->>'templateId')
+        AND ct.team_id = ${developerProfileId}
+      LEFT JOIN outreach_campaign_template_steps s
+        ON s.template_id = (c.broker_filter->>'templateId')
+        AND s.sequence_index = 0
+      WHERE c.id = ${campaignId}
+        AND c.developer_profile_id = ${developerProfileId}
+        AND COALESCE(c.is_archived, false) = false
+      LIMIT 1
+    `);
+    return result.rows?.[0] as any || null;
+  }
+
+  function normalizeDeveloperAiMessages(messages: Array<{ role: "user" | "assistant"; content: string }>) {
+    return messages
+      .map((message) => ({
+        role: message.role,
+        content: String(message.content || "").trim(),
+      }))
+      .filter((message) => message.content)
+      .slice(-24);
+  }
+
+  async function saveDeveloperAiConversation({
+    developerProfileId,
+    campaignId,
+    stepKey,
+    messages,
+    suggestedSubject,
+    suggestedContent,
+  }: {
+    developerProfileId: string;
+    campaignId: string;
+    stepKey: string;
+    messages: Array<{ role: "user" | "assistant"; content: string }>;
+    suggestedSubject?: string | null;
+    suggestedContent?: string | null;
+  }) {
+    await db.execute(sql`
+      INSERT INTO developer_outreach_ai_conversations
+        (developer_profile_id, campaign_id, step_key, messages, suggested_subject, suggested_content, updated_at)
+      VALUES
+        (${developerProfileId}, ${campaignId}, ${stepKey}, ${JSON.stringify(messages)}::jsonb,
+         ${suggestedSubject || null}, ${suggestedContent || null}, NOW())
+      ON CONFLICT (developer_profile_id, campaign_id, step_key)
+      DO UPDATE SET
+        messages = EXCLUDED.messages,
+        suggested_subject = EXCLUDED.suggested_subject,
+        suggested_content = EXCLUDED.suggested_content,
+        updated_at = NOW()
+    `);
+  }
+
+  app.get("/api/developer-profile/me/outreach/campaigns/:campaignId/ai-conversations/:stepKey", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const stepKey = developerAiStepKeySchema.parse(req.params.stepKey);
+      const campaign = await getOwnedDeveloperCampaignForAi(req.params.campaignId, developerProfileId);
+      if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+
+      const result = await db.execute(sql`
+        SELECT messages, suggested_subject, suggested_content, updated_at
+        FROM developer_outreach_ai_conversations
+        WHERE developer_profile_id = ${developerProfileId}
+          AND campaign_id = ${campaign.id}
+          AND step_key = ${stepKey}
+        LIMIT 1
+      `);
+      const row = result.rows?.[0] as any;
+      return res.json({
+        messages: Array.isArray(row?.messages) ? row.messages : [],
+        suggestedDraft: row?.suggested_subject || row?.suggested_content
+          ? { subject: row.suggested_subject || "", content: row.suggested_content || "" }
+          : null,
+        updatedAt: row?.updated_at || null,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid campaign step" });
+      console.error("[developer outreach AI conversation GET] Error:", error);
+      return res.status(500).json({ error: "Failed to load writing assistant conversation" });
+    }
+  });
+
+  app.put("/api/developer-profile/me/outreach/campaigns/:campaignId/ai-conversations/:stepKey", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const stepKey = developerAiStepKeySchema.parse(req.params.stepKey);
+      const body = z.object({
+        messages: developerAiMessagesSchema,
+        suggestedDraft: developerAiDraftSchema.nullable().optional(),
+      }).parse(req.body || {});
+      const campaign = await getOwnedDeveloperCampaignForAi(req.params.campaignId, developerProfileId);
+      if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+
+      const messages = normalizeDeveloperAiMessages(body.messages);
+      await saveDeveloperAiConversation({
+        developerProfileId,
+        campaignId: campaign.id,
+        stepKey,
+        messages,
+        suggestedSubject: body.suggestedDraft?.subject || null,
+        suggestedContent: body.suggestedDraft?.content || null,
+      });
+      return res.json({ success: true, messages, suggestedDraft: body.suggestedDraft || null });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid writing assistant conversation", details: error.errors });
+      console.error("[developer outreach AI conversation PUT] Error:", error);
+      return res.status(500).json({ error: "Failed to save writing assistant conversation" });
+    }
+  });
+
+  app.post("/api/developer-profile/me/outreach/campaigns/:campaignId/ai-draft", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const body = z.object({
+        stepKey: developerAiStepKeySchema.default("0"),
+        messages: developerAiMessagesSchema.default([]),
+        userMessage: z.string().trim().min(1).max(6000),
+        currentDraft: developerAiDraftSchema,
+      }).parse(req.body || {});
+      const campaign = await getOwnedDeveloperCampaignForAi(req.params.campaignId, developerProfileId);
+      if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+
+      const [profile] = await db.select({
+        companyName: developerProfiles.companyName,
+        logoUrl: developerProfiles.logoUrl,
+        primaryColor: developerProfiles.primaryColor,
+        secondaryColor: developerProfiles.secondaryColor,
+        targetStates: developerProfiles.targetStates,
+        targetCounties: developerProfiles.targetCounties,
+        rentMetric: developerProfiles.rentMetric,
+        minRentPsf: developerProfiles.minRentPsf,
+        minRentPerUnit: developerProfiles.minRentPerUnit,
+      }).from(developerProfiles).where(and(
+        eq(developerProfiles.id, developerProfileId),
+        eq(developerProfiles.isActive, true),
+      )).limit(1);
+      if (!profile) return res.status(404).json({ error: "Investment Company profile not found" });
+
+      const productTypes = await db.select({
+        name: developerProductTypes.name,
+        minAcres: developerProductTypes.minAcres,
+        maxAcres: developerProductTypes.maxAcres,
+        minRentPsf: developerProductTypes.minRentPsf,
+        minRentPerUnit: developerProductTypes.minRentPerUnit,
+      }).from(developerProductTypes).where(and(
+        eq(developerProductTypes.developerProfileId, developerProfileId),
+        eq(developerProductTypes.isActive, true),
+      )).orderBy(asc(developerProductTypes.name));
+
+      const history = normalizeDeveloperAiMessages(body.messages);
+      const draft = await draftOutreachEmailWithAI({
+        companyName: profile.companyName,
+        logoUrl: profile.logoUrl,
+        primaryColor: profile.primaryColor,
+        secondaryColor: profile.secondaryColor,
+        targetStates: profile.targetStates || [],
+        targetCounties: profile.targetCounties || [],
+        rentMetric: profile.rentMetric,
+        minRentPsf: profile.minRentPsf,
+        minRentPerUnit: profile.minRentPerUnit,
+        productTypes,
+        triggerTag: campaign.trigger_tag || null,
+        campaignName: campaign.name,
+        stepNumber: Number(body.stepKey) || 0,
+        currentSubject: body.currentDraft.subject,
+        currentContent: body.currentDraft.content,
+      }, history, body.userMessage);
+
+      const messages = [
+        ...history,
+        { role: "user" as const, content: body.userMessage },
+        { role: "assistant" as const, content: draft.reply },
+      ].slice(-24);
+      await saveDeveloperAiConversation({
+        developerProfileId,
+        campaignId: campaign.id,
+        stepKey: body.stepKey,
+        messages,
+        suggestedSubject: draft.suggestedSubject,
+        suggestedContent: draft.suggestedContent,
+      });
+
+      return res.json({
+        reply: draft.reply,
+        suggestedDraft: { subject: draft.suggestedSubject, content: draft.suggestedContent },
+        messages,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid writing assistant request", details: error.errors });
+      console.error("[developer outreach AI draft] Error:", error);
+      return res.status(502).json({ error: "The writing assistant could not generate a draft right now" });
     }
   });
 

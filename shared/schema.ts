@@ -2915,6 +2915,32 @@ export const outreachCampaignSteps = pgTable("outreach_campaign_steps", {
   index("outreach_campaign_steps_sequence_idx").on(table.senderId, table.sequenceIndex),
 ]);
 
+// Conversation history for the Investment Company campaign writing assistant.
+// The developer profile is repeated here intentionally so every read/write can
+// enforce the authenticated tenant boundary without trusting campaign metadata.
+export const developerOutreachAiConversations = pgTable("developer_outreach_ai_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id")
+    .references(() => developerProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  campaignId: varchar("campaign_id")
+    .references(() => outreachCampaigns.id, { onDelete: "cascade" })
+    .notNull(),
+  stepKey: varchar("step_key").notNull().default("0"),
+  messages: jsonb("messages").notNull().default(sql`'[]'::jsonb`),
+  suggestedSubject: text("suggested_subject"),
+  suggestedContent: text("suggested_content"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique("developer_outreach_ai_conversations_scope_unique").on(
+    table.developerProfileId,
+    table.campaignId,
+    table.stepKey,
+  ),
+  index("developer_outreach_ai_conversations_campaign_idx").on(table.campaignId),
+]);
+
 // Type exports for outreach senders
 export type OutreachSender = typeof outreachSenders.$inferSelect;
 export type InsertOutreachSender = typeof outreachSenders.$inferInsert;
@@ -2924,6 +2950,8 @@ export type HubspotSyncLog = typeof hubspotSyncLog.$inferSelect;
 export type InsertHubspotSyncLog = typeof hubspotSyncLog.$inferInsert;
 export type OutreachCampaignStep = typeof outreachCampaignSteps.$inferSelect;
 export type InsertOutreachCampaignStep = typeof outreachCampaignSteps.$inferInsert;
+export type DeveloperOutreachAiConversation = typeof developerOutreachAiConversations.$inferSelect;
+export type InsertDeveloperOutreachAiConversation = typeof developerOutreachAiConversations.$inferInsert;
 
 // ============================================================================
 // SHARED CAMPAIGN TEMPLATES - Tag-based campaign routing for scalable outreach
