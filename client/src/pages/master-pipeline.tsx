@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Building2, ExternalLink, Filter, MapPin, RefreshCw, Search } from "lucide-react";
+import { BriefcaseBusiness, ExternalLink, Filter, MapPin, RefreshCw, Search } from "lucide-react";
 import Navigation from "@/components/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
@@ -143,7 +143,7 @@ export default function MasterPipeline() {
 
   if (!isPlatformAdmin) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-warm">
         <Navigation />
         <main className="mx-auto max-w-xl px-6 py-24 text-center">
           <Building2 className="mx-auto mb-4 h-12 w-12 text-slate-300" />
@@ -155,17 +155,17 @@ export default function MasterPipeline() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+    <div className="min-h-screen bg-warm">
       <Navigation />
       <main className="mx-auto max-w-[1800px] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-blue-600">
-              <Building2 className="h-4 w-4" />
-              Platform administration
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-[#081729]">Master Pipeline</h1>
-            <p className="mt-1 text-slate-500">See how every deal is moving across all Investment Company portals.</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#4A90E2]">Admin workspace</p>
+            <h1 className="mt-1 flex items-center gap-3 font-serif text-4xl font-normal text-[#0A2B4A]">
+              <BriefcaseBusiness className="h-8 w-8 text-[#4A90E2]" />
+              Master Pipeline
+            </h1>
+            <p className="mt-2 text-slate-600">See how every deal is moving across all Investment Company portals.</p>
           </div>
           <Button variant="outline" className="gap-2 self-start md:self-auto" onClick={() => pipelineQuery.refetch()} disabled={pipelineQuery.isFetching}>
             <RefreshCw className={`h-4 w-4 ${pipelineQuery.isFetching ? "animate-spin" : ""}`} />
@@ -173,23 +173,22 @@ export default function MasterPipeline() {
           </Button>
         </div>
 
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-6 grid gap-4 sm:grid-cols-3">
           {[
-            { label: "Pipeline rows", value: counts.total, tone: "text-slate-900" },
-            { label: "Pursuing", value: counts.pursuing, tone: "text-emerald-700" },
-            { label: "Review", value: counts.review, tone: "text-amber-700" },
-            { label: "Passed", value: counts.passed, tone: "text-blue-700" },
+            { label: "Total deals", value: counts.total, tone: "text-[#0A2B4A]" },
+            { label: "Passed", value: counts.passed, tone: "text-[#0A2B4A]" },
+            { label: "Review", value: counts.review, tone: "text-[#0A2B4A]" },
           ].map((stat) => (
-            <Card key={stat.label}>
-              <CardContent className="p-5">
-                <p className="text-sm font-medium text-slate-500">{stat.label}</p>
-                <p className={`mt-1 text-3xl font-bold ${stat.tone}`}>{pipelineQuery.isLoading ? "—" : stat.value}</p>
+            <Card key={stat.label} className="rounded-lg border-slate-200 bg-slate-50 shadow-none">
+              <CardContent className="px-4 py-3">
+                <p className={`text-2xl font-bold tracking-tight ${stat.tone}`}>{pipelineQuery.isLoading ? "—" : stat.value}</p>
+                <p className="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{stat.label}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <Card className="mb-6">
+        <Card className="mb-6 border-slate-200 shadow-sm">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-base">
               <Filter className="h-4 w-4 text-blue-600" />
@@ -248,7 +247,7 @@ export default function MasterPipeline() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-slate-200 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle className="text-lg">Deal activity by Investment Company</CardTitle>

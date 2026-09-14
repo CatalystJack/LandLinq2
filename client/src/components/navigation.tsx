@@ -343,7 +343,7 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
         onFocusCapture={() => setIsSidebarHovering(true)}
         aria-label="Application sidebar"
       >
-        <div className={`flex h-20 items-center border-b border-white/10 ${isSidebarExpanded ? "justify-between px-4" : "justify-center px-2"}`}>
+        <div className={`relative flex h-20 items-center border-b border-white/10 ${isSidebarExpanded ? "justify-between px-4" : "justify-center px-2"}`}>
           <Link href="/" className="flex min-w-0 items-center gap-2" aria-label="LandLinq home" title="LandLinq home">
             <img
               src={landlinqWhiteLogo}
@@ -367,12 +367,13 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
           {!isSidebarExpanded && (
             <button
               type="button"
-              className="sr-only"
+              className="absolute bottom-1.5 right-1.5 rounded-md p-1 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
               onClick={() => setIsSidebarPinned(true)}
               aria-label="Expand navigation sidebar"
+              title="Expand navigation sidebar"
               data-testid="button-sidebar-toggle"
             >
-              Expand navigation
+              <PanelLeftOpen className="h-3.5 w-3.5" />
             </button>
           )}
         </div>

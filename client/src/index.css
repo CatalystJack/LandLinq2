@@ -57,6 +57,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Authenticated desktop workspaces reserve room for the collapsed icon rail.
+   The sidebar expands over the rail on hover so the page does not reflow. */
+@media (min-width: 768px) {
+  body[data-app-sidebar] #root {
+    padding-left: 4.5rem;
+  }
+}
+
 /* Shared scrollbar for every horizontally scrollable table.
    Keep both axes visible: long deal lists need a vertical scrollbar and wide
    tables need a discoverable horizontal scrollbar at the bottom. */
