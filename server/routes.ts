@@ -74,8 +74,6 @@ import {
 import {
   addMyContactTag,
   createMyPipelineOpportunity,
-} from "./aiEmailParser";
-import {
   getCompsForDeal,
   getMyContacts,
   getMyCriteria,
@@ -14192,6 +14190,95 @@ RULES:
     } catch (error: any) {
       console.error('[developer-profile/me/contacts] Error:', error);
       return res.status(500).json({ error: 'Failed to load contacts' });
+    }
+  });
+
+  app.post("/api/developer-profile/me/assistant/query", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const question = typeof req.body?.question === "string" ? req.body.question.trim() : "";
+      if (!question) {
+        return res.status(400).json({ error: "A question is required" });
+      }
+      if (question.length > 2000) {
+        return res.status(400).json({ error: "Question must be 2,000 characters or fewer" });
+      }
+
+      const [dealsForContext, contactsForContext, pipelineSummary] = await Promise.all([
+        getMyDeals(developerProfileId, { limit: 100 }),
+        getMyContacts(developerProfileId),
+        getMyPipelineSummary(developerProfileId),
+      ]);
+
+      const plan = await planDeveloperAssistantQuestion(question, {
+        deals: dealsForContext.map((deal) => ({
+          id: deal.id,
+          address: deal.address,
+          city: deal.city,
+          state: deal.state,
+          status: deal.status,
+        })),
+        contacts: contactsForContext.map((contact) => ({
+          id: contact.id,
+          name: contact.name,
+          email: contact.email,
+          brokerage: contact.brokerage,
+        })),
+        pipelineStages: pipelineSummary.stages.map((stage) => ({
+          id: stage.id,
+          name: stage.name,
+        })),
+      });
+
+      const readOnlyTools = new Set([
+        "getMyDeals",
+        "getMyPipelineSummary",
+        "getMyContacts",
+        "getCompsForDeal",
+        "getMyCriteria",
+      ]);
+      if (plan.kind !== "answer" || !readOnlyTools.has(plan.tool)) {
+        return res.status(400).json({ error: "The assistant supports read-only questions only" });
+      }
+
+      const args = plan.args || {};
+      let result: unknown;
+      switch (plan.tool) {
+        case "getMyDeals": {
+          const requestedStatus = typeof args.status === "string" ? args.status.trim() : undefined;
+          const status = requestedStatus && ["Pursuing", "Passed", "Review"].includes(requestedStatus)
+            ? requestedStatus
+            : undefined;
+          const search = typeof args.search === "string" ? args.search.trim().slice(0, 200) : undefined;
+          result = await getMyDeals(developerProfileId, { status, search, limit: 100 });
+          break;
+        }
+        case "getMyPipelineSummary":
+          result = await getMyPipelineSummary(developerProfileId);
+          break;
+        case "getMyContacts": {
+          const search = typeof args.search === "string" ? args.search.trim().slice(0, 200) : "";
+          result = await getMyContacts(developerProfileId, search);
+          break;
+        }
+        case "getCompsForDeal": {
+          const dealId = typeof args.dealId === "string" ? args.dealId.trim() : "";
+          result = dealId ? await getCompsForDeal(developerProfileId, dealId) : null;
+          break;
+        }
+        case "getMyCriteria":
+          result = await getMyCriteria(developerProfileId);
+          break;
+      }
+
+      const answer = await answerDeveloperAssistantQuestion(question, plan.tool, result);
+      return res.json({ answer, tool: plan.tool });
+    } catch (error: any) {
+      console.error("[developer-profile/me/assistant/query] Error:", error);
+      return res.status(500).json({ error: "The assistant could not answer that question" });
     }
   });
 
