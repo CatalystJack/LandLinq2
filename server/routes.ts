@@ -13855,7 +13855,6 @@ RULES:
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
-      const currentUserId = String(req.user?.id || req.user?.claims?.sub || "");
       const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import('@shared/schema');
       const [profile] = await db.select().from(developerProfiles).where(and(
         eq(developerProfiles.id, developerProfileId),
@@ -13883,6 +13882,7 @@ RULES:
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
+      const currentUserId = String(req.user?.id || req.user?.claims?.sub || "");
 
       const [profile, activeProductTypes, connectedSenders, teamCount] = await Promise.all([
         db.select({
@@ -13899,7 +13899,6 @@ RULES:
         )),
         db.select({ id: outreachSenders.id }).from(outreachSenders).where(and(
           eq(outreachSenders.developerProfileId, developerProfileId),
-          eq(outreachSenders.isActive, true),
           eq(outreachSenders.outlookConnected, true),
         )).limit(1),
         db.select({ count: count() }).from(users).where(and(
