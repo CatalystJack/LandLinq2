@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import path from "path";
 import fs from "fs";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { storage } from "./storage";
 import { db, pool } from "./db";
 import { 
@@ -14199,12 +14199,114 @@ RULES:
       if (!developerProfileId) return;
       if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
 
+      const pendingActionKey = "developerAssistantPendingAction";
+      const pendingAction = req.session?.[pendingActionKey] as {
+        id: string;
+        developerProfileId: string;
+        tool: "markDealPursuing" | "addContactTag" | "createPipelineOpportunity";
+        args: Record<string, unknown>;
+        expiresAt: number;
+      } | undefined;
+      const saveSession = () => new Promise<void>((resolve, reject) => {
+        req.session.save((error: Error | null) => error ? reject(error) : resolve());
+      });
+
+      const confirmActionId = typeof req.body?.confirmActionId === "string"
+        ? req.body.confirmActionId.trim()
+        : "";
+      const cancelActionId = typeof req.body?.cancelActionId === "string"
+        ? req.body.cancelActionId.trim()
+        : "";
+
+      if (confirmActionId || cancelActionId) {
+        const requestedActionId = confirmActionId || cancelActionId;
+        if (
+          !pendingAction
+          || pendingAction.id !== requestedActionId
+          || pendingAction.developerProfileId !== developerProfileId
+          || pendingAction.expiresAt < Date.now()
+        ) {
+          if (pendingAction) {
+            delete req.session[pendingActionKey];
+            await saveSession();
+          }
+          return res.status(409).json({ error: "That assistant action has expired. Please ask again." });
+        }
+
+        delete req.session[pendingActionKey];
+        await saveSession();
+
+        if (cancelActionId) {
+          return res.json({ actionCancelled: true, answer: "Okay — I did not make that change." });
+        }
+
+        let actionResult: any = null;
+        switch (pendingAction.tool) {
+          case "markDealPursuing":
+            actionResult = await markMyDealPursuing(
+              developerProfileId,
+              String(pendingAction.args.dealId || ""),
+            );
+            break;
+          case "addContactTag":
+            actionResult = await addMyContactTag(
+              developerProfileId,
+              String(pendingAction.args.contactId || ""),
+              String(pendingAction.args.tag || ""),
+            );
+            break;
+          case "createPipelineOpportunity":
+            actionResult = await createMyPipelineOpportunity(developerProfileId, {
+              contactId: String(pendingAction.args.contactId || ""),
+              stageId: typeof pendingAction.args.stageId === "string"
+                ? pendingAction.args.stageId
+                : undefined,
+              title: typeof pendingAction.args.title === "string"
+                ? pendingAction.args.title
+                : undefined,
+              value: typeof pendingAction.args.value === "number"
+                ? pendingAction.args.value
+                : undefined,
+              notes: typeof pendingAction.args.notes === "string"
+                ? pendingAction.args.notes
+                : undefined,
+            });
+            break;
+        }
+
+        if (!actionResult) {
+          return res.status(409).json({
+            error: "That record is no longer available in your company account. No change was made.",
+          });
+        }
+
+        if (pendingAction.tool === "markDealPursuing") {
+          return res.json({ actionExecuted: true, answer: "The deal is now marked as Pursuing." });
+        }
+        if (pendingAction.tool === "addContactTag") {
+          const name = [actionResult.first_name, actionResult.last_name].filter(Boolean).join(" ") || "the contact";
+          return res.json({
+            actionExecuted: true,
+            answer: `Added the “${String(pendingAction.args.tag)}” tag to ${name}.`,
+          });
+        }
+        return res.json({
+          actionExecuted: true,
+          answer: `Created the pipeline opportunity${actionResult.stageName ? ` in ${actionResult.stageName}` : ""}.`,
+        });
+      }
+
       const question = typeof req.body?.question === "string" ? req.body.question.trim() : "";
       if (!question) {
         return res.status(400).json({ error: "A question is required" });
       }
       if (question.length > 2000) {
         return res.status(400).json({ error: "Question must be 2,000 characters or fewer" });
+      }
+
+      if (pendingAction) {
+        delete req.session[pendingActionKey];
+        await saveSession();
       }
 
       const [dealsForContext, contactsForContext, pipelineSummary] = await Promise.all([
@@ -14240,11 +14342,83 @@ RULES:
         "getCompsForDeal",
         "getMyCriteria",
       ]);
-      if (plan.kind !== "answer" || !readOnlyTools.has(plan.tool)) {
-        return res.status(400).json({ error: "The assistant supports read-only questions only" });
-      }
 
       const args = plan.args || {};
+      if (plan.kind === "action") {
+        let actionArgs: Record<string, unknown>;
+        let description: string;
+
+        switch (plan.tool) {
+          case "markDealPursuing": {
+            const dealId = typeof args.dealId === "string" ? args.dealId.trim() : "";
+            const deal = dealsForContext.find((candidate) => candidate.id === dealId);
+            if (!deal) {
+              return res.status(400).json({ error: "I could not identify that deal in your company data." });
+            }
+            actionArgs = { dealId: deal.id };
+            description = `Mark ${deal.address || "this deal"}${deal.city ? `, ${deal.city}` : ""} as Pursuing`;
+            break;
+          }
+          case "addContactTag": {
+            const contactId = typeof args.contactId === "string" ? args.contactId.trim() : "";
+            const tag = typeof args.tag === "string" ? args.tag.trim() : "";
+            const contact = contactsForContext.find((candidate) => candidate.id === contactId);
+            if (!contact || !tag || tag.length > 100) {
+              return res.status(400).json({ error: "I could not identify that contact and tag in your company data." });
+            }
+            actionArgs = { contactId: contact.id, tag };
+            description = `Add the “${tag}” CRM tag to ${contact.name}`;
+            break;
+          }
+          case "createPipelineOpportunity": {
+            const contactId = typeof args.contactId === "string" ? args.contactId.trim() : "";
+            const contact = contactsForContext.find((candidate) => candidate.id === contactId);
+            const stageId = typeof args.stageId === "string" ? args.stageId.trim() : "";
+            const stage = stageId
+              ? pipelineSummary.stages.find((candidate) => candidate.id === stageId)
+              : pipelineSummary.stages[0];
+            const title = typeof args.title === "string" ? args.title.trim().slice(0, 255) : "";
+            const notes = typeof args.notes === "string" ? args.notes.trim().slice(0, 5000) : "";
+            const rawValue = args.value === null || args.value === undefined || args.value === ""
+              ? undefined
+              : Number(args.value);
+            if (!contact || !stage || (rawValue !== undefined && !Number.isFinite(rawValue))) {
+              return res.status(400).json({ error: "I could not identify the contact, stage, or value for that opportunity." });
+            }
+            actionArgs = {
+              contactId: contact.id,
+              stageId: stage.id,
+              ...(title ? { title } : {}),
+              ...(rawValue !== undefined ? { value: rawValue } : {}),
+              ...(notes ? { notes } : {}),
+            };
+            description = `Create a pipeline opportunity for ${contact.name} in ${stage.name}`;
+            break;
+          }
+          default:
+            return res.status(400).json({ error: "That assistant action is not supported." });
+        }
+
+        const action = {
+          id: randomUUID(),
+          developerProfileId,
+          tool: plan.tool,
+          args: actionArgs,
+          expiresAt: Date.now() + 5 * 60 * 1000,
+        };
+        req.session[pendingActionKey] = action;
+        await saveSession();
+        return res.json({
+          confirmationRequired: true,
+          action: { id: action.id, description, expiresAt: action.expiresAt },
+          answer: `I can ${description.toLowerCase()}. Do you want me to continue?`,
+        });
+      }
+
+      if (plan.kind !== "answer" || !readOnlyTools.has(plan.tool)) {
+        return res.status(400).json({ error: "The assistant could not route that question safely." });
+      }
+
       let result: unknown;
       switch (plan.tool) {
         case "getMyDeals": {

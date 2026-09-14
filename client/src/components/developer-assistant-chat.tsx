@@ -7,10 +7,16 @@ type ChatMessage = {
   content: string;
 };
 
+type PendingAction = {
+  id: string;
+  description: string;
+};
+
 export default function DeveloperAssistantChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nextMessageId = useRef(1);
@@ -25,6 +31,7 @@ export default function DeveloperAssistantChat() {
     const trimmedQuestion = question.trim();
     if (!trimmedQuestion || isSending) return;
 
+    setPendingAction(null);
     const userMessage: ChatMessage = {
       id: nextMessageId.current++,
       role: "user",
@@ -54,8 +61,49 @@ export default function DeveloperAssistantChat() {
           content: String(payload.answer || "I could not find an answer from your company data."),
         },
       ]);
+      setPendingAction(payload.confirmationRequired && payload.action?.id
+        ? {
+            id: String(payload.action.id),
+            description: String(payload.action.description || "make this change"),
+          }
+        : null);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "The assistant could not answer that question.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const respondToPendingAction = async (decision: "confirm" | "cancel") => {
+    if (!pendingAction || isSending) return;
+    setIsSending(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/developer-profile/me/assistant/query", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(decision === "confirm"
+          ? { confirmActionId: pendingAction.id }
+          : { cancelActionId: pendingAction.id }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "The assistant could not complete that action.");
+      }
+      setMessages((current) => [
+        ...current,
+        {
+          id: nextMessageId.current++,
+          role: "assistant",
+          content: String(payload.answer || (decision === "confirm"
+            ? "The action was completed."
+            : "Okay — I did not make that change.")),
+        },
+      ]);
+      setPendingAction(null);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "The assistant could not complete that action.");
     } finally {
       setIsSending(false);
     }
@@ -116,6 +164,32 @@ export default function DeveloperAssistantChat() {
             {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">
                 {error}
+              </div>
+            )}
+            {pendingAction && (
+              <div className="rounded-xl border border-[#9CC8F5] bg-[#EEF6FF] p-3" data-testid="developer-assistant-confirmation">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#0A2B4A]">Confirmation required</p>
+                <p className="mt-1 text-sm text-slate-700">{pendingAction.description}</p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => respondToPendingAction("confirm")}
+                    disabled={isSending}
+                    className="rounded-md bg-[#0A2B4A] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white hover:text-[#4A90E2] hover:ring-1 hover:ring-[#4A90E2] disabled:cursor-not-allowed disabled:opacity-50"
+                    data-testid="button-confirm-developer-assistant-action"
+                  >
+                    Yes, continue
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => respondToPendingAction("cancel")}
+                    disabled={isSending}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-[#4A90E2] hover:text-[#4A90E2] disabled:cursor-not-allowed disabled:opacity-50"
+                    data-testid="button-cancel-developer-assistant-action"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
             <div ref={messagesEndRef} />
