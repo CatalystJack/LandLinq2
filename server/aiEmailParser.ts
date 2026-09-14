@@ -206,6 +206,35 @@ ${question}`,
   return { kind: parsed.kind, tool, args: parsed.args && typeof parsed.args === "object" ? parsed.args : {} };
 }
 
+export async function answerDeveloperAssistantQuestion(
+  question: string,
+  tool: DeveloperAssistantPlan["tool"],
+  result: unknown,
+): Promise<string> {
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: `Answer an Investment Company user's question using only the verified result below.
+Be concise and natural. State exact counts, names, statuses, or values present in the result.
+Do not invent or infer missing facts. If the result is empty or null, say that no matching
+tenant-owned records were found. Never mention internal tool names, database details, or other
+companies. This is read-only Q&A unless the server has separately returned a confirmation prompt.
+
+Question: ${question}
+Verified read result:
+${JSON.stringify({ tool, result })}`,
+      },
+      { role: "user", content: question },
+    ],
+    max_completion_tokens: 500,
+  });
+  const answer = response.choices[0]?.message?.content?.trim();
+  if (!answer) throw new Error("Empty assistant answer");
+  return answer;
+}
+
 export interface ParsedPropertyData {
   address: string | null;
   city: string | null;

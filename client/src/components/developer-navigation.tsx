@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
+import DeveloperAssistantChat from "@/components/developer-assistant-chat";
 
 const realEstateTabs = [
   { label: "Deal Dashboard", href: "/developer/dashboard" },
@@ -60,10 +61,11 @@ export default function DeveloperNavigation() {
   };
 
   return (
-    <nav
-      className="relative sticky top-0 z-50 border-b border-slate-800 bg-[#081729] shadow-lg md:fixed md:inset-y-0 md:left-0 md:border-0 md:bg-transparent md:shadow-none"
-      aria-label="Developer navigation"
-    >
+    <>
+      <nav
+        className="relative sticky top-0 z-50 border-b border-slate-800 bg-[#081729] shadow-lg md:fixed md:inset-y-0 md:left-0 md:border-0 md:bg-transparent md:shadow-none"
+        aria-label="Developer navigation"
+      >
       <aside
         className={`pointer-events-auto fixed inset-y-0 left-0 z-50 hidden flex-col border-r border-slate-700/80 bg-[#081729] shadow-xl transition-[width] duration-200 md:flex ${
           isSidebarExpanded ? "w-64" : "w-[4.5rem]"
@@ -256,6 +258,8 @@ export default function DeveloperNavigation() {
           </div>
         )}
       </div>
-    </nav>
+      </nav>
+      <DeveloperAssistantChat />
+    </>
   );
 }

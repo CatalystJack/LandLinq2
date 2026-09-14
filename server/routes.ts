@@ -66,7 +66,23 @@ import { PropertySearchService } from "./propertySearchService";
 import { alertSystem } from "./alertSystem";
 import { competitiveIntelligence } from "./competitiveIntelligence";
 import { realPropertyDataService } from "./propertyDataService";
-import { draftOutreachEmailWithAI } from "./aiEmailParser";
+import {
+  answerDeveloperAssistantQuestion,
+  draftOutreachEmailWithAI,
+  planDeveloperAssistantQuestion,
+} from "./aiEmailParser";
+import {
+  addMyContactTag,
+  createMyPipelineOpportunity,
+} from "./aiEmailParser";
+import {
+  getCompsForDeal,
+  getMyContacts,
+  getMyCriteria,
+  getMyDeals,
+  getMyPipelineSummary,
+  markMyDealPursuing,
+} from "./developerAssistantData";
 
 const DEFAULT_PIPELINE_STAGES = [
   { name: "New Lead", sortOrder: 1 },
