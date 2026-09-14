@@ -59,6 +59,7 @@ export default function DealDetails() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [showIntakeBody, setShowIntakeBody] = useState(false);
   const shareToken = new URLSearchParams(window.location.search).get("token");
 
@@ -323,6 +324,225 @@ Best regards`;
     return productTypes.toString();
   };
 
+  const generateDealSummaryPdf = async () => {
+    if (!deal) return;
+
+    setIsGeneratingPdf(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const pdf = new jsPDF({ unit: "pt", format: "letter" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 42;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      const navy = [7, 23, 42] as const;
+      const blue = [74, 144, 226] as const;
+      const slate = [83, 97, 113] as const;
+      const lightBlue = [239, 246, 255] as const;
+      const lightGray = [241, 245, 249] as const;
+
+      const asText = (value: unknown): string | null => {
+        if (value === null || value === undefined) return null;
+        const text = String(value).trim();
+        return text && text !== "null" && text !== "undefined" ? text : null;
+      };
+      const numberValue = (value: unknown): number | null => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+      };
+      const money = (value: unknown, decimals = 0): string | null => {
+        const parsed = numberValue(value);
+        return parsed === null
+          ? null
+          : `$${parsed.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+      };
+      const acres = numberValue(deal.sizeAcres);
+      const price = money(deal.askingPrice);
+      const rentPsf = money(deal.topRentPSF, 2) || money(deal.avgRentPSF, 2);
+      const rentPerUnit = money(deal.topRentPerUnit) || money(deal.avgRentPerUnit);
+      const location = [deal.address, deal.city, deal.state, deal.zip]
+        .map(asText)
+        .filter(Boolean)
+        .join(", ");
+      const productTypes = formatProductTypes(deal.productTypes);
+      const analysis = (deal.aiAnalysisData || {}) as Record<string, any>;
+      const comps = Array.isArray(analysis.comparable_properties)
+        ? analysis.comparable_properties
+        : Array.isArray((deal as any).comparablesJson)
+          ? (deal as any).comparablesJson
+          : [];
+
+      const floodZone =
+        asText((deal as any).floodZone) ||
+        asText(analysis.floodZone?.floodZone) ||
+        asText(analysis.floodZone?.zone) ||
+        asText(analysis.floodZoneData?.zoneCode) ||
+        asText(analysis.floodZoneData?.floodZone);
+      const wetlands =
+        asText((deal as any).wetlands) ||
+        asText((deal as any).wetlandNotes) ||
+        asText(analysis.wetlands) ||
+        asText(analysis.wetlandsData);
+      const epa =
+        asText(analysis.epa) ||
+        asText(analysis.epaData) ||
+        asText(analysis.hazardsData?.summary) ||
+        asText(analysis.environmental?.epa) ||
+        (Array.isArray(analysis.hazardsData?.sites) && analysis.hazardsData.sites.length
+          ? `${analysis.hazardsData.sites.length} nearby site(s)`
+          : null);
+
+      const drawText = (
+        text: string,
+        x: number,
+        baseline: number,
+        options?: { size?: number; color?: readonly [number, number, number]; style?: "normal" | "bold"; maxWidth?: number },
+      ) => {
+        pdf.setFont("helvetica", options?.style || "normal");
+        pdf.setFontSize(options?.size || 9);
+        pdf.setTextColor(...(options?.color || navy));
+        const lines = pdf.splitTextToSize(text, options?.maxWidth || contentWidth);
+        pdf.text(lines, x, baseline);
+        return lines.length * ((options?.size || 9) + 3);
+      };
+
+      const drawSectionTitle = (title: string) => {
+        pdf.setFillColor(...lightBlue);
+        pdf.roundedRect(margin, y, contentWidth, 22, 4, 4, "F");
+        drawText(title.toUpperCase(), margin + 10, y + 15, { size: 8, color: blue, style: "bold" });
+        y += 32;
+      };
+
+      const drawKeyValueGrid = (items: Array<[string, string | null]>, columns = 2) => {
+        const columnWidth = contentWidth / columns;
+        const rowHeight = 31;
+        items.forEach(([label, value], index) => {
+          const column = index % columns;
+          const row = Math.floor(index / columns);
+          const x = margin + column * columnWidth;
+          const rowY = y + row * rowHeight;
+          drawText(label, x, rowY, { size: 7.5, color: slate, style: "bold" });
+          drawText(value || "Not provided", x, rowY + 14, { size: 10, color: value ? navy : slate });
+        });
+        y += Math.ceil(items.length / columns) * rowHeight + 4;
+      };
+
+      // Header
+      pdf.setFillColor(...navy);
+      pdf.rect(0, 0, pageWidth, 82, "F");
+      drawText("LANDLINQ", margin, 31, { size: 10, color: [147, 197, 253], style: "bold" });
+      drawText("Investment Committee Deal Summary", margin, 54, { size: 18, color: [255, 255, 255], style: "bold" });
+      drawText(
+        deal.dealNumber ? `Deal #${deal.dealNumber}` : "Deal summary",
+        pageWidth - margin - 120,
+        32,
+        { size: 9, color: [226, 232, 240], maxWidth: 120 },
+      );
+      drawText(formatDateEST.date(deal.createdAt || new Date()), pageWidth - margin - 120, 50, {
+        size: 8,
+        color: [203, 213, 225],
+        maxWidth: 120,
+      });
+      y = 104;
+
+      drawText(location || "Property address not provided", margin, y, { size: 15, color: navy, style: "bold", maxWidth: contentWidth });
+      y += 23;
+      const status = deal.classification === "green" ? "Pursuing" : deal.classification === "yellow" ? "Reviewing" : deal.classification === "red" ? "Passed" : "Pending";
+      pdf.setFillColor(...(status === "Pursuing" ? [220, 252, 231] : status === "Passed" ? [254, 226, 226] : [254, 249, 195]));
+      pdf.roundedRect(margin, y, 74, 19, 9, 9, "F");
+      drawText(status, margin + 10, y + 13, { size: 8, color: navy, style: "bold" });
+      if (productTypes !== "Not specified") {
+        drawText(productTypes, margin + 88, y + 13, { size: 8, color: slate, maxWidth: contentWidth - 88 });
+      }
+      y += 34;
+
+      drawSectionTitle("Property & underwriting");
+      drawKeyValueGrid([
+        ["Asking price", price],
+        ["Acreage", acres === null ? null : `${acres.toLocaleString("en-US", { maximumFractionDigits: 2 })} acres`],
+        ["Zoning", asText(deal.zoning)],
+        ["Proposed units", deal.unitCount == null ? null : Number(deal.unitCount).toLocaleString("en-US")],
+        ["Top comparable rent / SF", rentPsf ? `${rentPsf}/SF` : null],
+        ["Top comparable rent / unit", rentPerUnit ? `${rentPerUnit}/unit` : null],
+      ]);
+
+      if (comps.length > 0) {
+        drawSectionTitle("Comparable rent data");
+        const compRows = comps.slice(0, 3).map((comp: any) => {
+          const name = asText(comp.address || comp.propertyName || comp.name) || "Comparable property";
+          const compRent = money(comp.averageRent ?? comp.average_rent);
+          const compPsf = money(comp.rentPerSqFt ?? comp.rent_per_sqft ?? comp.rentPerSF, 2);
+          return [name, compRent || "—", compPsf ? `${compPsf}/SF` : "—"];
+        });
+        const colWidths = [contentWidth * 0.56, contentWidth * 0.22, contentWidth * 0.22];
+        pdf.setFillColor(...lightGray);
+        pdf.rect(margin, y - 3, contentWidth, 18, "F");
+        ["Property", "Avg rent", "Rent / SF"].forEach((header, index) => {
+          drawText(header, margin + colWidths.slice(0, index).reduce((sum, width) => sum + width, 0) + 6, y + 9, {
+            size: 7.5,
+            color: slate,
+            style: "bold",
+            maxWidth: colWidths[index] - 10,
+          });
+        });
+        y += 23;
+        compRows.forEach(([name, compRent, compPsf]) => {
+          drawText(name, margin + 6, y + 9, { size: 8, maxWidth: colWidths[0] - 12 });
+          drawText(compRent, margin + colWidths[0] + 6, y + 9, { size: 8, maxWidth: colWidths[1] - 10 });
+          drawText(compPsf, margin + colWidths[0] + colWidths[1] + 6, y + 9, { size: 8, maxWidth: colWidths[2] - 10 });
+          pdf.setDrawColor(226, 232, 240);
+          pdf.line(margin, y + 16, margin + contentWidth, y + 16);
+          y += 21;
+        });
+        if (comps.length > 3) {
+          drawText(`Showing 3 of ${comps.length} comparable properties.`, margin, y + 2, { size: 7.5, color: slate });
+          y += 14;
+        }
+      }
+
+      if (floodZone || wetlands || epa) {
+        drawSectionTitle("Environmental screening");
+        drawKeyValueGrid([
+          ["FEMA flood zone", floodZone],
+          ["Wetlands", wetlands],
+          ["EPA / hazardous sites", epa],
+        ]);
+      }
+
+      const missingFields = [
+        !price && "asking price",
+        acres === null && "acreage",
+        !rentPsf && !rentPerUnit && "rent/comps",
+        !asText(deal.zoning) && "zoning",
+      ].filter(Boolean) as string[];
+      if (missingFields.length > 0) {
+        pdf.setFillColor(255, 251, 235);
+        const note = `Data gaps: ${missingFields.join(", ")} not provided.`;
+        const noteHeight = drawText(note, margin + 10, y + 16, { size: 8, color: [146, 64, 14], maxWidth: contentWidth - 20 });
+        pdf.roundedRect(margin, y, contentWidth, Math.max(28, noteHeight + 11), 4, 4, "F");
+        pdf.setTextColor(146, 64, 14);
+        pdf.text(pdf.splitTextToSize(note, contentWidth - 20), margin + 10, y + 16);
+        y += Math.max(36, noteHeight + 19);
+      }
+
+      pdf.setDrawColor(203, 213, 225);
+      pdf.line(margin, pageHeight - 38, pageWidth - margin, pageHeight - 38);
+      drawText("Prepared in LandLinq • For discussion purposes only", margin, pageHeight - 22, { size: 7.5, color: slate });
+      drawText(`Generated ${formatDateEST.date(new Date())}`, pageWidth - margin - 125, pageHeight - 22, { size: 7.5, color: slate, maxWidth: 125 });
+
+      const safeAddress = (deal.address || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+      pdf.save(`landlinq-deal-summary-${safeAddress || deal.id.slice(0, 8)}.pdf`);
+      toast({ title: "PDF exported", description: "The deal summary was downloaded." });
+    } catch (error) {
+      console.error("Failed to generate deal summary PDF:", error);
+      toast({ title: "PDF export failed", description: "Unable to generate the deal summary. Please try again.", variant: "destructive" });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   const readableEmailBody = (body: unknown) => {
     const source = String(body || "");
     if (!source) return "No email body was retained.";
@@ -483,6 +703,20 @@ Best regards`;
                   >
                     <Mail className="mr-2" size={16} />
                     Share via Email
+                  </Button>
+                  <Button
+                    onClick={generateDealSummaryPdf}
+                    variant="outline"
+                    size="sm"
+                    disabled={isGeneratingPdf}
+                    data-testid="button-export-pdf"
+                  >
+                    {isGeneratingPdf ? (
+                      <Loader2 className="mr-2 animate-spin" size={16} />
+                    ) : (
+                      <FileText className="mr-2" size={16} />
+                    )}
+                    {isGeneratingPdf ? "Preparing PDF..." : "Export PDF"}
                   </Button>
                 </div>
               </div>
