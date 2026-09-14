@@ -305,7 +305,7 @@ function SystemWideView() {
 
     <Card>
       <CardHeader><CardTitle>Company Activity Detail</CardTitle></CardHeader>
-      <CardContent className="overflow-x-auto p-0">
+      <CardContent className="table-scroll-container p-0">
         <table className="w-full min-w-[1050px] text-sm">
           <thead className="border-y bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr><th className="px-5 py-3">Investment Company</th><th className="px-4 py-3">Deals</th><th className="px-4 py-3">Passed</th><th className="px-4 py-3">Review</th><th className="px-4 py-3">Pursuing</th><th className="px-4 py-3">CRM</th><th className="px-4 py-3">Sent</th><th className="px-4 py-3">Open rate</th><th className="px-4 py-3">Reply rate</th><th className="px-4 py-3">Last activity</th></tr>

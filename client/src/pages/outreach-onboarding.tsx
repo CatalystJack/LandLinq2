@@ -272,7 +272,7 @@ function DailySendActivityPanel() {
           No emails sent in the last 14 days
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="table-scroll-container">
           {/* Today spotlight row */}
           <div className="px-4 py-3 bg-blue-50 border-b flex items-center gap-6 flex-wrap">
             <div className="flex items-center gap-2">

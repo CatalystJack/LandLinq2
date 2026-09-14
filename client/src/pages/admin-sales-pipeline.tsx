@@ -191,7 +191,7 @@ export default function AdminSalesPipeline() {
         </CardContent></Card>}
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(380px,0.8fr)]">
-          <div className="min-w-0 overflow-x-auto pb-2">
+          <div className="table-scroll-container min-w-0 pb-2">
             <div className="flex min-w-[1050px] gap-4">
               {stageGroups.map((stage) => {
                 const prospects = (pipelineQuery.data?.prospects || []).filter((prospect) => prospect.stageId === stage.id);

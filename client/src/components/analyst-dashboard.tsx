@@ -341,7 +341,7 @@ export default function AnalystDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="table-scroll-container">
               <table className="w-full">
                 <thead className="bg-catalyst-gray-50">
                   <tr>

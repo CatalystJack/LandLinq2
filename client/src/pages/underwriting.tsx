@@ -1100,7 +1100,7 @@ export default function UnderwritingPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="table-scroll-container">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">

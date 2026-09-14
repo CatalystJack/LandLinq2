@@ -535,7 +535,7 @@ export default function DeveloperCriteriaSettings() {
               {teamQuery.isLoading ? <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div> : (teamQuery.data?.team || []).length === 0 ? (
                 <p className="rounded-lg bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">No team members found.</p>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="table-scroll-container">
                   <table className="w-full text-left text-sm">
                     <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="px-3 py-3 font-semibold">Name</th><th className="px-3 py-3 font-semibold">Email</th><th className="px-3 py-3 font-semibold">Date added</th></tr></thead>
                     <tbody>{teamQuery.data?.team.map((member) => <tr key={member.id} className="border-b border-slate-100 last:border-0"><td className="px-3 py-3 font-medium text-slate-800">{[member.firstName, member.lastName].filter(Boolean).join(" ") || "—"}</td><td className="px-3 py-3 text-slate-600">{member.email}</td><td className="px-3 py-3 text-slate-500">{member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "—"}</td></tr>)}</tbody>

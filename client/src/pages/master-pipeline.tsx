@@ -274,7 +274,7 @@ export default function MasterPipeline() {
                 <p className="mt-1 text-sm text-slate-500">Try clearing a filter or searching a different address.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="table-scroll-container">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-slate-50/80">

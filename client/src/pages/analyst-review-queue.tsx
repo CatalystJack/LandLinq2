@@ -469,7 +469,7 @@ export default function AnalystReviewQueue() {
             ) : reviewItems.length === 0 ? (
               <div className="text-center py-8 text-gray-500">No reviews found matching your criteria</div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="table-scroll-container">
                 <Table>
                   <TableHeader>
                     <TableRow>

@@ -8838,7 +8838,7 @@ export default function AnalystDashboard() {
                   )}
                 </div>
                 {ncParcelData.multifamilyComps && ncParcelData.multifamilyComps.length > 0 ? (
-                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <div className="table-scroll-container rounded-lg border border-gray-200">
                     <table className="w-full text-xs">
                       <thead className="bg-gray-50">
                         <tr>

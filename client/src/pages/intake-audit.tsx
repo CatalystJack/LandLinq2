@@ -40,7 +40,7 @@ function ComparisonTable({ comparisons }: { comparisons: any }) {
     : Object.entries(comparisons || {});
   if (!entries.length) return <p className="text-sm text-muted-foreground">No extracted-to-final comparison was recorded.</p>;
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="table-scroll-container rounded-md border">
       <table className="w-full min-w-[520px] text-sm">
         <thead className="bg-muted/50 text-left"><tr><th className="p-2">Field</th><th className="p-2">Extracted</th><th className="p-2">Final deal value</th></tr></thead>
         <tbody>

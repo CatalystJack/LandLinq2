@@ -231,7 +231,7 @@ export default function OutreachAnalyticsPage() {
             </h2>
             <span className="text-xs text-gray-400">Open/reply tracking not available via Microsoft Graph</span>
           </div>
-          <div className="overflow-x-auto">
+          <div className="table-scroll-container">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100">

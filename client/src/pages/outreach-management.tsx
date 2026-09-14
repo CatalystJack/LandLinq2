@@ -2808,7 +2808,7 @@ export default function OutreachManagement() {
             {/* MSA Table */}
             <Card>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                <div className="table-scroll-container">
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b">
                       <tr>

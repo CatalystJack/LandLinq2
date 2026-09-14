@@ -417,7 +417,7 @@ export default function DataHub() {
                         Showing {dealInsights.returnedCount} of {dealInsights.totalDeals} deals.
                         {dealInsights.truncated ? " Narrow the filters to focus the table, or export all deals as CSV." : ""}
                       </p>
-                      <div className="overflow-x-auto">
+                      <div className="table-scroll-container">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -557,7 +557,7 @@ export default function DataHub() {
                       <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
                     </div>
                   ) : marketData?.markets?.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <div className="table-scroll-container">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -612,7 +612,7 @@ export default function DataHub() {
                       <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
                     </div>
                   ) : brokerAnalytics?.topBrokers?.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <div className="table-scroll-container">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -674,7 +674,7 @@ export default function DataHub() {
                       <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
                     </div>
                   ) : comparablesCache?.comparables?.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <div className="table-scroll-container">
                       <Table>
                         <TableHeader>
                           <TableRow>

@@ -498,7 +498,7 @@ export default function DeveloperDashboard() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="table-scroll-container">
               <Table>
                 <TableHeader className="bg-slate-50">
                   <TableRow className="border-slate-300 hover:bg-slate-50">

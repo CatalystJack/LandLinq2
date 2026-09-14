@@ -131,7 +131,7 @@ export default function PropertyDataPanel({ dealId, address }: PropertyDataPanel
           </CardHeader>
           <CardContent>
             {/* Simple table showing only requested fields */}
-            <div className="overflow-x-auto">
+            <div className="table-scroll-container">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b">

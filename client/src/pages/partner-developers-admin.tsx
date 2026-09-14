@@ -1153,7 +1153,7 @@ function OutboxRow({ rec, onSent, onDismiss }: {
                 <div className="border-t border-gray-100 pt-1.5">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Comparable Properties</div>
                   {Array.isArray(rec.dealComparablesJson) && rec.dealComparablesJson.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <div className="table-scroll-container">
                       <table className="w-full text-xs border-collapse">
                         <thead>
                           <tr className="text-gray-400">

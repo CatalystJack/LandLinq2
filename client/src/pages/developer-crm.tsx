@@ -257,7 +257,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           ) : filteredContacts.length === 0 ? (
             <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search ? "No matching contacts" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search ? "Try a broader name, email, or company search." : "Import a contact list to get started."}</p></div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="table-scroll-container">
               <Table className="min-w-[900px]">
                 <TableHeader><TableRow className="border-[#e3e9ee] bg-[#f8fafb] hover:bg-[#f8fafb]"><TableHead className="h-11 pl-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Name</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Email</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Phone</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Brokerage</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Region</TableHead><TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source</TableHead></TableRow></TableHeader>
                 <TableBody>{filteredContacts.map((contact) => (

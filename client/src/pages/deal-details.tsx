@@ -522,7 +522,7 @@ Best regards`;
                    </div>
                    <div>
                      <p className="mb-2 text-sm font-medium text-catalyst-gray-600">Extracted vs. final values</p>
-                     {comparisonEntries.length ? <div className="overflow-x-auto rounded border"><table className="w-full min-w-[500px] text-sm"><thead className="bg-gray-50 text-left"><tr><th className="p-2">Field</th><th className="p-2">Extracted</th><th className="p-2">Final</th></tr></thead><tbody>{comparisonEntries.map(([field, raw]: any) => {
+                     {comparisonEntries.length ? <div className="table-scroll-container rounded border"><table className="w-full min-w-[500px] text-sm"><thead className="bg-gray-50 text-left"><tr><th className="p-2">Field</th><th className="p-2">Extracted</th><th className="p-2">Final</th></tr></thead><tbody>{comparisonEntries.map(([field, raw]: any) => {
                        const value = typeof raw === "object" && raw !== null ? raw : { extracted: raw };
                        const extracted = value.extracted ?? value.parsed ?? value.intake ?? value.intakeValue ?? value.source;
                        const finalValue = value.final ?? value.deal ?? value.dealValue ?? value.value ?? value.destination;
@@ -1033,7 +1033,7 @@ Best regards`;
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="overflow-x-auto">
+                    <div className="table-scroll-container">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-catalyst-gray-200">
