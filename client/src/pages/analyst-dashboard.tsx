@@ -73,7 +73,6 @@ import {
   File,
   Image as ImageIcon,
   Settings,
-  Filter,
   Check,
   List,
   Upload,
@@ -5974,7 +5973,6 @@ export default function AnalystDashboard() {
                             data-testid="dropdown-classification-filter"
                           >
                             <span className="flex items-center gap-1">
-                              <Filter className="h-3 w-3" />
                               Status {filterClassifications.length > 0 && `(${filterClassifications.length})`}
                             </span>
                             <ChevronDown className="h-3 w-3 ml-1" />

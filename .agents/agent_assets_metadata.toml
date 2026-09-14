@@ -147,3 +147,31 @@ mtime_ms = 1789402239628
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/e13ee45a-54c0-46fe-b21f-81976e040134/27d52a2d-96c3-4dff-9cee-793e4724e984"
 storage_version_token = "1789402247179561"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "xNAmfmAWRJDfMkglxVwSi"
+uri = "file://screenshots/analyst-dashboard-status-filter-no-icon.jpg"
+type = "image"
+title = "Status filter without funnel icon"
+description = "Default dashboard filter row after removing the Status funnel icon. Status now matches the plain-text Priority and Type controls; active styling and filtering logic remain unchanged."
+logical_id = "753870c9-66d4-49b7-98ad-c94122ea342f"
+content_hash = "sha256:a4ac09c607dc333242b922037461b8bc8496374563c320c23c57aa7402b44bf8"
+size = 80778
+mtime_ms = 1789402339483
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/753870c9-66d4-49b7-98ad-c94122ea342f/83b45edd-8da0-40ae-9cf5-3509def5d377"
+storage_version_token = "1789402346571194"
+content_type = "image/jpeg"
+
+[[outputs]]
+id = "ze-C1crdfPLEMk1ZUXaAx"
+uri = "file://screenshots/acquisition-criteria-header-no-eyebrow.jpg"
+type = "image"
+title = "Acquisition criteria route after eyebrow removal"
+description = "Screenshot of the requested route after the change. The preview session is signed out and shows the public entrypoint; authenticated header markup was verified directly in the page source."
+logical_id = "cdf8d498-deab-414d-a601-37d5d7dac7f2"
+content_hash = "sha256:a69f8ff307f56750888e8b09cefb9d5158d484eaf3936374204460da99057379"
+size = 81386
+mtime_ms = 1789402416880
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/cdf8d498-deab-414d-a601-37d5d7dac7f2/ce5842ef-b550-444b-8196-48dc47316c05"
+storage_version_token = "1789402424032966"
+content_type = "image/jpeg"

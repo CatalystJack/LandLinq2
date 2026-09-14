@@ -375,7 +375,6 @@ export default function DeveloperCriteriaSettings() {
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em]" style={{ color: secondaryColor }}>Company Settings</p>
             <h1 className="mt-1 text-3xl font-bold text-slate-950">{form.profileType === "general_sales" ? "Company settings" : "Acquisition criteria"}</h1>
             <p className="mt-2 text-slate-500">{form.profileType === "general_sales" ? `Manage ${form.companyName} team access and account settings.` : `Control how ${form.companyName} evaluates and receives deals.`}</p>
           </div>
