@@ -6201,7 +6201,7 @@ export default function AnalystDashboard() {
                   <Button
                     onClick={() => handleBulkOperation('approve-all')}
                     disabled={bulkOperationMutation.isPending}
-                    className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] hover:border-[#4A90E2] rounded transition-all duration-200 flex items-center space-x-1"
+                    className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-green-600 text-white hover:bg-white hover:text-green-600 border border-green-600 hover:border-green-600 rounded transition-all duration-200 flex items-center space-x-1"
                     data-testid="button-bulk-approve"
                   >
                     <CheckCircle className="h-3 w-3" />
@@ -6228,7 +6228,7 @@ export default function AnalystDashboard() {
                   <Button
                     onClick={() => handleBulkOperation('delete-all')}
                     disabled={bulkOperationMutation.isPending || !isAuthenticated}
-                    className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-red-800 text-white hover:bg-white hover:text-red-800 hover:border hover:border-red-800 rounded transition-all duration-200 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-white text-red-700 border border-red-300 hover:bg-red-50 hover:text-red-800 hover:border-red-400 rounded transition-all duration-200 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     data-testid="button-bulk-delete"
                     title={!isAuthenticated ? "Login required to delete deals" : "Delete selected deals"}
                   >
@@ -6260,34 +6260,6 @@ export default function AnalystDashboard() {
                       </>
                     )}
                   </Button>
-                  {/* DEBUG: Test cellUpdateMutation */}
-                  <Button
-                    onClick={() => {
-                      // Test cellUpdateMutation with first deal
-                      const firstDeal = deals[0];
-                      if (firstDeal) {
-                        console.log('🧪 TESTING cellUpdateMutation with deal:', firstDeal.id);
-                        cellUpdateMutation.mutate({
-                          dealId: firstDeal.id,
-                          analystNotes: `Test update - ${new Date().toISOString()}`
-                        });
-                      }
-                    }}
-                    disabled={cellUpdateMutation.isPending || deals.length === 0}
-                    className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-purple-600 text-white hover:bg-white hover:text-purple-600 hover:border hover:border-purple-600 rounded transition-all duration-200"
-                    data-testid="button-test-mutation"
-                  >
-                    {cellUpdateMutation.isPending ? (
-                      <>
-                        <Activity className="animate-spin h-3 w-3 mr-1" />
-                        Testing...
-                      </>
-                    ) : (
-                      <>
-                        🧪 Test Mutation
-                      </>
-                    )}
-                  </Button>
                 </div>
               )}
               
@@ -6305,6 +6277,27 @@ export default function AnalystDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+            <AlertDialogContent data-testid="dialog-bulk-delete-confirmation">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete selected deals?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete {selectedDeals.length} selected {selectedDeals.length === 1 ? 'deal' : 'deals'}. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-bulk-delete">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={confirmBulkDelete}
+                  className="bg-red-700 text-white hover:bg-red-800"
+                  data-testid="button-confirm-bulk-delete"
+                >
+                  Delete {selectedDeals.length} {selectedDeals.length === 1 ? 'deal' : 'deals'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Map View */}
           {viewMode === 'map' ? (
@@ -6856,7 +6849,10 @@ export default function AnalystDashboard() {
                         </th>
                         {/* Dynamic reorderable columns */}
                         {columnOrder.map(k => renderHeaderCell(k))}
-                        <th className="text-center px-1 py-1 font-semibold text-xs text-gray-700 min-w-[60px]">
+                        <th
+                          className="text-center px-2 py-1 font-semibold text-xs text-gray-700 min-w-[160px] bg-gray-100 z-40 border-l border-gray-200"
+                          style={{ position: 'sticky', right: 0, boxShadow: '-6px 0 8px -4px rgba(0,0,0,0.22)' }}
+                        >
                           {headerLabel('Actions')}
                         </th>
                       </tr>
@@ -7291,8 +7287,11 @@ export default function AnalystDashboard() {
                           <td className="px-1 py-1 text-xs border-r border-gray-200 text-center">
                             <span className="text-xs text-gray-500">--</span>
                           </td>
-                          <td className="p-2">
-                            <div className="flex items-center gap-1">
+                          <td
+                            className="p-2 min-w-[160px] border-l border-gray-200 bg-white z-20"
+                            style={{ position: 'sticky', right: 0, boxShadow: '-6px 0 8px -4px rgba(0,0,0,0.22)' }}
+                          >
+                            <div className="flex items-center gap-1 whitespace-nowrap">
                               <Button
                                 onClick={saveNewDeal}
                                 size="sm"
@@ -7674,8 +7673,11 @@ export default function AnalystDashboard() {
                           {columnOrder.map(k => renderBodyCell(deal, k))}
                           
                           {/* 34. Actions (Delete + Re-Run Analysis) */}
-                          <td className="p-2">
-                            <div className="flex items-center gap-1">
+                          <td
+                            className={`p-2 min-w-[160px] border-l border-gray-200 z-20 ${selectedDeals.includes(deal.id) ? 'bg-blue-50' : 'bg-white'}`}
+                            style={{ position: 'sticky', right: 0, boxShadow: '-6px 0 8px -4px rgba(0,0,0,0.22)' }}
+                          >
+                            <div className="flex items-center gap-1 whitespace-nowrap">
                               {editingRow === deal.id ? (
                                 <>
                                   <Button
