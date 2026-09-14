@@ -180,33 +180,8 @@ async function determineUserRole(user: any): Promise<UserRole | null> {
 
   if (!email) return null;
   
-  // Role determination based on email domain and position
-  const name = user.name?.toLowerCase() || '';
-  
-  // Super admins - only Jack Berg
-  const superAdminEmails = ['jack@catalystcp.com'];
-  if (superAdminEmails.includes(email)) {
-    return UserRole.SUPER_ADMIN;
-  }
-  
-  // Team member recognition by name (case insensitive)
-  const partners = ['aj klenk', 'brian ford'];
-  const analysts = ['davis hammond', 'austin blondell'];
-  
-  if (partners.some(partner => name.includes(partner) || email.includes(partner.replace(' ', '')))) {
-    return UserRole.PARTNER;
-  }
-  
-  if (analysts.some(analyst => name.includes(analyst) || email.includes(analyst.replace(' ', '')))) {
-    return UserRole.ANALYST;
-  }
-  
-  // All other @catalystcp.com emails are analysts by default
-  if (email.endsWith('@catalystcp.com')) {
-    return UserRole.ANALYST;
-  }
-  
-  // Everyone else is a broker
+  // If no recognized persisted role is available, use the least-privileged
+  // default rather than inferring internal access from an email address.
   return UserRole.BROKER;
 }
 

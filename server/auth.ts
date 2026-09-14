@@ -60,14 +60,8 @@ function enforcePlatformRolePolicy<T extends SelectUser | null | undefined>(user
   if (isPlatformAdminEmail(email)) {
     return { ...user, role: platformRoleForEmail(email, user.role || "ADMIN") } as T;
   }
-  const role = String(user.role || "").toUpperCase();
-  if (role === "ADMIN" || role === "SUPER_ADMIN") {
-    // Privileged platform roles are never accepted from persistence alone.
-    return {
-      ...user,
-      role: "USER",
-    } as T;
-  }
+  // Persisted administrator roles are authoritative for internal accounts.
+  // Platform-owner emails above still override stale stored values.
   return user;
 }
 
@@ -469,17 +463,16 @@ export function setupAuth(app: Express) {
         try {
           broker = await storage.getBrokerByUserId(userId);
         } catch (error) {
-          // Broker might not exist for analysts, that's okay
-          console.log(`No broker found for user ${userId}, likely an analyst`);
+          // Internal administrators and other non-broker accounts may not have a broker profile.
+          console.log(`No broker found for user ${userId}`);
         }
       }
       
-      // Check if user is an analyst (any email ending in catalystcp.com)
       const userEmail = (user?.email || '').toLowerCase();
-      const isAnalyst = userEmail.endsWith('@catalystcp.com');
+      const isAnalyst = String(user?.role || '').toUpperCase() === 'ANALYST';
       
-      // CRITICAL FIX (Dec 15, 2025): Determine correct role based on email domain
-      // This ensures @catalystcp.com users get analyst navigation, not broker navigation
+      // Persisted roles are authoritative. Platform owner emails may elevate a stale
+      // stored role, but ordinary Catalyst accounts must not be reclassified by email.
       let role = user?.role || 'BROKER';
       if (isPlatformAdminEmail(userEmail)) {
         role = platformRoleForEmail(userEmail, "ADMIN");
@@ -487,17 +480,6 @@ export function setupAuth(app: Express) {
         role = 'DEVELOPER';
       } else if (userEmail === 'demo@catalystcp.com') {
         role = 'DEMO';
-      } else if (userEmail.endsWith('@catalystcp.com')) {
-        // Check for partners. DEVELOPER is intentionally never inferred from
-        // email because it is a tenant-isolated platform role.
-        const partners = ['ajklenk', 'brianford'];
-        const emailPrefix = userEmail.split('@')[0].toLowerCase().replace(/[^a-z]/g, '');
-        
-        if (partners.some(partner => emailPrefix.includes(partner.replace(' ', '')))) {
-          role = 'PARTNER';
-        } else {
-          role = 'ANALYST';
-        }
       }
       
       let developerProfile = null;

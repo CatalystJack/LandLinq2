@@ -55,7 +55,7 @@ export default function UserManagement() {
     firstName: "",
     lastName: "",
     password: "",
-    role: "analyst",
+    role: "admin",
     dealRole: ""
   });
 
@@ -101,7 +101,7 @@ export default function UserManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setIsAddUserOpen(false);
-      setNewUser({ email: "", firstName: "", lastName: "", password: "", role: "analyst", dealRole: "" });
+      setNewUser({ email: "", firstName: "", lastName: "", password: "", role: "admin", dealRole: "" });
       toast({
         title: "Success",
         description: "User created successfully",
@@ -227,7 +227,6 @@ export default function UserManagement() {
     const role = String(user.role || "").toUpperCase();
     if (role === "DEVELOPER") return "developer";
     if (role === "ADMIN" || role === "SUPER_ADMIN" || isPlatformAdminEmail(user.email)) return "admin";
-    if (role === "ANALYST" || user.email.toLowerCase().endsWith("@catalystcp.com")) return "analyst";
     return "broker";
   };
 
@@ -237,8 +236,6 @@ export default function UserManagement() {
         return "Investment Company Team";
       case "admin":
         return "Admin Team";
-      case "analyst":
-        return "LandLinq Team";
       default:
         return "Broker";
     }
@@ -255,7 +252,6 @@ export default function UserManagement() {
 
   const getRoleBadgeVariant = (user: User) => {
     if (getRoleKey(user) === "admin") return "default";
-    if (getRoleKey(user) === "analyst") return "default";
     return "secondary";
   };
 
@@ -394,7 +390,6 @@ export default function UserManagement() {
                         <SelectItem value="all">All Roles</SelectItem>
                         <SelectItem value="super_admin">Super Admin</SelectItem>
                         <SelectItem value="admin">Admin Team</SelectItem>
-                        <SelectItem value="analyst">LandLinq Team</SelectItem>
                         <SelectItem value="developer">Investment Company Team</SelectItem>
                         <SelectItem value="broker">Brokers</SelectItem>
                       </SelectContent>
@@ -461,7 +456,6 @@ export default function UserManagement() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="analyst">LandLinq Team</SelectItem>
                               <SelectItem value="admin">Admin</SelectItem>
                             </SelectContent>
                           </Select>
@@ -673,7 +667,7 @@ export default function UserManagement() {
                   <div className="space-y-2">
                     <Label htmlFor="editUserType">Access Role</Label>
                     <Select
-                      value={editingUser.role === "SUPER_ADMIN" ? "ADMIN" : (editingUser.role || "ANALYST")}
+                      value={editingUser.role === "SUPER_ADMIN" ? "ADMIN" : (editingUser.role || "ADMIN")}
                       onValueChange={(value) => setEditingUser({ ...editingUser, role: value })}
                       disabled={editingUser.role === "SUPER_ADMIN"}
                     >
@@ -681,7 +675,6 @@ export default function UserManagement() {
                         <SelectValue placeholder="Select user type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ANALYST">LandLinq Team</SelectItem>
                         <SelectItem value="ADMIN">Admin Team</SelectItem>
                         <SelectItem value="DEVELOPER">Investment Company Team</SelectItem>
                       </SelectContent>
@@ -813,7 +806,7 @@ export default function UserManagement() {
                   <div className="border-t pt-4" />
 
                   {/* Role Definitions */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Card className="border-2 border-red-200">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-2 mb-3">
@@ -837,22 +830,6 @@ export default function UserManagement() {
                           <h3 className="font-semibold text-indigo-700">Admin</h3>
                         </div>
                         <p className="text-sm text-gray-600 mb-3">Standard platform administrator access</p>
-                        <ul className="text-sm text-gray-500 space-y-1">
-                          <li>• Deal management</li>
-                          <li>• Broker oversight</li>
-                          <li>• Analytics access</li>
-                          <li>• Team collaboration</li>
-                        </ul>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-2 border-blue-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Users className="h-5 w-5 text-blue-500" />
-                          <h3 className="font-semibold text-blue-700">LandLinq Team</h3>
-                        </div>
-                        <p className="text-sm text-gray-600 mb-3">Internal team members</p>
                         <ul className="text-sm text-gray-500 space-y-1">
                           <li>• Deal management</li>
                           <li>• Broker oversight</li>

@@ -261,13 +261,13 @@ function Router() {
     );
   }
 
-  // UNIFIED DASHBOARD: SUPER_ADMIN, ADMIN, and ANALYST all see the same dashboard
-  if (isAuthenticated && user && (userRole === UserRole.SUPER_ADMIN || userRole === UserRole.ADMIN || userRole === UserRole.ANALYST)) {
+  // UNIFIED DASHBOARD: SUPER_ADMIN and ADMIN share the platform dashboard
+  if (isAuthenticated && user && (userRole === UserRole.SUPER_ADMIN || userRole === UserRole.ADMIN)) {
     const userEmail = (user as any)?.claims?.email || (user as any)?.email || '';
     return (
       <Suspense fallback={<LoadingFallback />}>
         <Switch>
-          {/* Admin/Analyst shared routes - all lazy loaded */}
+          {/* Admin shared routes - all lazy loaded */}
           <Route path="/executive" component={ExecutiveDashboard} />
           <Route path="/affordable-housing" component={AffordableHousingScoring} />
           <Route path="/data-hub" component={DataHub} />
@@ -642,7 +642,7 @@ function Router() {
 
       <Route path="/partner-developers" component={() => {
         if (isAuthenticated && user) {
-          const internalRoles = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ANALYST, UserRole.DEVELOPER, UserRole.PARTNER];
+          const internalRoles = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.DEVELOPER, UserRole.PARTNER];
           if (internalRoles.includes(userRole as UserRole)) {
             return (
               <Suspense fallback={<LoadingFallback />}>
@@ -656,7 +656,7 @@ function Router() {
 
       <Route path="/partner-brokers-admin" component={() => {
         if (isAuthenticated && user) {
-          const internalRoles = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ANALYST];
+          const internalRoles = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
           if (internalRoles.includes(userRole as UserRole)) {
             return (
               <Suspense fallback={<LoadingFallback />}>

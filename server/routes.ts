@@ -3093,13 +3093,13 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.get('/api/team-members', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
-      const analystRole = String(user?.role || "").toUpperCase();
-      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email)
-        || analystRole === "ANALYST"
-        || analystRole === "ADMIN";
+      const persistedRole = String(user?.role || "").toUpperCase();
+      const isAdmin = isPlatformAdminEmail(user?.claims?.email || user?.email)
+        || persistedRole === "SUPER_ADMIN"
+        || persistedRole === "ADMIN";
       
-      if (!isAnalyst) {
-        return res.status(403).json({ message: "Access denied. Analyst privileges required." });
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Access denied. Administrator privileges required." });
       }
 
       const teamMembers = await storage.getCatalystTeamMembers();
@@ -3164,6 +3164,11 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         return res.status(400).json({ message: "Missing required fields" });
       }
 
+      const normalizedRole = String(role || "ADMIN").toUpperCase();
+      if (!["ADMIN", "BROKER", "DEVELOPER"].includes(normalizedRole)) {
+        return res.status(400).json({ message: "Unsupported user role" });
+      }
+
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
@@ -3179,7 +3184,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         email,
         password: hashedPassword,
         firstName,
-        lastName
+        lastName,
+        role: normalizedRole,
       });
 
       // Remove password from response
@@ -12184,8 +12190,13 @@ RULES:
     if (isPlatformAdminEmail(email)) {
       return { isPlatformAdmin: true, userId, assignedProfileIds: [] };
     }
-    if (String(req.user?.role || "").toUpperCase() !== "ANALYST" || !userId) {
-      res.status(403).json({ error: "Listing Review access requires an assigned analyst account" });
+    const persistedRole = String(req.user?.role || "").toUpperCase();
+    if (!userId || !(
+      isPlatformAdminEmail(email)
+      || persistedRole === "SUPER_ADMIN"
+      || persistedRole === "ADMIN"
+    )) {
+      res.status(403).json({ error: "Listing Review access requires administrator access" });
       return null;
     }
     const assignments = await db.execute(sql`
@@ -12409,7 +12420,7 @@ RULES:
           lastName: users.lastName,
         }).from(users).where(and(
           isNull(users.developerProfileId),
-          inArray(users.role, ["ADMIN", "SUPER_ADMIN", "ANALYST", "admin", "super_admin", "analyst"]),
+          inArray(users.role, ["ADMIN", "SUPER_ADMIN", "admin", "super_admin"]),
         )).orderBy(asc(users.firstName), asc(users.lastName)),
       ]);
       const value = (prospects as any[]).reduce((sum, prospect) => sum + (Number(prospect.estimatedValue) || 0), 0);
@@ -21883,14 +21894,14 @@ RULES:
       const userEmail = user?.email || '';
       
       // Platform-domain users retain access even if a legacy session carries a stale role.
-      const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'ANALYST'];
+      const allowedRoles = ['SUPER_ADMIN', 'ADMIN'];
       const isAuthorized = isPlatformAdminEmail(userEmail) || allowedRoles.includes(userRole);
       
       console.log('🧪 Test email request:', { userEmail, userRole, isAuthorized });
       
       if (!isAuthorized) {
         console.log('❌ Test email denied - insufficient privileges');
-        return res.status(403).json({ message: "Access denied. Administrator or Analyst privileges required." });
+        return res.status(403).json({ message: "Access denied. Administrator privileges required." });
       }
 
       const { email, brandingSettings } = req.body;
@@ -22913,7 +22924,7 @@ RULES:
       const persistedRole = String(user?.role || "").toUpperCase();
       let canAccess = isPlatformAdminEmail(userEmail)
         || persistedRole === "ADMIN"
-        || persistedRole === "ANALYST";
+        || persistedRole === "SUPER_ADMIN";
 
       if (!canAccess && persistedRole === "DEVELOPER" && user?.developerProfileId) {
         const [send] = await db.select({ id: partnerDeveloperSends.id })
