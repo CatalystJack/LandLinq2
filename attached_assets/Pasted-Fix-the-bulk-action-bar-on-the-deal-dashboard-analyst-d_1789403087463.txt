@@ -1,0 +1,37 @@
+Fix the bulk action bar on the deal dashboard (analyst-dashboard.tsx, ~lines 
+6215-6306): remove a debug button that's actively dangerous in production, fix 
+the color logic, and add a missing safety confirmation.
+
+TASK 1 — Remove the "Test Mutation" button entirely
+This button (~lines 6279-6306, marked "DEBUG: Test cellUpdateMutation" in the 
+code) writes real test text into a real deal's notes field every time it's 
+clicked (deals[0].analystNotes gets overwritten with "Test update - [timestamp]"). 
+This is debug-only functionality that should never have been visible in 
+production — remove the button and its handler entirely.
+
+TASK 2 — Fix the color logic to actually mean something
+  - Approve (~line 6220): change from brand blue (#4A90E2) to green, signaling a 
+    clear positive/go action — distinct from Review (amber) and Reject (red).
+  - Delete (~line 6247): currently red-800, one shade darker than Reject's 
+    red-600 — too similar, and dangerously easy to misclick given Delete is 
+    permanent while Reject is reversible. Make Delete visually distinct from 
+    Reject — consider a different treatment entirely (e.g. an outlined/bordered 
+    style with a red icon, rather than another solid red fill) so it doesn't 
+    read as "a slightly different shade of the same button."
+  - Review, Clear, Score: leave as-is, these already make sense (amber for 
+    Review matching the existing classification color, gray for Clear, navy for 
+    the informational Score action).
+
+TASK 3 — Add a confirmation dialog to the bulk Delete action
+handleBulkOperation('delete-all') currently executes immediately with no 
+confirmation step, despite being able to permanently delete every selected deal 
+(potentially hundreds at once, per "305 selected"). Add a confirmation dialog 
+(reuse the existing AlertDialog pattern already used elsewhere in this app) 
+clearly stating how many deals will be permanently deleted, requiring explicit 
+confirmation before the action executes.
+
+Verify: confirm the Test Mutation button is completely gone and no code path can 
+write test data to a real deal's notes. Confirm Approve now shows green, and 
+Delete is now clearly visually distinct from Reject. Confirm clicking Delete with 
+deals selected now shows a confirmation dialog stating the count, and only 
+proceeds after explicit confirmation.

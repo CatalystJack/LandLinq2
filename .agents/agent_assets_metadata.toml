@@ -175,3 +175,17 @@ mtime_ms = 1789402416880
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/cdf8d498-deab-414d-a601-37d5d7dac7f2/ce5842ef-b550-444b-8196-48dc47316c05"
 storage_version_token = "1789402424032966"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "m2Tnq2fd-ryZWXfmDhy_Y"
+uri = "file://screenshots/analyst-dashboard-plain-table-headers.jpg"
+type = "image"
+title = "Deal dashboard plain table headers"
+description = "Dashboard table-header screenshot after removing the T, numeric, clock, and link type indicators. Existing header labels and sorting controls remain in place."
+logical_id = "3fa9cef6-9f87-477d-96a5-31b55129e0db"
+content_hash = "sha256:0f075e243aa9d8bd952e28817fa8728e75a4627e641799d3712cfe57a4e30b4f"
+size = 80126
+mtime_ms = 1789403165667
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/3fa9cef6-9f87-477d-96a5-31b55129e0db/48c881cb-ccad-487e-90f8-1640f1c448cf"
+storage_version_token = "1789403171914610"
+content_type = "image/jpeg"

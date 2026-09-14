@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -157,20 +158,6 @@ type ColumnKey = typeof ALL_COLUMNS[number]['key'];
 const TABLE_SELECTION_WIDTH = 36;
 const COLUMN_VISIBILITY_VERSION_KEY = 'deal-table-visible-columns-version';
 const COLUMN_VISIBILITY_VERSION = '2';
-const NUMERIC_HEADER_KEYS = new Set<string>([
-  'id', 'yieldOnCost', 'automatedYoc', 'irr', 'topRentPerUnit', 'topRentPSF',
-  'lihtc', 'price', 'units', 'maxUnitsZoning', 'vintage', 'acres',
-  'netDevelopableAcres', 'dua', 'pricePerUnit',
-]);
-const DATE_HEADER_KEYS = new Set<string>(['date']);
-const FILE_HEADER_KEYS = new Set<string>(['excelModel', 'brokerDocs', 'analystDocs']);
-
-function getHeaderTypeMarker(key: string): string {
-  if (NUMERIC_HEADER_KEYS.has(key)) return '#';
-  if (DATE_HEADER_KEYS.has(key)) return '◷';
-  if (FILE_HEADER_KEYS.has(key)) return '↗';
-  return 'T';
-}
 
 const ASSIGNEE_AVATAR_COLORS = [
   '#2563eb', '#0f766e', '#7c3aed', '#c2410c', '#be123c', '#4f46e5',
@@ -628,6 +615,7 @@ export default function AnalystDashboard() {
   const [showFlaggingDialog, setShowFlaggingDialog] = useState<{dealId: string; dealAddress: string} | null>(null);
   const [reviewingDeal, setReviewingDeal] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState<{dealId: string; dealAddress: string} | null>(null);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
   // Pipeline view slide-out panel
   const [pipelinePanel, setPipelinePanel] = useState<DealWithBroker | null>(null);
@@ -4421,6 +4409,24 @@ export default function AnalystDashboard() {
     return formatDateEST.date(date);
   };
 
+  const operationData: { [key: string]: any } = {
+    'approve-all': { classification: 'green', status: 'high_priority' },
+    'review-all': { classification: 'unclassified', status: 'pending_review' },
+    'reject-all': { classification: 'red', status: 'clear_no' },
+    'delete-all': { operation: 'delete' },
+    'auto-fill-all': { operation: 'auto-fill' },
+  };
+
+  const executeBulkOperation = (operation: string) => {
+    if (operationData[operation]) {
+      bulkOperationMutation.mutate({
+        dealIds: selectedDeals,
+        operation,
+        data: operationData[operation]
+      });
+    }
+  };
+
   // Handle bulk operations
   const handleBulkOperation = (operation: string) => {
     if (selectedDeals.length === 0) {
@@ -4432,29 +4438,17 @@ export default function AnalystDashboard() {
       return;
     }
 
-    const operationData: { [key: string]: any } = {
-      'approve-all': { classification: 'green', status: 'high_priority' },
-      'review-all': { classification: 'unclassified', status: 'pending_review' },
-      'reject-all': { classification: 'red', status: 'clear_no' },
-      'delete-all': { operation: 'delete' },
-      'auto-fill-all': { operation: 'auto-fill' },
-    };
-
-    // Special handling for delete operation with confirmation
     if (operation === 'delete-all') {
-      const confirmed = window.confirm(
-        `Are you sure you want to delete ${selectedDeals.length} selected deals? This action cannot be undone.`
-      );
-      if (!confirmed) return;
+      setBulkDeleteDialogOpen(true);
+      return;
     }
 
-    if (operationData[operation]) {
-      bulkOperationMutation.mutate({
-        dealIds: selectedDeals,
-        operation,
-        data: operationData[operation]
-      });
-    }
+    executeBulkOperation(operation);
+  };
+
+  const confirmBulkDelete = () => {
+    setBulkDeleteDialogOpen(false);
+    executeBulkOperation('delete-all');
   };
 
   // Toggle deal selection
@@ -5165,68 +5159,58 @@ export default function AnalystDashboard() {
 
   // ─── Column render helpers (used for dynamic column ordering) ──────────────
   const thBase = "text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200";
-  const headerLabel = (label: string, headerKey: string) => (
-    <span className="inline-flex items-center gap-1 min-w-0">
-      <span
-        aria-hidden="true"
-        className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border border-gray-300 text-[9px] font-bold leading-none text-gray-400"
-      >
-        {getHeaderTypeMarker(headerKey)}
-      </span>
-      <span>{label}</span>
-    </span>
-  );
+  const headerLabel = (label: string) => <span>{label}</span>;
   const renderHeaderCell = (key: ReorderableColumnKey): JSX.Element | null => {
     const vis = isVisible(key);
     const sortBtn = (label: string, sortKey: string) => (
       <button onClick={() => handleSort(sortKey)} className="flex items-center space-x-1 hover:text-[#07172A]">
-        {headerLabel(label, key)}<ArrowUpDown size={12} />
+        {headerLabel(label)}<ArrowUpDown size={12} />
       </button>
     );
     switch (key) {
-      case 'automatedYoc': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}>{headerLabel('Auto YOC', key)}</th>;
-      case 'developerSummary': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}>{headerLabel('Developer Summary', key)}</th>;
+      case 'automatedYoc': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}>{headerLabel('Auto YOC')}</th>;
+      case 'developerSummary': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}>{headerLabel('Developer Summary')}</th>;
       case 'assigned': return <th key={key} className={`${thBase} min-w-[130px]`} style={{display: vis?'':'none'}}>{sortBtn('Assigned', 'nextAssignee')}</th>;
-      case 'name': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}>{headerLabel('Name', key)}</th>;
+      case 'name': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}>{headerLabel('Name')}</th>;
       case 'yieldOnCost': return <th key={key} className={thBase} style={{display: vis?'':'none'}}>{sortBtn('YOC','yieldOnCost')}</th>;
       case 'irr': return <th key={key} className={`${thBase} min-w-[90px]`} style={{display: vis?'':'none'}}>{sortBtn('IRR','irr')}</th>;
-      case 'excelModel': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{headerLabel('Excel', key)}</th>;
-      case 'reason': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}>{headerLabel('Reason', key)}</th>;
+      case 'excelModel': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{headerLabel('Excel')}</th>;
+      case 'reason': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}>{headerLabel('Reason')}</th>;
       case 'dealType': return <th key={key} className={`${thBase} w-[70px] min-w-[70px]`} style={{display: vis?'':'none'}}>{sortBtn('Deal','dealType')}</th>;
       case 'productTypes': return <th key={key} className={thBase} style={{display: vis?'':'none'}}>{sortBtn('Type','productTypes')}</th>;
-      case 'analystNotes': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{headerLabel('Analyst Notes', key)}</th>;
-      case 'dealSummary': return <th key={key} className={`${thBase} min-w-[160px]`} style={{display: vis?'':'none'}}>{headerLabel('Summary', key)}</th>;
-      case 'developerNotes': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{headerLabel('Dev Notes', key)}</th>;
-      case 'notes': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}>{headerLabel('Notes', key)}</th>;
+      case 'analystNotes': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{headerLabel('Analyst Notes')}</th>;
+      case 'dealSummary': return <th key={key} className={`${thBase} min-w-[160px]`} style={{display: vis?'':'none'}}>{headerLabel('Summary')}</th>;
+      case 'developerNotes': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{headerLabel('Dev Notes')}</th>;
+      case 'notes': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}>{headerLabel('Notes')}</th>;
       case 'topRentPerUnit': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{sortBtn('Top Rent/Unit','topRentPerUnit')}</th>;
       case 'topRentPSF': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{sortBtn('Top Rent PSF','topRentPSF')}</th>;
       case 'lihtc': return <th key={key} className={`${thBase} min-w-[60px]`} style={{display: vis?'':'none'}}>{sortBtn('LIHTC','lihtcScoreTotal')}</th>;
       case 'qct': return <th key={key} className={`${thBase} min-w-[45px]`} style={{display: vis?'':'none'}}>{sortBtn('QCT','qctStatus')}</th>;
-      case 'dda': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}><button onClick={() => handleSort('ddaStatus')} className="flex items-center space-x-1 hover:text-[#07172A]" title="Difficult Development Area (HUD 2026) — MDDA = Metropolitan, NMDDA = Non-Metropolitan">{headerLabel('DDA', key)}<ArrowUpDown size={12} /></button></th>;
+      case 'dda': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}><button onClick={() => handleSort('ddaStatus')} className="flex items-center space-x-1 hover:text-[#07172A]" title="Difficult Development Area (HUD 2026) — MDDA = Metropolitan, NMDDA = Non-Metropolitan">{headerLabel('DDA')}<ArrowUpDown size={12} /></button></th>;
       case 'oz': return <th key={key} className={`${thBase} min-w-[45px]`} style={{display: vis?'':'none'}}>{sortBtn('OZ','ozStatus')}</th>;
-      case 'fema': return <th key={key} className={`${thBase} min-w-[58px]`} style={{display: vis?'':'none'}}>{headerLabel('FEMA', key)}</th>;
-      case 'floodZone': return <th key={key} className={`${thBase} min-w-[72px]`} style={{display: vis?'':'none'}}>{headerLabel('Flood Zone', key)}</th>;
-      case 'wetlands': return <th key={key} className={`${thBase} min-w-[68px]`} style={{display: vis?'':'none'}}>{headerLabel('Wetlands', key)}</th>;
-      case 'environmental': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}>{headerLabel('Environmental', key)}</th>;
+      case 'fema': return <th key={key} className={`${thBase} min-w-[58px]`} style={{display: vis?'':'none'}}>{headerLabel('FEMA')}</th>;
+      case 'floodZone': return <th key={key} className={`${thBase} min-w-[72px]`} style={{display: vis?'':'none'}}>{headerLabel('Flood Zone')}</th>;
+      case 'wetlands': return <th key={key} className={`${thBase} min-w-[68px]`} style={{display: vis?'':'none'}}>{headerLabel('Wetlands')}</th>;
+      case 'environmental': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}>{headerLabel('Environmental')}</th>;
       case 'date': return <th key={key} className={`${thBase} min-w-[65px]`} style={{display: vis?'':'none'}}>{sortBtn('Date','createdAt')}</th>;
-      case 'brokerDocs': return <th key={key} className={`${thBase} ${expandedBrokerDocs.size>0?'w-[260px]':'w-[110px] max-w-[110px]'}`} style={{display: vis?'':'none'}}>{headerLabel('Broker Docs', key)}</th>;
-      case 'analystDocs': return <th key={key} className={`${thBase} ${expandedAnalystDocs.size>0?'w-[260px]':'w-[130px] max-w-[130px]'}`} style={{display: vis?'':'none'}}>{headerLabel('Analyst Docs', key)}</th>;
-      case 'comps': return <th key={key} className={`${thBase} min-w-[72px]`} style={{display: vis?'':'none'}}>{headerLabel('Comps', key)}</th>;
+      case 'brokerDocs': return <th key={key} className={`${thBase} ${expandedBrokerDocs.size>0?'w-[260px]':'w-[110px] max-w-[110px]'}`} style={{display: vis?'':'none'}}>{headerLabel('Broker Docs')}</th>;
+      case 'analystDocs': return <th key={key} className={`${thBase} ${expandedAnalystDocs.size>0?'w-[260px]':'w-[130px] max-w-[130px]'}`} style={{display: vis?'':'none'}}>{headerLabel('Analyst Docs')}</th>;
+      case 'comps': return <th key={key} className={`${thBase} min-w-[72px]`} style={{display: vis?'':'none'}}>{headerLabel('Comps')}</th>;
       case 'price': return <th key={key} className={`${thBase} min-w-[100px]`} style={{display: vis?'':'none'}}>{sortBtn('Price','askingPrice')}</th>;
       case 'units': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{sortBtn('Units','unitCount')}</th>;
-      case 'maxUnitsZoning': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}>{headerLabel('Max Zoning', key)}</th>;
+      case 'maxUnitsZoning': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}>{headerLabel('Max Zoning')}</th>;
       case 'vintage': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{sortBtn('Vintage','vintage')}</th>;
       case 'acres': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{sortBtn('Acres','sizeAcres')}</th>;
       case 'netDevelopableAcres': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{sortBtn('Net Dev Acres','netDevelopableAcres')}</th>;
-      case 'dua': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}>{headerLabel('DUA', key)}</th>;
+      case 'dua': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}>{headerLabel('DUA')}</th>;
       case 'zoning': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}>{sortBtn('Zoning','zoning')}</th>;
-      case 'wetlandNotes': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}>{headerLabel('Wetland/Environmental Notes', key)}</th>;
+      case 'wetlandNotes': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}>{headerLabel('Wetland/Environmental Notes')}</th>;
       case 'entitlements': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}>{sortBtn('Entitlements','hasEntitlements')}</th>;
-      case 'pricePerUnit': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}>{headerLabel('Price/Unit', key)}</th>;
-      case 'sewer': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{headerLabel('Sewer', key)}</th>;
+      case 'pricePerUnit': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}>{headerLabel('Price/Unit')}</th>;
+      case 'sewer': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{headerLabel('Sewer')}</th>;
       case 'brokerName': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{sortBtn('Broker Name','broker.firstName')}</th>;
-      case 'brokerEmail': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{headerLabel('Broker Email', key)}</th>;
-      case 'brokerPhone': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{headerLabel('Broker Phone', key)}</th>;
+      case 'brokerEmail': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{headerLabel('Broker Email')}</th>;
+      case 'brokerPhone': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{headerLabel('Broker Phone')}</th>;
       default: return null;
     }
   };
@@ -6839,7 +6823,7 @@ export default function AnalystDashboard() {
                             onClick={() => handleSort('dealNumber')}
                             className="flex items-center space-x-1 hover:text-[#07172A]"
                           >
-                            {headerLabel('ID', 'id')}
+                            {headerLabel('ID')}
                             <ArrowUpDown size={12} />
                           </button>
                         </th>
@@ -6848,7 +6832,7 @@ export default function AnalystDashboard() {
                             onClick={() => handleSort('classification')}
                             className="flex items-center space-x-1 hover:text-[#07172A]"
                           >
-                            {headerLabel('Status', 'colStatus')}
+                            {headerLabel('Status')}
                             <ArrowUpDown size={12} />
                           </button>
                         </th>
@@ -6857,7 +6841,7 @@ export default function AnalystDashboard() {
                             onClick={() => handleSort('priority')}
                             className="flex items-center space-x-1 hover:text-[#07172A]"
                           >
-                            {headerLabel('Priority', 'colPriority')}
+                            {headerLabel('Priority')}
                             <ArrowUpDown size={12} />
                           </button>
                         </th>
@@ -6866,14 +6850,14 @@ export default function AnalystDashboard() {
                             onClick={() => handleSort('address')}
                             className="flex items-center space-x-1 hover:text-[#07172A]"
                           >
-                            {headerLabel('Property Address', 'propertyAddress')}
+                            {headerLabel('Property Address')}
                             <ArrowUpDown size={12} />
                           </button>
                         </th>
                         {/* Dynamic reorderable columns */}
                         {columnOrder.map(k => renderHeaderCell(k))}
                         <th className="text-center px-1 py-1 font-semibold text-xs text-gray-700 min-w-[60px]">
-                          {headerLabel('Actions', 'actions')}
+                          {headerLabel('Actions')}
                         </th>
                       </tr>
                     </thead>
