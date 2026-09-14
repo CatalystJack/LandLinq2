@@ -42,6 +42,7 @@ import {
   salesPipelineEmailTemplates,
   salesProspectEmails,
   developerProductTypes,
+  outreachSenders,
   emailIntakeQueue,
   propertyData,
 } from "@shared/schema";
@@ -13854,6 +13855,7 @@ RULES:
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
+      const currentUserId = String(req.user?.id || req.user?.claims?.sub || "");
       const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import('@shared/schema');
       const [profile] = await db.select().from(developerProfiles).where(and(
         eq(developerProfiles.id, developerProfileId),
@@ -13874,6 +13876,59 @@ RULES:
     } catch (error: any) {
       console.error('[developer-profile/me] Error:', error);
       return res.status(500).json({ error: 'Failed to load company settings' });
+    }
+  });
+
+  app.get("/api/developer-profile/me/onboarding-status", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+
+      const [profile, activeProductTypes, connectedSenders, teamCount] = await Promise.all([
+        db.select({
+          profileType: developerProfiles.profileType,
+          targetStates: developerProfiles.targetStates,
+          targetCounties: developerProfiles.targetCounties,
+        }).from(developerProfiles).where(and(
+          eq(developerProfiles.id, developerProfileId),
+          eq(developerProfiles.isActive, true),
+        )).limit(1),
+        db.select({ id: developerProductTypes.id }).from(developerProductTypes).where(and(
+          eq(developerProductTypes.developerProfileId, developerProfileId),
+          eq(developerProductTypes.isActive, true),
+        )),
+        db.select({ id: outreachSenders.id }).from(outreachSenders).where(and(
+          eq(outreachSenders.developerProfileId, developerProfileId),
+          eq(outreachSenders.isActive, true),
+          eq(outreachSenders.outlookConnected, true),
+        )).limit(1),
+        db.select({ count: count() }).from(users).where(and(
+          eq(users.developerProfileId, developerProfileId),
+          eq(users.role, "DEVELOPER"),
+          currentUserId ? ne(users.id, currentUserId) : sql`true`,
+        )),
+      ]);
+
+      if (!profile[0]) return res.status(404).json({ error: "Investment Company profile not found" });
+
+      const criteriaSet = profile[0].profileType === "general_sales"
+        ? true
+        : activeProductTypes.length > 0 &&
+          ((profile[0].targetStates || []).length > 0 || (profile[0].targetCounties || []).length > 0);
+      const teamInvited = Number(teamCount[0]?.count || 0);
+      const checks = {
+        criteriaSet,
+        emailConnected: connectedSenders.length > 0,
+        teamInvited,
+      };
+
+      return res.json({
+        checks,
+        complete: checks.criteriaSet && checks.emailConnected && checks.teamInvited > 0,
+      });
+    } catch (error: any) {
+      console.error("[developer-profile/me/onboarding-status] Error:", error);
+      return res.status(500).json({ error: "Failed to load onboarding status" });
     }
   });
 

@@ -101,6 +101,15 @@ interface DealWithBroker extends Omit<Deal, 'publicListings'> {
   coordinates?: { lat: number; lng: number } | null;
 }
 
+interface DeveloperOnboardingStatus {
+  checks: {
+    criteriaSet: boolean;
+    emailConnected: boolean;
+    teamInvited: number;
+  };
+  complete: boolean;
+}
+
 
 // Column visibility configuration
 const ALL_COLUMNS = [
@@ -570,6 +579,16 @@ export default function AnalystDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const isDeveloperUser = String((user as any)?.role || "").toUpperCase() === "DEVELOPER";
+  const { data: onboardingStatus } = useQuery<DeveloperOnboardingStatus>({
+    queryKey: ["/api/developer-profile/me/onboarding-status"],
+    enabled: isAuthenticated && isDeveloperUser,
+    queryFn: async () => {
+      const response = await fetch("/api/developer-profile/me/onboarding-status", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load onboarding status");
+      return response.json();
+    },
+  });
   const [filterClassifications, setFilterClassifications] = useState<string[]>([]);
   const [filterPriorities, setFilterPriorities] = useState<string[]>([]);
   const [filterDealTypes, setFilterDealTypes] = useState<string[]>([]);
@@ -5788,6 +5807,72 @@ export default function AnalystDashboard() {
               </div>
             </div>
           </header>
+
+          {onboardingStatus && !onboardingStatus.complete && isDeveloperUser && (
+            <Card className="mb-6 overflow-hidden border-[#b8d8f5] bg-white shadow-sm" data-testid="card-developer-onboarding-checklist">
+              <div className="border-l-4 border-[#4A90E2] px-4 py-4 sm:px-5">
+                <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2f73bb]">Getting started</p>
+                    <h2 className="mt-1 font-serif text-xl text-[#07172A]">Complete your company setup</h2>
+                    <p className="mt-1 text-sm text-gray-500">Finish these steps to get the most from your Investment Company portal.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 border-[#4A90E2] text-[#2f73bb]"
+                    onClick={() => setLocation("/developer/settings")}
+                  >
+                    Open settings
+                  </Button>
+                </div>
+                <div className="mt-4 grid gap-2 md:grid-cols-3">
+                  {[
+                    {
+                      label: "Acquisition criteria set",
+                      complete: onboardingStatus.checks.criteriaSet,
+                      icon: Building,
+                      action: () => setLocation("/developer/settings"),
+                    },
+                    {
+                      label: "Email connected",
+                      complete: onboardingStatus.checks.emailConnected,
+                      icon: Mail,
+                      action: () => setLocation("/developer/outreach"),
+                    },
+                    {
+                      label: `Team invited (${onboardingStatus.checks.teamInvited})`,
+                      complete: onboardingStatus.checks.teamInvited > 0,
+                      icon: Users,
+                      action: () => setLocation("/developer/user-management"),
+                    },
+                  ].map(({ label, complete, icon: Icon, action }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={complete ? undefined : action}
+                      disabled={complete}
+                      className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
+                        complete
+                          ? "border-emerald-200 bg-emerald-50"
+                          : "border-gray-200 bg-gray-50 hover:border-[#4A90E2] hover:bg-blue-50"
+                      }`}
+                    >
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                        complete ? "bg-emerald-600 text-white" : "bg-white text-gray-400"
+                      }`}>
+                        {complete ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                      </span>
+                      <span className={`text-sm font-medium ${complete ? "text-emerald-800" : "text-gray-700"}`}>
+                        {label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
 
           {/* API Safety System Status Banner */}
           <ApiSafetyBanner />
