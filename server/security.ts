@@ -146,7 +146,7 @@ export function optimizeSessionSecurity() {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'strict' as const
+      sameSite: 'lax' as const
     },
     // Enhanced session store configuration
     store: {

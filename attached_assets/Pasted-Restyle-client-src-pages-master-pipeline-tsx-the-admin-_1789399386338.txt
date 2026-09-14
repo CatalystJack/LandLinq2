@@ -1,0 +1,37 @@
+Restyle client/src/pages/master-pipeline.tsx (the admin "Deal activity by 
+Investment Company" table) to match the visual design already established in 
+client/src/pages/developer-pipeline.tsx — do not invent new design patterns, 
+copy the existing ones from that file directly.
+
+TASK 1 — Background and page structure
+Apply bg-warm (the existing --background-warm token, #fbfaf8) as the main page 
+background, matching developer-pipeline.tsx's <div className="min-h-screen 
+bg-warm">.
+
+TASK 2 — Header treatment
+Match developer-pipeline.tsx's header pattern exactly: a small-caps eyebrow label 
+above the title (e.g. "Admin workspace" in text-sm font-semibold uppercase 
+tracking-[0.18em] text-[#4A90E2]), the page title in font-serif text-4xl with an 
+appropriate icon, and a supporting description line beneath in text-slate-600.
+
+TASK 3 — Summary stat row
+Add a stat-card row above the table matching developer-pipeline.tsx's exact 
+pattern (rounded-lg border border-slate-200 bg-slate-50 cards, each with a large 
+bold number and a small uppercase tracking-wide label beneath). Show relevant 
+admin-level stats here — total deals across all companies (306, per the current 
+"306 rows" count), total classified as Passed, and total as Review, using 
+whatever data this page already has access to.
+
+TASK 4 — Button hierarchy
+If this page has multiple action buttons, ensure only one uses the solid dark 
+navy fill (#0A2B4A) as the primary action, with any others as outline/ghost 
+buttons — matching developer-pipeline.tsx's "New Opportunity" (filled) vs. 
+"Manage Stages" (outline) pattern.
+
+Do NOT change the actual table data, columns, or the classification badge colors 
+(Review/Passed/Pursuing) — this is a header and page-chrome restyle only, the 
+table rows themselves stay as they are.
+
+Verify: screenshot before/after and confirm the table data and functionality are 
+completely unchanged, and confirm the page now visually matches 
+developer-pipeline.tsx's header/background/button treatment.

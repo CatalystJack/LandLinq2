@@ -1,0 +1,52 @@
+Redesign client/src/pages/executive-dashboard.tsx (the "Platform Dashboard" admin 
+page) to look more professional and editorial, following the Harvey-inspired 
+design direction already discussed for this app. This prompt is self-contained — 
+create any missing design tokens as part of this task rather than assuming they 
+already exist.
+
+TASK 1 — Establish design tokens (if not already present)
+In client/src/index.css, add if missing: --color-cream (a warm off-white 
+background, not stark white), --color-light-blue (a soft, pale blue for active/ 
+selected states). Add "Space Grotesk" via Google Fonts as --font-headline in 
+index.css and as a "headline" entry in tailwind.config.ts fontFamily.
+
+TASK 2 — Big, confident number treatment for the four stat cards
+Currently the four top stat cards (Investment Companies, Company Deal Activity, 
+CRM Contacts, Outreach Sent) use four different bright pastel background colors 
+(blue, green, purple, blue again) with a matching colored icon circle in each — 
+this reads as a generic templated card kit. Replace with: one consistent, 
+restrained card style (same neutral background, same border treatment) across 
+all four cards, and render each number (1, 305, 0, 0) large in the new 
+--font-headline font — mirroring Harvey's oversized "49.5%" treatment — with the 
+label beneath in small, muted text. Icons can stay but should be simplified to a 
+single muted color rather than four different bright hues.
+
+TASK 3 — Warm background
+Change the page's main background from white to --color-cream.
+
+TASK 4 — Pill-style toggle
+Convert the "LandLinq Overview / System-Wide" two-button toggle to the same 
+rounded pill/segmented control style already used elsewhere in this app (soft 
+light-blue background on the active option, not a solid white box with a border), 
+matching the Table/Pipeline/Map switcher pattern in analyst-dashboard.tsx.
+
+TASK 5 — Page title typography
+Render "Platform Dashboard" and the "Classification by Investment Company" / 
+"Deal Source Mix" chart titles in the new --font-headline font. Keep the 
+supporting description text ("A parent view of every Investment Company...") in 
+the existing body font.
+
+TASK 6 — Button restraint
+Of the three top-right buttons (Manage Partners, Refresh, All Deal Pipeline), 
+keep only one as a solid-filled primary action — "All Deal Pipeline" already 
+looks like the intended primary action in dark navy, so leave that one as-is. 
+Confirm "Manage Partners" and "Refresh" remain as quieter outlined/ghost buttons, 
+not filled.
+
+Do NOT change the actual chart data, colors tied to classification (Passed/ 
+Review/Pursuing), or any functional behavior — this is a visual-only pass.
+
+Verify: screenshot before/after and confirm all data displayed is unchanged, only 
+the visual treatment. Confirm the four stat cards no longer use four different 
+bright background colors, and confirm the big numbers now render in the new 
+headline font.

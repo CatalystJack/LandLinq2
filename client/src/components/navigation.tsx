@@ -1,8 +1,31 @@
 import { useAuth, UserRole } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
-import { Menu, X, ChevronDown } from "lucide-react";
-import { useState, useMemo, memo } from "react";
+import {
+  BarChart3,
+  Briefcase,
+  Building2,
+  ChevronDown,
+  CircleDot,
+  Contact,
+  Database,
+  FileSearch,
+  Home,
+  LayoutDashboard,
+  LineChart,
+  LogOut,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Send,
+  Settings,
+  Shield,
+  UserCog,
+  Users,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { useState, useMemo, memo, useEffect } from "react";
 import { AuthModal } from "@/components/auth-modal";
 import { preloadRoute } from "@/lib/route-preload";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
@@ -14,6 +37,35 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const landlinqWhiteLogo = "/assets/landlinq-white-logo.png";
+
+const navIconFor = (name: string): LucideIcon => {
+  const normalized = name.toLowerCase();
+  if (normalized.includes("home") || normalized.includes("overview")) return Home;
+  if (normalized.includes("dashboard") || normalized === "deals" || normalized === "my deals") return LayoutDashboard;
+  if (normalized.includes("pipeline")) return LineChart;
+  if (normalized.includes("investment compan")) return Building2;
+  if (normalized.includes("data")) return Database;
+  if (normalized.includes("analytics")) return BarChart3;
+  if (normalized.includes("audit") || normalized.includes("reports")) return FileSearch;
+  if (normalized.includes("people") || normalized.includes("user")) return UserCog;
+  if (normalized.includes("broker") || normalized.includes("contact")) return Contact;
+  if (normalized.includes("crm")) return Users;
+  if (normalized.includes("outreach")) return Send;
+  if (normalized.includes("setup")) return Settings;
+  if (normalized.includes("process") || normalized.includes("criteria")) return Briefcase;
+  if (normalized.includes("developer")) return Shield;
+  return CircleDot;
+};
+
+function useAppSidebarOffset(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    document.body.dataset.appSidebar = "true";
+    return () => {
+      delete document.body.dataset.appSidebar;
+    };
+  }, [enabled]);
+}
 
 interface NavigationProps {
   onOpenSlideForm?: () => void;
@@ -98,6 +150,10 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isSidebarPinned, setIsSidebarPinned] = useState(false);
+  const [isSidebarHovering, setIsSidebarHovering] = useState(false);
+  useAppSidebarOffset(isAuthenticated);
+  const isSidebarExpanded = isSidebarPinned || isSidebarHovering;
 
   const handleLogout = () => {
     if (logout) {
@@ -274,8 +330,139 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
   }
 
   return (
-    <nav className="relative border-b border-slate-800 sticky top-0 z-50 shadow-lg" style={{ backgroundColor: '#081729' }}>
-      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+    <nav
+      className="relative sticky top-0 z-50 border-b border-slate-800 bg-[#081729] shadow-lg md:fixed md:inset-y-0 md:left-0 md:border-0 md:bg-transparent md:shadow-none"
+      aria-label="Application navigation"
+    >
+      <aside
+        className={`pointer-events-auto fixed inset-y-0 left-0 z-50 hidden flex-col border-r border-slate-700/80 bg-[#081729] shadow-xl transition-[width] duration-200 md:flex ${
+          isSidebarExpanded ? "w-64" : "w-[4.5rem]"
+        }`}
+        onMouseEnter={() => setIsSidebarHovering(true)}
+        onMouseLeave={() => setIsSidebarHovering(false)}
+        onFocusCapture={() => setIsSidebarHovering(true)}
+        aria-label="Application sidebar"
+      >
+        <div className={`flex h-20 items-center border-b border-white/10 ${isSidebarExpanded ? "justify-between px-4" : "justify-center px-2"}`}>
+          <Link href="/" className="flex min-w-0 items-center gap-2" aria-label="LandLinq home" title="LandLinq home">
+            <img
+              src={landlinqWhiteLogo}
+              alt="LandLinq"
+              className={`h-10 w-auto object-contain transition-all ${isSidebarExpanded ? "max-w-[170px]" : "max-w-9"}`}
+              data-testid="logo-landlinq"
+            />
+          </Link>
+          {isSidebarExpanded && (
+            <button
+              type="button"
+              className="rounded-md p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              onClick={() => setIsSidebarPinned((pinned) => !pinned)}
+              aria-label={isSidebarPinned ? "Collapse navigation sidebar" : "Keep navigation sidebar expanded"}
+              aria-expanded={isSidebarPinned}
+              data-testid="button-sidebar-toggle"
+            >
+              {isSidebarPinned ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </button>
+          )}
+          {!isSidebarExpanded && (
+            <button
+              type="button"
+              className="sr-only"
+              onClick={() => setIsSidebarPinned(true)}
+              aria-label="Expand navigation sidebar"
+              data-testid="button-sidebar-toggle"
+            >
+              Expand navigation
+            </button>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-4">
+          {isPlatformAdmin ? (
+            navigationSections.map((section) => (
+              <div key={section.name} className="mb-4">
+                {isSidebarExpanded ? (
+                  <div className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {section.name}
+                  </div>
+                ) : (
+                  <div className="mx-2 mb-2 border-t border-slate-700/80" aria-hidden="true" />
+                )}
+                <div className="space-y-1">
+                  {section.items.map((item: any) => {
+                    const Icon = navIconFor(item.name);
+                    const isActive = location === item.href;
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        data-nav-item={item.href}
+                        className={`group flex items-center rounded-md py-2.5 text-sm font-medium transition-colors ${
+                          isSidebarExpanded ? "gap-3 px-3" : "justify-center px-2"
+                        } ${isActive ? "bg-white/10 text-cyan-300" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}
+                        onMouseEnter={() => preloadRoute(item.href)}
+                        onFocus={() => preloadRoute(item.href)}
+                        onTouchStart={() => preloadRoute(item.href)}
+                        data-testid={`nav-link-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                        title={item.description}
+                        aria-label={item.name}
+                        aria-current={isActive ? "page" : undefined}
+                      >
+                        <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                        <span className={isSidebarExpanded ? "truncate" : "sr-only"}>{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="space-y-1">
+              {landlinqNav.filter((item: any) => !item.section).map((item: any) => {
+                const Icon = navIconFor(item.name);
+                const isActive = location === item.href;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    data-nav-item={item.href}
+                    className={`group flex items-center rounded-md py-2.5 text-sm font-medium transition-colors ${
+                      isSidebarExpanded ? "gap-3 px-3" : "justify-center px-2"
+                    } ${isActive ? "bg-white/10 text-cyan-300" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}
+                    onMouseEnter={() => preloadRoute(item.href)}
+                    onFocus={() => preloadRoute(item.href)}
+                    onTouchStart={() => preloadRoute(item.href)}
+                    data-testid={`nav-link-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                    title={item.description}
+                    aria-label={item.name}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    <span className={isSidebarExpanded ? "truncate" : "sr-only"}>{item.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-white/10 p-2">
+          <Button
+            onClick={handleLogout}
+            data-testid="button-logout"
+            variant="white"
+            size="sm"
+            className={isSidebarExpanded ? "w-full justify-start gap-3 px-3" : "mx-auto flex w-10 justify-center px-0"}
+            title="Sign Out"
+            aria-label="Sign Out"
+          >
+            <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className={isSidebarExpanded ? "" : "sr-only"}>Sign Out</span>
+          </Button>
+        </div>
+      </aside>
+
+      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 md:hidden">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Left side - Logo */}
           <div className="flex items-center flex-shrink-0">
