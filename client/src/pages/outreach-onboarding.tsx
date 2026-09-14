@@ -2594,7 +2594,6 @@ export default function OutreachOnboarding() {
             <CardTitle>Configure {editingSender.name} ({editingSender.email})</CardTitle>
             <CardDescription>
               Build multi-step drip campaigns for automated broker outreach
-              <span className="block text-xs text-gray-400 mt-1">Sender ID: {editingSender.id}</span>
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

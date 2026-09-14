@@ -1,0 +1,57 @@
+Add four selectable starting templates to the campaign editor in 
+client/src/pages/developer-outreach.tsx, and extend the merge-field system beyond 
+the current {{firstName}}-only support so templates can pull real company data.
+
+TASK 1 — Extend supported merge fields
+Currently only {{firstName}} is supported (pulled from the CRM contact). Add 
+support for: {{companyName}} (the sending Investment Company's own name, from 
+their developer profile), {{targetMarket}} (their target counties/states from 
+their acquisition criteria settings). Wire these into wherever {{firstName}} is 
+currently substituted at send time, using the same existing 
+developerProfileId-scoped data access pattern already used elsewhere in this app.
+
+TASK 2 — Add four selectable starting templates
+Add a template picker to the campaign editor (a simple dropdown or button row 
+above the email content field) offering four starting templates:
+
+Template 1 - Cold intro to a new broker:
+Subject: Land site inquiry, {{targetMarket}}
+Content: "Hi {{firstName}},\n\nI'm reaching out from {{companyName}}. We're 
+actively acquiring multifamily development sites in {{targetMarket}}. If you 
+have anything off market or coming up that fits, I'd love to take a look. Happy 
+to move quickly on the right deal.\n\nWould you be open to a quick call this 
+week?"
+
+Template 2 - Following up on a specific site:
+Subject: Following up
+Content: "Hi {{firstName}},\n\nThanks for sending that site over, it looks like a 
+strong fit for what we're targeting. Could you share more on pricing 
+expectations and timeline?\n\nHappy to hop on a call if that's easier."
+
+Template 3 - Staying top of mind:
+Subject: Still actively acquiring in {{targetMarket}}
+Content: "Hi {{firstName}},\n\nWanted to check back in, we're still very active 
+in {{targetMarket}} and always looking for good land opportunities, on or off 
+market. If anything has come across your desk recently, I'd love to hear about 
+it, even if it's still early."
+
+Template 4 - Re-engaging a quiet contact:
+Subject: Still looking in {{targetMarket}}
+Content: "Hi {{firstName}},\n\nIt's been a bit since we last connected. Just 
+wanted to reconnect and see if anything has come up on your end. We're still 
+actively pursuing sites in {{targetMarket}}, and always appreciate being kept in 
+the loop on new listings."
+
+Do not use em dashes anywhere in this copy — use commas or separate sentences 
+instead, exactly as written above.
+
+TASK 3 — Selecting a template populates the editor, doesn't lock it
+Selecting a template should populate the subject/content fields as a starting 
+point, fully editable afterward, and should also work as a valid starting point 
+for the existing AI writing assistant to refine further.
+
+Verify: select each of the four templates and confirm the subject/content 
+populate correctly with the merge fields still in {{fieldName}} form (not 
+resolved yet, since resolution happens at send time). Send a real test email 
+using one of these templates and confirm {{companyName}} and {{targetMarket}} 
+correctly resolve to real data, not literal placeholder text.
