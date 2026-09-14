@@ -6,111 +6,144 @@ id = "9FEujoL8mBCEsUPIYEw8v"
 uri = "file://attached_assets/brokers_cleaned.csv"
 type = "table"
 title = "brokers_cleaned.csv — 1,020 records with person-specific tags"
+logical_id = "123aa732-db92-468b-8602-4144d1fc47be"
 
 [[outputs]]
 id = "c9OxEhqscCgXARcNOp3jp"
 uri = "file://attached_assets/intracoastal-jack-import.csv"
 type = "table"
 title = "Full CRM Import — 1,761 contacts with Sophisticated tags"
+logical_id = "6ef6f50a-7579-4edf-94db-6285a37d1d01"
 
 [[outputs]]
 id = "Dzj1ixaogXKe16LUxrjiG"
 uri = "file://attached_assets/aj_jack_unknown_sophisticated_brokers.csv"
 type = "table"
 title = "AJ & Jack — Unknown Sophisticated Brokers (1,761 contacts)"
+logical_id = "aec04f48-8450-42a0-b963-bfb2c1f8c076"
 
 [[outputs]]
 id = "PwToZb7nyJ_3x2PgNjBXg"
 uri = "file://attached_assets/AJ_Known_Unknown_Sophisticated_Import.xlsx"
 type = "table"
 title = "AJ Known + Unknown Sophisticated (158 contacts)"
+logical_id = "91f2617d-cc9b-4bbf-a9a1-e006ba7e54e6"
 
 [[outputs]]
 id = "oceDFWvLJbqhkBcrDNo8B"
 uri = "file://attached_assets/Jack_Unknown_Sophisticated_Import.xlsx"
 type = "table"
 title = "Jack - Unknown Sophisticated (1,034 contacts)"
+logical_id = "e896326b-a1f7-4cf2-8c6b-632b61baf402"
 
 [[outputs]]
 id = "xYhPMjgUt6SPbhVpwpFL8"
 uri = "file://attached_assets/TN_Unknown_Sophisticated_Import.xlsx"
 type = "table"
 title = "TN_Unknown_Sophisticated_Import.xlsx"
+logical_id = "47cee39e-c142-4bb2-adb9-aba50c268128"
 
 [[outputs]]
 id = "ZkDxaXjqmSCjcPBilqD4k"
 uri = "file://attached_assets/Jack_Unknown_Sophisticated_CRE_Import.xlsx"
 type = "table"
 title = "Jack_Unknown_Sophisticated_CRE_Import.xlsx — 334 contacts"
+logical_id = "a71562e9-582e-4cae-9795-6904c60f1faf"
 
 [[outputs]]
 id = "j4Nb7nrSdjwq0h9hxy9qK"
 uri = "file://attached_assets/AJ_Unknown_Sophisticated_CRE_Import.xlsx"
 type = "table"
 title = "AJ_Unknown_Sophisticated_CRE_Import.xlsx — 36 contacts"
+logical_id = "6700a916-4140-4688-9c16-0a0d92c95784"
 
 [[outputs]]
 id = "8MR0GmBtcUdwzrP4IxRsl"
 uri = "file://attached_assets/Jack_Unknown_Sophisticated_CRE_v2.xlsx"
 type = "table"
 title = "Jack_Unknown_Sophisticated_CRE_v2.xlsx — 334 contacts"
+logical_id = "8e6bfd6d-5faa-4b72-b7d1-6cf4154e83ae"
 
 [[outputs]]
 id = "VHN_vijV3ehF1dicvdw6W"
 uri = "file://attached_assets/AJ_Unknown_Sophisticated_CRE_v2.xlsx"
 type = "table"
 title = "AJ_Unknown_Sophisticated_CRE_v2.xlsx — 36 contacts"
+logical_id = "281c0629-ef0b-4098-acf5-8a34b445ab5f"
 
 [[outputs]]
 id = "lwmsWF68W-Ly3E336oPLp"
 uri = "file://attached_assets/Jack_TN_Unknown_Sophisticated.xlsx"
 type = "table"
 title = "Jack_TN_Unknown_Sophisticated.xlsx — 34 contacts"
+logical_id = "109eedb6-c002-4d70-8099-6c8dd2fdbfc7"
 
 [[outputs]]
 id = "dkDykF2i5NYo9ZXnxEwzb"
 uri = "file://attached_assets/AJ_TN_Unknown_Sophisticated.xlsx"
 type = "table"
 title = "AJ_TN_Unknown_Sophisticated.xlsx — 34 contacts"
+logical_id = "87538acd-5d44-4eb3-89ae-3bdaa3cf572a"
 
 [[outputs]]
 id = "TjMT2vTUwEGqV5mMPfE-h"
 uri = "file://attached_assets/Jack_TN_Unknown_Sophisticated.csv"
 type = "table"
 title = "Jack_TN_Unknown_Sophisticated.csv — 34 contacts"
+logical_id = "cc72ac1e-77fd-4031-a2e9-05492e371a5f"
 
 [[outputs]]
 id = "9LwLdHz_6gY38xHDgEpgj"
 uri = "file://attached_assets/AJ_TN_Unknown_Sophisticated.csv"
 type = "table"
 title = "AJ_TN_Unknown_Sophisticated.csv — 34 contacts"
+logical_id = "36573f8f-a22a-44ae-867b-d5a90557fd75"
 
 [[outputs]]
 id = "5kkeQYMcB2H8awrvz3iQO"
 uri = "file://attached_assets/jack_berg_unknown_sophisticated.csv"
 type = "table"
 title = "Jack Berg — Unknown Sophisticated (2,965 contacts)"
+logical_id = "37d543b6-a879-4240-8082-93869ac10363"
 
 [[outputs]]
 id = "jsGspW7dqW3yDbhDLjRc9"
 uri = "file://exports/landlinq_code.tar.gz"
 type = "unspecified"
 title = "LandLinq Full Project Code"
+logical_id = "dee04d4c-9719-4431-9814-e0ad9a1ecc79"
 
 [[outputs]]
 id = "wZ-cgO9WNhvnfZz2in4pu"
 uri = "file://exports/landlinq_website_code.tar.gz"
 type = "unspecified"
 title = "LandLinq Website Source Code"
+logical_id = "1389e6b7-05fd-402f-8bf3-edc39df17a77"
 
 [[outputs]]
 id = "E1_oFrgEYRFOWDYmnBMod"
 uri = "file://exports/landlinq_website_code.zip"
 type = "unspecified"
 title = "LandLinq Website Source Code (.zip)"
+logical_id = "0b027929-9fb8-4d9b-8118-b35a79587de0"
 
 [[outputs]]
 id = "D4zQQXDHS4FwqkaRFbBmN"
 uri = "file://landlinq-makecom-guide.pdf"
 type = "pdf"
 title = "LandLinq × Make.com Integration Guide"
+logical_id = "5b1135d4-33b0-4ce4-a944-fac68c71ea49"
+
+[[outputs]]
+id = "tbpCd9dOiWEDRloY1DAB3"
+uri = "file://screenshots/analyst-dashboard-toolbar-no-view.jpg"
+type = "image"
+title = "Deal dashboard toolbar without View dropdown"
+description = "Toolbar screenshot after removing the saved-column-layout View control. The remaining Table, Pipeline, Map, Columns, Status, Priority, Type, and Next controls remain visible."
+logical_id = "e13ee45a-54c0-46fe-b21f-81976e040134"
+content_hash = "sha256:7ff91f6ab032af8ac796093db09d9f29b3a755afe3a11129d1b01bd39d35d05b"
+size = 80767
+mtime_ms = 1789402239628
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/e13ee45a-54c0-46fe-b21f-81976e040134/27d52a2d-96c3-4dff-9cee-793e4724e984"
+storage_version_token = "1789402247179561"
+content_type = "image/jpeg"

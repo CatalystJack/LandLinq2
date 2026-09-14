@@ -108,6 +108,7 @@ const ALL_COLUMNS = [
   { key: 'colStatus', label: 'Status', defaultVisible: true },
   { key: 'colPriority', label: 'Priority', defaultVisible: true },
   { key: 'propertyAddress', label: 'Property Address', defaultVisible: true },
+  { key: 'assigned', label: 'Assigned', defaultVisible: true },
   { key: 'name', label: 'Name', defaultVisible: true },
   { key: 'yieldOnCost', label: 'YOC', defaultVisible: true },
   { key: 'automatedYoc', label: 'Auto YOC', defaultVisible: true },
@@ -154,6 +155,65 @@ const ALL_COLUMNS = [
 
 type ColumnKey = typeof ALL_COLUMNS[number]['key'];
 
+const TABLE_SELECTION_WIDTH = 36;
+const COLUMN_VISIBILITY_VERSION_KEY = 'deal-table-visible-columns-version';
+const COLUMN_VISIBILITY_VERSION = '2';
+const NUMERIC_HEADER_KEYS = new Set<string>([
+  'id', 'yieldOnCost', 'automatedYoc', 'irr', 'topRentPerUnit', 'topRentPSF',
+  'lihtc', 'price', 'units', 'maxUnitsZoning', 'vintage', 'acres',
+  'netDevelopableAcres', 'dua', 'pricePerUnit',
+]);
+const DATE_HEADER_KEYS = new Set<string>(['date']);
+const FILE_HEADER_KEYS = new Set<string>(['excelModel', 'brokerDocs', 'analystDocs']);
+
+function getHeaderTypeMarker(key: string): string {
+  if (NUMERIC_HEADER_KEYS.has(key)) return '#';
+  if (DATE_HEADER_KEYS.has(key)) return '◷';
+  if (FILE_HEADER_KEYS.has(key)) return '↗';
+  return 'T';
+}
+
+const ASSIGNEE_AVATAR_COLORS = [
+  '#2563eb', '#0f766e', '#7c3aed', '#c2410c', '#be123c', '#4f46e5',
+  '#0369a1', '#15803d', '#a16207', '#9333ea',
+];
+
+function getAssigneeInitials(value: string): string {
+  const source = value.trim().split('@')[0].replace(/[._-]+/g, ' ');
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  }
+  return source.replace(/[^a-z0-9]/gi, '').slice(0, 2).toUpperCase() || '?';
+}
+
+function getAssigneeAvatarColor(value: string): string {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return ASSIGNEE_AVATAR_COLORS[Math.abs(hash) % ASSIGNEE_AVATAR_COLORS.length];
+}
+
+function AssigneeDisplay({ value, compact = false }: { value?: string | null; compact?: boolean }) {
+  if (!value) {
+    return <span className="text-gray-300 italic text-[10px]">Unassigned</span>;
+  }
+
+  return (
+    <span className={`inline-flex items-center ${compact ? 'gap-1.5' : 'gap-2'} min-w-0`} title={value}>
+      <span
+        aria-hidden="true"
+        className={`${compact ? 'h-5 w-5 text-[9px]' : 'h-6 w-6 text-[10px]'} shrink-0 rounded-full inline-flex items-center justify-center font-bold text-white`}
+        style={{ backgroundColor: getAssigneeAvatarColor(value) }}
+      >
+        {getAssigneeInitials(value)}
+      </span>
+      <span className="truncate font-medium text-gray-700">{value}</span>
+    </span>
+  );
+}
+
 // Fixed columns always shown first, not user-reorderable
 const FIXED_COLUMN_KEYS: readonly ColumnKey[] = [
   'id', 'colStatus', 'colPriority', 'propertyAddress'
@@ -184,104 +244,18 @@ function getDefaultVisibleColumns(): Set<ColumnKey> {
     if (saved) {
       const parsed = JSON.parse(saved) as ColumnKey[];
       const validKeys = new Set(ALL_COLUMNS.map(c => c.key));
-      return new Set(parsed.filter((key): key is ColumnKey => validKeys.has(key)));
+      const visible = new Set(parsed.filter((key): key is ColumnKey => validKeys.has(key)));
+      // Migrate existing saved layouts once for the new Assigned column, then
+      // preserve the user's subsequent visibility choices.
+      if (localStorage.getItem(COLUMN_VISIBILITY_VERSION_KEY) !== COLUMN_VISIBILITY_VERSION) {
+        visible.add('assigned');
+        localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, COLUMN_VISIBILITY_VERSION);
+      }
+      return visible;
     }
+    localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, COLUMN_VISIBILITY_VERSION);
   } catch {}
   return new Set(ALL_COLUMNS.filter(c => c.defaultVisible).map(c => c.key));
-}
-
-type ColumnPreset = {
-  id: string;
-  name: string;
-  builtIn: boolean;
-  visibleColumns: ColumnKey[];
-  columnOrder: ReorderableColumnKey[];
-};
-
-const COLUMN_PRESETS_STORAGE_KEY = 'deal-table-column-presets';
-
-function presetVisibleColumns(keys: readonly ColumnKey[]): ColumnKey[] {
-  return Array.from(new Set([...FIXED_COLUMN_KEYS, ...keys]));
-}
-
-function presetColumnOrder(keys: readonly ReorderableColumnKey[]): ReorderableColumnKey[] {
-  const requested = new Set(keys);
-  return [
-    ...keys,
-    ...REORDERABLE_COLUMNS
-      .map(column => column.key as ReorderableColumnKey)
-      .filter(key => !requested.has(key)),
-  ];
-}
-
-// The fixed ID/status/priority/address context stays available in every preset.
-// The category-specific columns below are the actual keys from ALL_COLUMNS.
-const BUILT_IN_COLUMN_PRESETS: ColumnPreset[] = [
-  {
-    id: 'financial',
-    name: 'Financial',
-    builtIn: true,
-    visibleColumns: presetVisibleColumns([
-      'yieldOnCost', 'irr', 'topRentPerUnit', 'topRentPSF',
-      'price', 'pricePerUnit', 'acres', 'units',
-    ]),
-    columnOrder: presetColumnOrder([
-      'yieldOnCost', 'irr', 'topRentPerUnit', 'topRentPSF',
-      'price', 'pricePerUnit', 'acres', 'units',
-    ]),
-  },
-  {
-    id: 'compliance',
-    name: 'Compliance',
-    builtIn: true,
-    visibleColumns: presetVisibleColumns([
-       'lihtc', 'qct', 'dda', 'oz', 'fema', 'floodZone', 'wetlands', 'environmental', 'comps',
-      'zoning', 'entitlements', 'wetlandNotes', 'sewer',
-      'netDevelopableAcres', 'dua', 'maxUnitsZoning',
-    ]),
-    columnOrder: presetColumnOrder([
-       'lihtc', 'qct', 'dda', 'oz', 'fema', 'floodZone', 'comps',
-      'zoning', 'entitlements', 'wetlandNotes', 'sewer',
-      'netDevelopableAcres', 'dua', 'maxUnitsZoning',
-    ]),
-  },
-  {
-    id: 'broker',
-    name: 'Broker',
-    builtIn: true,
-    visibleColumns: presetVisibleColumns([
-      'brokerName', 'brokerEmail', 'brokerPhone', 'notes', 'brokerDocs',
-    ]),
-    columnOrder: presetColumnOrder([
-      'brokerName', 'brokerEmail', 'brokerPhone', 'notes', 'brokerDocs',
-    ]),
-  },
-];
-
-function getSavedColumnPresets(): ColumnPreset[] {
-  try {
-    const saved = localStorage.getItem(COLUMN_PRESETS_STORAGE_KEY);
-    if (!saved) return [];
-    const parsed = JSON.parse(saved) as Partial<ColumnPreset>[];
-    const validColumnKeys = new Set(ALL_COLUMNS.map(column => column.key));
-    const validReorderableKeys = new Set(REORDERABLE_COLUMNS.map(column => column.key));
-    return parsed
-      .filter(preset => preset && typeof preset.name === 'string' && preset.name.trim() && !preset.builtIn)
-      .map(preset => ({
-        id: typeof preset.id === 'string' && preset.id ? preset.id : `custom-${Date.now()}`,
-        name: preset.name!.trim(),
-        builtIn: false,
-        visibleColumns: Array.from(new Set((preset.visibleColumns || []).filter((key): key is ColumnKey => validColumnKeys.has(key)))),
-        columnOrder: [
-          ...(preset.columnOrder || []).filter((key): key is ReorderableColumnKey => validReorderableKeys.has(key)),
-          ...REORDERABLE_COLUMNS
-            .map(column => column.key as ReorderableColumnKey)
-            .filter(key => !(preset.columnOrder || []).includes(key)),
-        ],
-      }));
-  } catch {
-    return [];
-  }
 }
 
 // Team members for dropdowns by role
@@ -711,8 +685,6 @@ export default function AnalystDashboard() {
   // Column visibility state - persisted to localStorage
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(() => getDefaultVisibleColumns());
   const [colPickerOpen, setColPickerOpen] = useState(false);
-  const [columnPresetOpen, setColumnPresetOpen] = useState(false);
-  const [customColumnPresets, setCustomColumnPresets] = useState<ColumnPreset[]>(() => getSavedColumnPresets());
   // Column order state - persisted to localStorage
   const [columnOrder, setColumnOrder] = useState<ReorderableColumnKey[]>(() => getDefaultColumnOrder());
   const [dragColIdx, setDragColIdx] = useState<number | null>(null);
@@ -727,7 +699,7 @@ export default function AnalystDashboard() {
       { key: 'colPriority', width: 55 },
     ] as const;
     const result: Record<string, number> = {};
-    let left = 0;
+    let left = TABLE_SELECTION_WIDTH;
     for (const col of STICKY_COLS) {
       result[col.key] = left;
       if (visibleColumns.has(col.key as ColumnKey)) left += col.width;
@@ -741,6 +713,7 @@ export default function AnalystDashboard() {
       const next = new Set(prev);
       if (next.has(key)) { next.delete(key); } else { next.add(key); }
       try { localStorage.setItem('deal-table-visible-columns', JSON.stringify([...next])); } catch {}
+      try { localStorage.setItem(COLUMN_VISIBILITY_VERSION_KEY, COLUMN_VISIBILITY_VERSION); } catch {}
       return next;
     });
   };
@@ -768,52 +741,6 @@ export default function AnalystDashboard() {
     setVisibleColumns(defaults);
     try { localStorage.setItem('deal-table-visible-columns', JSON.stringify([...defaults])); } catch {}
     resetColumnOrder();
-  };
-
-  const persistCustomColumnPresets = (presets: ColumnPreset[]) => {
-    setCustomColumnPresets(presets);
-    try { localStorage.setItem(COLUMN_PRESETS_STORAGE_KEY, JSON.stringify(presets)); } catch {}
-  };
-
-  const applyColumnPreset = (preset: ColumnPreset) => {
-    const nextVisible = new Set(preset.visibleColumns);
-    setVisibleColumns(nextVisible);
-    try { localStorage.setItem('deal-table-visible-columns', JSON.stringify([...nextVisible])); } catch {}
-    saveColumnOrder(preset.columnOrder);
-    toast({ title: `${preset.name} view applied`, description: `${nextVisible.size} columns are now visible.` });
-  };
-
-  const saveCurrentColumnPreset = () => {
-    const enteredName = window.prompt('Name this column view');
-    const name = enteredName?.trim();
-    if (!name) return;
-
-    const existingBuiltIn = BUILT_IN_COLUMN_PRESETS.some(preset => preset.name.toLowerCase() === name.toLowerCase());
-    if (existingBuiltIn) {
-      toast({ title: 'Choose a different name', description: 'Built-in views cannot be overwritten.', variant: 'destructive' });
-      return;
-    }
-
-    const existingCustom = customColumnPresets.find(preset => preset.name.toLowerCase() === name.toLowerCase());
-    if (existingCustom && !window.confirm(`Replace the saved "${existingCustom.name}" view?`)) return;
-
-    const nextPreset: ColumnPreset = {
-      id: existingCustom?.id || `custom-${Date.now()}`,
-      name,
-      builtIn: false,
-      visibleColumns: [...visibleColumns],
-      columnOrder: [...columnOrder],
-    };
-    const nextPresets = existingCustom
-      ? customColumnPresets.map(preset => preset.id === existingCustom.id ? nextPreset : preset)
-      : [...customColumnPresets, nextPreset];
-    persistCustomColumnPresets(nextPresets);
-    toast({ title: 'Column view saved', description: `"${name}" is now available in Saved views.` });
-  };
-
-  const deleteCustomColumnPreset = (preset: ColumnPreset) => {
-    persistCustomColumnPresets(customColumnPresets.filter(savedPreset => savedPreset.id !== preset.id));
-    toast({ title: 'Saved view deleted', description: `"${preset.name}" was removed.` });
   };
 
   // Map view toggle state
@@ -4472,6 +4399,15 @@ export default function AnalystDashboard() {
     return result;
   }, [optimizedDeals, filterNextAssignees, autoYocMin, autoYocMax]);
 
+  const visibleDealIds = useMemo(
+    () => filteredAndSortedDeals.map((deal: DealWithBroker) => deal.id),
+    [filteredAndSortedDeals],
+  );
+  const allVisibleDealsSelected =
+    visibleDealIds.length > 0 && visibleDealIds.every((dealId) => selectedDeals.includes(dealId));
+  const someVisibleDealsSelected =
+    visibleDealIds.some((dealId) => selectedDeals.includes(dealId)) && !allVisibleDealsSelected;
+
   const formatPrice = (price: string | null) => {
     if (!price) return 'N/A';
     return new Intl.NumberFormat('en-US', {
@@ -4531,10 +4467,18 @@ export default function AnalystDashboard() {
     );
   };
 
-  // Select all deals on current page
+  // Select or deselect the currently visible page without disturbing
+  // selections from other pages.
   const selectAllDeals = () => {
-    const allDealIds = deals.map((deal: DealWithBroker) => deal.id);
-    setSelectedDeals(allDealIds);
+    setSelectedDeals(prev => {
+      const next = new Set(prev);
+      const shouldSelect = visibleDealIds.some((dealId) => !next.has(dealId));
+      visibleDealIds.forEach((dealId) => {
+        if (shouldSelect) next.add(dealId);
+        else next.delete(dealId);
+      });
+      return Array.from(next);
+    });
   };
 
   // Pagination navigation - memoized for performance
@@ -5222,56 +5166,68 @@ export default function AnalystDashboard() {
 
   // ─── Column render helpers (used for dynamic column ordering) ──────────────
   const thBase = "text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200";
+  const headerLabel = (label: string, headerKey: string) => (
+    <span className="inline-flex items-center gap-1 min-w-0">
+      <span
+        aria-hidden="true"
+        className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border border-gray-300 text-[9px] font-bold leading-none text-gray-400"
+      >
+        {getHeaderTypeMarker(headerKey)}
+      </span>
+      <span>{label}</span>
+    </span>
+  );
   const renderHeaderCell = (key: ReorderableColumnKey): JSX.Element | null => {
     const vis = isVisible(key);
     const sortBtn = (label: string, sortKey: string) => (
       <button onClick={() => handleSort(sortKey)} className="flex items-center space-x-1 hover:text-[#07172A]">
-        <span>{label}</span><ArrowUpDown size={12} />
+        {headerLabel(label, key)}<ArrowUpDown size={12} />
       </button>
     );
     switch (key) {
-      case 'automatedYoc': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}><span>Auto YOC</span></th>;
-      case 'developerSummary': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}><span>Developer Summary</span></th>;
-      case 'name': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}><span>Name</span></th>;
+      case 'automatedYoc': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}>{headerLabel('Auto YOC', key)}</th>;
+      case 'developerSummary': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}>{headerLabel('Developer Summary', key)}</th>;
+      case 'assigned': return <th key={key} className={`${thBase} min-w-[130px]`} style={{display: vis?'':'none'}}>{sortBtn('Assigned', 'nextAssignee')}</th>;
+      case 'name': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}>{headerLabel('Name', key)}</th>;
       case 'yieldOnCost': return <th key={key} className={thBase} style={{display: vis?'':'none'}}>{sortBtn('YOC','yieldOnCost')}</th>;
       case 'irr': return <th key={key} className={`${thBase} min-w-[90px]`} style={{display: vis?'':'none'}}>{sortBtn('IRR','irr')}</th>;
-      case 'excelModel': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}><span>Excel</span></th>;
-      case 'reason': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}><span className="sr-only">Reason</span></th>;
+      case 'excelModel': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{headerLabel('Excel', key)}</th>;
+      case 'reason': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}>{headerLabel('Reason', key)}</th>;
       case 'dealType': return <th key={key} className={`${thBase} w-[70px] min-w-[70px]`} style={{display: vis?'':'none'}}>{sortBtn('Deal','dealType')}</th>;
       case 'productTypes': return <th key={key} className={thBase} style={{display: vis?'':'none'}}>{sortBtn('Type','productTypes')}</th>;
-      case 'analystNotes': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}><span>Analyst Notes</span></th>;
-      case 'dealSummary': return <th key={key} className={`${thBase} min-w-[160px]`} style={{display: vis?'':'none'}}><span>Summary</span></th>;
-      case 'developerNotes': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}><span>Dev Notes</span></th>;
-      case 'notes': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}><span className="sr-only">Broker Notes</span></th>;
+      case 'analystNotes': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{headerLabel('Analyst Notes', key)}</th>;
+      case 'dealSummary': return <th key={key} className={`${thBase} min-w-[160px]`} style={{display: vis?'':'none'}}>{headerLabel('Summary', key)}</th>;
+      case 'developerNotes': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{headerLabel('Dev Notes', key)}</th>;
+      case 'notes': return <th key={key} className={`${thBase} w-[38px] min-w-[38px] max-w-[38px] px-1`} style={{display: vis?'':'none'}}>{headerLabel('Notes', key)}</th>;
       case 'topRentPerUnit': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{sortBtn('Top Rent/Unit','topRentPerUnit')}</th>;
       case 'topRentPSF': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{sortBtn('Top Rent PSF','topRentPSF')}</th>;
       case 'lihtc': return <th key={key} className={`${thBase} min-w-[60px]`} style={{display: vis?'':'none'}}>{sortBtn('LIHTC','lihtcScoreTotal')}</th>;
       case 'qct': return <th key={key} className={`${thBase} min-w-[45px]`} style={{display: vis?'':'none'}}>{sortBtn('QCT','qctStatus')}</th>;
-      case 'dda': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}><button onClick={() => handleSort('ddaStatus')} className="flex items-center space-x-1 hover:text-[#07172A]" title="Difficult Development Area (HUD 2026) — MDDA = Metropolitan, NMDDA = Non-Metropolitan"><span>DDA</span><ArrowUpDown size={12} /></button></th>;
+      case 'dda': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}><button onClick={() => handleSort('ddaStatus')} className="flex items-center space-x-1 hover:text-[#07172A]" title="Difficult Development Area (HUD 2026) — MDDA = Metropolitan, NMDDA = Non-Metropolitan">{headerLabel('DDA', key)}<ArrowUpDown size={12} /></button></th>;
       case 'oz': return <th key={key} className={`${thBase} min-w-[45px]`} style={{display: vis?'':'none'}}>{sortBtn('OZ','ozStatus')}</th>;
-      case 'fema': return <th key={key} className={`${thBase} min-w-[58px]`} style={{display: vis?'':'none'}}><span>FEMA</span></th>;
-      case 'floodZone': return <th key={key} className={`${thBase} min-w-[72px]`} style={{display: vis?'':'none'}}><span>Flood Zone</span></th>;
-      case 'wetlands': return <th key={key} className={`${thBase} min-w-[68px]`} style={{display: vis?'':'none'}}><span>Wetlands</span></th>;
-      case 'environmental': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}><span>Environmental</span></th>;
+      case 'fema': return <th key={key} className={`${thBase} min-w-[58px]`} style={{display: vis?'':'none'}}>{headerLabel('FEMA', key)}</th>;
+      case 'floodZone': return <th key={key} className={`${thBase} min-w-[72px]`} style={{display: vis?'':'none'}}>{headerLabel('Flood Zone', key)}</th>;
+      case 'wetlands': return <th key={key} className={`${thBase} min-w-[68px]`} style={{display: vis?'':'none'}}>{headerLabel('Wetlands', key)}</th>;
+      case 'environmental': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}>{headerLabel('Environmental', key)}</th>;
       case 'date': return <th key={key} className={`${thBase} min-w-[65px]`} style={{display: vis?'':'none'}}>{sortBtn('Date','createdAt')}</th>;
-      case 'brokerDocs': return <th key={key} className={`${thBase} ${expandedBrokerDocs.size>0?'w-[260px]':'w-[110px] max-w-[110px]'}`} style={{display: vis?'':'none'}}><span>Broker Docs</span></th>;
-      case 'analystDocs': return <th key={key} className={`${thBase} ${expandedAnalystDocs.size>0?'w-[260px]':'w-[130px] max-w-[130px]'}`} style={{display: vis?'':'none'}}><span>Analyst Docs</span></th>;
-      case 'comps': return <th key={key} className={`${thBase} min-w-[72px]`} style={{display: vis?'':'none'}}><span>Comps</span></th>;
+      case 'brokerDocs': return <th key={key} className={`${thBase} ${expandedBrokerDocs.size>0?'w-[260px]':'w-[110px] max-w-[110px]'}`} style={{display: vis?'':'none'}}>{headerLabel('Broker Docs', key)}</th>;
+      case 'analystDocs': return <th key={key} className={`${thBase} ${expandedAnalystDocs.size>0?'w-[260px]':'w-[130px] max-w-[130px]'}`} style={{display: vis?'':'none'}}>{headerLabel('Analyst Docs', key)}</th>;
+      case 'comps': return <th key={key} className={`${thBase} min-w-[72px]`} style={{display: vis?'':'none'}}>{headerLabel('Comps', key)}</th>;
       case 'price': return <th key={key} className={`${thBase} min-w-[100px]`} style={{display: vis?'':'none'}}>{sortBtn('Price','askingPrice')}</th>;
       case 'units': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{sortBtn('Units','unitCount')}</th>;
-      case 'maxUnitsZoning': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}><span>Max Zoning</span></th>;
+      case 'maxUnitsZoning': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}>{headerLabel('Max Zoning', key)}</th>;
       case 'vintage': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{sortBtn('Vintage','vintage')}</th>;
       case 'acres': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{sortBtn('Acres','sizeAcres')}</th>;
       case 'netDevelopableAcres': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{sortBtn('Net Dev Acres','netDevelopableAcres')}</th>;
-      case 'dua': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}><span>DUA</span></th>;
+      case 'dua': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}>{headerLabel('DUA', key)}</th>;
       case 'zoning': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}>{sortBtn('Zoning','zoning')}</th>;
-      case 'wetlandNotes': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}><span>Wetland/Environmental Notes</span></th>;
+      case 'wetlandNotes': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}>{headerLabel('Wetland/Environmental Notes', key)}</th>;
       case 'entitlements': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}>{sortBtn('Entitlements','hasEntitlements')}</th>;
-      case 'pricePerUnit': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}><span>Price/Unit</span></th>;
-      case 'sewer': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}><span>Sewer</span></th>;
+      case 'pricePerUnit': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}>{headerLabel('Price/Unit', key)}</th>;
+      case 'sewer': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{headerLabel('Sewer', key)}</th>;
       case 'brokerName': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{sortBtn('Broker Name','broker.firstName')}</th>;
-      case 'brokerEmail': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}><span>Broker Email</span></th>;
-      case 'brokerPhone': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}><span>Broker Phone</span></th>;
+      case 'brokerEmail': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{headerLabel('Broker Email', key)}</th>;
+      case 'brokerPhone': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{headerLabel('Broker Phone', key)}</th>;
       default: return null;
     }
   };
@@ -5280,6 +5236,11 @@ export default function AnalystDashboard() {
     const vis = isVisible(key);
     const d = deal as any;
     switch (key) {
+      case 'assigned': return (
+        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700 min-w-[130px]" style={{display: vis?'':'none'}}>
+          <AssigneeDisplay value={deal.nextAssignee} />
+        </td>
+      );
       case 'automatedYoc': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           <button
@@ -5995,105 +5956,6 @@ export default function AnalystDashboard() {
                             })}
                           </div>
                         </PopoverContent>
-                      </Popover>
-                      {/* Saved column-visibility presets */}
-                      <Popover open={columnPresetOpen} onOpenChange={setColumnPresetOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className={`font-semibold transition-all duration-200 min-w-[140px] justify-between cursor-pointer ${
-                              columnPresetOpen
-                                ? "bg-[#07172A] text-white border-[#07172A]"
-                                : "border-gray-300 text-gray-700 hover:bg-[#4A90E2] hover:text-white hover:border-[#4A90E2]"
-                            }`}
-                            data-testid="button-column-presets"
-                          >
-                             <span className="flex items-center gap-1">
-                               <Save className="h-3 w-3" />
-                               View
-                             </span>
-                             <ChevronDown className="h-3 w-3 ml-1" />
-                          </Button>
-                        </PopoverTrigger>
-                         <PopoverContent
-                           align="start"
-                           sideOffset={8}
-                           className="w-[320px] overflow-hidden rounded-xl border border-slate-200 bg-white p-0 shadow-xl"
-                         >
-                           <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
-                             <div className="flex items-start justify-between gap-3">
-                               <div className="flex min-w-0 items-start gap-2.5">
-                                 <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-[#2563a5]">
-                                   <Save className="h-4 w-4" />
-                                 </div>
-                                 <div className="min-w-0">
-                                   <p className="text-sm font-semibold leading-5 text-slate-800">Saved views</p>
-                                   <p className="mt-0.5 text-[11px] leading-4 text-slate-500">Apply a saved column layout</p>
-                                 </div>
-                               </div>
-                               <button
-                                 type="button"
-                                 onClick={saveCurrentColumnPreset}
-                                 className="shrink-0 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#2563a5] shadow-sm transition-colors hover:border-[#4A90E2] hover:bg-blue-50"
-                                 data-testid="button-save-column-preset"
-                               >
-                                 Save current
-                               </button>
-                             </div>
-                           </div>
-                           <div className="p-2.5">
-                             <div className="mb-1.5 flex items-center justify-between px-1">
-                               <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Column layouts</span>
-                               <span className="text-[10px] text-slate-400">
-                                 {BUILT_IN_COLUMN_PRESETS.length + customColumnPresets.length} saved
-                               </span>
-                             </div>
-                             <div className="space-y-1">
-                               {[...BUILT_IN_COLUMN_PRESETS, ...customColumnPresets].map(preset => (
-                                 <div
-                                   key={preset.id}
-                                   className="group flex items-center gap-1 rounded-lg border border-transparent p-1 transition-colors hover:border-blue-100 hover:bg-blue-50/70"
-                                 >
-                                   <button
-                                     type="button"
-                                     onClick={() => applyColumnPreset(preset)}
-                                     className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-2 text-left"
-                                     data-testid={`button-apply-column-preset-${preset.id}`}
-                                   >
-                                     <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[11px] font-bold ${
-                                       preset.builtIn
-                                         ? 'bg-slate-100 text-slate-500'
-                                         : 'bg-blue-100 text-[#2563a5]'
-                                     }`}>
-                                       {preset.name.slice(0, 1).toUpperCase()}
-                                     </span>
-                                     <span className="min-w-0 flex-1">
-                                       <span className="block truncate text-xs font-semibold text-slate-700 group-hover:text-[#2563a5]">{preset.name}</span>
-                                       <span className="mt-0.5 block text-[10px] text-slate-400">
-                                         {preset.builtIn ? 'Built-in layout' : 'Custom layout'}
-                                       </span>
-                                     </span>
-                                     <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
-                                       {preset.visibleColumns.length} cols
-                                     </span>
-                                   </button>
-                                   {!preset.builtIn && (
-                                     <button
-                                       type="button"
-                                       onClick={() => deleteCustomColumnPreset(preset)}
-                                       className="mr-1 rounded-md p-1.5 text-slate-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
-                                       aria-label={`Delete ${preset.name} saved view`}
-                                       data-testid={`button-delete-column-preset-${preset.id}`}
-                                     >
-                                       <Trash2 className="h-3.5 w-3.5" />
-                                     </button>
-                                   )}
-                                 </div>
-                               ))}
-                             </div>
-                           </div>
-                         </PopoverContent>
                       </Popover>
                     </>)}
                     
@@ -6900,10 +6762,9 @@ export default function AnalystDashboard() {
                                     {deal.askingPrice ? <span className="font-semibold text-indigo-700">${(Number(deal.askingPrice)/1000000).toFixed(1)}M</span> : <span className="text-gray-300">—</span>}
                                   </span>
                                   <span className="w-32 text-right text-xs text-gray-500 truncate pl-2">
-                                    {deal.nextAssignee
-                                      ? <span className="font-medium">{deal.nextAssignee.split(' ')[0]}</span>
-                                      : <span className="text-gray-300 italic text-[10px]">Unassigned</span>
-                                    }
+                                    <span className="inline-flex max-w-full justify-end">
+                                      <AssigneeDisplay value={deal.nextAssignee} compact />
+                                    </span>
                                   </span>
                                   <span className="w-20 shrink-0 text-right text-[11px] text-gray-400">
                                     {deal.createdAt ? new Date(deal.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : ''}
@@ -6962,12 +6823,25 @@ export default function AnalystDashboard() {
                 <table className="min-w-max" style={{ marginBottom: '10px' }}>
                     <thead className="bg-gray-100 border-b-2 border-gray-300 sticky top-0 z-30" style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                       <tr>
+                        <th
+                          className="w-[36px] min-w-[36px] px-1 py-1 border-r border-gray-200 bg-gray-100 z-40 shadow-lg"
+                          style={{ position: 'sticky', left: 0 }}
+                        >
+                          <Checkbox
+                            checked={allVisibleDealsSelected ? true : someVisibleDealsSelected ? 'indeterminate' : false}
+                            onCheckedChange={selectAllDeals}
+                            disabled={visibleDealIds.length === 0}
+                            aria-label={allVisibleDealsSelected ? 'Deselect all visible deals' : 'Select all visible deals'}
+                            data-testid="checkbox-select-all-deals"
+                            className="mx-auto border-gray-400 data-[state=checked]:bg-[#4A90E2] data-[state=indeterminate]:bg-[#4A90E2]"
+                          />
+                        </th>
                         <th className="text-left px-3 py-1 font-semibold text-xs text-gray-700 border-r border-gray-200 min-w-[40px] bg-gray-100 z-40 shadow-lg" style={{display: isVisible('id') ? '' : 'none', position: 'sticky', left: stickyLeft['id']}}>
                           <button
                             onClick={() => handleSort('dealNumber')}
                             className="flex items-center space-x-1 hover:text-[#07172A]"
                           >
-                            <span>ID</span>
+                            {headerLabel('ID', 'id')}
                             <ArrowUpDown size={12} />
                           </button>
                         </th>
@@ -6976,7 +6850,7 @@ export default function AnalystDashboard() {
                             onClick={() => handleSort('classification')}
                             className="flex items-center space-x-1 hover:text-[#07172A]"
                           >
-                            <span>Status</span>
+                            {headerLabel('Status', 'colStatus')}
                             <ArrowUpDown size={12} />
                           </button>
                         </th>
@@ -6985,7 +6859,7 @@ export default function AnalystDashboard() {
                             onClick={() => handleSort('priority')}
                             className="flex items-center space-x-1 hover:text-[#07172A]"
                           >
-                            <span>Priority</span>
+                            {headerLabel('Priority', 'colPriority')}
                             <ArrowUpDown size={12} />
                           </button>
                         </th>
@@ -6994,14 +6868,14 @@ export default function AnalystDashboard() {
                             onClick={() => handleSort('address')}
                             className="flex items-center space-x-1 hover:text-[#07172A]"
                           >
-                            <span>Property Address</span>
+                            {headerLabel('Property Address', 'propertyAddress')}
                             <ArrowUpDown size={12} />
                           </button>
                         </th>
                         {/* Dynamic reorderable columns */}
                         {columnOrder.map(k => renderHeaderCell(k))}
                         <th className="text-center px-1 py-1 font-semibold text-xs text-gray-700 min-w-[60px]">
-                          <span>Actions</span>
+                          {headerLabel('Actions', 'actions')}
                         </th>
                       </tr>
                     </thead>
@@ -7009,7 +6883,7 @@ export default function AnalystDashboard() {
                       {/* Loading State - only show when no cached data */}
                       {isLoading && (
                         <tr>
-                          <td colSpan={34} className="p-8 text-center text-gray-500">
+                          <td colSpan={ALL_COLUMNS.length + 2} className="p-8 text-center text-gray-500">
                             <div className="flex items-center justify-center space-x-2">
                               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#4A90E2]"></div>
                               <span>Loading deals...</span>
@@ -7021,7 +6895,7 @@ export default function AnalystDashboard() {
                       {/* Subtle loading indicator for pagination while showing cached data */}
                       {isFetching && !isLoading && (
                         <tr>
-                          <td colSpan={34} className="p-0">
+                          <td colSpan={ALL_COLUMNS.length + 2} className="p-0">
                             <div className="w-full h-1 bg-gray-100 overflow-hidden">
                               <div className="h-full bg-[#4A90E2] animate-pulse"></div>
                             </div>
@@ -7463,7 +7337,7 @@ export default function AnalystDashboard() {
                       {/* Empty State Row when no deals and not loading */}
                       {!isLoading && filteredAndSortedDeals.length === 0 && editingRow !== 'new-deal-temp' && (
                         <tr className="border-b">
-                          <td colSpan={34} className="p-8 text-center text-gray-500">
+                          <td colSpan={ALL_COLUMNS.length + 2} className="p-8 text-center text-gray-500">
                             <div className="flex flex-col items-center space-y-4">
                               <FileText className="h-12 w-12 text-gray-400" />
                               <div>
@@ -7489,9 +7363,19 @@ export default function AnalystDashboard() {
                       
                       {/* Regular Deal Rows */}
                       {!isLoading && filteredAndSortedDeals.map((deal: DealWithBroker) => (
-                        <tr key={deal.id} id={`deal-${deal.id}`} className="border-b hover:bg-gray-50 transition-colors duration-150">
+                        <tr key={deal.id} id={`deal-${deal.id}`} className={`border-b transition-colors duration-150 ${selectedDeals.includes(deal.id) ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`}>
+                          {/* Row selection — kept outside the paged data so selections persist across pages */}
+                          <td className={`w-[36px] min-w-[36px] px-1 py-1 text-center border-r border-gray-200 z-10 shadow-lg ${selectedDeals.includes(deal.id) ? 'bg-blue-50' : 'bg-white'}`} style={{position: 'sticky', left: 0}}>
+                            <Checkbox
+                              checked={selectedDeals.includes(deal.id)}
+                              onCheckedChange={() => toggleDealSelection(deal.id)}
+                              aria-label={`Select deal ${deal.dealNumber ? formatDealNumber(deal.dealNumber) : deal.id}`}
+                              data-testid={`checkbox-deal-${deal.id}`}
+                              className="mx-auto border-gray-400 data-[state=checked]:bg-[#4A90E2]"
+                            />
+                          </td>
                           {/* 1. Deal ID - Click to copy search terms and open Outlook */}
-                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-white z-10 shadow-lg" style={{display: isVisible('id') ? '' : 'none', position: 'sticky', left: stickyLeft['id']}}>
+                          <td className={`px-1 py-1 text-xs border-r border-gray-200 z-10 shadow-lg ${selectedDeals.includes(deal.id) ? 'bg-blue-50' : 'bg-white'}`} style={{display: isVisible('id') ? '' : 'none', position: 'sticky', left: stickyLeft['id']}}>
                             {(() => {
                               const searchString = buildOutlookSearchString(deal);
                               const dealId = deal.dealNumber ? formatDealNumber(deal.dealNumber) : 'N/A';
@@ -7900,15 +7784,12 @@ export default function AnalystDashboard() {
           {totalDeals > 0 && (
             <Card className="mt-4">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    {pageSize === 9999
-                      ? `Showing all ${totalDeals} deals`
-                      : `Showing ${((currentPage - 1) * pageSize) + 1} to ${Math.min(currentPage * pageSize, totalDeals)} of ${totalDeals} deals`
-                    }
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm font-medium text-gray-600 sm:flex-1">
+                    {totalDeals} deals
                   </div>
                   
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center justify-center space-x-2 sm:flex-1">
                     <Button
                       variant="outline"
                       size="sm"
@@ -7959,10 +7840,11 @@ export default function AnalystDashboard() {
                       <span>Next</span>
                       <span>›</span>
                     </Button>
-                    
-                    {/* Page Size Selector */}
-                    <div className="flex items-center space-x-2 ml-4 border-l pl-4">
-                      <span className="text-sm text-gray-600">Show:</span>
+                  </div>
+
+                  {/* Page Size Selector */}
+                  <div className="flex items-center justify-start gap-2 sm:flex-1 sm:justify-end">
+                      <span className="text-sm text-gray-600">Rows:</span>
                       <Select
                         value={pageSize === 9999 ? "all" : pageSize.toString()}
                         onValueChange={(value) => {
@@ -7981,7 +7863,6 @@ export default function AnalystDashboard() {
                           <SelectItem value="all">All</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
                   </div>
                 </div>
               </CardContent>
