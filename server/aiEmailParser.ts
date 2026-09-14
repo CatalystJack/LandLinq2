@@ -115,6 +115,97 @@ Respond as JSON with exactly these fields:
   return { reply, suggestedSubject, suggestedContent };
 }
 
+export type DeveloperAssistantPlan = {
+  kind: "answer" | "action";
+  tool:
+    | "getMyDeals"
+    | "getMyPipelineSummary"
+    | "getMyContacts"
+    | "getCompsForDeal"
+    | "getMyCriteria"
+    | "markDealPursuing"
+    | "addContactTag"
+    | "createPipelineOpportunity";
+  args: Record<string, unknown>;
+};
+
+export async function planDeveloperAssistantQuestion(
+  question: string,
+  context: {
+    deals: Array<{ id: string; address: string; city: string; state: string; status: string }>;
+    contacts: Array<{ id: string; name: string; email: string | null; brokerage: string | null }>;
+    pipelineStages: Array<{ id: string; name: string }>;
+  },
+): Promise<DeveloperAssistantPlan> {
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: `You route a read-only Investment Company assistant question to one safe server function, or identify one safe action that requires confirmation.
+Never invent IDs, names, or values. Use only IDs from the supplied tenant-scoped context.
+Read tools:
+- getMyDeals: args {status?: "Pursuing"|"Passed"|"Review", search?: string}
+- getMyPipelineSummary: args {}
+- getMyContacts: args {search?: string}
+- getCompsForDeal: args {dealId: string}
+- getMyCriteria: args {}
+Action tools:
+- markDealPursuing: args {dealId: string}
+- addContactTag: args {contactId: string, tag: string}
+- createPipelineOpportunity: args {contactId: string, stageId?: string, title?: string, value?: number, notes?: string}
+Choose kind "action" only when the user explicitly asks to perform one of the three allowed actions.
+For a request to mark a deal, match the requested address to the supplied deals.
+For a contact tag request, match the contact by name or email and preserve the requested tag exactly.
+For a pipeline opportunity, match the contact and stage when supplied. Do not choose an unrelated contact.
+Return JSON only:
+{"kind":"answer"|"action","tool":"...","args":{...}}
+
+Tenant-scoped deals:
+${JSON.stringify(context.deals)}
+
+Tenant-scoped contacts:
+${JSON.stringify(context.contacts)}
+
+Tenant-scoped pipeline stages:
+${JSON.stringify(context.pipelineStages)}
+
+User question:
+${question}`,
+      },
+      { role: "user", content: question },
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: 700,
+  });
+  const raw = response.choices[0]?.message?.content;
+  if (!raw) throw new Error("Empty assistant routing response");
+  const parsed = JSON.parse(raw) as Partial<DeveloperAssistantPlan>;
+  const allowedTools = new Set<DeveloperAssistantPlan["tool"]>([
+    "getMyDeals",
+    "getMyPipelineSummary",
+    "getMyContacts",
+    "getCompsForDeal",
+    "getMyCriteria",
+    "markDealPursuing",
+    "addContactTag",
+    "createPipelineOpportunity",
+  ]);
+  if ((parsed.kind !== "answer" && parsed.kind !== "action") || !allowedTools.has(parsed.tool as DeveloperAssistantPlan["tool"])) {
+    throw new Error("Assistant returned an unsupported query plan");
+  }
+  const actionTools = new Set([
+    "markDealPursuing",
+    "addContactTag",
+    "createPipelineOpportunity",
+  ]);
+  const tool = parsed.tool as DeveloperAssistantPlan["tool"];
+  if ((parsed.kind === "action") !== actionTools.has(tool)) {
+    throw new Error("Assistant returned an invalid action plan");
+  }
+  return { kind: parsed.kind, tool, args: parsed.args && typeof parsed.args === "object" ? parsed.args : {} };
+}
+
 export interface ParsedPropertyData {
   address: string | null;
   city: string | null;

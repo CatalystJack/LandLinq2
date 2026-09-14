@@ -8,6 +8,16 @@ import { outreachService } from '../services/outreachService';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 
+function formatDeveloperTargetMarket(states: unknown, counties: unknown): string {
+  const values = [...(Array.isArray(states) ? states : []), ...(Array.isArray(counties) ? counties : [])]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  const uniqueValues = values.filter((value, index) =>
+    values.findIndex((candidate) => candidate.toLowerCase() === value.toLowerCase()) === index
+  );
+  return uniqueValues.join(', ') || 'all available markets';
+}
+
 /**
  * Convert markdown-style content to email-safe HTML with proper bullet formatting
  */
@@ -435,12 +445,16 @@ export async function processDripEnrollments(): Promise<void> {
           t.name as template_name,
           s.name as sender_name, s.email as sender_email,
           s.developer_profile_id,
+           p.company_name,
+           p.target_states,
+           p.target_counties,
           s.microsoft_access_token, s.microsoft_refresh_token, s.microsoft_token_expiry,
           s.signature_html, s.daily_limit_override,
           ROW_NUMBER() OVER (PARTITION BY e.sender_id ORDER BY e.next_send_at ASC) AS rn
         FROM drip_campaign_enrollments e
         JOIN outreach_campaign_templates t ON e.template_id = t.id
         JOIN outreach_senders s ON e.sender_id = s.id
+        LEFT JOIN developer_profiles p ON p.id = s.developer_profile_id
         WHERE e.next_send_at <= NOW()
           AND e.status IN ('pending', 'in_progress')
           AND t.is_active = true
@@ -542,6 +556,8 @@ export async function processDripEnrollments(): Promise<void> {
         // Prepare email content with personalization
         const brokerFirstName = enrollment.contact_first_name || 'there';
         const brokerName = `${enrollment.contact_first_name || ''} ${enrollment.contact_last_name || ''}`.trim() || 'there';
+        const companyName = enrollment.company_name || '';
+        const targetMarket = formatDeveloperTargetMarket(enrollment.target_states, enrollment.target_counties);
         
         let emailContent = currentStep.content || '';
         let emailSubject = currentStep.subject || 'Hello from LandLinq';
@@ -556,11 +572,15 @@ export async function processDripEnrollments(): Promise<void> {
           .replace(/\{\{brokerName\}\}/gi, brokerName)
           .replace(/\{\{brokerFirstName\}\}/gi, brokerFirstName)
           .replace(/\{\{sender\.name\}\}/gi, enrollment.sender_name || '')
-          .replace(/\{\{sender\.email\}\}/gi, enrollment.sender_email);
+           .replace(/\{\{sender\.email\}\}/gi, enrollment.sender_email)
+           .replace(/\{\{companyName\}\}/gi, companyName)
+           .replace(/\{\{targetMarket\}\}/gi, targetMarket);
         
         emailSubject = emailSubject
           .replace(/\{\{broker\.firstname\}\}/gi, brokerFirstName)
-          .replace(/\{\{brokerName\}\}/gi, brokerName);
+          .replace(/\{\{brokerName\}\}/gi, brokerName)
+          .replace(/\{\{companyName\}\}/gi, companyName)
+          .replace(/\{\{targetMarket\}\}/gi, targetMarket);
         
         // Convert to HTML
         let emailHtml = convertContentToHtml(emailContent);

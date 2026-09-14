@@ -54,6 +54,33 @@ type SuggestedDraft = {
   content: string;
 };
 
+const STARTING_TEMPLATES = [
+  {
+    id: "cold-intro",
+    name: "Cold intro to a new broker",
+    subject: "Land site inquiry, {{targetMarket}}",
+    content: "Hi {{firstName}},\n\nI'm reaching out from {{companyName}}. We're actively acquiring multifamily development sites in {{targetMarket}}. If you have anything off market or coming up that fits, I'd love to take a look. Happy to move quickly on the right deal.\n\nWould you be open to a quick call this week?",
+  },
+  {
+    id: "specific-site-follow-up",
+    name: "Following up on a specific site",
+    subject: "Following up",
+    content: "Hi {{firstName}},\n\nThanks for sending that site over, it looks like a strong fit for what we're targeting. Could you share more on pricing expectations and timeline?\n\nHappy to hop on a call if that's easier.",
+  },
+  {
+    id: "staying-top-of-mind",
+    name: "Staying top of mind",
+    subject: "Still actively acquiring in {{targetMarket}}",
+    content: "Hi {{firstName}},\n\nWanted to check back in, we're still very active in {{targetMarket}} and always looking for good land opportunities, on or off market. If anything has come across your desk recently, I'd love to hear about it, even if it's still early.",
+  },
+  {
+    id: "reengage-quiet-contact",
+    name: "Re-engaging a quiet contact",
+    subject: "Still looking in {{targetMarket}}",
+    content: "Hi {{firstName}},\n\nIt's been a bit since we last connected. Just wanted to reconnect and see if anything has come up on your end. We're still actively pursuing sites in {{targetMarket}}, and always appreciate being kept in the loop on new listings.",
+  },
+] as const;
+
 const emptyForm: CampaignForm = {
   name: "",
   subject: "",
@@ -237,6 +264,16 @@ export default function DeveloperOutreach() {
     aiDraftMutation.mutate();
   };
 
+  const applyStartingTemplate = (templateId: string) => {
+    const template = STARTING_TEMPLATES.find((candidate) => candidate.id === templateId);
+    if (!template) return;
+    setForm((current) => ({
+      ...current,
+      subject: template.subject,
+      content: template.content,
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <DeveloperNavigation />
@@ -303,7 +340,26 @@ export default function DeveloperOutreach() {
               <div><Label htmlFor="campaign-name">Campaign name</Label><Input id="campaign-name" className="mt-1.5" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Broker introduction" /></div>
               <div><Label htmlFor="campaign-subject">Subject line</Label><Input id="campaign-subject" className="mt-1.5" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} placeholder="A quick introduction" /></div>
               <div><Label htmlFor="campaign-trigger-tag">Auto-enrollment tag</Label><Input id="campaign-trigger-tag" className="mt-1.5" value={form.triggerTag} onChange={(event) => setForm({ ...form, triggerTag: event.target.value })} placeholder="Interested Broker" /><p className="mt-1 text-xs text-slate-500">Contacts owned by your company are enrolled when this exact CRM tag is added. Geography targeting remains available when you launch the campaign.</p></div>
-              <div><Label htmlFor="campaign-content">Email message</Label><Textarea id="campaign-content" className="mt-1.5 min-h-52" value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} /><p className="mt-1 text-xs text-slate-500">Use {"{{firstName}}"} to personalize the greeting. Your edits stay in place until you choose an assistant action.</p></div>
+              <div>
+                <Label htmlFor="campaign-template">Starting template</Label>
+                <select
+                  id="campaign-template"
+                  defaultValue=""
+                  onChange={(event) => {
+                    applyStartingTemplate(event.target.value);
+                    event.target.value = "";
+                  }}
+                  className="mt-1.5 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                  data-testid="campaign-starting-template"
+                >
+                  <option value="">Choose a starting template...</option>
+                  {STARTING_TEMPLATES.map((template) => (
+                    <option key={template.id} value={template.id}>{template.name}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">Templates are editable starting points. Merge fields resolve when the email is sent.</p>
+              </div>
+              <div><Label htmlFor="campaign-content">Email message</Label><Textarea id="campaign-content" className="mt-1.5 min-h-52" value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} /><p className="mt-1 text-xs text-slate-500">Use {"{{firstName}}"}, {"{{companyName}}"}, or {"{{targetMarket}}"} to personalize the email. Your edits stay in place until you choose an assistant action.</p></div>
               <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="campaign-delay">Send delay in days</Label><Input id="campaign-delay" type="number" min={0} max={365} className="mt-1.5" value={form.dayNumber} onChange={(event) => setForm({ ...form, dayNumber: Number(event.target.value) })} /></div><div><Label htmlFor="campaign-status">Status</Label><select id="campaign-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as "paused" | "active" })} className="mt-1.5 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option value="paused">Draft / paused</option><option value="active">Active</option></select></div></div>
             </div>
             <Card className="flex min-h-[520px] flex-col border-slate-200 bg-slate-50/70">

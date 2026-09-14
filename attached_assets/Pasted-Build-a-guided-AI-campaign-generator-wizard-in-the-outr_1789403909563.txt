@@ -1,0 +1,50 @@
+Build a guided AI campaign generator wizard in the outreach setup flow 
+(client/src/pages/developer-outreach.tsx), complementing the existing chat-based 
+writing assistant. Instead of refining one email conversationally, this asks a 
+few structured questions once, then generates a complete multi-step drip campaign 
+and links it to a chosen CRM tag automatically.
+
+TASK 1 — Add a "Build with AI" entry point
+Add a new option (button or entry point) in the campaign creation flow, alongside 
+the existing manual campaign builder, offering this guided wizard as an 
+alternative starting path.
+
+TASK 2 — The wizard questions
+Present a short form asking:
+  - Tone: Professional / Casual
+  - Length: Short / Medium / Long
+  - Number of steps in the sequence (e.g. 2-5, default 3)
+  - Frequency between steps: a day-count input or preset options (30 / 45 / 60 / 
+    90 days), applied as the dayNumber gap between each generated step
+  - Which CRM tag this campaign should trigger from (reuse the existing tag 
+    fetch pattern already used elsewhere in this app, e.g. GET /api/crm/tags)
+
+TASK 3 — Backend generation endpoint
+Add a new endpoint, e.g. POST /api/developer-profile/me/outreach/campaigns/ 
+generate-sequence, scoped via the existing developerProfileId pattern. Given the 
+wizard's answers, use the same AI infrastructure already powering the existing 
+writing assistant (aiEmailParser.ts's provider) to generate the requested number 
+of steps, each with a subject and content, matching the requested tone and 
+length, using the same {{firstName}}/{{companyName}}/{{targetMarket}} merge 
+fields already established. Each generated step should feel like a natural 
+progression (e.g. an initial intro, then a shorter follow-up, not identical 
+emails repeated).
+
+TASK 4 — Create the real campaign, steps, and tag trigger
+On confirmation, create the actual outreachCampaign record, insert each generated 
+step into outreachCampaignSteps with the correct sequenceIndex and dayNumber 
+(calculated from the chosen frequency — e.g. steps at day 0, day 30, day 60 for a 
+30-day cadence), and wire the campaign to the selected CRM tag using the existing 
+trigger-tag mechanism already used elsewhere in this app.
+
+TASK 5 — Review before saving, not silent creation
+After generation, show all generated steps for review before actually creating 
+anything in the database — let the user edit any step's content, or regenerate, 
+before confirming. Do not silently create a live campaign without this review 
+step.
+
+Verify: run through the wizard end-to-end with real inputs (e.g. Professional 
+tone, Medium length, 3 steps, 30-day frequency, a real CRM tag), confirm the 
+generated steps read naturally and use real merge fields, confirm the resulting 
+campaign and its steps are created correctly with the right day spacing, and 
+confirm it's correctly linked to the chosen CRM tag as a trigger.

@@ -29993,6 +29993,16 @@ RULES:
     }
   });
 
+  function formatDeveloperTargetMarket(states: unknown, counties: unknown): string {
+    const values = [...(Array.isArray(states) ? states : []), ...(Array.isArray(counties) ? counties : [])]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+    const uniqueValues = values.filter((value, index) =>
+      values.findIndex((candidate) => candidate.toLowerCase() === value.toLowerCase()) === index
+    );
+    return uniqueValues.join(', ') || 'all available markets';
+  }
+
   // TEST DRIP CAMPAIGN - Send a test email using a sender's drip campaign step
   app.post('/api/outreach/senders/:senderId/test-drip-email', isAuthenticated, async (req: any, res) => {
     try {
@@ -30014,7 +30024,8 @@ RULES:
       // Get sender details including signature
       let senderResult = await db.execute(sql`
         SELECT id, name, email, microsoft_access_token as "microsoftAccessToken",
-               signature_html as "signatureHtml"
+               signature_html as "signatureHtml",
+               developer_profile_id as "developerProfileId"
         FROM outreach_senders WHERE id::text = ${senderId}
       `);
 
@@ -30023,7 +30034,8 @@ RULES:
         console.log(`⚠️ [TEST-DRIP] Sender not found by ID ${senderId}, trying email fallback: ${userEmail}`);
         senderResult = await db.execute(sql`
           SELECT id, name, email, microsoft_access_token as "microsoftAccessToken",
-                 signature_html as "signatureHtml"
+                 signature_html as "signatureHtml",
+                 developer_profile_id as "developerProfileId"
           FROM outreach_senders WHERE email = ${userEmail}
         `);
       }
@@ -30033,6 +30045,19 @@ RULES:
       }
 
       const sender = senderResult.rows[0] as any;
+      let companyName = '';
+      let targetMarket = 'all available markets';
+      if (sender.developerProfileId) {
+        const profileResult = await db.execute(sql`
+          SELECT company_name, target_states, target_counties
+          FROM developer_profiles
+          WHERE id = ${sender.developerProfileId} AND is_active = true
+          LIMIT 1
+        `);
+        const profile = profileResult.rows?.[0] as any;
+        companyName = profile?.company_name || '';
+        targetMarket = formatDeveloperTargetMarket(profile?.target_states, profile?.target_counties);
+      }
 
       // Support direct content from template editor OR lookup from campaign steps
       let step: any;
@@ -30250,7 +30275,9 @@ RULES:
       let personalizedMessage = (step.messageContent || "")
         .replace(/\{\{Broker\.firstname\}\}/gi, 'Test')
         .replace(/\{\{broker\.firstname\}\}/gi, 'Test')
-        .replace(/\{\{firstname\}\}/gi, 'Test');
+        .replace(/\{\{firstname\}\}/gi, 'Test')
+        .replace(/\{\{companyName\}\}/gi, companyName)
+        .replace(/\{\{targetMarket\}\}/gi, targetMarket);
       
       // DEBUG: Log raw content before conversion
       console.log(`📧 [TEST-EMAIL-DEBUG] Raw content (first 500 chars):`, personalizedMessage.substring(0, 500));
@@ -30289,7 +30316,10 @@ RULES:
       
       const personalizedSubject = (step.subjectLine || "Test Email")
         .replace(/\{\{Broker\.firstname\}\}/gi, 'Test')
-        .replace(/\{\{broker\.firstname\}\}/gi, 'Test');
+        .replace(/\{\{broker\.firstname\}\}/gi, 'Test')
+        .replace(/\{\{firstname\}\}/gi, 'Test')
+        .replace(/\{\{companyName\}\}/gi, companyName)
+        .replace(/\{\{targetMarket\}\}/gi, targetMarket);
 
       // Check if sender has Microsoft OAuth connected
       if (sender.microsoftAccessToken) {
