@@ -57,6 +57,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Inter is the single application font, including legacy monospace utilities. */
+.font-mono {
+  font-family: var(--font-sans) !important;
+}
+
 /* Authenticated desktop workspaces reserve room for the collapsed icon rail.
    The sidebar expands over the rail on hover so the page does not reflow. */
 @media (min-width: 768px) {
@@ -1157,7 +1162,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   align-self: start;
   padding-top: .2rem;
   color: var(--landlinq-sky);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans);
   font-size: .78rem;
   letter-spacing: .12em;
 }
@@ -1383,7 +1388,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   gap: 1rem;
   padding: 1rem 1.35rem;
   color: rgba(255,255,255,.4);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans);
   font-size: .55rem;
   letter-spacing: .15em;
 }
@@ -1404,7 +1409,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   gap: .8rem;
   height: 4rem;
   color: var(--landlinq-sky);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans);
   font-size: .6rem;
   font-weight: 600;
   letter-spacing: .2em;
@@ -1481,7 +1486,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 
 .ll-audience-index b {
   color: var(--landlinq-sky);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans);
   font-size: .78rem;
   font-weight: 500;
 }
@@ -1528,7 +1533,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 
 .ll-audience-proof small {
   color: rgba(255,255,255,.35);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans);
   font-size: .52rem;
   letter-spacing: .16em;
 }
@@ -1881,7 +1886,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 .ll-feed-item:nth-child(3) { animation-delay: 1.3s; }
 .ll-feed-item:nth-child(4) { animation-delay: 2.6s; }
 .ll-feed-item b { color: #183047; font-weight: 700; }
-.ll-feed-index { color: #55C3E9; font-family: ui-monospace, monospace; }
+.ll-feed-index { color: #55C3E9; font-family: var(--font-sans); }
 .ll-feed-item time { text-align: right; color: #a0adb5; }
 .ll-pipeline-track { display: grid; grid-template-columns: 24fr 18fr 12fr 7fr; height: 5px; margin: 15px 0 5px; gap: 2px; }
 .ll-pipeline-track i:nth-child(1) { background: #dce5ea; }
@@ -2013,7 +2018,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 .ll-signal-label,
 .ll-signal-flow-foot {
   color: #3286c8;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans);
   font-size: .6rem;
   font-weight: 700;
   letter-spacing: .18em;
@@ -2094,7 +2099,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   border-radius: 50%;
   background: #eef4f5;
   color: #3286c8;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans);
   font-size: .65rem;
   font-weight: 700;
   letter-spacing: .08em;
@@ -2164,7 +2169,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   border-top: 1px solid rgba(16,40,61,.14);
   padding-top: .7rem;
   color: rgba(16,40,61,.44);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans);
   font-size: .53rem;
   letter-spacing: .04em;
 }

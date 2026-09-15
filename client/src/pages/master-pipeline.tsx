@@ -161,7 +161,7 @@ export default function MasterPipeline() {
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#4A90E2]">Admin workspace</p>
-            <h1 className="mt-1 flex items-center gap-3 font-serif text-4xl font-normal text-[#0A2B4A]">
+            <h1 className="mt-1 flex items-center gap-3 font-serif text-4xl font-bold text-[#0A2B4A]">
               <BriefcaseBusiness className="h-8 w-8 text-[#4A90E2]" />
               Master Pipeline
             </h1>

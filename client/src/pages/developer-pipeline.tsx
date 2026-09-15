@@ -230,7 +230,7 @@ export default function DeveloperPipeline() {
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#4A90E2]">Sales workspace</p>
-            <h1 className="mt-1 flex items-center gap-3 font-serif text-4xl font-normal text-[#0A2B4A]"><BriefcaseBusiness className="h-8 w-8 text-[#4A90E2]" />Pipeline</h1>
+            <h1 className="mt-1 flex items-center gap-3 font-serif text-4xl font-bold text-[#0A2B4A]"><BriefcaseBusiness className="h-8 w-8 text-[#4A90E2]" />Pipeline</h1>
             <p className="mt-2 text-slate-600">Track opportunities from first contact through close, independent of deal classification.</p>
           </div>
           <div className="flex gap-2">

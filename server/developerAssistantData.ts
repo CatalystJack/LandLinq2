@@ -52,7 +52,7 @@ export async function getMyDeals(developerProfileId: string, filters: MyDealFilt
         pds.developer_profile_id = ${developerProfileId}
         OR (pds.developer_profile_id IS NULL AND pd.developer_profile_id = ${developerProfileId})
       )
-      ORDER BY d.id, pds.matched_at DESC NULLS LAST, pds.created_at DESC NULLS LAST
+      ORDER BY d.id, pds.matched_at DESC NULLS LAST, pd.created_at DESC NULLS LAST
     )
     SELECT id, address, city, state, source_status, developer_status,
       asking_price, created_at
@@ -155,7 +155,7 @@ export async function getCompsForDeal(developerProfileId: string, dealId: string
         pds.developer_profile_id = ${developerProfileId}
         OR (pds.developer_profile_id IS NULL AND pd.developer_profile_id = ${developerProfileId})
       )
-    ORDER BY pds.matched_at DESC NULLS LAST, pds.created_at DESC NULLS LAST
+    ORDER BY pds.matched_at DESC NULLS LAST, pd.created_at DESC NULLS LAST
     LIMIT 1
   `);
   const deal = result.rows?.[0] as any;

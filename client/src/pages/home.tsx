@@ -105,7 +105,7 @@ export default function Home() {
         <section className="py-16 bg-gradient-to-r from-[#081729] to-[#0a2540]" data-testid="section-quick-what-we-do">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto text-center">
-              <h2 className="text-2xl md:text-3xl font-normal text-gray-300 mb-6">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-300 mb-6">
                 What We Do
               </h2>
               <p className="text-3xl md:text-5xl font-bold text-white leading-tight">

@@ -5779,7 +5779,7 @@ export default function AnalystDashboard() {
           <header className="mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="font-serif text-3xl md:text-4xl font-normal text-[#07172A] tracking-tight">
+                <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#07172A] tracking-tight">
                   Analyst Dashboard
                 </h1>
               </div>

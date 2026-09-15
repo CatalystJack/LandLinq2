@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Contact = {
   id: string;
@@ -89,6 +90,55 @@ async function requestJson(url: string, options?: RequestInit) {
   return data;
 }
 
+function ContactTableSkeleton({ adminMode }: { adminMode: boolean }) {
+  return (
+    <div className="table-scroll-container">
+      <Table className="min-w-[1120px]">
+        <TableHeader>
+          <TableRow className="border-[#e3e9ee] bg-[#f8fafb] hover:bg-[#f8fafb]">
+            {!adminMode && <TableHead className="h-11 w-12 pl-5" />}
+            <TableHead className="h-11 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Name</TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Email</TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Phone</TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Brokerage</TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Region</TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Tags</TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from({ length: 6 }).map((_, index) => (
+            <TableRow key={index} className="border-[#e8edf1]">
+              {!adminMode && (
+                <TableCell className="pl-5">
+                  <Skeleton className="h-4 w-4 rounded-sm bg-[#e4ebf0]" />
+                </TableCell>
+              )}
+              <TableCell className="pl-5">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-8 w-8 shrink-0 rounded-full bg-[#dfe8ee]" />
+                  <Skeleton className="h-4 w-28 bg-[#e4ebf0]" />
+                </div>
+              </TableCell>
+              <TableCell><Skeleton className="h-4 w-40 bg-[#e4ebf0]" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-28 bg-[#e4ebf0]" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-36 bg-[#e4ebf0]" /></TableCell>
+              <TableCell><Skeleton className="h-4 w-16 bg-[#e4ebf0]" /></TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1.5">
+                  <Skeleton className="h-6 w-16 rounded-full bg-[#e4ebf0]" />
+                  <Skeleton className="h-6 w-12 rounded-full bg-[#e4ebf0]" />
+                </div>
+              </TableCell>
+              <TableCell><Skeleton className="h-6 w-24 rounded-full bg-[#e4ebf0]" /></TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 type DeveloperCrmProps = {
   adminMode?: boolean;
 };
@@ -110,7 +160,6 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [smsFilter, setSmsFilter] = useState<"all" | "opted_in" | "opted_out">("all");
   const [stateFilter, setStateFilter] = useState("all");
   const [assignedToFilter, setAssignedToFilter] = useState("all");
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
@@ -200,19 +249,16 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     return contacts.filter((contact) => {
       const matchesCompany = companyFilter === "all" || contact.brokerage?.trim().toLowerCase() === companyFilter;
       const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => contact.crmTags?.includes(tag));
-      const matchesSms = smsFilter === "all"
-        || (smsFilter === "opted_in" && contact.smsOptIn === true)
-        || (smsFilter === "opted_out" && contact.smsOptIn !== true);
       const matchesState = stateFilter === "all" || contact.stateRegion?.trim() === stateFilter;
       const matchesAssignedTo = assignedToFilter === "all" || contact.assignedTo?.trim() === assignedToFilter;
       if (!matchesCompany) return false;
-      if (!matchesTags || !matchesSms || !matchesState || !matchesAssignedTo) return false;
+      if (!matchesTags || !matchesState || !matchesAssignedTo) return false;
       if (!term) return true;
       return [contact.firstName, contact.lastName, contact.email, contact.phone, contact.brokerage, contact.stateRegion]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [contactsQuery.data?.contacts, search, companyFilter, selectedTags, smsFilter, stateFilter, assignedToFilter]);
+  }, [contactsQuery.data?.contacts, search, companyFilter, selectedTags, stateFilter, assignedToFilter]);
 
   const availableTags = useMemo(() => {
     if (!adminMode) return (tagsQuery.data || []).map((tag) => tag.trim()).filter(Boolean);
@@ -249,11 +295,10 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       : current.filter((id) => id !== contactId));
   };
 
-  const hasActiveFilters = companyFilter !== "all" || selectedTags.length > 0 || smsFilter !== "all" || stateFilter !== "all" || assignedToFilter !== "all";
+  const hasActiveFilters = companyFilter !== "all" || selectedTags.length > 0 || stateFilter !== "all" || assignedToFilter !== "all";
   const clearFilters = () => {
     setCompanyFilter("all");
     setSelectedTags([]);
-    setSmsFilter("all");
     setStateFilter("all");
     setAssignedToFilter("all");
   };
@@ -324,7 +369,11 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
             <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[#10283b] sm:text-4xl">Company contacts</h1>
             <p className="mt-2 max-w-xl text-sm text-[#6e8192]">A focused directory for the relationships your team is building across the LandLinq network.</p>
           </div>
-          <Button onClick={() => setImportOpen(true)} style={{ backgroundColor: primaryColor }} className="h-10 rounded-full px-4 text-white shadow-sm hover:opacity-90">
+          <Button
+            onClick={() => setImportOpen(true)}
+            style={{ backgroundColor: primaryColor }}
+            className="h-10 rounded-full border-2 border-transparent px-4 text-white shadow-sm transition-colors hover:!border-[#8CC8FF] hover:!bg-white hover:!text-[#4A90E2]"
+          >
             <Upload className="mr-2 h-4 w-4" />Import Contacts
           </Button>
         </div>
@@ -380,16 +429,6 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                </DropdownMenuContent>
              </DropdownMenu>
              <select
-               value={smsFilter}
-               onChange={(event) => setSmsFilter(event.target.value as typeof smsFilter)}
-               aria-label="SMS status filter"
-               className="h-8 rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] outline-none"
-             >
-               <option value="all">SMS: All</option>
-               <option value="opted_in">SMS: Opted in</option>
-               <option value="opted_out">SMS: Opted out</option>
-             </select>
-             <select
                value={stateFilter}
                onChange={(event) => setStateFilter(event.target.value)}
                aria-label="State or region filter"
@@ -437,8 +476,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               )}
              <span className="ml-auto hidden sm:inline">{filteredContacts.length} shown · search updates as you type</span>
           </div>
-          {contactsQuery.isLoading ? (
-            <div className="space-y-3 p-5">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-[#eef2f5]" />)}</div>
+           {contactsQuery.isLoading ? (
+             <ContactTableSkeleton adminMode={adminMode} />
           ) : contactsQuery.isError ? (
             <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center"><p className="text-sm font-medium text-[#9b4545]">{(contactsQuery.error as Error).message}</p><Button variant="outline" className="mt-4 h-9" onClick={() => contactsQuery.refetch()}><RefreshCw className="mr-2 h-3.5 w-3.5" />Try again</Button></div>
            ) : filteredContacts.length === 0 ? (

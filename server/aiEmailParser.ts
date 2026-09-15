@@ -263,7 +263,9 @@ ${question}`,
       { role: "user", content: question },
     ],
     response_format: { type: "json_object" },
-    max_completion_tokens: 700,
+    // GPT-5 may spend completion tokens on reasoning before returning the
+    // short JSON route. Keep enough headroom to avoid an empty message.
+    max_completion_tokens: 1600,
   });
   const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty assistant routing response");
