@@ -54,6 +54,21 @@ type SuggestedDraft = {
   content: string;
 };
 
+type SequenceGenerationForm = {
+  tone: "professional" | "casual";
+  length: "short" | "medium" | "long";
+  stepCount: number;
+  frequencyDays: number;
+  crmTagId: string;
+};
+
+type GeneratedSequenceStep = {
+  stepNumber: number;
+  dayNumber: number;
+  subject: string;
+  content: string;
+};
+
 const STARTING_TEMPLATES = [
   {
     id: "cold-intro",
@@ -90,6 +105,14 @@ const emptyForm: CampaignForm = {
   status: "paused",
 };
 
+const emptySequenceForm: SequenceGenerationForm = {
+  tone: "professional",
+  length: "medium",
+  stepCount: 3,
+  frequencyDays: 30,
+  crmTagId: "",
+};
+
 async function jsonRequest(url: string, options?: RequestInit) {
   const response = await fetch(url, { credentials: "include", ...options });
   const data = await response.json().catch(() => ({}));
@@ -109,6 +132,9 @@ export default function DeveloperOutreach() {
   const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
   const [aiInput, setAiInput] = useState("");
   const [aiSuggestedDraft, setAiSuggestedDraft] = useState<SuggestedDraft | null>(null);
+  const [sequenceDialogOpen, setSequenceDialogOpen] = useState(false);
+  const [sequenceForm, setSequenceForm] = useState<SequenceGenerationForm>(emptySequenceForm);
+  const [generatedSteps, setGeneratedSteps] = useState<GeneratedSequenceStep[]>([]);
 
   const senderQuery = useQuery<{ sender: SenderAccount | null }>({
     queryKey: ["/api/developer-profile/me/outreach/sender"],
@@ -121,6 +147,10 @@ export default function DeveloperOutreach() {
   const targetsQuery = useQuery<{ contacts: any[]; count: number; targetStates: string[]; targetCounties: string[] }>({
     queryKey: ["/api/developer-profile/me/outreach/targets"],
     queryFn: () => jsonRequest("/api/developer-profile/me/outreach/targets"),
+  });
+  const tagsQuery = useQuery<string[]>({
+    queryKey: ["/api/crm/tags"],
+    queryFn: () => jsonRequest("/api/crm/tags"),
   });
   const aiConversationQuery = useQuery<{ messages: AiMessage[]; suggestedDraft: SuggestedDraft | null }>({
     queryKey: ["/api/developer-profile/me/outreach/ai-conversation", editing?.id],
@@ -207,6 +237,19 @@ export default function DeveloperOutreach() {
     onError: (error: Error) => toast({ title: "Assistant unavailable", description: error.message, variant: "destructive" }),
   });
 
+  const sequenceGenerationMutation = useMutation({
+    mutationFn: () => jsonRequest("/api/developer-profile/me/outreach/campaigns/generate-sequence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sequenceForm),
+    }),
+    onSuccess: (data: { steps: GeneratedSequenceStep[] }) => {
+      setGeneratedSteps(data.steps || []);
+      toast({ title: "Sequence generated", description: `${data.steps?.length || 0} draft steps are ready to review.` });
+    },
+    onError: (error: Error) => toast({ title: "Could not generate sequence", description: error.message, variant: "destructive" }),
+  });
+
   const sender = senderQuery.data?.sender;
   const campaigns = campaignsQuery.data?.campaigns || [];
   const scopeLabel = useMemo(() => {
@@ -238,6 +281,15 @@ export default function DeveloperOutreach() {
     setAiInput("");
     setAiSuggestedDraft(null);
     setDialogOpen(true);
+  };
+
+  const openSequenceWizard = () => {
+    setSequenceForm({
+      ...emptySequenceForm,
+      crmTagId: tagsQuery.data?.[0] || "",
+    });
+    setGeneratedSteps([]);
+    setSequenceDialogOpen(true);
   };
 
   const insertSuggestedDraft = (replace: boolean) => {
@@ -283,9 +335,14 @@ export default function DeveloperOutreach() {
             <h1 className="text-3xl font-bold text-slate-950">Campaigns</h1>
             <p className="mt-2 text-slate-500">Build drip campaigns for your approved contact audience.</p>
           </div>
-          <Button variant="brand" onClick={openCreate} disabled={!sender?.outlookConnected}>
-            <Plus className="mr-2 h-4 w-4" />New Campaign
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={openSequenceWizard}>
+              <Sparkles className="mr-2 h-4 w-4" />Build with AI
+            </Button>
+            <Button variant="brand" onClick={openCreate} disabled={!sender?.outlookConnected}>
+              <Plus className="mr-2 h-4 w-4" />New Campaign
+            </Button>
+          </div>
         </div>
 
         <div className="mb-6 grid gap-4 lg:grid-cols-3">
@@ -420,6 +477,120 @@ export default function DeveloperOutreach() {
             </Card>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button><Button variant="brand" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.name.trim() || !form.subject.trim() || !form.content.trim()}>{saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Campaign</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={sequenceDialogOpen} onOpenChange={setSequenceDialogOpen}>
+        <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5" style={{ color: secondaryColor }} />Build campaign with AI</DialogTitle>
+            <DialogDescription>Choose the outreach style and cadence. The generated drafts are for review only and will not be saved.</DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!sequenceForm.crmTagId || sequenceGenerationMutation.isPending) return;
+              sequenceGenerationMutation.mutate();
+            }}
+            className="space-y-5"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="ai-sequence-tone">Tone</Label>
+                <select
+                  id="ai-sequence-tone"
+                  value={sequenceForm.tone}
+                  onChange={(event) => setSequenceForm({ ...sequenceForm, tone: event.target.value as SequenceGenerationForm["tone"] })}
+                  className="mt-1.5 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/20"
+                >
+                  <option value="professional">Professional</option>
+                  <option value="casual">Casual</option>
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="ai-sequence-length">Length</Label>
+                <select
+                  id="ai-sequence-length"
+                  value={sequenceForm.length}
+                  onChange={(event) => setSequenceForm({ ...sequenceForm, length: event.target.value as SequenceGenerationForm["length"] })}
+                  className="mt-1.5 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/20"
+                >
+                  <option value="short">Short</option>
+                  <option value="medium">Medium</option>
+                  <option value="long">Long</option>
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="ai-sequence-step-count">Number of steps</Label>
+                <select
+                  id="ai-sequence-step-count"
+                  value={sequenceForm.stepCount}
+                  onChange={(event) => setSequenceForm({ ...sequenceForm, stepCount: Number(event.target.value) })}
+                  className="mt-1.5 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/20"
+                >
+                  {[2, 3, 4, 5].map((count) => <option key={count} value={count}>{count} steps</option>)}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="ai-sequence-frequency">Frequency</Label>
+                <select
+                  id="ai-sequence-frequency"
+                  value={sequenceForm.frequencyDays}
+                  onChange={(event) => setSequenceForm({ ...sequenceForm, frequencyDays: Number(event.target.value) })}
+                  className="mt-1.5 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/20"
+                >
+                  {[30, 45, 60, 90].map((days) => <option key={days} value={days}>Every {days} days</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="ai-sequence-crm-tag">CRM tag trigger</Label>
+              <select
+                id="ai-sequence-crm-tag"
+                value={sequenceForm.crmTagId}
+                onChange={(event) => setSequenceForm({ ...sequenceForm, crmTagId: event.target.value })}
+                disabled={tagsQuery.isLoading || !tagsQuery.data?.length}
+                className="mt-1.5 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/20 disabled:bg-slate-100"
+              >
+                <option value="">{tagsQuery.isLoading ? "Loading CRM tags…" : "Select a CRM tag"}</option>
+                {(tagsQuery.data || []).map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+              </select>
+              <p className="mt-1.5 text-xs text-slate-500">Only active contacts owned by your company can be used for this trigger.</p>
+            </div>
+
+            {generatedSteps.length > 0 && (
+              <div className="space-y-3 border-t border-slate-200 pt-5" data-testid="generated-sequence-results">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-950">Generated draft steps</h3>
+                  <p className="mt-1 text-xs text-slate-500">Review these drafts before deciding what to do next. Nothing has been saved.</p>
+                </div>
+                {generatedSteps.map((step) => (
+                  <Card key={step.stepNumber} className="border-slate-200 bg-slate-50/70">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center justify-between text-sm">
+                        <span>Step {step.stepNumber}</span>
+                        <Badge variant="outline">Day {step.dayNumber}</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <p className="font-medium text-slate-900">{step.subject}</p>
+                      <p className="whitespace-pre-line text-sm leading-6 text-slate-700">{step.content}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setSequenceDialogOpen(false)}>Close</Button>
+              <Button type="submit" variant="brand" disabled={!sequenceForm.crmTagId || sequenceGenerationMutation.isPending || tagsQuery.isLoading}>
+                {sequenceGenerationMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {generatedSteps.length ? "Generate again" : "Generate sequence"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
