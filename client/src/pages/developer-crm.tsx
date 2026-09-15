@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
-import { Building2, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, SlidersHorizontal } from "lucide-react";
+import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, SlidersHorizontal } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type Contact = {
   id: string;
@@ -26,6 +27,7 @@ type Contact = {
   stateRegion: string | null;
   assignedTo: string | null;
   crmTags: string[] | null;
+  smsOptIn: boolean | null;
   ownerDeveloperProfileId: string | null;
   createdAt: string | null;
 };
@@ -106,6 +108,10 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     : "/api/developer-profile/me/import-contacts";
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [smsFilter, setSmsFilter] = useState<"all" | "opted_in" | "opted_out">("all");
+  const [stateFilter, setStateFilter] = useState("all");
+  const [assignedToFilter, setAssignedToFilter] = useState("all");
   const [importOpen, setImportOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -117,6 +123,12 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const contactsQuery = useQuery<{ contacts: Contact[] }>({
     queryKey: [contactsQueryKey],
     queryFn: () => requestJson(contactsEndpoint),
+  });
+
+  const tagsQuery = useQuery<string[]>({
+    queryKey: ["/api/developer-profile/me/crm-tags"],
+    queryFn: () => requestJson("/api/developer-profile/me/crm-tags"),
+    enabled: !adminMode,
   });
 
   const importMutation = useMutation({
@@ -142,13 +154,46 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     const contacts = contactsQuery.data?.contacts || [];
     return contacts.filter((contact) => {
       const matchesCompany = companyFilter === "all" || contact.brokerage?.trim().toLowerCase() === companyFilter;
+      const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => contact.crmTags?.includes(tag));
+      const matchesSms = smsFilter === "all"
+        || (smsFilter === "opted_in" && contact.smsOptIn === true)
+        || (smsFilter === "opted_out" && contact.smsOptIn !== true);
+      const matchesState = stateFilter === "all" || contact.stateRegion?.trim() === stateFilter;
+      const matchesAssignedTo = assignedToFilter === "all" || contact.assignedTo?.trim() === assignedToFilter;
       if (!matchesCompany) return false;
+      if (!matchesTags || !matchesSms || !matchesState || !matchesAssignedTo) return false;
       if (!term) return true;
       return [contact.firstName, contact.lastName, contact.email, contact.phone, contact.brokerage, contact.stateRegion]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [contactsQuery.data?.contacts, search, companyFilter]);
+  }, [contactsQuery.data?.contacts, search, companyFilter, selectedTags, smsFilter, stateFilter, assignedToFilter]);
+
+  const availableTags = useMemo(() => {
+    if (!adminMode) return (tagsQuery.data || []).map((tag) => tag.trim()).filter(Boolean);
+    return Array.from(new Set((contactsQuery.data?.contacts || []).flatMap((contact) => contact.crmTags || []).map((tag) => tag.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  }, [adminMode, tagsQuery.data, contactsQuery.data?.contacts]);
+
+  const availableStates = useMemo(() => Array.from(new Set(
+    (contactsQuery.data?.contacts || [])
+      .map((contact) => contact.stateRegion?.trim())
+      .filter((value): value is string => Boolean(value)),
+  )).sort((a, b) => a.localeCompare(b)), [contactsQuery.data?.contacts]);
+
+  const availableAssignedTo = useMemo(() => Array.from(new Set(
+    (contactsQuery.data?.contacts || [])
+      .map((contact) => contact.assignedTo?.trim())
+      .filter((value): value is string => Boolean(value)),
+  )).sort((a, b) => a.localeCompare(b)), [contactsQuery.data?.contacts]);
+
+  const hasActiveFilters = companyFilter !== "all" || selectedTags.length > 0 || smsFilter !== "all" || stateFilter !== "all" || assignedToFilter !== "all";
+  const clearFilters = () => {
+    setCompanyFilter("all");
+    setSelectedTags([]);
+    setSmsFilter("all");
+    setStateFilter("all");
+    setAssignedToFilter("all");
+  };
 
   const companyProfiles = useMemo(() => {
     const profiles = new Map<string, { name: string; people: number }>();
@@ -232,10 +277,10 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email, company…" className="h-10 rounded-lg border-[#d7e2e9] bg-white pl-10 text-sm shadow-none focus-visible:ring-1" style={{ "--tw-ring-color": secondaryColor } as CSSProperties} />
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 border-b border-[#e6edf1] px-5 py-3 text-xs text-[#718493]">
+           <div className="flex flex-wrap items-center gap-2 border-b border-[#e6edf1] px-5 py-3 text-xs text-[#718493]">
             <SlidersHorizontal className="h-3.5 w-3.5" />
-            <span className="font-medium">Directory view</span>
-            <div className="ml-1 flex items-center gap-2">
+             <span className="mr-1 font-medium">Filters</span>
+             <div className="flex items-center gap-2">
               <Building2 className="h-3.5 w-3.5" />
               <select
                 value={companyFilter}
@@ -248,14 +293,66 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                 ))}
               </select>
             </div>
-            <span className="ml-auto hidden sm:inline">Search updates as you type</span>
+             <DropdownMenu>
+               <DropdownMenuTrigger asChild>
+                 <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] outline-none hover:bg-[#f5f8fa]">
+                   Tags{selectedTags.length > 0 ? ` (${selectedTags.length})` : ""}<ChevronDown className="h-3.5 w-3.5 text-[#8195a5]" />
+                 </button>
+               </DropdownMenuTrigger>
+               <DropdownMenuContent align="start" className="w-56">
+                 <DropdownMenuLabel>Match any selected tag</DropdownMenuLabel>
+                 <DropdownMenuSeparator />
+                 {availableTags.length ? availableTags.map((tag) => (
+                   <DropdownMenuCheckboxItem
+                     key={tag}
+                     checked={selectedTags.includes(tag)}
+                     onSelect={(event) => event.preventDefault()}
+                     onCheckedChange={(checked) => setSelectedTags((current) => checked === true ? [...current, tag] : current.filter((value) => value !== tag))}
+                   >
+                     <span className="max-w-[190px] truncate">{tag}</span>
+                   </DropdownMenuCheckboxItem>
+                 )) : (
+                   <div className="px-2 py-2 text-xs text-[#7b8d9b]">{tagsQuery.isLoading ? "Loading tags…" : "No tags on your contacts"}</div>
+                 )}
+               </DropdownMenuContent>
+             </DropdownMenu>
+             <select
+               value={smsFilter}
+               onChange={(event) => setSmsFilter(event.target.value as typeof smsFilter)}
+               aria-label="SMS status filter"
+               className="h-8 rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] outline-none"
+             >
+               <option value="all">SMS: All</option>
+               <option value="opted_in">SMS: Opted in</option>
+               <option value="opted_out">SMS: Opted out</option>
+             </select>
+             <select
+               value={stateFilter}
+               onChange={(event) => setStateFilter(event.target.value)}
+               aria-label="State or region filter"
+               className="h-8 max-w-[180px] rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] outline-none"
+             >
+               <option value="all">State: All</option>
+               {availableStates.map((state) => <option key={state} value={state}>{state}</option>)}
+             </select>
+             <select
+               value={assignedToFilter}
+               onChange={(event) => setAssignedToFilter(event.target.value)}
+               aria-label="Assigned team member filter"
+               className="h-8 max-w-[220px] rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] outline-none"
+             >
+               <option value="all">Rep: All</option>
+               {availableAssignedTo.map((person) => <option key={person} value={person}>{person}</option>)}
+             </select>
+             {hasActiveFilters && <button type="button" onClick={clearFilters} className="h-8 rounded-md px-2 text-xs font-medium text-[#4A90E2] hover:bg-[#edf4fa]">Clear filters</button>}
+             <span className="ml-auto hidden sm:inline">{filteredContacts.length} shown · search updates as you type</span>
           </div>
           {contactsQuery.isLoading ? (
             <div className="space-y-3 p-5">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-[#eef2f5]" />)}</div>
           ) : contactsQuery.isError ? (
             <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center"><p className="text-sm font-medium text-[#9b4545]">{(contactsQuery.error as Error).message}</p><Button variant="outline" className="mt-4 h-9" onClick={() => contactsQuery.refetch()}><RefreshCw className="mr-2 h-3.5 w-3.5" />Try again</Button></div>
-          ) : filteredContacts.length === 0 ? (
-            <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search ? "No matching contacts" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search ? "Try a broader name, email, or company search." : "Import a contact list to get started."}</p></div>
+           ) : filteredContacts.length === 0 ? (
+             <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search.trim() || hasActiveFilters ? "No matching contacts" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search.trim() || hasActiveFilters ? "Try clearing a filter or broadening your search." : "Import a contact list to get started."}</p>{(search.trim() || hasActiveFilters) && <Button variant="outline" onClick={() => { setSearch(""); clearFilters(); }} className="mt-4 h-9">Clear search and filters</Button>}</div>
           ) : (
             <div className="table-scroll-container">
               <Table className="min-w-[900px]">

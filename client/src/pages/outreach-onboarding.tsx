@@ -449,19 +449,25 @@ function CrmDailyLimitCard() {
 }
 
 // Helper to render email preview with formatting and nested lists
-export function renderEmailPreview(content: string, subject?: string): string {
+export function renderEmailPreview(
+  content: string,
+  subject?: string,
+  sender?: { name?: string | null; email?: string | null },
+): string {
   if (!content) return '';
   
   // Helper function to apply personalization token highlighting
   const applyPersonalizationTokens = (html: string): string => {
+    const senderName = sender?.name?.trim() || 'Your Name';
+    const senderEmail = sender?.email?.trim() || 'you@company.com';
     return html
       .replace(/{{broker\.firstName}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">John</span>')
       .replace(/{{broker\.lastName}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">Smith</span>')
       .replace(/{{broker\.email}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">john@example.com</span>')
       .replace(/{{broker\.phone}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">(555) 123-4567</span>')
       .replace(/{{broker\.company}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">ABC Realty</span>')
-      .replace(/{{sender\.name}}/g, '<span class="bg-green-100 text-green-800 px-1 rounded">Your Name</span>')
-      .replace(/{{sender\.email}}/g, '<span class="bg-green-100 text-green-800 px-1 rounded">you@company.com</span>')
+      .replace(/{{sender\.name}}/g, `<span class="bg-green-100 text-green-800 px-1 rounded">${senderName}</span>`)
+      .replace(/{{sender\.email}}/g, `<span class="bg-green-100 text-green-800 px-1 rounded">${senderEmail}</span>`)
       .replace(/{{company\.name}}/g, '<span class="bg-purple-100 text-purple-800 px-1 rounded">Catalyst</span>');
   };
   

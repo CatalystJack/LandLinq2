@@ -14175,6 +14175,7 @@ RULES:
         email: brokers.email,
         phone: brokers.phone,
         brokerage: brokers.brokerage,
+         smsOptIn: brokers.smsOptIn,
         stateRegion: brokers.stateRegion,
         assignedTo: brokers.assignedTo,
         crmTags: brokers.crmTags,

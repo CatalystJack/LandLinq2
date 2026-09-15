@@ -347,6 +347,14 @@ export default function DeveloperOutreach() {
   });
 
   const sender = senderQuery.data?.sender;
+  const senderName = sender?.name?.trim() || "Sender unavailable";
+  const senderEmail = sender?.email?.trim() || "Connect Outlook to show sender email";
+  const senderInitials = senderName
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .slice(0, 2)
+    .join("") || "?";
   const campaigns = campaignsQuery.data?.campaigns || [];
   const scopeLabel = useMemo(() => {
     const states = targetsQuery.data?.targetStates || [];
@@ -721,7 +729,7 @@ export default function DeveloperOutreach() {
                         <span className="text-xs uppercase tracking-wide text-slate-400">{step.channel}</span>
                       </div>
                       <p className="mt-2 truncate font-semibold text-slate-900">{step.subject || "No subject"}</p>
-                      <div className="mt-1 line-clamp-2 text-sm text-slate-500" dangerouslySetInnerHTML={{ __html: renderEmailPreview(step.content, step.subject || "") }} />
+                      <div className="mt-1 line-clamp-2 text-sm text-slate-500" dangerouslySetInnerHTML={{ __html: renderEmailPreview(step.content, step.subject || "", sender) }} />
                       {step.attachments?.length > 0 && <p className="mt-2 flex items-center gap-1 text-xs text-slate-500"><Paperclip className="h-3.5 w-3.5" />{step.attachments.length} attachment{step.attachments.length === 1 ? "" : "s"}</p>}
                     </div>
                     <Button variant="outline" size="sm" className="shrink-0" onClick={() => openStepEditor(step)}><Edit3 className="mr-1.5 h-4 w-4" />Edit step</Button>
@@ -805,18 +813,63 @@ export default function DeveloperOutreach() {
                   </div>
                 )}
               </div>
-              <Card className="h-fit border-slate-200 bg-slate-50/70">
-                <CardHeader className="border-b border-slate-200 pb-3"><CardTitle className="text-base">Outlook preview</CardTitle><p className="text-xs font-normal text-slate-500">{sender?.name || "Connected sender"} · {sender?.email || "Mailbox address unavailable"}</p></CardHeader>
-                <CardContent className="p-4">
-                  {stepDraft.channel === "email" ? (
-                    <>
-                      <p className="mb-3 font-semibold text-slate-900">{stepDraft.subject || "No subject"}</p>
-                      <div className="prose prose-sm max-w-none text-slate-700" dangerouslySetInnerHTML={{ __html: renderEmailPreview(stepDraft.content, stepDraft.subject || "") }} />
-                      {sender?.signatureHtml && <><div className="my-5 border-t border-slate-200" /><div className="prose prose-sm max-w-none text-slate-600" dangerouslySetInnerHTML={{ __html: sender.signatureHtml }} /></>}
-                    </>
-                  ) : <p className="whitespace-pre-wrap text-sm text-slate-700">{stepDraft.content || "Your SMS message will appear here."}</p>}
-                </CardContent>
-              </Card>
+              <div className="flex h-full flex-col">
+                <div className="mb-2 flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-[#0078D4]" />
+                  <Label className="text-xs font-medium">Outlook Preview</Label>
+                </div>
+                {stepDraft.channel === "email" ? (
+                  <div className="flex flex-1 flex-col overflow-hidden rounded-lg border bg-white shadow-lg">
+                    <div className="flex items-center gap-2 bg-[#0078D4] px-4 py-2 text-white">
+                      <Mail className="h-4 w-4" />
+                      <span className="text-sm font-medium">Outlook</span>
+                    </div>
+                    <div className="space-y-2 border-b bg-gray-50 px-4 py-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0078D4] text-sm font-semibold text-white">
+                          {senderInitials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-3">
+                            <span className="truncate text-sm font-semibold">{senderName}</span>
+                            <span className="shrink-0 text-xs text-gray-500">Just now</span>
+                          </div>
+                          <div className="truncate text-xs text-gray-500">{senderEmail}</div>
+                          <div className="mt-1 truncate text-xs text-gray-400">To: John Smith &lt;broker@example.com&gt;</div>
+                        </div>
+                      </div>
+                      <div className="pl-13 text-sm font-semibold text-gray-800">{stepDraft.subject || "(No subject line)"}</div>
+                    </div>
+                    <div className="min-h-[320px] flex-1 overflow-auto bg-white p-4">
+                      {stepDraft.content ? (
+                        <div
+                          className="prose prose-sm max-w-none text-gray-700"
+                          style={{ lineHeight: stepDraft.lineHeight || "1.5" }}
+                          dangerouslySetInnerHTML={{ __html: renderEmailPreview(stepDraft.content, stepDraft.subject || "", sender) }}
+                        />
+                      ) : (
+                        <p className="mt-8 text-center text-sm italic text-gray-400">Start typing to see how your email will appear in Outlook…</p>
+                      )}
+                      {sender?.signatureHtml && (
+                        <>
+                          <div className="my-5 border-t border-slate-200" />
+                          <div className="prose prose-sm max-w-none text-gray-600" dangerouslySetInnerHTML={{ __html: sender.signatureHtml }} />
+                        </>
+                      )}
+                    </div>
+                    <div className="border-t bg-gray-50 px-4 py-2 text-center text-xs text-gray-400">
+                      Personalization tokens will be replaced with actual contact data
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex min-h-[320px] flex-1 flex-col overflow-hidden rounded-lg border bg-white shadow-lg">
+                    <div className="bg-gray-900 px-4 py-2 text-center text-sm font-medium text-white">SMS Preview</div>
+                    <div className="p-4">
+                      <p className="whitespace-pre-wrap text-sm text-slate-700">{stepDraft.content || "Your SMS message will appear here."}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           <DialogFooter>
