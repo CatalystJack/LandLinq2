@@ -2721,3 +2721,20 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 @media (prefers-reduced-motion: reduce) {
   .ll-analyst-table tbody tr, .ll-analyst-actions button { transition: none; }
 }
+
+/*
+ * Page section rhythm
+ *
+ * These utilities are intentionally limited to boundaries between major page
+ * sections. Dense controls, cards, tables, and form fields should keep their
+ * own compact spacing.
+ */
+:root {
+  --ll-section-space-sm: 1.5rem;
+  --ll-section-space-md: 3rem;
+  --ll-section-space-lg: 6rem;
+}
+
+.section-gap-sm { margin-block-end: var(--ll-section-space-sm); }
+.section-gap-md { margin-block-end: var(--ll-section-space-md); }
+.section-gap-lg { margin-block-end: var(--ll-section-space-lg); }

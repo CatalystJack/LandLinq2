@@ -279,7 +279,7 @@ function SystemWideView() {
               <YAxis type="category" dataKey="companyName" width={120} fontSize={12} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="deals.passed" name="Passed" fill="#3b82f6" stackId="classification" />
+              <Bar dataKey="deals.passed" name="Passed" fill="#ef4444" stackId="classification" />
               <Bar dataKey="deals.review" name="Review" fill="#eab308" stackId="classification" />
               <Bar dataKey="deals.pursuing" name="Pursuing" fill="#22c55e" stackId="classification" />
             </BarChart>

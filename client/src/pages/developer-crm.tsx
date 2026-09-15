@@ -359,7 +359,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     <div className="min-h-[100dvh] bg-[#f3f6f9] text-[#172b3d]">
       {adminMode ? <Navigation /> : <DeveloperNavigation />}
       <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
-        <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <div className="section-gap-md flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
             {adminMode ? (
               <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: secondaryColor }}>

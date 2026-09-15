@@ -227,7 +227,7 @@ export default function DeveloperPipeline() {
     <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div className="section-gap-md flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#4A90E2]">Sales workspace</p>
             <h1 className="mt-1 flex items-center gap-3 font-serif text-4xl font-bold text-[#0A2B4A]"><BriefcaseBusiness className="h-8 w-8 text-[#4A90E2]" />Pipeline</h1>

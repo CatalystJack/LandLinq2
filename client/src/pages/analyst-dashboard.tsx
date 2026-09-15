@@ -5786,7 +5786,7 @@ export default function AnalystDashboard() {
       <main className="pt-20 pb-16 px-4">
         <div className="max-w-[2200px] mx-auto">
           {/* Header */}
-          <header className="mb-8">
+          <header className="section-gap-md">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#07172A] tracking-tight">
@@ -5819,7 +5819,7 @@ export default function AnalystDashboard() {
           </header>
 
           {onboardingStatus && !onboardingStatus.complete && isDeveloperUser && (
-            <Card className="mb-6 overflow-hidden border-[#b8d8f5] bg-white shadow-sm" data-testid="card-developer-onboarding-checklist">
+            <Card className="section-gap-sm overflow-hidden border-[#b8d8f5] bg-white shadow-sm" data-testid="card-developer-onboarding-checklist">
               <div className="border-l-4 border-[#4A90E2] px-4 py-4 sm:px-5">
                 <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
                   <div>
@@ -5889,13 +5889,13 @@ export default function AnalystDashboard() {
 
           {/* Quick Deal Addition */}
           {showQuickAddition && (
-            <div className="mb-6">
+            <div className="section-gap-sm">
               <QuickDealAddition defaultOpen={true} />
             </div>
           )}
 
           {/* Filters */}
-          <Card className="mb-6">
+          <Card className="section-gap-sm">
             <CardContent className="p-4 md:p-6">
               <div className="space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">

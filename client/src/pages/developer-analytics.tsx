@@ -148,7 +148,7 @@ export default function DeveloperAnalytics() {
     <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="section-gap-md flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div><h1 className="flex items-center gap-3 font-serif text-4xl font-normal text-catalyst-gray-900"><BarChart3 className="h-8 w-8 text-catalyst-gold" />Analytics Dashboard</h1><p className="mt-2 text-lg text-catalyst-gray-600">Your company’s deal flow, markets, brokers, and outreach performance</p></div>
           <div className="flex gap-2">
             <Dialog open={showFilters} onOpenChange={setShowFilters}><DialogTrigger asChild><Button variant="outline" size="sm"><Filter className="mr-2 h-4 w-4" />Filters</Button></DialogTrigger><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Filter Analytics Data</DialogTitle></DialogHeader><div className="grid gap-4 py-4">
@@ -161,7 +161,7 @@ export default function DeveloperAnalytics() {
           </div>
         </div>
 
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="section-gap-md grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           {[
             ["Total Deals", analytics.totalDeals, "Based on filtered data", Building],
             ["Total Pipeline Value", `$${(analytics.totalValue / 1000000).toFixed(1)}M`, "Based on filtered data", DollarSign],
@@ -173,7 +173,7 @@ export default function DeveloperAnalytics() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4"><TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="markets">Markets</TabsTrigger><TabsTrigger value="brokers">Brokers</TabsTrigger><TabsTrigger value="trends">Trends</TabsTrigger></TabsList>
           <TabsContent value="overview" className="space-y-6"><div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card><CardHeader><CardTitle className="flex items-center gap-2"><PieChart className="h-5 w-5" />Deal Status Distribution</CardTitle></CardHeader><CardContent className="space-y-4">{analytics.statusBreakdown.map((item) => <div key={item.status} className="flex items-center justify-between"><div className="flex items-center gap-3"><div className={`h-3 w-3 rounded-full ${item.status === "Pursuing" ? "bg-green-500" : item.status === "Passed" ? "bg-blue-500" : "bg-yellow-500"}`} /><span className="text-sm font-medium">{item.status}</span></div><div className="text-right"><div className="text-sm font-bold">{item.count}</div><div className="text-xs text-gray-500">{item.percentage.toFixed(1)}%</div></div></div>)}</CardContent></Card>
+            <Card><CardHeader><CardTitle className="flex items-center gap-2"><PieChart className="h-5 w-5" />Deal Status Distribution</CardTitle></CardHeader><CardContent className="space-y-4">{analytics.statusBreakdown.map((item) => <div key={item.status} className="flex items-center justify-between"><div className="flex items-center gap-3"><div className={`h-3 w-3 rounded-full ${item.status === "Pursuing" ? "bg-green-500" : item.status === "Passed" ? "bg-red-500" : "bg-yellow-500"}`} /><span className="text-sm font-medium">{item.status}</span></div><div className="text-right"><div className="text-sm font-bold">{item.count}</div><div className="text-xs text-gray-500">{item.percentage.toFixed(1)}%</div></div></div>)}</CardContent></Card>
              <Card><CardHeader><CardTitle className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5" />Pipeline Stages This Month</CardTitle></CardHeader><CardContent className="space-y-3">{(data?.pipelineStageBreakdown || []).length ? (data?.pipelineStageBreakdown || []).map((item) => <div key={item.stage} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"><span className="text-sm font-medium">{item.stage}</span><Badge variant="outline">{item.count}</Badge></div>) : <p className="text-sm text-slate-500">No pipeline stages configured yet.</p>}</CardContent></Card>
             <Card><CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5" />Key Performance Metrics</CardTitle></CardHeader><CardContent className="space-y-4">{analytics.marketInsights.map((item) => <div key={item.metric} className="flex items-center justify-between rounded-lg bg-gray-50 p-3"><div><div className="text-sm font-medium">{item.metric}</div><div className="text-xs text-gray-500">{item.description}</div></div><div className="text-right"><div className="text-lg font-bold">{item.value}</div><div className="flex items-center gap-1 text-xs text-gray-500"><TrendingUp className="h-3 w-3" />{Math.abs(item.trend)}%</div></div></div>)}</CardContent></Card>
           </div><Card><CardHeader><CardTitle>Advanced Analytics Dashboard</CardTitle></CardHeader><CardContent><AnalyticsDashboard dataOverride={data?.advancedDashboard} allowFetch={false} /></CardContent></Card>

@@ -58,7 +58,7 @@ export default function ApiSafetyBanner() {
   const AlertIcon = systemHealth === 'critical' ? AlertCircle : systemHealth === 'warning' ? AlertTriangle : CheckCircle2;
 
   return (
-    <Alert variant={alertVariant} className="mb-4" data-testid="api-safety-banner">
+    <Alert variant={alertVariant} className="section-gap-sm" data-testid="api-safety-banner">
       <AlertIcon className="h-5 w-5" />
       <AlertTitle className="flex items-center justify-between">
         <span className="flex items-center gap-2">

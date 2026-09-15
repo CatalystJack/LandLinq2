@@ -359,7 +359,7 @@ export default function DeveloperDashboard() {
     <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
       <main className="mx-auto max-w-[1600px] px-3 py-5 sm:px-5 lg:px-6">
-        <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
+        <div className="section-gap-sm flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: secondaryColor }}>
               Investment Company Portal
@@ -385,7 +385,7 @@ export default function DeveloperDashboard() {
           </div>
         </div>
 
-        <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="section-gap-sm grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { label: "All deals", value: counts.total, icon: Building2, tone: "text-slate-700 bg-slate-100", filter: "all" },
             { label: "Review", value: counts.review, icon: Search, tone: "text-amber-700 bg-amber-100", filter: "review" },
