@@ -27689,13 +27689,13 @@ RULES:
   
   // Deal blocking and analyst override endpoints
   app.get('/api/deals/:dealId/blocking-status', dealBlockingEndpoints.getBlockingStatus);
-  app.post('/api/deals/:dealId/analyst-override', dealBlockingEndpoints.analystOverride);
-  app.post('/api/deals/:dealId/escalate', dealBlockingEndpoints.manualEscalation);
+  app.post('/api/deals/:dealId/analyst-override', isAuthenticated, requirePlatformAdmin, dealBlockingEndpoints.analystOverride);
+  app.post('/api/deals/:dealId/escalate', isAuthenticated, requirePlatformAdmin, dealBlockingEndpoints.manualEscalation);
   
   // Emergency review workflow endpoints
   app.get('/api/emergency/status', emergencyReviewEndpoints.getEmergencyStatus);
-  app.post('/api/emergency/activate', emergencyReviewEndpoints.activateEmergency);
-  app.post('/api/emergency/deactivate', emergencyReviewEndpoints.deactivateEmergency);
+  app.post('/api/emergency/activate', isAuthenticated, requirePlatformAdmin, emergencyReviewEndpoints.activateEmergency);
+  app.post('/api/emergency/deactivate', isAuthenticated, requirePlatformAdmin, emergencyReviewEndpoints.deactivateEmergency);
 
   // API Call Tracking - Monitor external API usage and costs
   app.get('/api/tracking/stats', isAuthenticated, async (req, res) => {
