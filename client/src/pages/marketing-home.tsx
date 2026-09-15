@@ -74,20 +74,20 @@ function OutreachAnalyticsMockup() {
 
 function DashboardMockup({ compact = false }: { compact?: boolean }) {
   const [activeFilter, setActiveFilter] = useState("STATUS");
-  const columns = ["ID", "Status", "Priority", "Property Address", "Name", "YOC", "IBR", "Deal", "Type", "Analyst Notes", "Summary", "Dev Notes", "Broker Notes", "Top Rent/Unit", "Top Rent PSF", "OCC T."];
+  const columns = ["ID", "Status", "Priority", "Property Address", "Name", "YOC", "Deal", "Type", "Analyst Notes", "Summary", "Dev Notes", "Broker Notes", "Top Rent/Unit", "Top Rent PSF", "OCC T."];
   const rows = [
-    ["#84", "Review", "High", "1824 Glenwood Avenue|Raleigh, NC 27608", "Glenwood Commons", "7.8%", "8.4%", "Land", "Affordable", "Site plan received", "Strong infill opportunity", "Review density", "Seller expects Q4 close", "$1,845", "$2.18", "YES"],
-    ["#83", "Qualified", "High", "6400 Providence Road|Charlotte, NC 28226", "Providence Grove", "8.6%", "9.1%", "Land", "BTR", "Utilities confirmed", "High-growth submarket", "Advance to UW", "Best offers due Friday", "$2,120", "$2.34", "YES"],
-    ["#82", "Review", "Medium", "915 South Main Street|Greenville, SC 29601", "Reedy River Flats", "7.4%", "8.0%", "Land", "Conventional", "Traffic study pending", "Walkable downtown site", "Confirm access", "Broker shared survey", "$1,765", "$2.06", "YES"],
-    ["#81", "Qualified", "High", "3120 Hillsborough Road|Durham, NC 27705", "Bull City Landing", "9.0%", "9.5%", "Land", "Student", "Zoning verified", "Near university demand", "Model 280 units", "Clean title reported", "$1,980", "$2.41", "YES"],
-    ["#80", "Review", "Medium", "4475 New Bern Avenue|Raleigh, NC 27610", "Eastgate Residences", "7.1%", "7.9%", "Land", "Affordable", "QCT status confirmed", "Transit-oriented parcel", "Check tax credits", "Seller flexible on timing", "$1,690", "$1.98", "YES"],
-    ["#79", "Qualified", "Medium", "2280 Wendover Avenue|Greensboro, NC 27407", "Wendover Park", "8.3%", "8.8%", "Land", "Active Adult", "Demographics complete", "Strong 55+ population", "Begin concept plan", "Full package received", "$1,725", "$2.09", "YES"],
-    ["#78", "Review", "Low", "7600 Market Street|Wilmington, NC 28411", "Porters Neck Village", "7.0%", "7.6%", "Land", "BTR", "Wetlands report added", "Coastal growth corridor", "Review wetland area", "Pricing guidance received", "$1,860", "$2.22", "YES"],
-    ["#77", "Qualified", "High", "1350 Veterans Parkway|Murfreesboro, TN 37128", "Veterans Crossing", "8.8%", "9.3%", "Land", "Conventional", "Comp set refreshed", "Rapid household growth", "Schedule IC review", "Seller financing available", "$1,925", "$2.27", "YES"],
-    ["#76", "Review", "Medium", "2900 Western Boulevard|Raleigh, NC 27606", "Western Row", "7.6%", "8.2%", "Land", "Student", "Enrollment data added", "NC State demand driver", "Verify unit mix", "Broker uploaded OM", "$1,995", "$2.38", "YES"],
-    ["#75", "Qualified", "High", "5210 South Boulevard|Charlotte, NC 28217", "South End Exchange", "9.1%", "9.7%", "Land", "Conventional", "Transit access verified", "Prime infill location", "Prepare LOI terms", "Seller prefers certainty", "$2,180", "$2.46", "YES"],
-    ["#74", "Review", "Medium", "3801 Battleground Avenue|Greensboro, NC 27410", "Battleground Oaks", "7.9%", "8.3%", "Land", "Affordable", "AMI rents modeled", "Established retail node", "Confirm bond volume", "Phase I available", "$1,640", "$1.94", "YES"],
-    ["#73", "Qualified", "Low", "2045 Highway 70 East|New Bern, NC 28560", "Neuse River Landing", "8.1%", "8.6%", "Land", "Active Adult", "Flood maps reviewed", "Low basis opportunity", "Order market study", "Flexible closing window", "$1,575", "$1.87", "YES"],
+    ["#84", "Review", "High", "1824 Glenwood Avenue|Raleigh, NC 27608", "Glenwood Commons", "7.8%", "Land", "Affordable", "Site plan received", "Strong infill opportunity", "Review density", "Seller expects Q4 close", "$1,845", "$2.18", "YES"],
+    ["#83", "Qualified", "High", "6400 Providence Road|Charlotte, NC 28226", "Providence Grove", "8.6%", "Land", "BTR", "Utilities confirmed", "High-growth submarket", "Advance to UW", "Best offers due Friday", "$2,120", "$2.34", "YES"],
+    ["#82", "Review", "Medium", "915 South Main Street|Greenville, SC 29601", "Reedy River Flats", "7.4%", "Land", "Conventional", "Traffic study pending", "Walkable downtown site", "Confirm access", "Broker shared survey", "$1,765", "$2.06", "YES"],
+    ["#81", "Qualified", "High", "3120 Hillsborough Road|Durham, NC 27705", "Bull City Landing", "9.0%", "Land", "Student", "Zoning verified", "Near university demand", "Model 280 units", "Clean title reported", "$1,980", "$2.41", "YES"],
+    ["#80", "Review", "Medium", "4475 New Bern Avenue|Raleigh, NC 27610", "Eastgate Residences", "7.1%", "Land", "Affordable", "QCT status confirmed", "Transit-oriented parcel", "Check tax credits", "Seller flexible on timing", "$1,690", "$1.98", "YES"],
+    ["#79", "Qualified", "Medium", "2280 Wendover Avenue|Greensboro, NC 27407", "Wendover Park", "8.3%", "Land", "Active Adult", "Demographics complete", "Strong 55+ population", "Begin concept plan", "Full package received", "$1,725", "$2.09", "YES"],
+    ["#78", "Review", "Low", "7600 Market Street|Wilmington, NC 28411", "Porters Neck Village", "7.0%", "Land", "BTR", "Wetlands report added", "Coastal growth corridor", "Review wetland area", "Pricing guidance received", "$1,860", "$2.22", "YES"],
+    ["#77", "Qualified", "High", "1350 Veterans Parkway|Murfreesboro, TN 37128", "Veterans Crossing", "8.8%", "Land", "Conventional", "Comp set refreshed", "Rapid household growth", "Schedule IC review", "Seller financing available", "$1,925", "$2.27", "YES"],
+    ["#76", "Review", "Medium", "2900 Western Boulevard|Raleigh, NC 27606", "Western Row", "7.6%", "Land", "Student", "Enrollment data added", "NC State demand driver", "Verify unit mix", "Broker uploaded OM", "$1,995", "$2.38", "YES"],
+    ["#75", "Qualified", "High", "5210 South Boulevard|Charlotte, NC 28217", "South End Exchange", "9.1%", "Land", "Conventional", "Transit access verified", "Prime infill location", "Prepare LOI terms", "Seller prefers certainty", "$2,180", "$2.46", "YES"],
+    ["#74", "Review", "Medium", "3801 Battleground Avenue|Greensboro, NC 27410", "Battleground Oaks", "7.9%", "Land", "Affordable", "AMI rents modeled", "Established retail node", "Confirm bond volume", "Phase I available", "$1,640", "$1.94", "YES"],
+    ["#73", "Qualified", "Low", "2045 Highway 70 East|New Bern, NC 28560", "Neuse River Landing", "8.1%", "Land", "Active Adult", "Flood maps reviewed", "Low basis opportunity", "Order market study", "Flexible closing window", "$1,575", "$1.87", "YES"],
   ];
   return (
     <div className={`ll-window ll-analyst-real relative overflow-hidden rounded-[1.1rem] border border-white/15 bg-[#f7f9fa] text-[#182b3e] shadow-2xl ${compact ? "min-h-[280px]" : "min-h-[430px]"}`}>
@@ -103,7 +103,7 @@ function DashboardMockup({ compact = false }: { compact?: boolean }) {
           {["STATUS", "PRIORITY", "TYPE", "NEXT"].map((filter) => <button type="button" key={filter} onClick={() => setActiveFilter(filter)} className={`ll-analyst-filter ${activeFilter === filter ? "is-active" : ""}`}>{filter}⌄</button>)}
         </div>
         <div className="ll-analyst-table-scroll">
-          <table className="ll-analyst-table"><thead><tr>{columns.map((column) => <th key={column}>{column}{column !== "ID" && <small>↕</small>}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`} className={`ll-cell-${index}`}>{index === 1 ? <b className={`ll-status ll-status-dot ${cell === "Qualified" ? "is-green" : "is-yellow"}`} aria-label={cell} title={cell}><span className="sr-only">{cell}</span></b> : index === 8 ? <b className="ll-type">{cell}</b> : index === 9 ? <b className="ll-notes">{cell}</b> : cell.includes("|") ? cell.split("|").map((line, i) => <span key={line} className={i === 0 ? "ll-address" : "ll-subaddress"}>{line}</span>) : cell}</td>)}</tr>)}</tbody></table>
+           <table className="ll-analyst-table"><thead><tr>{columns.map((column) => <th key={column}>{column}{column !== "ID" && <small>↕</small>}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`} className={`ll-cell-${index}`}>{index === 1 ? <b className={`ll-status ll-status-dot ${cell === "Qualified" ? "is-green" : "is-yellow"}`} aria-label={cell} title={cell}><span className="sr-only">{cell}</span></b> : index === 7 ? <b className="ll-type">{cell}</b> : index === 8 ? <b className="ll-notes">{cell}</b> : cell.includes("|") ? cell.split("|").map((line, i) => <span key={line} className={i === 0 ? "ll-address" : "ll-subaddress"}>{line}</span>) : cell}</td>)}</tr>)}</tbody></table>
         </div>
       </div>
     </div>
@@ -238,35 +238,6 @@ export default function MarketingHome() {
         </section>
 
         <HeroStats />
-
-       <section id="workflow" data-reveal className="ll-scroll-reveal ll-focus-section px-4 py-16 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-7xl"><div className="ll-focus-intro"><div><div className="ll-focus-kicker">A QUIETER OPERATING RHYTHM</div><h2 className="text-4xl font-semibold leading-[1.02] tracking-[-0.05em] sm:text-6xl">Your funnel is wide.<br /><em>Your attention should not be.</em></h2></div><p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground sm:mt-7 sm:text-lg sm:leading-8">Manual screening, one-off follow-up, and disconnected deal notes make good opportunities easy to miss. LandLinq gives every lead a path forward.</p></div></div></section>
-
-         <section id="platform" data-reveal className="ll-scroll-reveal ll-journey bg-background px-4 py-16 sm:px-8 sm:py-32 lg:px-10 lg:py-40">
-          <div className="mx-auto max-w-7xl">
-            <div className="ll-journey-intro">
-              <div><div className="ll-eyebrow">THE OPERATING SYSTEM IN MOTION</div><h2 className="max-w-2xl text-4xl font-semibold leading-[1.02] tracking-[-0.05em] sm:text-6xl">The work moves.<br />Your team moves up.</h2></div>
-              <p className="max-w-sm text-base leading-7 text-muted-foreground">One connected workflow for sourcing, screening, outreach, and the decisions that follow.</p>
-            </div>
-            <div className="ll-journey-route" aria-label="The LandLinq product workflow">
-              <article className="ll-journey-step ll-step-dashboard">
-                <div className="ll-step-copy"><div className="ll-eyebrow">DEAL INTELLIGENCE</div><h3>Deal Dashboard</h3><p>Every deal arrives pre-screened against your own criteria, so your team knows what is worth a second look.</p></div>
-                <div className="ll-step-surface ll-surface-paper"><DashboardMockup compact /></div>
-              </article>
-              <article className="ll-journey-step ll-step-outreach">
-                <div className="ll-step-copy"><div className="ll-eyebrow">CONNECTED ACTION</div><h3>CRM & Outreach</h3><p>Campaigns run from your own connected email, reaching brokers without anyone drafting or sending each message by hand.</p></div>
-                <div className="ll-step-surface ll-surface-paper"><OutreachMockup /></div>
-              </article>
-              <article className="ll-journey-step ll-step-pipeline">
-                <div className="ll-step-copy"><div className="ll-eyebrow">OPERATIONAL CLARITY</div><h3>Pipeline</h3><p>Track opportunities through stages you define without a dedicated ops hire to maintain it.</p></div>
-                <div className="ll-step-surface ll-surface-paper"><PipelineMockup /></div>
-              </article>
-              <article className="ll-journey-step ll-step-analytics">
-                <div className="ll-step-copy"><div className="ll-eyebrow">COMPOUNDING FOCUS</div><h3>Outreach Analytics</h3><p>See send activity, contacts reached, and drip enrollment status without pulling it together yourself.</p></div>
-                <div className="ll-step-surface ll-surface-paper"><OutreachAnalyticsMockup /></div>
-              </article>
-            </div>
-          </div>
-        </section>
 
          <section id="company" data-reveal className="ll-scroll-reveal bg-background px-4 py-16 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-3xl"><div className="mb-10 sm:mb-14"><h2 className="text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">Know what you're getting.</h2></div><div className="divide-y divide-border border-y border-border">{faqs.map(([question, answer], i) => <div key={question}><button type="button" onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i} className="flex w-full items-center justify-between gap-4 py-5 text-left text-base font-semibold sm:gap-5 sm:py-6 sm:text-lg"><span>{question}</span><ChevronDown className={`h-5 w-5 shrink-0 text-primary transition-transform duration-300 ${openFaq === i ? "rotate-180" : ""}`} /></button><div className={`grid transition-[grid-template-rows,opacity] duration-300 ${openFaq === i ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}><div className="overflow-hidden"><p className="max-w-2xl pb-6 leading-7 text-muted-foreground">{answer}</p></div></div></div>)}</div></div></section>
 
