@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  Activity, BarChart3, BriefcaseBusiness, Building, DollarSign, Download, Filter, MapPin,
+  Activity, BriefcaseBusiness, Building, DollarSign, Download, Filter, MapPin,
   PieChart, Shield, Target, TrendingUp, Users, Zap,
 } from "lucide-react";
 
@@ -149,7 +149,7 @@ export default function DeveloperAnalytics() {
       <DeveloperNavigation />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="section-gap-md flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div><h1 className="flex items-center gap-3 font-serif text-4xl font-normal text-catalyst-gray-900"><BarChart3 className="h-8 w-8 text-catalyst-gold" />Analytics Dashboard</h1><p className="mt-2 text-lg text-catalyst-gray-600">Your company’s deal flow, markets, brokers, and outreach performance</p></div>
+          <div><h1 className="font-serif text-4xl font-normal text-catalyst-gray-900">Analytics Dashboard</h1><p className="mt-2 text-lg text-catalyst-gray-600">Your company’s deal flow, markets, brokers, and outreach performance</p></div>
           <div className="flex gap-2">
             <Dialog open={showFilters} onOpenChange={setShowFilters}><DialogTrigger asChild><Button variant="outline" size="sm"><Filter className="mr-2 h-4 w-4" />Filters</Button></DialogTrigger><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Filter Analytics Data</DialogTitle></DialogHeader><div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 items-center gap-4"><Label>Status:</Label><Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}><SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All Statuses</SelectItem>{["Passed", "Review", "Pursuing"].map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent></Select></div>

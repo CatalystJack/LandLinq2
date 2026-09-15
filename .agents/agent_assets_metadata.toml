@@ -189,3 +189,17 @@ mtime_ms = 1789403165667
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/3fa9cef6-9f87-477d-96a5-31b55129e0db/48c881cb-ccad-487e-90f8-1640f1c448cf"
 storage_version_token = "1789403171914610"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "a1R7idK2S9gdzCDz5b8Ir"
+uri = "file://screenshots/developer-analytics-title.png"
+type = "image"
+title = "Analytics Dashboard header"
+description = "Authenticated analytics page header showing plain Analytics Dashboard text with no icon and normal font weight."
+logical_id = "c08ea430-fbfb-4f5f-9aeb-7da238d011d1"
+content_hash = "sha256:5262308c59c541e2a7c4e1eab07358eb4e56b59118bb7d3404cb9d7a7f04c60e"
+size = 93624
+mtime_ms = 1789500662272
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/c08ea430-fbfb-4f5f-9aeb-7da238d011d1/39fbed2a-2d8b-4cb9-9afb-92656e7fce42"
+storage_version_token = "1789500703169128"
+content_type = "image/png"
