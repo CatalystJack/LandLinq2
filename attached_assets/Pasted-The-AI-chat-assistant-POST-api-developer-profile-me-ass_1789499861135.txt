@@ -1,0 +1,35 @@
+The AI chat assistant (POST /api/developer-profile/me/assistant/query) is still 
+failing to answer questions, despite the earlier SQL column-alias bug 
+(pds.created_at vs pd.created_at) being confirmed fixed in the current code. 
+Given real evidence was just found of intermittent 502 Bad Gateway errors 
+affecting other endpoints and even static assets on this app, investigate 
+whether this is the same underlying server-side issue, or a new, separate 
+problem specific to the assistant.
+
+TASK 1 — Reproduce and capture real evidence
+Ask the assistant a real question through the actual chat widget and capture:
+- The exact response shown in the chat UI
+- The real server logs from that exact moment (the same logs that revealed the 
+  earlier SQL error)
+- Whether the request returns a 500, a 502, or something else entirely, checked 
+  directly via the Network tab or server-side request logging
+
+TASK 2 — If it's a 502, treat it as the same infrastructure issue
+If this specific endpoint is also returning 502 Bad Gateway (matching the 
+pattern already found elsewhere in this app), investigate the underlying cause 
+of that broader server instability rather than treating this as an assistant- 
+specific bug. Report findings.
+
+TASK 3 — If it's a genuine application error, find and fix it
+If the logs show a real application-level error (a different SQL issue, a 
+timeout calling the AI provider, a data issue), report the exact error and fix 
+the actual root cause found, the same way the previous column-alias bug was 
+identified and fixed.
+
+Do not report this as resolved without pasting the actual real error or success 
+response captured from Task 1 as evidence.
+
+Verify: after any fix, ask the assistant several different real questions (a 
+simple one like "how many deals do I have" and a more complex one like "what 
+deals do I have in North Carolina") using a real test account, and confirm both 
+return correct, real answers with no errors in the server logs.

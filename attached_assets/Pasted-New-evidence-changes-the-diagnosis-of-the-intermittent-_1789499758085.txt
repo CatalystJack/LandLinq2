@@ -1,0 +1,35 @@
+New evidence changes the diagnosis of the intermittent "Something went wrong" 
+login error. Real browser console evidence shows:
+
+- GET https://landlinq.ai/api/classification-progress returns 502 (Bad Gateway)
+- Multiple font files (inter-latin-*.woff2) also fail with 502 (Bad Gateway)
+- A Content-Security-Policy violation blocking a script (script-src-elem not 
+  explicitly set, falling back to script-src, and blocking the action)
+- The previously-diagnosed React error #300 (hooks mismatch) also still appears
+
+A 502 on both an API call AND static font files strongly suggests a genuine 
+server-side/infrastructure problem, not just a frontend bug: the actual server 
+is failing or unreachable for some requests, at least intermittently. The React 
+error may be a downstream symptom of a component not handling this failed 
+request gracefully, rather than the true root cause.
+
+TASK 1 — Investigate the actual 502 source
+Determine why /api/classification-progress and static font assets are 
+intermittently returning 502 Bad Gateway. Check server logs from around the time 
+this was captured for crashes, restarts, or resource exhaustion. Report findings 
+before fixing anything.
+
+TASK 2 — Fix the Content Security Policy issue
+Explicitly set script-src-elem in the CSP configuration rather than relying on 
+the script-src fallback, since this is currently blocking a script from loading.
+
+TASK 3 — Handle failed requests gracefully on the frontend
+Regardless of the server-side cause, whatever component calls 
+/api/classification-progress should not crash the entire page if that specific 
+request fails, it should fail gracefully (show nothing, or a small inline error) 
+rather than contributing to a full-page error boundary crash.
+
+Verify: reproduce this in a fresh Incognito window multiple times, capturing 
+real server logs alongside the browser console, and confirm both the 502 source 
+and its downstream effect on the page are resolved, not just the previously 
+diagnosed hooks-order symptom.

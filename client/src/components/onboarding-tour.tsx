@@ -70,6 +70,8 @@ export default function OnboardingTour() {
     queryKey: ['/api/classification-progress'],
     refetchInterval: 2000,
     staleTime: 1000,
+    retry: false,
+    throwOnError: false,
   });
   
   const hasActiveClassificationJobs = (classificationData?.activeJobs?.length || 0) > 0;

@@ -94,7 +94,8 @@ app.use((req, res, next) => {
   // Content Security Policy
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://replit.com", // Vite requires unsafe-eval and unsafe-inline for development
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://replit.com https://i.replit.com", // Vite requires unsafe-eval and unsafe-inline for development
+    "script-src-elem 'self' 'unsafe-inline' https://replit.com https://i.replit.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: https:",
     "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com",

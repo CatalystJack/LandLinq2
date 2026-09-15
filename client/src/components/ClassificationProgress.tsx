@@ -23,13 +23,15 @@ export function ClassificationProgress() {
   const [visible, setVisible] = useState(true);
   const [recentlyCompleted, setRecentlyCompleted] = useState<ClassificationJob[]>([]);
 
-  const { data } = useQuery<ClassificationProgressData>({
+  const { data, isError } = useQuery<ClassificationProgressData>({
     queryKey: ['/api/classification-progress'],
     refetchInterval: 1000,
     staleTime: 500,
+    retry: false,
+    throwOnError: false,
   });
 
-  const activeJobs = data?.activeJobs || [];
+  const activeJobs = isError ? [] : data?.activeJobs || [];
 
   useEffect(() => {
     if (activeJobs.length > 0) {

@@ -17,6 +17,7 @@
 - [Developer analytics tenant scope](developer-analytics-tenant-scope.md) — deal status is send-profile-specific; outreach totals must be jointly scoped through both an owned sender and campaign.
 - [Investment Company tenant boundary](investment-company-tenant-boundary.md) — legacy CRM/dashboard routes must enforce the persisted developer profile boundary, including direct IDs, exports, searches, and mutations.
 - [VM HTTPS readiness probes](vm-https-readiness-probes.md) — production HTTPS redirects must exempt loopback hosts or Replit VM promotion follows TLS to the app's plain HTTP port and times out.
+- [VM startup healthcheck window](vm-startup-healthcheck-window.md) — early VM connection-refused/500 probes can be transient before the app listens; compare timestamps with readiness markers before diagnosing a route failure.
 - [Production admin provisioning](production-admin-provisioning.md) — development users do not backfill production; provision the first Apex admin during its authenticated login, never blocking startup.
 - [Apex email authorization migration](apex-email-authorization.md) — internal domain checks use strict @apexresi.com matching; preserve legacy Catalyst demo, data, and delivery references unless separately migrated.
 - [Outreach trigger-tag tenant boundary](outreach-trigger-tag-tenancy.md) — tag enrollment must bind campaign, template, sender, and broker to one developer profile; Catalyst uses only shared contacts.
