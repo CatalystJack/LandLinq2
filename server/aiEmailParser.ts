@@ -115,6 +115,93 @@ Respond as JSON with exactly these fields:
   return { reply, suggestedSubject, suggestedContent };
 }
 
+export type OutreachSequenceGenerationInput = {
+  companyName: string;
+  targetStates: string[];
+  targetCounties: string[];
+  triggerTag: string;
+  tone: "professional" | "casual";
+  length: "short" | "medium" | "long";
+  stepCount: number;
+  frequencyDays: number;
+  productTypes: Array<{ name: string }>;
+};
+
+export type GeneratedOutreachSequenceStep = {
+  stepNumber: number;
+  dayNumber: number;
+  subject: string;
+  content: string;
+};
+
+export async function generateOutreachSequenceWithAI(
+  input: OutreachSequenceGenerationInput,
+): Promise<GeneratedOutreachSequenceStep[]> {
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: `You generate a reviewable multi-step email outreach sequence for an Investment Company.
+The sequence is sent to real estate brokers who may have relevant land opportunities.
+Return JSON only with exactly one "steps" array containing exactly ${input.stepCount} objects.
+Each object must have "subject" and "content" strings.
+
+The requested tone is ${input.tone}; the requested email length is ${input.length}.
+Make each email naturally different and progressively follow up on the previous message:
+step 1 introduces the company and acquisition focus, middle steps add a useful reason to
+respond without repeating the first email, and the final step is a respectful close-the-loop
+message. Do not pretend the recipient replied or opted in. Do not invent a specific property,
+deal, statistic, or market fact.
+
+Every email must use all three literal merge fields exactly as written:
+{{firstName}}, {{companyName}}, and {{targetMarket}}.
+Keep the content plain text with normal paragraphs, no HTML, no markdown headings, and no
+signature placeholder beyond a simple closing. Do not include a subject prefix such as "Subject:".
+
+Company context:
+${JSON.stringify({
+  companyName: input.companyName,
+  targetStates: input.targetStates,
+  targetCounties: input.targetCounties,
+  productTypes: input.productTypes,
+  triggerTag: input.triggerTag,
+  frequencyDays: input.frequencyDays,
+})}
+
+JSON shape:
+{"steps":[{"subject":"...","content":"..."},...]}`,
+      },
+      { role: "user", content: `Generate the ${input.stepCount}-step sequence now.` },
+    ],
+    response_format: { type: "json_object" },
+    max_completion_tokens: Math.min(6000, Math.max(1800, input.stepCount * 1400)),
+  });
+
+  const raw = response.choices[0]?.message?.content;
+  if (!raw) throw new Error("Empty outreach sequence response from OpenAI");
+
+  const parsed = JSON.parse(raw) as { steps?: Array<{ subject?: unknown; content?: unknown }> };
+  if (!Array.isArray(parsed.steps) || parsed.steps.length !== input.stepCount) {
+    throw new Error("OpenAI returned the wrong number of outreach sequence steps");
+  }
+
+  const mergeFields = ["{{firstName}}", "{{companyName}}", "{{targetMarket}}"];
+  return parsed.steps.map((step, index) => {
+    const subject = String(step.subject || "").trim();
+    const content = String(step.content || "").trim();
+    if (!subject || !content || mergeFields.some((field) => !content.includes(field))) {
+      throw new Error("OpenAI returned an incomplete outreach sequence step");
+    }
+    return {
+      stepNumber: index + 1,
+      dayNumber: index * input.frequencyDays,
+      subject,
+      content,
+    };
+  });
+}
+
 export type DeveloperAssistantPlan = {
   kind: "answer" | "action";
   tool:

@@ -69,6 +69,7 @@ import { realPropertyDataService } from "./propertyDataService";
 import {
   answerDeveloperAssistantQuestion,
   draftOutreachEmailWithAI,
+  generateOutreachSequenceWithAI,
   planDeveloperAssistantQuestion,
 } from "./aiEmailParser";
 import {
@@ -15028,6 +15029,198 @@ RULES:
     triggerTag: z.string().trim().max(160).optional(),
     dayNumber: z.coerce.number().int().min(0).max(365).default(0),
     status: z.enum(['paused', 'active']).default('paused'),
+  });
+
+  const developerSequenceGenerationSchema = z.object({
+    tone: z.enum(["professional", "casual"]),
+    length: z.enum(["short", "medium", "long"]),
+    stepCount: z.coerce.number().int().min(2).max(5),
+    frequencyDays: z.coerce.number().int().refine(
+      (value) => [30, 45, 60, 90].includes(value),
+      { message: "Frequency must be 30, 45, 60, or 90 days" },
+    ),
+    crmTagId: z.string().trim().min(1).max(160),
+  });
+  const developerSequenceSaveSchema = developerSequenceGenerationSchema.extend({
+    name: z.string().trim().min(1).max(160),
+    steps: z.array(z.object({
+      subject: z.string().trim().min(1).max(240),
+      content: z.string().trim().min(1).max(50000),
+    })).min(2).max(5),
+  });
+
+  async function resolveCompanyCrmTag(developerProfileId: string, crmTagId: string) {
+    const registryTag = await db.execute(sql`
+      SELECT id, name
+      FROM crm_tag_registry
+      WHERE id = ${crmTagId}
+         OR LOWER(name) = LOWER(${crmTagId})
+      LIMIT 1
+    `);
+    const tagName = String((registryTag.rows?.[0] as any)?.name || crmTagId).trim();
+    const companyTag = await db.execute(sql`
+      SELECT 1
+      FROM brokers
+      WHERE owner_developer_profile_id = ${developerProfileId}
+        AND is_active = true
+        AND ${tagName} = ANY(COALESCE(crm_tags, ARRAY[]::text[]))
+      LIMIT 1
+    `);
+    return companyTag.rows?.length ? {
+      id: String((registryTag.rows?.[0] as any)?.id || crmTagId),
+      name: tagName,
+    } : null;
+  }
+
+  app.post("/api/developer-profile/me/outreach/campaigns/generate-sequence", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const body = developerSequenceGenerationSchema.parse(req.body || {});
+      const [profile] = await db.select({
+        companyName: developerProfiles.companyName,
+        targetStates: developerProfiles.targetStates,
+        targetCounties: developerProfiles.targetCounties,
+      }).from(developerProfiles).where(and(
+        eq(developerProfiles.id, developerProfileId),
+        eq(developerProfiles.isActive, true),
+      )).limit(1);
+      if (!profile) return res.status(404).json({ error: "Investment Company profile not found" });
+
+      const tag = await resolveCompanyCrmTag(developerProfileId, body.crmTagId);
+      if (!tag) return res.status(400).json({ error: "That CRM tag is not available on this company's active contacts" });
+      const productTypes = await db.select({
+        name: developerProductTypes.name,
+      }).from(developerProductTypes).where(and(
+        eq(developerProductTypes.developerProfileId, developerProfileId),
+        eq(developerProductTypes.isActive, true),
+      )).orderBy(asc(developerProductTypes.name));
+
+      const steps = await generateOutreachSequenceWithAI({
+        companyName: profile.companyName,
+        targetStates: profile.targetStates || [],
+        targetCounties: profile.targetCounties || [],
+        triggerTag: tag.name,
+        tone: body.tone,
+        length: body.length,
+        stepCount: body.stepCount,
+        frequencyDays: body.frequencyDays,
+        productTypes,
+      });
+      return res.json({
+        tone: body.tone,
+        length: body.length,
+        stepCount: body.stepCount,
+        frequencyDays: body.frequencyDays,
+        crmTagId: tag.id,
+        crmTag: tag.name,
+        steps,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid sequence generation request", details: error.errors });
+      console.error("[developer outreach sequence generation] Error:", error);
+      return res.status(502).json({ error: "The AI campaign generator could not generate a sequence right now" });
+    }
+  });
+
+  app.post("/api/developer-profile/me/outreach/campaigns/generate-sequence/save", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const body = developerSequenceSaveSchema.parse(req.body || {});
+      if (body.steps.length !== body.stepCount) {
+        return res.status(400).json({ error: "The number of edited steps must match the requested step count" });
+      }
+
+      const senderResult = await db.execute(sql`
+        SELECT id
+        FROM outreach_senders
+        WHERE developer_profile_id = ${developerProfileId}
+          AND is_active = true
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+      const sender = senderResult.rows?.[0] as any;
+      if (!sender) return res.status(400).json({ error: "Connect your email account before saving a campaign" });
+
+      const tag = await resolveCompanyCrmTag(developerProfileId, body.crmTagId);
+      if (!tag) return res.status(400).json({ error: "That CRM tag is not available on this company's active contacts" });
+
+      const saved = await db.transaction(async (tx) => {
+        const createdCampaign = await tx.execute(sql`
+          INSERT INTO outreach_campaigns
+            (developer_profile_id, name, status, cadence, channels, broker_filter, rate_limit_per_minute)
+          VALUES
+            (${developerProfileId}, ${body.name}, 'paused', 'drip', '["email"]'::jsonb, '{}'::jsonb, 10)
+          RETURNING *
+        `);
+        const campaign = createdCampaign.rows?.[0] as any;
+        if (!campaign) throw new Error("Campaign was not created");
+
+        const createdTemplate = await tx.execute(sql`
+          INSERT INTO outreach_campaign_templates
+            (name, description, hubspot_trigger_tag, team_id, is_active)
+          VALUES
+            (${body.name}, 'AI-generated Investment Company drip campaign', ${tag.name}, ${developerProfileId}, true)
+          RETURNING id
+        `);
+        const templateId = String((createdTemplate.rows?.[0] as any)?.id || "");
+        if (!templateId) throw new Error("Campaign template was not created");
+
+        for (const [index, step] of body.steps.entries()) {
+          const dayNumber = index * body.frequencyDays;
+          await tx.execute(sql`
+            INSERT INTO outreach_campaign_template_steps
+              (template_id, sequence_index, day_number, channel, subject, content, is_active)
+            VALUES
+              (${templateId}, ${index}, ${dayNumber}, 'email', ${step.subject}, ${step.content}, true)
+          `);
+          await tx.execute(sql`
+            INSERT INTO outreach_campaign_steps
+              (sender_id, sequence_index, day_number, channel, subject, content, is_active)
+            VALUES
+              (${sender.id}, ${index}, ${dayNumber}, 'email', ${step.subject}, ${step.content}, true)
+          `);
+        }
+
+        const brokerFilter = {
+          templateId,
+          senderId: String(sender.id),
+          crmTagId: tag.id,
+          crmTag: tag.name,
+          frequencyDays: body.frequencyDays,
+          generatedByAi: true,
+        };
+        await tx.execute(sql`
+          UPDATE outreach_campaigns
+          SET broker_filter = ${JSON.stringify(brokerFilter)}::jsonb,
+              updated_at = NOW()
+          WHERE id = ${campaign.id}
+            AND developer_profile_id = ${developerProfileId}
+        `);
+        return {
+          id: campaign.id,
+          name: campaign.name,
+          status: campaign.status,
+          brokerFilter,
+          crmTag: tag.name,
+          steps: body.steps.map((step, index) => ({
+            ...step,
+            sequenceIndex: index,
+            dayNumber: index * body.frequencyDays,
+          })),
+        };
+      });
+
+      return res.status(201).json({ campaign: saved });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid sequence save request", details: error.errors });
+      if (error?.code === "23505") return res.status(409).json({ error: "That CRM tag is already linked to another campaign" });
+      console.error("[developer outreach sequence save] Error:", error);
+      return res.status(500).json({ error: "Failed to save AI campaign" });
+    }
   });
 
   async function enrollDeveloperCampaign(campaign: any, developerProfileId: string) {

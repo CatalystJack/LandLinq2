@@ -55,6 +55,7 @@ type SuggestedDraft = {
 };
 
 type SequenceGenerationForm = {
+  name: string;
   tone: "professional" | "casual";
   length: "short" | "medium" | "long";
   stepCount: number;
@@ -106,6 +107,7 @@ const emptyForm: CampaignForm = {
 };
 
 const emptySequenceForm: SequenceGenerationForm = {
+  name: "AI outreach sequence",
   tone: "professional",
   length: "medium",
   stepCount: 3,
@@ -250,6 +252,25 @@ export default function DeveloperOutreach() {
     onError: (error: Error) => toast({ title: "Could not generate sequence", description: error.message, variant: "destructive" }),
   });
 
+  const sequenceSaveMutation = useMutation({
+    mutationFn: () => jsonRequest("/api/developer-profile/me/outreach/campaigns/generate-sequence/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...sequenceForm,
+        steps: generatedSteps.map(({ subject, content }) => ({ subject, content })),
+      }),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/outreach/campaigns"] });
+      setSequenceDialogOpen(false);
+      setGeneratedSteps([]);
+      setSequenceForm(emptySequenceForm);
+      toast({ title: "Campaign saved", description: "Your AI-generated campaign is ready in the campaign list." });
+    },
+    onError: (error: Error) => toast({ title: "Could not save campaign", description: error.message, variant: "destructive" }),
+  });
+
   const sender = senderQuery.data?.sender;
   const campaigns = campaignsQuery.data?.campaigns || [];
   const scopeLabel = useMemo(() => {
@@ -291,6 +312,17 @@ export default function DeveloperOutreach() {
     setGeneratedSteps([]);
     setSequenceDialogOpen(true);
   };
+
+  const updateGeneratedStep = (stepNumber: number, field: "subject" | "content", value: string) => {
+    setGeneratedSteps((current) => current.map((step) => (
+      step.stepNumber === stepNumber ? { ...step, [field]: value } : step
+    )));
+  };
+
+  const canSaveGeneratedSequence = generatedSteps.length === sequenceForm.stepCount
+    && Boolean(sequenceForm.name.trim())
+    && Boolean(sequenceForm.crmTagId)
+    && generatedSteps.every((step) => step.subject.trim() && step.content.trim());
 
   const insertSuggestedDraft = (replace: boolean) => {
     if (!aiSuggestedDraft) return;
@@ -495,6 +527,17 @@ export default function DeveloperOutreach() {
             }}
             className="space-y-5"
           >
+            <div>
+              <Label htmlFor="ai-sequence-name">Campaign name</Label>
+              <Input
+                id="ai-sequence-name"
+                value={sequenceForm.name}
+                onChange={(event) => setSequenceForm({ ...sequenceForm, name: event.target.value })}
+                className="mt-1.5"
+                placeholder="AI outreach sequence"
+                maxLength={160}
+              />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="ai-sequence-tone">Tone</Label>
@@ -574,9 +617,27 @@ export default function DeveloperOutreach() {
                         <Badge variant="outline">Day {step.dayNumber}</Badge>
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                      <p className="font-medium text-slate-900">{step.subject}</p>
-                      <p className="whitespace-pre-line text-sm leading-6 text-slate-700">{step.content}</p>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <Label htmlFor={`ai-sequence-subject-${step.stepNumber}`}>Subject</Label>
+                        <Input
+                          id={`ai-sequence-subject-${step.stepNumber}`}
+                          value={step.subject}
+                          onChange={(event) => updateGeneratedStep(step.stepNumber, "subject", event.target.value)}
+                          className="mt-1.5 bg-white"
+                          maxLength={240}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`ai-sequence-content-${step.stepNumber}`}>Email content</Label>
+                        <Textarea
+                          id={`ai-sequence-content-${step.stepNumber}`}
+                          value={step.content}
+                          onChange={(event) => updateGeneratedStep(step.stepNumber, "content", event.target.value)}
+                          className="mt-1.5 min-h-36 resize-y bg-white"
+                          maxLength={50000}
+                        />
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -589,6 +650,17 @@ export default function DeveloperOutreach() {
                 {sequenceGenerationMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {generatedSteps.length ? "Generate again" : "Generate sequence"}
               </Button>
+              {generatedSteps.length > 0 && (
+                <Button
+                  type="button"
+                  variant="brand"
+                  onClick={() => sequenceSaveMutation.mutate()}
+                  disabled={!canSaveGeneratedSequence || sequenceSaveMutation.isPending}
+                >
+                  {sequenceSaveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save campaign
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </DialogContent>
