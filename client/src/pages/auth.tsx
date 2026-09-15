@@ -15,7 +15,7 @@ import { isPlatformAdminEmail } from "@shared/admin-auth";
 export default function AuthPage() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { isAuthenticated, isLoading, user, userRole } = useAuth();
+  const { isAuthenticated, isLoading, isInitialized, user, userRole } = useAuth();
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [preparingFreshLogin, setPreparingFreshLogin] = useState(false);
@@ -43,13 +43,13 @@ export default function AuthPage() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (!isLoading && isAuthenticated && !isExplicitLoginEntry) {
+    if (isInitialized && !isLoading && isAuthenticated && !isExplicitLoginEntry) {
       setLocation(redirectUrl);
     }
-  }, [isLoading, isAuthenticated, isExplicitLoginEntry, setLocation, redirectUrl]);
+  }, [isInitialized, isLoading, isAuthenticated, isExplicitLoginEntry, setLocation, redirectUrl]);
 
   useEffect(() => {
-    if (!isExplicitLoginEntry || isLoading || !isAuthenticated || preparingFreshLogin) {
+    if (!isExplicitLoginEntry || !isInitialized || isLoading || !isAuthenticated || preparingFreshLogin) {
       return;
     }
 
@@ -72,12 +72,13 @@ export default function AuthPage() {
     return () => {
       cancelled = true;
     };
-  }, [isExplicitLoginEntry, isLoading, isAuthenticated, preparingFreshLogin]);
+  }, [isExplicitLoginEntry, isInitialized, isLoading, isAuthenticated, preparingFreshLogin]);
 
   if (
     preparingFreshLogin ||
-    (isExplicitLoginEntry && isLoading) ||
-    (!isExplicitLoginEntry && !isLoading && isAuthenticated)
+    !isInitialized ||
+    isLoading ||
+    (!isExplicitLoginEntry && isAuthenticated)
   ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">

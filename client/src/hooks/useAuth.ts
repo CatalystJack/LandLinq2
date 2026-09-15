@@ -65,6 +65,7 @@ let globalAuthState: {
 };
 
 const authListeners: Set<() => void> = new Set();
+let authFetchPromise: Promise<void> | null = null;
 
 const notifyListeners = () => {
   authListeners.forEach(listener => listener());
@@ -85,33 +86,45 @@ export function clearLocalAuthState() {
 
 const fetchUserOnce = async () => {
   if (globalAuthState.isInitialized) return;
-  
-  try {
-    const response = await fetch('/api/user', { 
-      credentials: 'include',
-      headers: { 'Cache-Control': 'no-cache' }
-    });
-    
-    if (response.ok) {
-      let user = await response.json();
-      
-      // Ultimate Power Override removed
-      
-      // Determine user role based on email and role data
-      const userRole = await determineUserRole(user);
-      const businessRole = await determineBusinessRole(user);
-      const permissions = await getUserPermissions(userRole);
-      
-      globalAuthState = {
-        user,
-        isLoading: false,
-        isAuthenticated: true,
-        isInitialized: true,
-        userRole,
-        businessRole,
-        permissions
-      };
-    } else {
+  if (authFetchPromise) return authFetchPromise;
+
+  authFetchPromise = (async () => {
+    try {
+      const response = await fetch('/api/user', {
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+
+      if (response.ok) {
+        const user = await response.json();
+
+        // Determine user role based on email and role data
+        const userRole = await determineUserRole(user);
+        const businessRole = await determineBusinessRole(user);
+        const permissions = await getUserPermissions(userRole);
+
+        globalAuthState = {
+          user,
+          isLoading: false,
+          isAuthenticated: true,
+          isInitialized: true,
+          userRole,
+          businessRole,
+          permissions
+        };
+      } else {
+        globalAuthState = {
+          user: null,
+          isLoading: false,
+          isAuthenticated: false,
+          isInitialized: true,
+          userRole: null,
+          businessRole: null,
+          permissions: []
+        };
+      }
+    } catch (error) {
+      console.error('Auth fetch error:', error);
       globalAuthState = {
         user: null,
         isLoading: false,
@@ -122,19 +135,14 @@ const fetchUserOnce = async () => {
         permissions: []
       };
     }
-  } catch (error) {
-    console.error('Auth fetch error:', error);
-    globalAuthState = {
-      user: null,
-      isLoading: false,
-      isAuthenticated: false,
-      isInitialized: true,
-      userRole: null,
-      businessRole: null,
-      permissions: []
-    };
+    notifyListeners();
+  })();
+
+  try {
+    await authFetchPromise;
+  } finally {
+    authFetchPromise = null;
   }
-  notifyListeners();
 };
 
 // Helper function to determine user role
@@ -269,6 +277,7 @@ export function useAuth() {
     user: globalAuthState.user,
     isLoading: globalAuthState.isLoading,
     isAuthenticated: globalAuthState.isAuthenticated,
+    isInitialized: globalAuthState.isInitialized,
     userRole: globalAuthState.userRole,
     businessRole: globalAuthState.businessRole,
     permissions: globalAuthState.permissions,

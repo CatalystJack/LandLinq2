@@ -101,9 +101,9 @@ const LoadingFallback = () => (
 );
 
 function DeveloperDashboardEntry() {
-  const { isAuthenticated, isLoading, user, userRole } = useAuth();
+  const { isAuthenticated, isLoading, isInitialized, user, userRole } = useAuth();
 
-  if (isLoading) {
+  if (!isInitialized || isLoading) {
     return <LoadingFallback />;
   }
 
@@ -148,14 +148,14 @@ function DeveloperHomeEntry() {
 }
 
 function Router() {
-  const { isAuthenticated, isLoading, user, userRole } = useAuth();
+  const { isAuthenticated, isLoading, isInitialized, user, userRole } = useAuth();
   // Automatically scroll to top on route changes
   useScrollToTop();
 
   // Resolve authentication before selecting any role-specific route table.
   // Without this guard, a direct visit to /developer/dashboard can briefly
   // fall through to the public catch-all while /api/user is still loading.
-  if (isLoading) {
+  if (!isInitialized || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
