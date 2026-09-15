@@ -20,6 +20,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "./db";
 import { isAuthenticated } from "./auth";
 import { apiKeys, leadAttachments, deals, brokers } from "@shared/schema";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 import { eq, desc, and, isNull } from "drizzle-orm";
 import crypto from "crypto";
 import multer from "multer";
@@ -62,6 +63,15 @@ async function requireApiKey(req: Request, res: Response, next: NextFunction) {
 
   (req as any).apiKeyRow = rows[0];
   (req as any).isSandbox = rows[0].environment === "test";
+  next();
+}
+
+function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = req.user as any;
+  const email = user?.claims?.email || user?.email;
+  if (!isPlatformAdminEmail(email)) {
+    return res.status(403).json({ message: "Platform administrator access required" });
+  }
   next();
 }
 
@@ -347,7 +357,7 @@ export function registerExternalApiRoutes(app: Express) {
   });
 
   // ── ADMIN: list keys ─────────────────────────────────────────────────────────
-  app.get("/api/admin/api-keys", isAuthenticated, async (_req, res) => {
+  app.get("/api/admin/api-keys", isAuthenticated, requirePlatformAdmin, async (_req, res) => {
     try {
       const rows = await db
         .select({
@@ -373,7 +383,7 @@ export function registerExternalApiRoutes(app: Express) {
   });
 
   // ── ADMIN: generate key ──────────────────────────────────────────────────────
-  app.post("/api/admin/api-keys", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/api-keys", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { name, environment = "live", notes, createdBy } = req.body;
       if (!name) return res.status(400).json({ error: "name is required" });
@@ -411,7 +421,7 @@ export function registerExternalApiRoutes(app: Express) {
   });
 
   // ── ADMIN: revoke ────────────────────────────────────────────────────────────
-  app.patch("/api/admin/api-keys/:id/revoke", isAuthenticated, async (req, res) => {
+  app.patch("/api/admin/api-keys/:id/revoke", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       await db
         .update(apiKeys)
@@ -424,7 +434,7 @@ export function registerExternalApiRoutes(app: Express) {
   });
 
   // ── ADMIN: re-activate ───────────────────────────────────────────────────────
-  app.patch("/api/admin/api-keys/:id/activate", isAuthenticated, async (req, res) => {
+  app.patch("/api/admin/api-keys/:id/activate", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       await db
         .update(apiKeys)
@@ -437,7 +447,7 @@ export function registerExternalApiRoutes(app: Express) {
   });
 
   // ── ADMIN: delete ────────────────────────────────────────────────────────────
-  app.delete("/api/admin/api-keys/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/admin/api-keys/:id", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       await db.delete(apiKeys).where(eq(apiKeys.id, req.params.id));
       res.json({ success: true });

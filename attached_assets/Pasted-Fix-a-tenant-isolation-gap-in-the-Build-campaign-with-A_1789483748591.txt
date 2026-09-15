@@ -1,0 +1,31 @@
+Fix a tenant-isolation gap in the "Build campaign with AI" wizard's CRM tag 
+picker. It currently calls GET /api/crm/tags (server/routes.ts ~line 4364), which 
+explicitly returns "all unique tags across all contacts + registry" system-wide — 
+meaning any Investment Company sees every other company's tags, plus legacy 
+internal tags (e.g. "AJ - Known Sophisticated," clearly an internal Catalyst tag, 
+not something a real Investment Company customer should ever see).
+
+TASK 1 — Create a properly scoped tags endpoint for developer-facing use
+Add a new endpoint, e.g. GET /api/developer-profile/me/crm-tags, scoped via the 
+existing getDeveloperProfileId pattern used throughout this app. It should 
+return only tags that exist on contacts actually owned by (ownerDeveloperProfileId 
+matching) the calling company — never tags belonging to other companies or 
+unscoped/legacy internal tags.
+
+TASK 2 — Update the campaign wizard to use the new scoped endpoint
+In the "Build campaign with AI" wizard (client/src/pages/developer-outreach.tsx), 
+change the CRM tag picker to call the new /api/developer-profile/me/crm-tags 
+endpoint instead of the unscoped /api/crm/tags.
+
+TASK 3 — Confirm the existing /api/crm/tags usage elsewhere is intentional
+The original unscoped endpoint may still be correctly used elsewhere for genuine 
+internal/admin-facing views where seeing all tags system-wide is intentional 
+(e.g. an internal admin tool). Do not change or remove that endpoint itself — 
+just stop using it for this developer-facing wizard specifically. Report any 
+other developer-facing (non-admin) UI found using the unscoped endpoint, since 
+those would have the same gap and should be updated the same way.
+
+Verify: as a real test Investment Company account with its own real tags on its 
+own contacts, open the campaign wizard and confirm the tag picker now shows only 
+that company's own tags — no other company's tags, and no legacy internal tags 
+like "AJ - Known Sophisticated," should appear.
