@@ -1225,6 +1225,65 @@ export default function OutreachOnboarding() {
   // Handler for paste events - auto-uploads pasted images
   const handleSignaturePaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
     const clipboardData = e.clipboardData;
+    const editor = signatureEditorRef.current;
+    const selection = window.getSelection();
+    const savedRange = editor && selection && selection.rangeCount > 0 && selection.anchorNode && editor.contains(selection.anchorNode)
+      ? selection.getRangeAt(0).cloneRange()
+      : null;
+    const insertNodeAtSelection = (node: Node) => {
+      if (!editor) return;
+
+      const currentSelection = window.getSelection();
+      let range: Range | null = null;
+
+      if (currentSelection && currentSelection.rangeCount > 0 && currentSelection.anchorNode && editor.contains(currentSelection.anchorNode)) {
+        range = currentSelection.getRangeAt(0);
+      }
+
+      if (!range && savedRange && editor.contains(savedRange.commonAncestorContainer)) {
+        range = savedRange.cloneRange();
+      }
+
+      if (!range) {
+        range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+      }
+
+      range.deleteContents();
+      range.insertNode(node);
+      range.setStartAfter(node);
+      range.collapse(true);
+      currentSelection?.removeAllRanges();
+      currentSelection?.addRange(range);
+    };
+    const insertHtmlAtSelection = (markup: string) => {
+      if (!editor) return;
+
+      const currentSelection = window.getSelection();
+      let range: Range | null = null;
+
+      if (currentSelection && currentSelection.rangeCount > 0 && currentSelection.anchorNode && editor.contains(currentSelection.anchorNode)) {
+        range = currentSelection.getRangeAt(0);
+      }
+
+      if (!range && savedRange && editor.contains(savedRange.commonAncestorContainer)) {
+        range = savedRange.cloneRange();
+      }
+
+      if (!range) {
+        range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+      }
+
+      range.deleteContents();
+      range.insertNode(range.createContextualFragment(markup));
+      range.collapse(false);
+      currentSelection?.removeAllRanges();
+      currentSelection?.addRange(range);
+    };
+    const clipboardHtml = clipboardData.getData('text/html');
     
     // Check if there are image files being pasted directly (screenshots, etc.)
     const imageFiles: File[] = [];
@@ -1236,27 +1295,20 @@ export default function OutreachOnboarding() {
       }
     }
     
-    // If pasting image files directly, upload them
-    if (imageFiles.length > 0) {
+    // If the clipboard only contains image files (for example, a screenshot),
+    // upload and insert them. Outlook can expose both an image file and rich
+    // HTML for one paste, so keep processing the HTML when it is available.
+    if (imageFiles.length > 0 && !clipboardHtml.trim()) {
       e.preventDefault();
       setIsUploadingSignatureLogo(true);
       
       for (const file of imageFiles) {
         const imageUrl = await uploadImageFile(file);
-        if (imageUrl && signatureEditorRef.current) {
+        if (imageUrl) {
           const img = document.createElement('img');
           img.src = imageUrl;
           img.alt = 'Logo';
-          
-          const selection = window.getSelection();
-          if (selection && selection.rangeCount > 0) {
-            const range = selection.getRangeAt(0);
-            range.deleteContents();
-            range.insertNode(img);
-            range.collapse(false);
-          } else {
-            signatureEditorRef.current.appendChild(img);
-          }
+          insertNodeAtSelection(img);
         }
       }
       
@@ -1267,20 +1319,43 @@ export default function OutreachOnboarding() {
     
     // Handle HTML paste (from Outlook, web pages, etc.)
     e.preventDefault();
-    let html = clipboardData.getData('text/html') || clipboardData.getData('text/plain');
+    let html = clipboardHtml || clipboardData.getData('text/plain');
     
     console.log('[SIGNATURE-PASTE] Paste event triggered');
     console.log('[SIGNATURE-PASTE] Raw HTML preview:', html.substring(0, 500));
+
+    // Outlook may provide the formatted HTML and the embedded logo as
+    // separate clipboard items. Re-host those files into the matching
+    // cid:/file:/blob: image tags instead of dropping the rest of the paste.
+    if (imageFiles.length > 0 && html) {
+      setIsUploadingSignatureLogo(true);
+      for (const file of imageFiles) {
+        const uploadedUrl = await uploadImageFile(file);
+        if (!uploadedUrl) continue;
+
+        const imageTagMatch = html.match(/<img\b[^>]*\bsrc=(["'])(?:(?:cid|file|blob):[^"']*|about:blank|)\1[^>]*>/i);
+        if (imageTagMatch) {
+          const replacementTag = imageTagMatch[0].replace(
+            /\bsrc=(["'])[^"']*\1/i,
+            `src="${uploadedUrl.replace(/"/g, '&quot;')}"`
+          );
+          html = html.replace(imageTagMatch[0], replacementTag);
+        } else {
+          html += `<img src="${uploadedUrl.replace(/"/g, '&quot;')}" alt="Logo">`;
+        }
+      }
+      setIsUploadingSignatureLogo(false);
+    }
     
     // Check for data: URI images and upload them
-    const dataUriRegex = /<img[^>]*src="(data:image\/[^;]+;base64,[^"]+)"[^>]*>/gi;
+    const dataUriRegex = /<img\b[^>]*\bsrc=(["'])(data:image\/[^;]+;base64,[^"']+)\1[^>]*>/gi;
     const dataUriMatches = [...html.matchAll(dataUriRegex)];
     
     if (dataUriMatches.length > 0) {
       setIsUploadingSignatureLogo(true);
       for (const match of dataUriMatches) {
         const fullTag = match[0];
-        const dataUri = match[1];
+        const dataUri = match[2];
         const file = dataURItoFile(dataUri, `pasted-image-${Date.now()}.png`);
         if (file) {
           const uploadedUrl = await uploadImageFile(file);
@@ -1362,14 +1437,7 @@ export default function OutreachOnboarding() {
       }
     }
     
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      range.deleteContents();
-      const fragment = range.createContextualFragment(html);
-      range.insertNode(fragment);
-      range.collapse(false);
-    }
+    insertHtmlAtSelection(html);
     
     // After pasting, detect and style broken images + constrain social icon sizes
     setTimeout(() => {
@@ -2656,7 +2724,7 @@ export default function OutreachOnboarding() {
                         <div>
                           <Label className="text-sm font-medium">Personal Email Signature</Label>
                           <p className="text-xs text-gray-500">
-                            Paste from Outlook. Select text/image then click "Add Link" for hyperlinks.
+                            Copy your signature from Outlook's settings and paste it here. Bold text, links, and logos are preserved.
                           </p>
                         </div>
                         <div className="flex gap-1 flex-wrap justify-end">
@@ -2996,7 +3064,7 @@ export default function OutreachOnboarding() {
                   <Badge variant="outline" className="text-xs">Read-only</Badge>
                 </div>
                 <div 
-                  className="bg-white border rounded p-3 text-sm overflow-auto max-h-[200px] [&_img]:max-h-[32px] [&_img]:w-auto"
+                  className="bg-white border rounded p-3 text-sm overflow-auto max-h-[200px] [&_img]:max-w-full [&_img]:h-auto"
                   dangerouslySetInnerHTML={{ __html: editingSender.signatureHtml }}
                 />
               </div>
