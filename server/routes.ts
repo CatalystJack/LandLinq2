@@ -14229,6 +14229,118 @@ RULES:
     }
   });
 
+  // Apply or remove a free-text CRM tag from contacts owned by this
+  // Investment Company. There is no separate tag registry for company CRM
+  // tags; the vocabulary is derived from brokers.crm_tags.
+  app.post("/api/developer-profile/me/crm-tags/apply", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const contactIds = Array.isArray(req.body?.contactIds)
+        ? Array.from(new Set(req.body.contactIds.filter((id: unknown): id is string => typeof id === "string" && id.trim()).map((id: string) => id.trim())))
+        : [];
+      const tag = typeof req.body?.tag === "string" ? req.body.tag.trim() : "";
+      const action = req.body?.action;
+
+      if (!contactIds.length || contactIds.length > 500) {
+        return res.status(400).json({ error: "Between one and 500 contact IDs are required" });
+      }
+      if (!tag || tag.length > 160) {
+        return res.status(400).json({ error: "Tag must be between 1 and 160 characters" });
+      }
+      if (action !== "add" && action !== "remove") {
+        return res.status(400).json({ error: "Tag action must be add or remove" });
+      }
+
+      const updatedContactIds = await db.transaction(async (tx) => {
+        const ownedContacts = await tx.select({
+          id: brokers.id,
+          crmTags: brokers.crmTags,
+        }).from(brokers).where(and(
+          inArray(brokers.id, contactIds),
+          eq(brokers.ownerDeveloperProfileId, developerProfileId),
+          isNonDemoBroker(),
+        ));
+
+        const updatedIds: string[] = [];
+        for (const contact of ownedContacts) {
+          const currentTags = Array.isArray(contact.crmTags) ? contact.crmTags : [];
+          const nextTags = action === "add"
+            ? Array.from(new Set([...currentTags, tag]))
+            : currentTags.filter((currentTag) => currentTag !== tag);
+
+          await tx.update(brokers)
+            .set({ crmTags: nextTags, updatedAt: new Date() } as any)
+            .where(and(
+              eq(brokers.id, contact.id),
+              eq(brokers.ownerDeveloperProfileId, developerProfileId),
+              isNonDemoBroker(),
+            ));
+          updatedIds.push(contact.id);
+        }
+        return updatedIds;
+      });
+
+      return res.json({ action, tag, updatedCount: updatedContactIds.length, updatedContactIds });
+    } catch (error: any) {
+      console.error("[developer-profile/me/crm-tags/apply] Error:", error);
+      return res.status(500).json({ error: "Failed to update CRM tags" });
+    }
+  });
+
+  // Rename a tag everywhere it appears on this Investment Company's contacts.
+  // The ownership predicate is present on both the read and each update so a
+  // request can never rename another company's tags.
+  app.post("/api/developer-profile/me/crm-tags/rename", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const oldTag = typeof req.body?.oldTag === "string" ? req.body.oldTag.trim() : "";
+      const newTag = typeof req.body?.newTag === "string" ? req.body.newTag.trim() : "";
+      if (!oldTag || oldTag.length > 160 || !newTag || newTag.length > 160) {
+        return res.status(400).json({ error: "Both tag names must be between 1 and 160 characters" });
+      }
+      if (oldTag === newTag) {
+        return res.status(400).json({ error: "The new tag name must be different" });
+      }
+
+      const updatedCount = await db.transaction(async (tx) => {
+        const ownedContacts = await tx.select({
+          id: brokers.id,
+          crmTags: brokers.crmTags,
+        }).from(brokers).where(and(
+          eq(brokers.ownerDeveloperProfileId, developerProfileId),
+          isNonDemoBroker(),
+          sql`${oldTag} = ANY(COALESCE(${brokers.crmTags}, ARRAY[]::text[]))`,
+        ));
+
+        for (const contact of ownedContacts) {
+          const nextTags = Array.from(new Set(
+            (Array.isArray(contact.crmTags) ? contact.crmTags : [])
+              .map((tag) => tag === oldTag ? newTag : tag),
+          ));
+          await tx.update(brokers)
+            .set({ crmTags: nextTags, updatedAt: new Date() } as any)
+            .where(and(
+              eq(brokers.id, contact.id),
+              eq(brokers.ownerDeveloperProfileId, developerProfileId),
+              isNonDemoBroker(),
+            ));
+        }
+        return ownedContacts.length;
+      });
+
+      return res.json({ oldTag, newTag, updatedCount });
+    } catch (error: any) {
+      console.error("[developer-profile/me/crm-tags/rename] Error:", error);
+      return res.status(500).json({ error: "Failed to rename CRM tag" });
+    }
+  });
+
   app.post("/api/developer-profile/me/assistant/query", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
