@@ -74,24 +74,6 @@ export default function AuthPage() {
     };
   }, [isExplicitLoginEntry, isInitialized, isLoading, isAuthenticated, preparingFreshLogin]);
 
-  if (
-    preparingFreshLogin ||
-    !isInitialized ||
-    isLoading ||
-    (!isExplicitLoginEntry && isAuthenticated)
-  ) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center text-slate-600">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-catalyst-gold" />
-          <p className="mt-3 text-sm">
-            {isExplicitLoginEntry ? "Preparing sign in…" : "Redirecting to your workspace…"}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const loginMutation = useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
       const response = await fetch('/api/login', {
@@ -196,6 +178,24 @@ export default function AuthPage() {
       });
     },
   });
+
+  if (
+    preparingFreshLogin ||
+    !isInitialized ||
+    isLoading ||
+    (!isExplicitLoginEntry && isAuthenticated)
+  ) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center text-slate-600">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-catalyst-gold" />
+          <p className="mt-3 text-sm">
+            {isExplicitLoginEntry ? "Preparing sign in…" : "Redirecting to your workspace…"}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
