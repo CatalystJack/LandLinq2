@@ -458,8 +458,15 @@ export function renderEmailPreview(
   
   // Helper function to apply personalization token highlighting
   const applyPersonalizationTokens = (html: string): string => {
-    const senderName = sender?.name?.trim() || 'Your Name';
-    const senderEmail = sender?.email?.trim() || 'you@company.com';
+    const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[character] || character));
+    const senderName = escapeHtml(sender?.name?.trim() || 'Your Name');
+    const senderEmail = escapeHtml(sender?.email?.trim() || 'you@company.com');
     return html
       .replace(/{{broker\.firstName}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">John</span>')
       .replace(/{{broker\.lastName}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">Smith</span>')
