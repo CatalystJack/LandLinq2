@@ -134,6 +134,7 @@ export default function DeveloperOutreach() {
   const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
   const [aiInput, setAiInput] = useState("");
   const [aiSuggestedDraft, setAiSuggestedDraft] = useState<SuggestedDraft | null>(null);
+  const [newCampaignChoiceOpen, setNewCampaignChoiceOpen] = useState(false);
   const [sequenceDialogOpen, setSequenceDialogOpen] = useState(false);
   const [sequenceForm, setSequenceForm] = useState<SequenceGenerationForm>(emptySequenceForm);
   const [generatedSteps, setGeneratedSteps] = useState<GeneratedSequenceStep[]>([]);
@@ -281,12 +282,20 @@ export default function DeveloperOutreach() {
   }, [targetsQuery.data]);
 
   const openCreate = () => {
+    setNewCampaignChoiceOpen(false);
     setEditing(null);
     setForm(emptyForm);
     setAiMessages([]);
     setAiInput("");
     setAiSuggestedDraft(null);
     setDialogOpen(true);
+  };
+  const openNewCampaignChoice = () => {
+    setNewCampaignChoiceOpen(true);
+  };
+  const openAiCampaignBuilder = () => {
+    setNewCampaignChoiceOpen(false);
+    openSequenceWizard();
   };
   const openEdit = (campaign: Campaign) => {
     setEditing(campaign);
@@ -368,10 +377,7 @@ export default function DeveloperOutreach() {
             <p className="mt-2 text-slate-500">Build drip campaigns for your approved contact audience.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={openSequenceWizard}>
-              <Sparkles className="mr-2 h-4 w-4" />Build with AI
-            </Button>
-            <Button variant="brand" onClick={openCreate} disabled={!sender?.outlookConnected}>
+            <Button variant="brand" onClick={openNewCampaignChoice} disabled={!sender?.outlookConnected}>
               <Plus className="mr-2 h-4 w-4" />New Campaign
             </Button>
           </div>
@@ -420,6 +426,43 @@ export default function DeveloperOutreach() {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={newCampaignChoiceOpen} onOpenChange={setNewCampaignChoiceOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Build a drip campaign</DialogTitle>
+            <DialogDescription>
+              Choose how you want to start. You can review and edit everything before saving.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={openAiCampaignBuilder}
+              className="group rounded-xl border border-slate-200 bg-white p-5 text-left transition-colors hover:border-[#4A90E2] hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+              data-testid="button-build-campaign-with-ai"
+            >
+              <Sparkles className="mb-3 h-5 w-5 text-[#4A90E2]" />
+              <span className="block font-semibold text-slate-900">Build with AI</span>
+              <span className="mt-1 block text-sm leading-5 text-slate-500">
+                Answer a few questions and generate a complete multi-step sequence.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="group rounded-xl border border-slate-200 bg-white p-5 text-left transition-colors hover:border-[#4A90E2] hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
+              data-testid="button-start-campaign-from-scratch"
+            >
+              <Edit3 className="mb-3 h-5 w-5 text-slate-600" />
+              <span className="block font-semibold text-slate-900">Start from scratch</span>
+              <span className="mt-1 block text-sm leading-5 text-slate-500">
+                Open the manual editor and write each campaign detail yourself.
+              </span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
