@@ -1,0 +1,38 @@
+Redesign the Investment Company Analytics page (client/src/pages/developer-analytics.tsx) 
+for visual consistency with the app's established design direction. Do NOT change 
+the Deal Status Distribution chart's colors (~line 176, the green/blue/yellow 
+dots tied to Pursuing/Passed/Review classification) — these must stay exactly as 
+they are.
+
+TASK 1 — Fix header and stat-card weight (per the just-established bold-header rule)
+"Analytics Dashboard" (~line 152) and the top four stat cards' big numbers 
+(~line 170) currently use font-normal instead of bold. Change both to font-bold. 
+Same for the "Access Restricted" state header (~line 126).
+
+TASK 2 — Apply the big-number treatment consistently across the whole page
+The top four stat cards already correctly use the large serif-style number 
+treatment (font-serif text-4xl). Extend this same treatment to every other 
+numeric metric shown as a standalone figure on this page — the Outreach 
+Engagement stats (Sent/Opens/Clicks/Replies, ~line 180), the Trends tab's Deal 
+Velocity/Price Trends/Success Rate cards (~line 183), and the Market Heat Map's 
+average deal value figures (~line 181) — so every "here's a key number" moment on 
+this page looks consistent, not just the top row.
+
+TASK 3 — Consistent warm background instead of mixed gray/white
+Several sections currently use bg-gray-50 for card backgrounds (Pipeline Stages, 
+Key Performance Metrics, Outreach Engagement stat boxes, broker rows) while 
+others use plain white with borders. Standardize on the existing bg-warm token 
+(already used elsewhere in this app) for these secondary content areas, reserving 
+plain white specifically for the main page background.
+
+TASK 4 — Consistent icon color
+Icons across this page currently use several different colors (text-catalyst-gray-400, 
+text-blue-600, text-catalyst-gold) with no clear logic. Standardize on one 
+consistent color (the existing brand blue) for all section-header icons on this 
+page, except where a color is meaningfully tied to status (leave the classification 
+chart dots untouched, per the exclusion above).
+
+Verify: screenshot every tab on this page (Overview, Markets, Brokers, Trends) 
+before and after, confirming the classification chart colors are pixel-identical 
+to before, all headers and big numbers now show in bold, and background/icon 
+colors are visually consistent across every section.

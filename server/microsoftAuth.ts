@@ -72,6 +72,8 @@ export interface MicrosoftSendOptions {
     filename: string;
     contentType: string;
     contentBytes: string; // base64
+    isInline?: boolean;
+    contentId?: string;
   }>;
 }
 
@@ -283,6 +285,8 @@ export async function sendEmailViaMicrosoft(
     name: att.filename,
     contentType: att.contentType,
     contentBytes: att.contentBytes,
+    ...(att.isInline ? { isInline: true } : {}),
+    ...(att.contentId ? { contentId: att.contentId } : {}),
   }));
 
   const body: Record<string, any> = {

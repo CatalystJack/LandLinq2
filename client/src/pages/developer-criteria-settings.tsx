@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Mail,
   Plus,
   Save,
   Settings2,
@@ -53,6 +54,20 @@ type TeamMember = {
   firstName: string | null;
   lastName: string | null;
   createdAt: string | null;
+};
+
+type NotificationSender = {
+  name: string;
+  email: string;
+  outlookConnected: boolean;
+  hasMicrosoftToken?: boolean;
+  isActive?: boolean;
+};
+
+type EffectiveSender = {
+  name: string;
+  email: string;
+  source: "company_outlook" | "platform_fallback";
 };
 
 async function jsonRequest(url: string, options?: RequestInit) {
@@ -231,6 +246,13 @@ export default function DeveloperCriteriaSettings() {
     queryKey: ["/api/developer-profile/me/team"],
     queryFn: () => jsonRequest("/api/developer-profile/me/team"),
   });
+  const senderQuery = useQuery<{
+    sender: NotificationSender | null;
+    effectiveSender: EffectiveSender;
+  }>({
+    queryKey: ["/api/developer-profile/me/outreach/sender"],
+    queryFn: () => jsonRequest("/api/developer-profile/me/outreach/sender"),
+  });
 
   useEffect(() => {
     if (profileQuery.data?.profile) {
@@ -385,6 +407,62 @@ export default function DeveloperCriteriaSettings() {
         </div>
 
         <div className="space-y-6">
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>
+                  <Mail className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle>Broker notifications</CardTitle>
+                  <CardDescription>
+                    Deal received, approved, and rejected messages use your connected Outlook sender.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="border-t border-slate-100 pt-5">
+              {senderQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading sender…
+                </div>
+              ) : senderQuery.isError ? (
+                <p className="text-sm text-red-600">Unable to load the broker notification sender.</p>
+              ) : senderQuery.data?.effectiveSender?.email ? (
+                <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sender address</p>
+                    <p className="mt-1 font-semibold text-slate-900">{senderQuery.data.effectiveSender.email}</p>
+                    <p className="mt-1 text-xs text-slate-500">{senderQuery.data.effectiveSender.name}</p>
+                  </div>
+                  <Badge
+                    variant="secondary"
+                    className={senderQuery.data.effectiveSender.source === "company_outlook"
+                      ? "w-fit bg-emerald-50 text-emerald-700"
+                      : "w-fit bg-amber-50 text-amber-700"}
+                  >
+                    {senderQuery.data.effectiveSender.source === "company_outlook" ? "Outlook connected" : "Platform fallback"}
+                  </Badge>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  No connected Outlook sender is configured. Connect Outlook in Outreach to enable broker notification delivery from your company mailbox.
+                </div>
+              )}
+              {senderQuery.data?.effectiveSender?.source === "platform_fallback" && (
+                <p className="mt-3 text-xs text-amber-700">
+                  {senderQuery.data.sender
+                    ? "Your company Outlook sender is not connected, so broker notifications currently come from the platform address above."
+                    : "No company Outlook sender is configured, so broker notifications currently come from the platform address above."}
+                </p>
+              )}
+              <p className="mt-3 text-xs text-slate-500">
+                This is display-only. Manage the connected account from Outreach.
+              </p>
+            </CardContent>
+          </Card>
+
           {form.profileType === "real_estate" && <Card className="border-slate-200 shadow-sm">
             <CardHeader>
               <div className="flex items-start gap-3">

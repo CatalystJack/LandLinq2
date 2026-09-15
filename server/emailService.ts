@@ -8,10 +8,12 @@ import type { EmailNotification } from './types';
 import { TemplateService, renderBrandedEmail } from './templateService';
 import { apiCallTracker } from './apiCallTracker.js';
 import { storage } from './storage';
+import { db } from './db';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { getAppOnlyGraphToken } from './microsoftAuth';
+import { getAppOnlyGraphToken, refreshMicrosoftToken, sendEmailViaMicrosoft } from './microsoftAuth';
+import { sql } from 'drizzle-orm';
 import nodemailer from 'nodemailer';
 
 export const PUBLIC_TRANSACTIONAL_EMAIL = 'help@landlinq.ai';
@@ -310,6 +312,86 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
     return false;
   } catch (error: any) {
     console.error('❌ [EMAIL] Failed to send notification:', error?.message || error);
+    return false;
+  }
+}
+
+export interface OutlookNotificationSender {
+  id: string;
+  name: string;
+  email: string;
+  developerProfileId?: string | null;
+  microsoftAccessToken: string | null;
+  microsoftRefreshToken: string | null;
+  microsoftTokenExpiry: Date | string | null;
+}
+
+/**
+ * Send a locally-rendered transactional notification through the company's
+ * connected Outlook account. The Graph /me endpoint makes the authenticated
+ * Outlook mailbox the actual From address.
+ */
+export async function sendNotificationEmailViaOutlookSender(
+  notification: EmailNotification,
+  sender: OutlookNotificationSender,
+): Promise<boolean> {
+  try {
+    let accessToken = sender.microsoftAccessToken;
+    const expiry = sender.microsoftTokenExpiry ? new Date(sender.microsoftTokenExpiry) : null;
+    const needsRefresh = !accessToken || (expiry && expiry <= new Date(Date.now() + 5 * 60 * 1_000));
+    if (needsRefresh && sender.microsoftRefreshToken) {
+      const refreshed = await refreshMicrosoftToken(
+        sender.microsoftRefreshToken,
+        sender.developerProfileId ? 'organizations' : undefined,
+      );
+      accessToken = refreshed.accessToken;
+      await db.execute(sql`
+        UPDATE outreach_senders
+        SET microsoft_access_token = ${refreshed.accessToken},
+            microsoft_refresh_token = ${refreshed.refreshToken ?? sender.microsoftRefreshToken},
+            microsoft_token_expiry = ${refreshed.expiresAt},
+            updated_at = NOW()
+        WHERE id = ${sender.id}
+      `);
+    }
+    if (!accessToken) {
+      console.error(`❌ [OUTLOOK-NOTIFICATION] Sender ${sender.id} has no usable access token`);
+      return false;
+    }
+
+    const subject = stripLegacyCatalystBranding(stripCompanyPhone(stripEmailEmojis(notification.subject)));
+    const rawHtml = notification.html || (notification.text ? transformTextToHTML(notification.text) : '');
+    const brandedHtml = rawHtml.includes('landlinq-branded-email')
+      ? rawHtml
+      : renderBrandedEmail({ title: subject, bodyHtml: rawHtml });
+    const logoBuffer = await getEmailLogoBuffer();
+    const htmlBody = stripLegacyCatalystBranding(logoBuffer ? inlineEmailLogo(brandedHtml) : brandedHtml);
+    const attachments = [
+      ...(notification.attachments || []).map((attachment) => ({
+        filename: attachment.filename,
+        contentType: attachment.type,
+        contentBytes: attachment.content,
+        isInline: attachment.disposition === 'inline',
+      })),
+      ...(logoBuffer ? [{
+        filename: 'landlinq-email-logo.png',
+        contentType: 'image/png',
+        contentBytes: logoBuffer.toString('base64'),
+        isInline: true,
+        contentId: EMAIL_LOGO_CID,
+      }] : []),
+    ];
+
+    await sendEmailViaMicrosoft(accessToken, {
+      to: notification.to,
+      subject,
+      htmlBody,
+      attachments,
+    });
+    console.log(`✅ [OUTLOOK-NOTIFICATION] Email sent from ${sender.email} to ${notification.to}`);
+    return true;
+  } catch (error: any) {
+    console.error(`❌ [OUTLOOK-NOTIFICATION] Failed to send from ${sender.email}:`, error?.message || error);
     return false;
   }
 }

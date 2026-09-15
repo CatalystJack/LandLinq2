@@ -1,0 +1,36 @@
+A specific, now-identified bug is causing the "Something went wrong" error on 
+first login: React error #300, confirmed directly from React's own 
+documentation (react.dev/errors/300) to mean "Rendered fewer hooks than 
+expected" — a component is calling a different number of hooks (useState, 
+useEffect, useQuery, etc.) between renders, which happens when hooks are called 
+conditionally, e.g. after an early return statement.
+
+This started appearing after the recent isInitialized/auth-timing fix to 
+client/src/App.tsx and client/src/pages/auth.tsx — very likely one of these 
+changes introduced an early return or conditional branch that occurs before all 
+of a component's hooks are declared, violating React's Rules of Hooks.
+
+TASK 1 — Get the real, non-minified error
+Run the app in development mode (or temporarily enable source maps in 
+production) and reproduce this exact error on a cold login page load. Report the 
+actual, non-minified stack trace showing the exact component and line number 
+where the hook-count mismatch occurs — this is essential, since the minified 
+trace alone (function names like Cd, Jv, Qv) can't identify the actual 
+component.
+
+TASK 2 — Audit App.tsx and auth.tsx for conditional hook calls
+Specifically check whether either file has any early return (e.g. based on 
+isLoading, isInitialized, or isAuthenticated) that occurs BEFORE all of that 
+component's own hooks are declared, or before a child component that itself 
+calls hooks conditionally. Every hook must be called unconditionally, in the 
+same order, on every single render — an early return is only safe if it happens 
+AFTER all hooks for that component have already been called.
+
+TASK 3 — Fix the actual violation found
+Restructure the conditional logic so all hooks are called unconditionally at the 
+top of the component, with any early-return/conditional-rendering logic moved to 
+apply only to the JSX being returned, not to whether hooks get called at all.
+
+Verify: reproduce the original cold-load scenario (fresh Incognito window) 
+multiple times and confirm no React error appears in the console, and the login 
+page renders correctly every time, not just after a refresh.

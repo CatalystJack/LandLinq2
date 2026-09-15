@@ -1,0 +1,37 @@
+analyst-dashboard.tsx is 11,102 lines — more than 10x larger than most other 
+pages in this app, and already the single biggest file in the entire codebase. 
+While it's correctly lazy-loaded at the route level, everything inside it 
+(Table view, Pipeline/Kanban view, Map view, and various modals) currently loads 
+as one single block the moment anyone opens this page, regardless of which of 
+the three views they actually use.
+
+TASK 1 — Split the three views into separately lazy-loaded components
+Extract the Table view, Pipeline/Kanban view, and Map view logic into three 
+separate component files, each lazy-loaded independently (using React's lazy() 
+and Suspense, matching the pattern already used for route-level splitting in 
+App.tsx). Only the currently-active view's code should actually need to load — 
+switching to Pipeline or Map for the first time can show a brief loading state 
+while that specific chunk downloads, rather than all three loading upfront.
+
+TASK 2 — Extract heavy modals/dialogs into separate lazy-loaded components
+Identify large modal or dialog components within this file (e.g. the YOC 
+breakdown dialog, bulk operation confirmations, any settings panels) that aren't 
+needed on initial render, and lazy-load them the same way — they should only load 
+when actually opened, not as part of the initial page load.
+
+TASK 3 — Extract shared configuration/logic into separate files
+Move large static configuration objects (e.g. ALL_COLUMNS and similar large 
+arrays/objects) into separate utility files imported by the main component. This 
+won't reduce total code shipped, but makes the main file more manageable and can 
+enable further splitting later.
+
+TASK 4 — Apply the same treatment to the second-largest file
+outreach-onboarding.tsx is 5,042 lines, also large enough to benefit from the 
+same splitting approach — identify its largest independent sections (e.g. the 
+sender configuration panel, the campaign step editor) and lazy-load them 
+similarly.
+
+Verify: measure and report the actual bundle size of the analyst dashboard's 
+initial chunk before and after this change, and confirm switching between Table/ 
+Pipeline/Map views still works correctly, with each view's specific code loading 
+on first use rather than all three loading immediately when the page opens.

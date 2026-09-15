@@ -1,6 +1,40 @@
 import { TemplateEvent, EmailTemplate, SMSTemplate } from '@shared/schema';
 import { storage } from './storage';
 
+async function resolveDealOutlookSender(dealId: string) {
+  const { db } = await import('./db');
+  const { sql } = await import('drizzle-orm');
+  const result = await db.execute(sql`
+    SELECT
+      os.id,
+      os.name,
+      os.email,
+      os.developer_profile_id as "developerProfileId",
+      os.microsoft_access_token as "microsoftAccessToken",
+      os.microsoft_refresh_token as "microsoftRefreshToken",
+      os.microsoft_token_expiry as "microsoftTokenExpiry"
+    FROM partner_developer_sends pds
+    INNER JOIN outreach_senders os
+      ON os.developer_profile_id = pds.developer_profile_id
+    WHERE pds.deal_id = ${dealId}
+      AND pds.developer_profile_id IS NOT NULL
+      AND os.is_active = true
+      AND os.outlook_connected = true
+      AND (os.microsoft_access_token IS NOT NULL OR os.microsoft_refresh_token IS NOT NULL)
+    ORDER BY os.created_at DESC NULLS LAST, pds.matched_at DESC NULLS LAST
+    LIMIT 1
+  `);
+  return (result.rows?.[0] || null) as {
+    id: string;
+    name: string;
+    email: string;
+    developerProfileId: string | null;
+    microsoftAccessToken: string | null;
+    microsoftRefreshToken: string | null;
+    microsoftTokenExpiry: Date | string | null;
+  } | null;
+}
+
 // Event payload interface for template variable replacement
 export interface EventPayload {
   brokerName: string;
@@ -321,15 +355,25 @@ export class EventDispatchService {
             return { emailSent: false, smsSent: false, error: 'No template content' };
           }
           
-         // Send email via sendNotificationEmail
-         const { sendNotificationEmail } = await import('./emailService');
-         const sendResult = await sendNotificationEmail({
+         // Use the routed company's connected Outlook mailbox when available.
+         // If the deal has no company sender yet, retain the platform fallback.
+         const { sendNotificationEmail, sendNotificationEmailViaOutlookSender } = await import('./emailService');
+         const routedSender = payload.dealId
+           ? await resolveDealOutlookSender(payload.dealId).catch((error) => {
+             console.warn(`⚠️ [OUTLOOK-NOTIFICATION] Could not resolve company sender for deal ${payload.dealId}:`, error);
+             return null;
+           })
+           : null;
+         const notification = {
            to: payload.brokerEmail,
            subject,
            html: htmlContent,
            type: 'broker_invitation',
            priority: 'medium'
-         });
+         };
+         const sendResult = routedSender
+           ? await sendNotificationEmailViaOutlookSender(notification, routedSender)
+           : await sendNotificationEmail(notification);
          
          if (!sendResult) {
            return { emailSent: false, smsSent: false, error: 'Email send failed' };

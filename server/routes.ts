@@ -197,7 +197,12 @@ async function purgeLegacyDemoData(): Promise<void> {
 }
 // realDataService removed per user request
 // HelloDataService removed per user request
-import { emailService, sendNotificationEmail } from "./emailService";
+import {
+  emailService,
+  sendNotificationEmail,
+  PUBLIC_TRANSACTIONAL_EMAIL,
+  PUBLIC_TRANSACTIONAL_NAME,
+} from "./emailService";
 import { sendSMS, landLinqSMSTemplates } from "./smsService";
 import { TemplateService, renderBrandedEmail } from "./templateService";
 import { marketIntelligence } from "./marketIntelligence";
@@ -15056,6 +15061,7 @@ RULES:
       const result = await db.execute(sql`
         SELECT id, name, email, outlook_connected as "outlookConnected",
           microsoft_token_expiry as "microsoftTokenExpiry",
+          (microsoft_access_token IS NOT NULL OR microsoft_refresh_token IS NOT NULL) as "hasMicrosoftToken",
           microsoft_refresh_token IS NOT NULL as "hasRefreshToken",
           signature_html as "signatureHtml", is_active as "isActive"
         FROM outreach_senders
@@ -15063,7 +15069,14 @@ RULES:
         ORDER BY created_at DESC
         LIMIT 1
       `);
-      return res.json({ sender: result.rows?.[0] || null });
+      const sender = result.rows?.[0] || null;
+      const senderIsUsable = Boolean(sender?.outlookConnected && sender?.hasMicrosoftToken);
+      return res.json({
+        sender,
+        effectiveSender: senderIsUsable
+          ? { email: sender.email, name: sender.name, source: "company_outlook" }
+          : { email: PUBLIC_TRANSACTIONAL_EMAIL, name: PUBLIC_TRANSACTIONAL_NAME, source: "platform_fallback" },
+      });
     } catch (error) {
       console.error('[developer outreach sender] Error:', error);
       return res.status(500).json({ error: 'Failed to load email connection' });

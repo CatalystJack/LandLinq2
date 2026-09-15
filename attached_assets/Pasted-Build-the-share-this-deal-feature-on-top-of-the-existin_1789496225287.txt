@@ -1,0 +1,38 @@
+Build the "share this deal" feature on top of the existing dealShareTokens table 
+(shared/schema.ts, ~line 1591), which has a complete schema but zero code 
+actually using it anywhere.
+
+TASK 1 — Generate a share link endpoint
+Add POST /api/deals/:dealId/share, authenticated, that creates a new row in 
+dealShareTokens: a cryptographically random 64-character token, the dealId, the 
+creating user's ID, and an expiresAt set to 7 days from now (matching the 
+existing expiresIdx design intent). Return the token so the frontend can build 
+the shareable URL.
+
+TASK 2 — A real public, read-only deal view
+Add a new public route (no authentication required), e.g. /shared-deal/:token, 
+rendering a clean, read-only summary of the deal — address, acreage, price, 
+rent/comps, zoning, and environmental data if populated. This must be a genuinely 
+separate, simpler view from the internal deal-details.tsx page — no internal 
+actions (edit, delete, re-run, notes), no navigation into the rest of the app, 
+just the deal's presentable information.
+
+Before rendering, validate the token: confirm it exists, hasn't expired 
+(expiresAt > now), and fetch only that specific deal's data — never expose any 
+other deal or any data beyond what's needed for this read-only view.
+
+TASK 3 — "Share" button on the deal detail page
+Add a "Share" button on client/src/pages/deal-details.tsx that calls the new 
+endpoint and copies the resulting shareable link to the clipboard, with a brief 
+confirmation ("Link copied — expires in 7 days").
+
+TASK 4 — Handle expired/invalid tokens gracefully
+If someone visits a shared link after it's expired, or with an invalid token, 
+show a clear, simple message ("This link has expired or is invalid") — not a 
+crash or blank page.
+
+Verify: generate a real share link for a real test deal, open it in a fresh 
+Incognito window (no login) and confirm the deal's information displays correctly 
+with no way to navigate elsewhere in the app. Confirm a fabricated/invalid token 
+shows the graceful error message, not a crash. Confirm this public route cannot 
+be used to access any deal other than the one the token was generated for.
