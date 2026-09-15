@@ -152,8 +152,8 @@ export default function DeveloperOutreach() {
     queryFn: () => jsonRequest("/api/developer-profile/me/outreach/targets"),
   });
   const tagsQuery = useQuery<string[]>({
-    queryKey: ["/api/crm/tags"],
-    queryFn: () => jsonRequest("/api/crm/tags"),
+    queryKey: ["/api/developer-profile/me/crm-tags"],
+    queryFn: () => jsonRequest("/api/developer-profile/me/crm-tags"),
   });
   const aiConversationQuery = useQuery<{ messages: AiMessage[]; suggestedDraft: SuggestedDraft | null }>({
     queryKey: ["/api/developer-profile/me/outreach/ai-conversation", editing?.id],

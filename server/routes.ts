@@ -14194,6 +14194,39 @@ RULES:
     }
   });
 
+  // CRM tags available to this Investment Company. Tags are derived only from
+  // contacts owned by the current developer profile; do not expose the
+  // system-wide registry or tags from another company's contacts here.
+  app.get("/api/developer-profile/me/crm-tags", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+
+      const result = await db.execute(sql`
+        SELECT DISTINCT tag
+        FROM brokers AS owned_broker
+        CROSS JOIN LATERAL unnest(owned_broker.crm_tags) AS tag
+        WHERE owned_broker.owner_developer_profile_id = ${developerProfileId}
+          AND owned_broker.crm_tags IS NOT NULL
+          AND tag IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM users AS demo_owner
+            WHERE demo_owner.id = owned_broker.user_id
+              AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+          )
+        ORDER BY tag
+      `);
+
+      return res.json((result.rows as Array<{ tag: unknown }>)
+        .map((row) => String(row.tag || "").trim())
+        .filter(Boolean));
+    } catch (error: any) {
+      console.error("[developer-profile/me/crm-tags] Error:", error);
+      return res.status(500).json({ error: "Failed to load CRM tags" });
+    }
+  });
+
   app.post("/api/developer-profile/me/assistant/query", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
