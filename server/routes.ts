@@ -20905,7 +20905,36 @@ RULES:
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
       }
 
-      const deals = await storage.getAllDealsWithBrokers();
+      const parseFilterValues = (value: unknown): string[] => String(value || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      const classifications = parseFilterValues(req.query.classifications ?? req.query.status);
+      const priorities = parseFilterValues(req.query.priorities ?? req.query.priority);
+      const dealTypes = parseFilterValues(req.query.dealTypes ?? req.query.type);
+      const search = String(req.query.search || "").trim().toLowerCase();
+      const allDeals = await storage.getAllDealsWithBrokers();
+      const deals = allDeals.filter((deal) => {
+        const matchesSearch = !search
+          || deal.address?.toLowerCase().includes(search)
+          || deal.city?.toLowerCase().includes(search)
+          || deal.state?.toLowerCase().includes(search)
+          || deal.zip?.toLowerCase().includes(search)
+          || deal.propertyName?.toLowerCase().includes(search)
+          || deal.msa?.toLowerCase().includes(search)
+          || deal.broker?.firstName?.toLowerCase().includes(search)
+          || deal.broker?.lastName?.toLowerCase().includes(search)
+          || deal.broker?.email?.toLowerCase().includes(search);
+        const matchesClassification = classifications.length === 0 || classifications.some((classification) =>
+          classification === "pending_address"
+            ? deal.addressConfidence === "pending"
+            : deal.classification === classification
+        );
+        const matchesPriority = priorities.length === 0 || priorities.includes(deal.priority);
+        const matchesDealType = dealTypes.length === 0 || dealTypes.includes((deal as any).dealType || "land");
+        return matchesSearch && matchesClassification && matchesPriority && matchesDealType;
+      });
+      const hasFilters = classifications.length > 0 || priorities.length > 0 || dealTypes.length > 0 || Boolean(search);
       
       // Create CSV data matching the exact analyst dashboard table structure
       const csvHeader = [
@@ -20985,7 +21014,10 @@ RULES:
       const csvContent = [csvHeader, ...csvRows].join('\n');
       
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="deals-export-${new Date().toISOString().split('T')[0]}.csv"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="deals-export${hasFilters ? '-filtered' : ''}-${new Date().toISOString().split('T')[0]}.csv"`
+      );
       res.send(csvContent);
     } catch (error) {
       console.error("Error exporting deals:", error);

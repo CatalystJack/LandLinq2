@@ -2772,7 +2772,17 @@ export default function AnalystDashboard() {
 
   const exportToExcelMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/deals/export/csv', {
+      const exportParams = new URLSearchParams({
+        ...(filterClassifications.length > 0 && { classifications: filterClassifications.join(',') }),
+        ...(filterPriorities.length > 0 && { priorities: filterPriorities.join(',') }),
+        ...(filterDealTypes.length > 0 && { dealTypes: filterDealTypes.join(',') }),
+        ...(searchQuery.trim() && { search: searchQuery.trim() }),
+      });
+      const hasActiveExportFilters = filterClassifications.length > 0
+        || filterPriorities.length > 0
+        || filterDealTypes.length > 0
+        || Boolean(searchQuery.trim());
+      const response = await fetch(`/api/analyst/deals/export?${exportParams.toString()}`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -2796,7 +2806,7 @@ export default function AnalystDashboard() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `landlinq-deals-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `deals-export${hasActiveExportFilters ? '-filtered' : ''}-${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
