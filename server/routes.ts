@@ -82,6 +82,7 @@ import {
   getMyPipelineSummary,
   markMyDealPursuing,
 } from "./developerAssistantData";
+import { sendDripEmailViaMicrosoft } from "./microsoftAuth";
 
 const DEFAULT_PIPELINE_STAGES = [
   { name: "New Lead", sortOrder: 1 },
@@ -15421,6 +15422,222 @@ RULES:
       if (error?.code === '23505') return res.status(409).json({ error: 'That trigger tag is already used by another campaign' });
       console.error('[developer outreach campaign update] Error:', error);
       return res.status(500).json({ error: 'Failed to update campaign' });
+    }
+  });
+
+  // Investment Company campaign-step editor. This intentionally stays separate
+  // from the legacy admin-only sender step endpoints below.
+  app.get("/api/developer-profile/me/outreach/campaigns/:campaignId/steps", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const result = await db.execute(sql`
+        SELECT
+          s.id,
+          s.template_id as "templateId",
+          s.sequence_index as "sequenceIndex",
+          s.day_number as "dayNumber",
+          s.channel,
+          s.subject,
+          s.content,
+          s.is_active as "isActive",
+          s.line_height as "lineHeight",
+          s.attachments,
+          s.created_at as "createdAt",
+          s.updated_at as "updatedAt"
+        FROM outreach_campaign_template_steps s
+        INNER JOIN outreach_campaign_templates t ON t.id = s.template_id
+        INNER JOIN outreach_campaigns c
+          ON c.broker_filter->>'templateId' = t.id
+         AND c.developer_profile_id = ${developerProfileId}
+        WHERE c.id = ${req.params.campaignId}
+          AND t.team_id = ${developerProfileId}
+        ORDER BY s.sequence_index ASC
+      `);
+      if (!result.rows?.length) {
+        const campaign = await db.execute(sql`
+          SELECT id
+          FROM outreach_campaigns
+          WHERE id = ${req.params.campaignId}
+            AND developer_profile_id = ${developerProfileId}
+            AND COALESCE(is_archived, false) = false
+          LIMIT 1
+        `);
+        if (!campaign.rows?.length) return res.status(404).json({ error: "Campaign not found" });
+      }
+      return res.json((result.rows || []).map((step: any) => ({
+        ...step,
+        attachments: typeof step.attachments === "string"
+          ? (() => { try { return JSON.parse(step.attachments); } catch { return []; } })()
+          : (step.attachments || []),
+      })));
+    } catch (error) {
+      console.error("[developer outreach steps GET] Error:", error);
+      return res.status(500).json({ error: "Failed to load campaign steps" });
+    }
+  });
+
+  app.patch("/api/developer-profile/me/outreach/campaigns/:campaignId/steps/:stepId", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const body = z.object({
+        dayNumber: z.number().int().min(0).max(365).optional(),
+        channel: z.enum(["email", "sms"]).optional(),
+        subject: z.string().max(240).optional(),
+        content: z.string().max(50000).optional(),
+        isActive: z.boolean().optional(),
+        attachments: z.array(z.object({
+          filename: z.string().max(255),
+          url: z.string().max(2000),
+          contentType: z.string().max(160),
+          size: z.number().nonnegative().optional(),
+        })).max(20).optional(),
+      }).parse(req.body || {});
+
+      const ownership = await db.execute(sql`
+        SELECT c.id, c.broker_filter->>'templateId' as "templateId"
+        FROM outreach_campaigns c
+        INNER JOIN outreach_campaign_templates t
+          ON t.id = c.broker_filter->>'templateId'
+         AND t.team_id = ${developerProfileId}
+        WHERE c.id = ${req.params.campaignId}
+          AND c.developer_profile_id = ${developerProfileId}
+          AND COALESCE(c.is_archived, false) = false
+        LIMIT 1
+      `);
+      const campaign = ownership.rows?.[0] as any;
+      if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+
+      const updated = await db.transaction(async (tx) => {
+        const result = await tx.execute(sql`
+          UPDATE outreach_campaign_template_steps
+          SET
+            day_number = COALESCE(${body.dayNumber ?? null}, day_number),
+            channel = COALESCE(${body.channel ?? null}, channel),
+            subject = COALESCE(${body.subject ?? null}, subject),
+            content = COALESCE(${body.content ?? null}, content),
+            is_active = COALESCE(${body.isActive ?? null}, is_active),
+            attachments = CASE
+              WHEN ${body.attachments === undefined ? null : JSON.stringify(body.attachments)}::text IS NULL THEN attachments
+              ELSE ${body.attachments === undefined ? null : JSON.stringify(body.attachments)}
+            END,
+            updated_at = NOW()
+          WHERE id = ${req.params.stepId}
+            AND template_id = ${campaign.templateId}
+          RETURNING id, template_id as "templateId", sequence_index as "sequenceIndex",
+                    day_number as "dayNumber", channel, subject, content,
+                    is_active as "isActive", line_height as "lineHeight", attachments
+        `);
+        const step = result.rows?.[0] as any;
+        if (!step) return null;
+
+        // Keep the sender-specific copy used by older worker paths in sync.
+        await tx.execute(sql`
+          UPDATE outreach_campaign_steps cs
+          SET day_number = ${step.dayNumber},
+              channel = ${step.channel},
+              subject = ${step.subject},
+              content = ${step.content},
+              is_active = ${step.isActive},
+              attachments = ${step.attachments},
+              updated_at = NOW()
+          FROM outreach_campaigns c
+          WHERE c.id = ${req.params.campaignId}
+            AND c.developer_profile_id = ${developerProfileId}
+            AND cs.sender_id = (c.broker_filter->>'senderId')
+            AND cs.sequence_index = ${step.sequenceIndex}
+        `);
+        return step;
+      });
+      if (!updated) return res.status(404).json({ error: "Campaign step not found" });
+      return res.json({
+        ...updated,
+        attachments: typeof updated.attachments === "string"
+          ? (() => { try { return JSON.parse(updated.attachments); } catch { return []; } })()
+          : (updated.attachments || []),
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid campaign step", details: error.errors });
+      console.error("[developer outreach steps PATCH] Error:", error);
+      return res.status(500).json({ error: "Failed to update campaign step" });
+    }
+  });
+
+  app.post("/api/developer-profile/me/outreach/campaigns/:campaignId/steps/:stepId/test", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const { recipientEmail } = z.object({
+        recipientEmail: z.string().trim().email(),
+      }).parse(req.body || {});
+
+      const result = await db.execute(sql`
+        SELECT
+          c.broker_filter,
+          s.subject,
+          s.content,
+          s.attachments,
+          sender.name as "senderName",
+          sender.email as "senderEmail",
+          sender.signature_html as "signatureHtml",
+          sender.microsoft_access_token as "accessToken",
+          sender.microsoft_refresh_token as "refreshToken",
+          sender.microsoft_token_expiry as "tokenExpiry",
+          sender.id as "senderId"
+        FROM outreach_campaigns c
+        INNER JOIN outreach_campaign_templates t
+          ON t.id = c.broker_filter->>'templateId'
+         AND t.team_id = ${developerProfileId}
+        INNER JOIN outreach_campaign_template_steps s
+          ON s.template_id = t.id
+         AND s.id = ${req.params.stepId}
+        INNER JOIN outreach_senders sender
+          ON sender.id = (c.broker_filter->>'senderId')
+         AND sender.developer_profile_id = ${developerProfileId}
+        WHERE c.id = ${req.params.campaignId}
+          AND c.developer_profile_id = ${developerProfileId}
+          AND sender.is_active = true
+        LIMIT 1
+      `);
+      const row = result.rows?.[0] as any;
+      if (!row) return res.status(404).json({ error: "Campaign step not found" });
+      if (!row.accessToken) return res.status(400).json({ error: "Reconnect Outlook before sending a test" });
+
+      const signature = row.signatureHtml || "";
+      const htmlBody = `${row.content || ""}${signature ? `<div style="margin-top:24px">${signature}</div>` : ""}`;
+      const parsedAttachments = typeof row.attachments === "string"
+        ? (() => { try { return JSON.parse(row.attachments); } catch { return []; } })()
+        : (row.attachments || []);
+      // Test sending is deliberately explicit and recipient-only. Attachments are
+      // retained in the saved step and used by the recurring sender; Graph test
+      // delivery stays conservative when an object-storage file cannot be read.
+      await sendDripEmailViaMicrosoft({
+        id: `developer-test-${req.params.stepId}`,
+        contact_email: recipientEmail,
+        sender_id: row.senderId,
+        developer_profile_id: developerProfileId,
+        microsoft_access_token: row.accessToken,
+        microsoft_refresh_token: row.refreshToken,
+        microsoft_token_expiry: row.tokenExpiry,
+      }, {
+        subject: row.subject || "Campaign test",
+        htmlBody,
+        attachments: parsedAttachments.filter((attachment: any) => attachment.contentBytes).map((attachment: any) => ({
+          filename: attachment.filename,
+          contentType: attachment.contentType,
+          contentBytes: attachment.contentBytes,
+        })),
+      });
+      return res.json({ success: true, sender: row.senderEmail, recipient: recipientEmail });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Enter a valid recipient email" });
+      console.error("[developer outreach step test] Error:", error);
+      return res.status(500).json({ error: "Failed to send test email" });
     }
   });
 

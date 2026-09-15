@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Edit3, Loader2, Mail, MapPin, MessageSquare, Plus, Rocket, Send, Sparkles, Tag, Users } from "lucide-react";
+import { CheckCircle2, Edit3, Loader2, Mail, MapPin, MessageSquare, Paperclip, Plus, Rocket, Send, Sparkles, Tag, Trash2, Users } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import Footer from "@/components/footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { renderEmailPreview } from "@/pages/outreach-onboarding";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +20,7 @@ type SenderAccount = {
   name: string;
   email: string;
   outlookConnected: boolean;
+  signatureHtml?: string | null;
   hasRefreshToken?: boolean;
   microsoftTokenExpiry?: string | null;
 };
@@ -68,6 +71,25 @@ type GeneratedSequenceStep = {
   dayNumber: number;
   subject: string;
   content: string;
+};
+
+type CampaignAttachment = {
+  filename: string;
+  url: string;
+  contentType: string;
+  size?: number;
+};
+
+type CampaignStep = {
+  id: string;
+  sequenceIndex: number;
+  dayNumber: number;
+  channel: "email" | "sms";
+  subject: string | null;
+  content: string;
+  isActive: boolean;
+  lineHeight?: string | null;
+  attachments: CampaignAttachment[];
 };
 
 const STARTING_TEMPLATES = [
@@ -138,6 +160,11 @@ export default function DeveloperOutreach() {
   const [sequenceDialogOpen, setSequenceDialogOpen] = useState(false);
   const [sequenceForm, setSequenceForm] = useState<SequenceGenerationForm>(emptySequenceForm);
   const [generatedSteps, setGeneratedSteps] = useState<GeneratedSequenceStep[]>([]);
+  const [stepsCampaign, setStepsCampaign] = useState<Campaign | null>(null);
+  const [stepEditorOpen, setStepEditorOpen] = useState(false);
+  const [stepDraft, setStepDraft] = useState<CampaignStep | null>(null);
+  const [testRecipientEmail, setTestRecipientEmail] = useState("");
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   const senderQuery = useQuery<{ sender: SenderAccount | null }>({
     queryKey: ["/api/developer-profile/me/outreach/sender"],
@@ -154,6 +181,11 @@ export default function DeveloperOutreach() {
   const tagsQuery = useQuery<string[]>({
     queryKey: ["/api/developer-profile/me/crm-tags"],
     queryFn: () => jsonRequest("/api/developer-profile/me/crm-tags"),
+  });
+  const campaignStepsQuery = useQuery<CampaignStep[]>({
+    queryKey: ["/api/developer-profile/me/outreach/campaigns/steps", stepsCampaign?.id],
+    queryFn: () => jsonRequest(`/api/developer-profile/me/outreach/campaigns/${stepsCampaign!.id}/steps`),
+    enabled: Boolean(stepsCampaign),
   });
   const aiConversationQuery = useQuery<{ messages: AiMessage[]; suggestedDraft: SuggestedDraft | null }>({
     queryKey: ["/api/developer-profile/me/outreach/ai-conversation", editing?.id],
@@ -272,6 +304,48 @@ export default function DeveloperOutreach() {
     onError: (error: Error) => toast({ title: "Could not save campaign", description: error.message, variant: "destructive" }),
   });
 
+  const updateStepMutation = useMutation({
+    mutationFn: (draft: CampaignStep) => jsonRequest(
+      `/api/developer-profile/me/outreach/campaigns/${stepsCampaign!.id}/steps/${draft.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dayNumber: draft.dayNumber,
+          channel: draft.channel,
+          subject: draft.subject || "",
+          content: draft.content,
+          isActive: draft.isActive,
+          attachments: draft.attachments || [],
+        }),
+      },
+    ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/outreach/campaigns/steps", stepsCampaign?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/outreach/campaigns"] });
+      setStepEditorOpen(false);
+      setStepDraft(null);
+      toast({ title: "Step saved" });
+    },
+    onError: (error: Error) => toast({ title: "Could not save step", description: error.message, variant: "destructive" }),
+  });
+
+  const testStepMutation = useMutation({
+    mutationFn: () => jsonRequest(
+      `/api/developer-profile/me/outreach/campaigns/${stepsCampaign!.id}/steps/${stepDraft!.id}/test`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipientEmail: testRecipientEmail.trim() }),
+      },
+    ),
+    onSuccess: (data: { sender?: string; recipient?: string }) => {
+      toast({ title: "Test email sent", description: `${data.sender || "Your connected mailbox"} → ${data.recipient || testRecipientEmail}` });
+      setTestRecipientEmail("");
+    },
+    onError: (error: Error) => toast({ title: "Could not send test email", description: error.message, variant: "destructive" }),
+  });
+
   const sender = senderQuery.data?.sender;
   const campaigns = campaignsQuery.data?.campaigns || [];
   const scopeLabel = useMemo(() => {
@@ -320,6 +394,47 @@ export default function DeveloperOutreach() {
     });
     setGeneratedSteps([]);
     setSequenceDialogOpen(true);
+  };
+
+  const openSteps = (campaign: Campaign) => {
+    setStepsCampaign(campaign);
+    setStepEditorOpen(false);
+    setStepDraft(null);
+  };
+
+  const openStepEditor = (step: CampaignStep) => {
+    setStepDraft({
+      ...step,
+      subject: step.subject || "",
+      attachments: Array.isArray(step.attachments) ? [...step.attachments] : [],
+    });
+    setStepEditorOpen(true);
+  };
+
+  const uploadStepAttachment = async (file: File) => {
+    setUploadingAttachment(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const attachment = await jsonRequest("/api/upload/attachment", {
+        method: "POST",
+        body: formData,
+      });
+      setStepDraft((current) => current ? {
+        ...current,
+        attachments: [...(current.attachments || []), {
+          filename: attachment.filename,
+          url: attachment.url,
+          contentType: attachment.contentType,
+          size: attachment.size,
+        }],
+      } : current);
+      toast({ title: "Attachment uploaded", description: `${file.name} is ready to save with this step.` });
+    } catch (error: any) {
+      toast({ title: "Could not upload attachment", description: error.message, variant: "destructive" });
+    } finally {
+      setUploadingAttachment(false);
+    }
   };
 
   const updateGeneratedStep = (stepNumber: number, field: "subject" | "content", value: string) => {
@@ -389,7 +504,17 @@ export default function DeveloperOutreach() {
             <CardContent>
               {senderQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : sender?.outlookConnected ? (
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                  <div><div className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-emerald-600" /><p className="font-semibold text-slate-900">{sender.email}</p></div><p className="mt-1 text-sm text-slate-500">Campaigns send through this Microsoft Outlook account.</p></div>
+                  <div>
+                    <div className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-emerald-600" /><p className="font-semibold text-slate-900">{sender.name || "Connected Outlook account"}</p></div>
+                    <p className="mt-1 text-sm text-slate-600">{sender.email || "Mailbox address is still loading"}</p>
+                    <p className="mt-1 text-xs text-slate-500">Campaigns send through this Microsoft Outlook account.</p>
+                    {sender.signatureHtml ? (
+                      <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Signature preview</p>
+                        <div dangerouslySetInnerHTML={{ __html: sender.signatureHtml }} />
+                      </div>
+                    ) : <p className="mt-2 text-xs text-amber-700">No signature is configured yet.</p>}
+                  </div>
                   <Button variant="outline" onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending}>Reconnect</Button>
                 </div>
               ) : (
@@ -419,7 +544,7 @@ export default function DeveloperOutreach() {
                     <p className="mt-1 text-sm text-slate-500">{campaign.subject}</p>
                     <p className="mt-2 text-xs text-slate-400">{campaign.enrollmentCount || 0} enrolled · starts {campaign.dayNumber ? `after ${campaign.dayNumber} day${campaign.dayNumber === 1 ? "" : "s"}` : "immediately"}</p>
                   </div>
-                  <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => openEdit(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Edit</Button><Button variant="brand" size="sm" onClick={() => launchMutation.mutate(campaign.id)} disabled={launchMutation.isPending || !sender?.outlookConnected}><Rocket className="mr-1.5 h-4 w-4" />Launch</Button></div>
+                   <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => openEdit(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Campaign</Button><Button variant="outline" size="sm" onClick={() => openSteps(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Steps</Button><Button variant="brand" size="sm" onClick={() => launchMutation.mutate(campaign.id)} disabled={launchMutation.isPending || !sender?.outlookConnected}><Rocket className="mr-1.5 h-4 w-4" />Launch</Button></div>
                 </div>
               ))}</div>
             )}
@@ -467,6 +592,12 @@ export default function DeveloperOutreach() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
           <DialogHeader><DialogTitle>{editing ? "Edit campaign" : "Create campaign"}</DialogTitle><DialogDescription>Email will send only from your connected Outlook account. Launching uses your saved target geography; tagged contacts can also enroll automatically.</DialogDescription></DialogHeader>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Sender identity</p>
+            <p className="mt-1 font-semibold text-slate-900">{sender?.name || "Connected Outlook account"}</p>
+            <p className="text-sm text-slate-600">{sender?.email || "Mailbox address unavailable"}</p>
+            {sender?.signatureHtml ? <div className="mt-2 border-t border-slate-200 pt-2 text-xs text-slate-600" dangerouslySetInnerHTML={{ __html: sender.signatureHtml }} /> : <p className="mt-2 text-xs text-amber-700">No configured signature will be added.</p>}
+          </div>
           <div className="grid gap-6 py-2 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
             <div className="grid content-start gap-4">
               <div><Label htmlFor="campaign-name">Campaign name</Label><Input id="campaign-name" className="mt-1.5" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Broker introduction" /></div>
@@ -491,7 +622,17 @@ export default function DeveloperOutreach() {
                 </select>
                 <p className="mt-1 text-xs text-slate-500">Templates are editable starting points. Merge fields resolve when the email is sent.</p>
               </div>
-              <div><Label htmlFor="campaign-content">Email message</Label><Textarea id="campaign-content" className="mt-1.5 min-h-52" value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} /><p className="mt-1 text-xs text-slate-500">Use {"{{firstName}}"}, {"{{companyName}}"}, or {"{{targetMarket}}"} to personalize the email. Your edits stay in place until you choose an assistant action.</p></div>
+              <div>
+                <Label htmlFor="campaign-content">Email message</Label>
+                <RichTextEditor
+                  value={form.content}
+                  onChange={(content) => setForm({ ...form, content })}
+                  placeholder="Write your email message..."
+                  minHeight="220px"
+                  className="mt-1.5"
+                />
+                <p className="mt-1 text-xs text-slate-500">Use {"{{firstName}}"}, {"{{companyName}}"}, or {"{{targetMarket}}"} to personalize the email. Your edits stay in place until you choose an assistant action.</p>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="campaign-delay">Send delay in days</Label><Input id="campaign-delay" type="number" min={0} max={365} className="mt-1.5" value={form.dayNumber} onChange={(event) => setForm({ ...form, dayNumber: Number(event.target.value) })} /></div><div><Label htmlFor="campaign-status">Status</Label><select id="campaign-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as "paused" | "active" })} className="mt-1.5 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option value="paused">Draft / paused</option><option value="active">Active</option></select></div></div>
             </div>
             <Card className="flex min-h-[520px] flex-col border-slate-200 bg-slate-50/70">
@@ -555,12 +696,150 @@ export default function DeveloperOutreach() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={Boolean(stepsCampaign)} onOpenChange={(open) => !open && setStepsCampaign(null)}>
+        <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit campaign steps</DialogTitle>
+            <DialogDescription>
+              Edit timing, delivery method, content, attachments, and active state. Changes are saved to this company’s campaign only.
+            </DialogDescription>
+          </DialogHeader>
+          {campaignStepsQuery.isLoading ? (
+            <div className="flex min-h-40 items-center justify-center text-sm text-slate-500"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading steps…</div>
+          ) : !campaignStepsQuery.data?.length ? (
+            <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">This campaign has no saved steps yet.</div>
+          ) : (
+            <div className="space-y-3">
+              {campaignStepsQuery.data.map((step) => (
+                <Card key={step.id} className="border-slate-200">
+                  <CardContent className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-start">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">Step {step.sequenceIndex + 1}</Badge>
+                        <Badge variant="secondary">Day {step.dayNumber}</Badge>
+                        <Badge variant={step.isActive ? "default" : "secondary"}>{step.isActive ? "Active" : "Paused"}</Badge>
+                        <span className="text-xs uppercase tracking-wide text-slate-400">{step.channel}</span>
+                      </div>
+                      <p className="mt-2 truncate font-semibold text-slate-900">{step.subject || "No subject"}</p>
+                      <div className="mt-1 line-clamp-2 text-sm text-slate-500" dangerouslySetInnerHTML={{ __html: renderEmailPreview(step.content, step.subject || "") }} />
+                      {step.attachments?.length > 0 && <p className="mt-2 flex items-center gap-1 text-xs text-slate-500"><Paperclip className="h-3.5 w-3.5" />{step.attachments.length} attachment{step.attachments.length === 1 ? "" : "s"}</p>}
+                    </div>
+                    <Button variant="outline" size="sm" className="shrink-0" onClick={() => openStepEditor(step)}><Edit3 className="mr-1.5 h-4 w-4" />Edit step</Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+          <DialogFooter><Button variant="outline" onClick={() => setStepsCampaign(null)}>Done</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={stepEditorOpen} onOpenChange={setStepEditorOpen}>
+        <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{stepDraft ? `Edit step ${stepDraft.sequenceIndex + 1}` : "Edit campaign step"}</DialogTitle>
+            <DialogDescription>Use the same formatted editor as the outreach configuration screen. Preview the exact HTML before saving.</DialogDescription>
+          </DialogHeader>
+          {stepDraft && (
+            <div className="grid gap-6 py-2 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <Label htmlFor="developer-step-day">Send on day</Label>
+                    <Input id="developer-step-day" type="number" min={0} max={365} className="mt-1.5" value={stepDraft.dayNumber} onChange={(event) => setStepDraft({ ...stepDraft, dayNumber: Number(event.target.value) })} />
+                  </div>
+                  <div>
+                    <Label htmlFor="developer-step-channel">Method</Label>
+                    <select id="developer-step-channel" value={stepDraft.channel} onChange={(event) => setStepDraft({ ...stepDraft, channel: event.target.value as CampaignStep["channel"] })} className="mt-1.5 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm">
+                      <option value="email">Email</option>
+                      <option value="sms">SMS</option>
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 pt-7 text-sm text-slate-700">
+                    <input type="checkbox" checked={stepDraft.isActive} onChange={(event) => setStepDraft({ ...stepDraft, isActive: event.target.checked })} className="h-4 w-4 rounded border-slate-300" />
+                    Active step
+                  </label>
+                </div>
+                {stepDraft.channel === "email" && (
+                  <>
+                    <div><Label htmlFor="developer-step-subject">Subject line</Label><Input id="developer-step-subject" className="mt-1.5" value={stepDraft.subject || ""} onChange={(event) => setStepDraft({ ...stepDraft, subject: event.target.value })} maxLength={240} /></div>
+                    <div>
+                      <Label>Email content</Label>
+                      <RichTextEditor
+                        value={stepDraft.content}
+                        onChange={(content) => setStepDraft({ ...stepDraft, content })}
+                        placeholder="Write your email content..."
+                        minHeight="260px"
+                        className="mt-1.5"
+                        lineHeight={stepDraft.lineHeight || "1.5"}
+                        onLineHeightChange={(lineHeight) => setStepDraft({ ...stepDraft, lineHeight })}
+                      />
+                    </div>
+                  </>
+                )}
+                {stepDraft.channel === "sms" && <div><Label htmlFor="developer-step-sms">Message</Label><Textarea id="developer-step-sms" className="mt-1.5 min-h-36" value={stepDraft.content} onChange={(event) => setStepDraft({ ...stepDraft, content: event.target.value })} /></div>}
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div><p className="text-sm font-semibold text-slate-900">Attachments</p><p className="text-xs text-slate-500">PDFs, documents, spreadsheets, text files, and images up to 50 MB.</p></div>
+                    <label className="inline-flex cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                      {uploadingAttachment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
+                      Add file
+                      <input type="file" className="sr-only" disabled={uploadingAttachment} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadStepAttachment(file); event.currentTarget.value = ""; }} />
+                    </label>
+                  </div>
+                  {stepDraft.attachments?.length > 0 && <div className="mt-3 space-y-2">{stepDraft.attachments.map((attachment, index) => (
+                    <div key={`${attachment.url}-${index}`} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
+                      <span className="flex min-w-0 items-center gap-2 truncate"><Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-400" /><span className="truncate">{attachment.filename}</span></span>
+                      <button type="button" className="text-slate-400 hover:text-red-600" aria-label={`Remove ${attachment.filename}`} onClick={() => setStepDraft({ ...stepDraft, attachments: stepDraft.attachments.filter((_, attachmentIndex) => attachmentIndex !== index) })}><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  ))}</div>}
+                </div>
+                {stepDraft.channel === "email" && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">Send a test</p>
+                    <p className="mt-1 text-xs text-slate-500">Enter a recipient explicitly. This never sends to a guessed or default address.</p>
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                      <Input type="email" placeholder="you@example.com" value={testRecipientEmail} onChange={(event) => setTestRecipientEmail(event.target.value)} />
+                      <Button type="button" variant="outline" onClick={() => testStepMutation.mutate()} disabled={!testRecipientEmail.trim() || testStepMutation.isPending}><Send className="mr-1.5 h-4 w-4" />Send Test</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <Card className="h-fit border-slate-200 bg-slate-50/70">
+                <CardHeader className="border-b border-slate-200 pb-3"><CardTitle className="text-base">Outlook preview</CardTitle><p className="text-xs font-normal text-slate-500">{sender?.name || "Connected sender"} · {sender?.email || "Mailbox address unavailable"}</p></CardHeader>
+                <CardContent className="p-4">
+                  {stepDraft.channel === "email" ? (
+                    <>
+                      <p className="mb-3 font-semibold text-slate-900">{stepDraft.subject || "No subject"}</p>
+                      <div className="prose prose-sm max-w-none text-slate-700" dangerouslySetInnerHTML={{ __html: renderEmailPreview(stepDraft.content, stepDraft.subject || "") }} />
+                      {sender?.signatureHtml && <><div className="my-5 border-t border-slate-200" /><div className="prose prose-sm max-w-none text-slate-600" dangerouslySetInnerHTML={{ __html: sender.signatureHtml }} /></>}
+                    </>
+                  ) : <p className="whitespace-pre-wrap text-sm text-slate-700">{stepDraft.content || "Your SMS message will appear here."}</p>}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStepEditorOpen(false)}>Cancel</Button>
+            <Button variant="brand" onClick={() => stepDraft && updateStepMutation.mutate(stepDraft)} disabled={!stepDraft || updateStepMutation.isPending || !stepDraft.content.trim()}>
+              {updateStepMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save step
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={sequenceDialogOpen} onOpenChange={setSequenceDialogOpen}>
         <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5" style={{ color: secondaryColor }} />Build campaign with AI</DialogTitle>
             <DialogDescription>Choose the outreach style and cadence. The generated drafts are for review only and will not be saved.</DialogDescription>
           </DialogHeader>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Sender identity</p>
+            <p className="mt-1 font-semibold text-slate-900">{sender?.name || "Connected Outlook account"}</p>
+            <p className="text-sm text-slate-600">{sender?.email || "Mailbox address unavailable"}</p>
+            {sender?.signatureHtml ? <div className="mt-2 border-t border-slate-200 pt-2 text-xs text-slate-600" dangerouslySetInnerHTML={{ __html: sender.signatureHtml }} /> : <p className="mt-2 text-xs text-amber-700">No configured signature will be added.</p>}
+          </div>
 
           <form
             onSubmit={(event) => {
@@ -671,16 +950,21 @@ export default function DeveloperOutreach() {
                           maxLength={240}
                         />
                       </div>
-                      <div>
-                        <Label htmlFor={`ai-sequence-content-${step.stepNumber}`}>Email content</Label>
-                        <Textarea
-                          id={`ai-sequence-content-${step.stepNumber}`}
-                          value={step.content}
-                          onChange={(event) => updateGeneratedStep(step.stepNumber, "content", event.target.value)}
-                          className="mt-1.5 min-h-36 resize-y bg-white"
-                          maxLength={50000}
-                        />
-                      </div>
+                       <div>
+                         <Label htmlFor={`ai-sequence-content-${step.stepNumber}`}>Email content</Label>
+                         <RichTextEditor
+                           value={step.content}
+                           onChange={(content) => updateGeneratedStep(step.stepNumber, "content", content)}
+                           placeholder="Write the email content..."
+                           minHeight="180px"
+                           className="mt-1.5"
+                         />
+                       </div>
+                       <div className="rounded-md border border-slate-200 bg-white p-3">
+                         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Outlook preview</p>
+                         <p className="mb-2 text-sm font-semibold text-slate-900">{step.subject || "No subject"}</p>
+                         <div className="prose prose-sm max-w-none text-slate-700" dangerouslySetInnerHTML={{ __html: renderEmailPreview(step.content, step.subject) }} />
+                       </div>
                     </CardContent>
                   </Card>
                 ))}

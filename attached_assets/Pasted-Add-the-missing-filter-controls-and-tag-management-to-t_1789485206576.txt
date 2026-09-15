@@ -1,0 +1,40 @@
+Add the missing filter controls and tag management to the CRM 
+(client/src/pages/developer-crm.tsx), building on real existing fields on the 
+brokers table.
+
+TASK 1 — Add filters backed by existing data
+Add filter dropdowns for:
+  - Tags (multi-select, using the existing crmTags array field)
+  - SMS status (using the existing smsOptIn field)
+  - State (using the existing stateRegion field, populated with actual distinct 
+    values from this company's own contacts)
+  - Rep/assigned team member (using the existing assignedTo field, populated 
+    with actual distinct values from this company's own contacts)
+All filters must combine with the existing search box and stay properly scoped 
+to the current company's own contacts only.
+
+TASK 2 — Report on MSA and County — no existing field for either
+The brokers table has no MSA or County field at all today. Before building these 
+two filters, report back: should these be added as new schema fields (populated 
+manually per contact, or derived automatically from an address/geocoding lookup 
+similar to how deals already get county assigned), or is there a different 
+existing field this should map to that I'm not aware of? Do not guess at this — 
+confirm the approach before adding schema changes.
+
+TASK 3 — Tag creation, editing, and adding to contacts
+Add the ability to:
+  - Create a new tag (a plain text value added to the company's own tag 
+    vocabulary)
+  - Edit an existing tag's name (updating it everywhere it's currently applied 
+    across this company's own contacts)
+  - Add or remove tags on an individual contact, or in bulk across multiple 
+    selected contacts
+Ensure this reuses the properly-scoped tag endpoint pattern already established 
+(the /api/developer-profile/me/crm-tags endpoint from the earlier tenant- 
+isolation fix), not the old unscoped /api/crm/tags.
+
+Verify: as a real test company, confirm each filter correctly narrows the 
+contact list using only that company's own real data, confirm creating/editing/ 
+tagging works correctly and stays scoped to that company's own contacts, and 
+confirm the MSA/County approach was reported and confirmed before any schema 
+changes were made.

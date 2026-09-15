@@ -449,7 +449,7 @@ function CrmDailyLimitCard() {
 }
 
 // Helper to render email preview with formatting and nested lists
-function renderEmailPreview(content: string, subject?: string): string {
+export function renderEmailPreview(content: string, subject?: string): string {
   if (!content) return '';
   
   // Helper function to apply personalization token highlighting
