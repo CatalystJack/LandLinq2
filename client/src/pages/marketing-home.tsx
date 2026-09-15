@@ -278,7 +278,7 @@ export default function MarketingHome() {
                  <h2 className="max-w-3xl text-[clamp(2.65rem,12vw,3.75rem)] font-semibold leading-[0.98] tracking-[-0.06em] sm:text-7xl">See what a supercharged acquisitions team looks like.</h2>
                  <p className="mt-6 max-w-xl text-base leading-7 text-white/65 sm:mt-7">Tell us a little about what your team is trying to solve. We’ll be in touch.</p>
               </div>
-              <form onSubmit={async (event) => {
+               <form onSubmit={async (event) => {
                 event.preventDefault();
                 setContactStatus("sending");
                 setContactError("");
@@ -295,14 +295,14 @@ export default function MarketingHome() {
                   setContactStatus("error");
                   setContactError(error instanceof Error ? error.message : "We could not send your message.");
                 }
-               }} className="rounded-2xl border border-white/20 p-4 sm:p-6">
+                }} className="w-full max-w-[520px] justify-self-end rounded-3xl border border-white/20 p-5 sm:p-8 lg:min-h-[390px] lg:p-9">
                 {contactStatus === "success" ? <p className="text-lg font-semibold text-white">Thanks — we’ll be in touch.</p> : <>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <input aria-label="Your name" required value={contactForm.name} onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })} placeholder="Your name" className="h-12 rounded-full border border-white/25 bg-transparent px-5 text-base text-white outline-none placeholder:text-white/40" />
-                    <input aria-label="Your email" type="email" required value={contactForm.email} onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })} placeholder="you@company.com" className="h-12 rounded-full border border-white/25 bg-transparent px-5 text-base text-white outline-none placeholder:text-white/40" />
+                   <div className="grid gap-4 sm:grid-cols-2">
+                     <input aria-label="Your name" required value={contactForm.name} onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })} placeholder="Your name" className="h-14 rounded-full border border-white/25 bg-transparent px-6 text-base text-white outline-none transition-colors placeholder:text-white/40 focus:border-white/60" />
+                     <input aria-label="Your email" type="email" required value={contactForm.email} onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })} placeholder="you@company.com" className="h-14 rounded-full border border-white/25 bg-transparent px-6 text-base text-white outline-none transition-colors placeholder:text-white/40 focus:border-white/60" />
                   </div>
-                  <textarea aria-label="Your message" required rows={4} value={contactForm.message} onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })} placeholder="How can we help?" className="mt-3 w-full resize-none rounded-2xl border border-white/25 bg-transparent p-4 text-base text-white outline-none placeholder:text-white/40" />
-                  <button type="submit" disabled={contactStatus === "sending"} className="mt-4 h-12 rounded-full bg-white px-6 text-sm font-semibold text-primary disabled:opacity-60">{contactStatus === "sending" ? "Sending…" : "Send message"}</button>
+                   <textarea aria-label="Your message" required rows={6} value={contactForm.message} onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })} placeholder="How can we help?" className="mt-4 min-h-[180px] w-full resize-none rounded-3xl border border-white/25 bg-transparent p-5 text-base leading-7 text-white outline-none transition-colors placeholder:text-white/40 focus:border-white/60" />
+                   <button type="submit" disabled={contactStatus === "sending"} className="mt-5 h-14 rounded-full bg-white px-8 text-base font-semibold text-primary transition-colors hover:bg-white/90 disabled:opacity-60">{contactStatus === "sending" ? "Sending…" : "Send message"}</button>
                   {contactStatus === "error" && <p role="alert" className="mt-3 text-sm text-red-200">{contactError}</p>}
                 </>}
               </form>
