@@ -1,0 +1,44 @@
+Building on the investigation already requested into the three outreach systems 
+(outreach-onboarding.tsx, developer-outreach.tsx, outreach-management.tsx): bring 
+the rich per-step campaign editing functionality already built in 
+outreach-onboarding.tsx over to the Investment Company-facing campaign builder in 
+developer-outreach.tsx.
+
+The existing internal "Edit Step" modal (outreach-onboarding.tsx) already has 
+everything needed as a reference:
+  - Day number and Method (Email) fields
+  - Subject Line field
+  - A real rich text editor (bold/italic/underline, lists, indent, alignment, 
+    link, undo/redo) for Message Content
+  - A live Outlook Preview pane showing exactly how the email will actually 
+    appear, using the REAL connected sender's name and email (not a placeholder — 
+    note this preview currently shows "sender@example.com" as a fallback, which 
+    should be fixed to always show the real connected sender's actual email)
+  - Attachment support (add/remove file attachments per step)
+  - An Active/Inactive toggle per step
+  - Save Changes and Cancel buttons
+  - A "Send Test" field to send a real test of this specific step to any email 
+    address
+
+TASK 1 — Build the same per-step editing experience in developer-outreach.tsx
+Once a campaign step exists (created via the simpler "Create campaign" modal 
+already built there), clicking to edit that step should open the same rich 
+editing experience described above — reusing the existing rich text editor 
+component, live preview logic, and attachment handling already built in 
+outreach-onboarding.tsx rather than building a second, separate implementation.
+
+TASK 2 — Fix the placeholder email in the live preview
+The Outlook Preview currently shows "sender@example.com" as a fallback when the 
+real sender email isn't available. Fix this to always pull and display the real 
+connected sender's actual email address.
+
+TASK 3 — Ensure attachments and test-sending work correctly for Investment 
+Company users
+Confirm attachment upload/storage and the "Send Test" functionality work 
+correctly when used from the Investment Company-facing side, properly scoped to 
+that company's own connected sender account.
+
+Verify: as a real test Investment Company account, create a campaign, edit a 
+step, confirm the rich editor, live Outlook preview (showing their real 
+connected email, not a placeholder), attachment upload, and Send Test all work 
+correctly and match the quality of the existing internal experience.

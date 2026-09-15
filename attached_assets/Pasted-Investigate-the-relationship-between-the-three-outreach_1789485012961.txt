@@ -1,0 +1,44 @@
+Investigate the relationship between the three outreach/campaign systems found in 
+this codebase (outreach-onboarding.tsx, developer-outreach.tsx, 
+outreach-management.tsx) and unify the Investment Company-facing campaign 
+builder (developer-outreach.tsx) to actually use the sender's configured identity.
+
+TASK 1 — Investigate the blank email bug
+Find why a real sender record (Jack Berg, known real email jack@catalystcp.com) 
+showed an empty email field in the "Configure" panel. Check whether this is a 
+data issue (the actual database record has a null/empty email) or a loading 
+timing issue (the record hadn't finished loading when the panel opened). Report 
+findings before fixing.
+
+TASK 2 — Report on the three-system relationship
+Confirm whether developer-outreach.tsx, outreach-onboarding.tsx, and 
+outreach-management.tsx are all working with the same underlying database tables 
+(outreachSenders, outreachCampaigns, outreachCampaignSteps), or whether any of 
+them use separate/legacy data structures. Report this clearly before making 
+changes, since unifying these safely depends on understanding what's actually 
+shared versus separate today.
+
+TASK 3 — Surface sender identity in the Investment Company campaign builder
+In developer-outreach.tsx's "Create campaign" modal, display the actual 
+connected sender's name and a preview of their configured email signature 
+(reusing the same signature data already stored and shown in 
+outreach-onboarding.tsx), so a company can see whose identity and signature will 
+actually be used before creating a campaign — not just a generic form disconnected 
+from that context.
+
+TASK 4 — Reconcile the two different tag-trigger mechanisms
+developer-outreach.tsx has its own "Auto-enrollment tag" field, separate from the 
+"CRM Tag Triggers" system already built in outreach-onboarding.tsx. Confirm 
+whether these are actually the same underlying mechanism with different UI, or 
+genuinely separate systems — report this clearly, since if they're separate, that 
+itself is likely a source of real confusion and bugs (e.g. a tag configured in 
+one place not actually working when referenced from the other).
+
+Do not make sweeping changes yet — this task is primarily investigation and 
+reporting, plus the specific Task 3 identity-surfacing fix, since a full 
+unification of three systems needs to be scoped deliberately once the actual 
+relationships between them are understood.
+
+Verify: report clearly on Tasks 1, 2, and 4's findings, and confirm Task 3's 
+identity preview shows real, accurate sender name and signature data when 
+creating a campaign as a real test Investment Company account.
