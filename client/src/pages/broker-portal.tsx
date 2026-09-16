@@ -580,13 +580,13 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>
               )}
-              <Button type="submit" disabled={loginMutation.isPending} className="w-full h-10 bg-[#0d2d4e] hover:bg-[#0d2d4e]/90 text-white font-semibold">
+              <Button type="submit" disabled={loginMutation.isPending} className="w-full h-10 bg-catalyst-navy hover:bg-catalyst-navy/90 text-white font-semibold">
                 {loginMutation.isPending ? "Signing in…" : "Sign In"}
               </Button>
             </form>
             <p className="text-center text-xs text-gray-400 mt-5">
               Don't have an account?{" "}
-              <a href="/broker-network" className="text-[#0d2d4e] font-semibold hover:underline">Apply to join</a>
+              <a href="/broker-network" className="text-catalyst-navy font-semibold hover:underline">Apply to join</a>
             </p>
           </div>
           <p className="text-center text-xs text-[#64748b] mt-6">
@@ -857,7 +857,7 @@ function PortalView({ account }: { account: BrokerAccount }) {
                 : "Try adjusting your search or filter."}
             </p>
             {deals.length === 0 && (
-              <button onClick={() => setShowProfile(true)} className="mt-4 text-sm text-[#0d2d4e] underline">
+              <button onClick={() => setShowProfile(true)} className="mt-4 text-sm text-catalyst-navy underline">
                 Update your market criteria
               </button>
             )}

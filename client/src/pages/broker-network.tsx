@@ -156,7 +156,7 @@ export default function BrokerNetworkPage() {
             </p>
             <p className="text-sm text-gray-400">
               Questions? Email us at{" "}
-              <a href="mailto:deals@landlinq.com" className="text-[#0d2d4e] font-medium hover:underline">
+              <a href="mailto:deals@landlinq.com" className="text-catalyst-navy font-medium hover:underline">
                 deals@landlinq.com
               </a>
             </p>
@@ -447,7 +447,7 @@ export default function BrokerNetworkPage() {
 
               <p className="text-center text-xs text-gray-400">
                 Already have an account?{" "}
-                <a href="/broker-portal" className="text-[#0d2d4e] font-medium hover:underline">
+                <a href="/broker-portal" className="text-catalyst-navy font-medium hover:underline">
                   Sign in to the broker portal
                 </a>
               </p>

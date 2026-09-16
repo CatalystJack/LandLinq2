@@ -346,7 +346,7 @@ function AIAnalysisCell({ dealId }: { dealId: string }) {
       <Button
         variant="outline"
         size="sm"
-        className="h-7 px-2 text-xs bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] transition-colors"
+        className="h-7 px-2 text-xs bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border border-catalyst-blue transition-colors"
         onClick={generateAnalysis}
         disabled={isGenerating}
       >
@@ -5316,11 +5316,11 @@ export default function AnalystDashboard() {
             </div>
           ) : d.excelModelUrl ? (
             <div className="flex items-center gap-1">
-              <a href={d.excelModelUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center h-7 px-2 text-xs rounded border bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border-[#4A90E2] transition-colors" title="Open Excel model">Excel</a>
+              <a href={d.excelModelUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center h-7 px-2 text-xs rounded border bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border-catalyst-blue transition-colors" title="Open Excel model">Excel</a>
               <button className="text-gray-400 hover:text-gray-600 p-0.5" title="Edit link" onClick={() => { setEditingCell({dealId:deal.id,field:'excelModelUrl'}); setCellEditValue(d.excelModelUrl||''); editingCellRef.current={dealId:deal.id,field:'excelModelUrl'}; cellEditValueRef.current=d.excelModelUrl||''; }}><Edit2 size={10} /></button>
             </div>
           ) : (
-            <button className="inline-flex items-center h-7 px-2 text-xs rounded border bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border-[#4A90E2] transition-colors opacity-50 hover:opacity-100" onClick={() => { setEditingCell({dealId:deal.id,field:'excelModelUrl'}); setCellEditValue(''); editingCellRef.current={dealId:deal.id,field:'excelModelUrl'}; cellEditValueRef.current=''; }} title="Add SharePoint link">Excel</button>
+            <button className="inline-flex items-center h-7 px-2 text-xs rounded border bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border-catalyst-blue transition-colors opacity-50 hover:opacity-100" onClick={() => { setEditingCell({dealId:deal.id,field:'excelModelUrl'}); setCellEditValue(''); editingCellRef.current={dealId:deal.id,field:'excelModelUrl'}; cellEditValueRef.current=''; }} title="Add SharePoint link">Excel</button>
           )}
         </td>
       );
@@ -5329,7 +5329,7 @@ export default function AnalystDashboard() {
           {(deal.aiExplanatoryNotes||deal.rejectionReason) ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Reason" className={`h-7 w-7 border transition-colors ${deal.status==='rejected'?'bg-red-500 text-white hover:bg-white hover:text-red-600 border-red-500':'bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border-[#4A90E2]'}`} title={deal.aiExplanatoryNotes||deal.rejectionReason||''} onClick={() => { setReasonDialogOpen(true); setReasonDialogContent({title:deal.status==='rejected'?`Rejection Reason — ${deal.address}`:`AI Notes — ${deal.address}`,content:deal.aiExplanatoryNotes||deal.rejectionReason||'',type:deal.status==='rejected'?'rejection':'acceptance'}); }}>
+                <Button variant="outline" size="icon" aria-label="Reason" className={`h-7 w-7 border transition-colors ${deal.status==='rejected'?'bg-red-500 text-white hover:bg-white hover:text-red-600 border-red-500':'bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border-catalyst-blue'}`} title={deal.aiExplanatoryNotes||deal.rejectionReason||''} onClick={() => { setReasonDialogOpen(true); setReasonDialogContent({title:deal.status==='rejected'?`Rejection Reason — ${deal.address}`:`AI Notes — ${deal.address}`,content:deal.aiExplanatoryNotes||deal.rejectionReason||'',type:deal.status==='rejected'?'rejection':'acceptance'}); }}>
                   <MessageSquare className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -5366,7 +5366,7 @@ export default function AnalystDashboard() {
               <Popover open={openProductTypePopover===deal.id} onOpenChange={(open) => setOpenProductTypePopover(open?deal.id:null)}>
                 <PopoverTrigger asChild><button className="w-full text-left text-xs min-h-[28px] px-1 py-0.5 rounded hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-colors flex items-center gap-1 flex-wrap">{currentTypes.length>0?currentTypes.map(t => <span key={t} className="inline-flex items-center bg-sky-100 text-sky-800 text-[10px] font-semibold px-1.5 py-0.5 rounded">{typeLabel(t)}</span>):<span className="text-gray-300 italic text-[11px]">+ select types</span>}</button></PopoverTrigger>
                 <PopoverContent className="w-44 p-2" align="start" side="bottom">
-                  <div className="space-y-0.5">{PRODUCT_TYPES.map(({value,label}) => (<label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-1.5 py-1.5 text-xs select-none"><input type="checkbox" checked={currentTypes.includes(value)} onChange={(e) => handleToggle(value,e.target.checked)} className="h-3.5 w-3.5 cursor-pointer accent-[#4A90E2]" /><span className="font-medium text-gray-700">{label}</span></label>))}{currentTypes.length>0&&(<div className="pt-1 mt-1 border-t border-gray-100"><button className="w-full text-left text-[11px] text-red-400 hover:text-red-600 px-1.5 py-0.5" onClick={() => { if(editingRow===deal.id)setEditData({...editData,productTypes:[]}); cellUpdateMutation.mutate({dealId:deal.id,productTypes:[]}); }}>Clear all</button></div>)}</div>
+                  <div className="space-y-0.5">{PRODUCT_TYPES.map(({value,label}) => (<label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-1.5 py-1.5 text-xs select-none"><input type="checkbox" checked={currentTypes.includes(value)} onChange={(e) => handleToggle(value,e.target.checked)} className="h-3.5 w-3.5 cursor-pointer accent-catalyst-blue" /><span className="font-medium text-gray-700">{label}</span></label>))}{currentTypes.length>0&&(<div className="pt-1 mt-1 border-t border-gray-100"><button className="w-full text-left text-[11px] text-red-400 hover:text-red-600 px-1.5 py-0.5" onClick={() => { if(editingRow===deal.id)setEditData({...editData,productTypes:[]}); cellUpdateMutation.mutate({dealId:deal.id,productTypes:[]}); }}>Clear all</button></div>)}</div>
                   {deal.suggestedDevelopmentType&&(<div className="mt-2 pt-2 border-t border-gray-100"><Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs py-0 px-1"><Zap className="mr-1" size={10} />{deal.suggestedDevelopmentType}</Badge></div>)}
                 </PopoverContent>
               </Popover>
@@ -5379,7 +5379,7 @@ export default function AnalystDashboard() {
           {deal.analystNotes ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Notes" className="h-7 w-7 bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] transition-colors" onClick={() => setAnalystNotesModal({dealId:deal.id,address:deal.address||'Property',notes:deal.analystNotes||'',isEditing:false})} data-testid={`button-view-analyst-notes-${deal.id}`}>
+                <Button variant="outline" size="icon" aria-label="Notes" className="h-7 w-7 bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border border-catalyst-blue transition-colors" onClick={() => setAnalystNotesModal({dealId:deal.id,address:deal.address||'Property',notes:deal.analystNotes||'',isEditing:false})} data-testid={`button-view-analyst-notes-${deal.id}`}>
                   <FileText className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -5393,7 +5393,7 @@ export default function AnalystDashboard() {
       case 'dealSummary': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           {d.dealSummary ? (
-            <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] hover:scale-100 transform-gpu" onClick={() => setDealSummaryModal({dealId:deal.id,address:deal.address||'Property',notes:d.dealSummary||'',isEditing:false})}><FileText size={12} />Summary</Button>
+            <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border border-catalyst-blue hover:scale-100 transform-gpu" onClick={() => setDealSummaryModal({dealId:deal.id,address:deal.address||'Property',notes:d.dealSummary||'',isEditing:false})}><FileText size={12} />Summary</Button>
           ) : (
             <div className="text-gray-400 italic text-xs cursor-pointer px-1" onClick={() => { dealSummaryEditRef.current=''; setDealSummaryModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true}); }}>Click to add...</div>
           )}
@@ -5402,7 +5402,7 @@ export default function AnalystDashboard() {
       case 'developerNotes': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           {d.developerNotes ? (
-            <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] hover:scale-100 transform-gpu" onClick={() => setDeveloperNotesModal({dealId:deal.id,address:deal.address||'Property',notes:d.developerNotes||'',isEditing:false})}><Building size={12} />Dev</Button>
+            <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border border-catalyst-blue hover:scale-100 transform-gpu" onClick={() => setDeveloperNotesModal({dealId:deal.id,address:deal.address||'Property',notes:d.developerNotes||'',isEditing:false})}><Building size={12} />Dev</Button>
           ) : (
             <div className="text-gray-400 italic text-xs cursor-pointer px-1" onClick={() => setDeveloperNotesModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true})}>Click to add...</div>
           )}
@@ -5413,7 +5413,7 @@ export default function AnalystDashboard() {
           {deal.brokerNotes ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Broker notes" className="h-7 w-7 bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] transition-colors" onClick={() => setBrokerNotesModal({dealId:deal.id,address:deal.address||'Property',notes:deal.brokerNotes||'',isEditing:false})} data-testid={`button-view-broker-notes-${deal.id}`}>
+                <Button variant="outline" size="icon" aria-label="Broker notes" className="h-7 w-7 bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border border-catalyst-blue transition-colors" onClick={() => setBrokerNotesModal({dealId:deal.id,address:deal.address||'Property',notes:deal.brokerNotes||'',isEditing:false})} data-testid={`button-view-broker-notes-${deal.id}`}>
                   <FileText className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -5441,7 +5441,7 @@ export default function AnalystDashboard() {
               {d.lihtcScoreTotal!=null ? (
                 <button onClick={() => setLihtcScoreModal({dealId:deal.id})} title={d.lihtcScorePreliminary?'Preliminary score — click to view breakdown':'Confirmed score — click to view breakdown'} className={`inline-flex items-center gap-0.5 font-bold px-1.5 py-0.5 rounded text-xs transition-colors hover:opacity-80 ${d.lihtcScoreTotal>=60?'bg-emerald-100 text-emerald-800 border border-emerald-200':d.lihtcScoreTotal>=40?'bg-amber-100 text-amber-800 border border-amber-200':'bg-red-100 text-red-700 border border-red-200'}`}>{d.lihtcScoreTotal}{d.lihtcScorePreliminary&&<span className="text-[8px] font-normal opacity-60 ml-0.5">~</span>}</button>
               ) : (
-                <button onClick={() => setLihtcScoreModal({dealId:deal.id})} className="text-[10px] text-gray-400 hover:text-[#4A90E2] transition-colors px-1 py-0.5 rounded hover:bg-blue-50" title="Run NC 2026 QAP score">Score</button>
+                <button onClick={() => setLihtcScoreModal({dealId:deal.id})} className="text-[10px] text-gray-400 hover:text-catalyst-blue transition-colors px-1 py-0.5 rounded hover:bg-blue-50" title="Run NC 2026 QAP score">Score</button>
               )}
               <button onClick={() => handleRescoreLihtc(deal.id)} disabled={rescoringLihtcDealId===deal.id} title="Re-run NC 2026 QAP scoring" className="p-0.5 rounded text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-40"><RefreshCw size={10} className={rescoringLihtcDealId===deal.id?'animate-spin text-blue-500':''} /></button>
             </div>
@@ -5559,7 +5559,7 @@ export default function AnalystDashboard() {
             {Array.isArray(deal.documentUrls)&&deal.documentUrls.length>0&&(
               <div className="flex flex-col gap-1">{(() => { const docs=deal.documentUrls as string[]; const isExpanded=expandedBrokerDocs.has(deal.id); return (<>{!isExpanded&&(<Button onClick={() => { const s=new Set(expandedBrokerDocs); s.add(deal.id); setExpandedBrokerDocs(s); }} size="sm" variant="outline" className="h-7 px-1 text-xs bg-blue-50 hover:bg-blue-500 hover:text-white border-blue-200 text-blue-700" data-testid={`button-expand-broker-docs-${deal.id}`}>{docs.length} Doc{docs.length!==1?'s':''}<ChevronDown size={12} className="ml-1" /></Button>)}{isExpanded&&(<><Button onClick={() => { const s=new Set(expandedBrokerDocs); s.delete(deal.id); setExpandedBrokerDocs(s); }} size="sm" variant="ghost" className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 w-full justify-center mb-1" data-testid={`button-collapse-broker-docs-${deal.id}`}><ChevronUp size={12} className="mr-1" />Hide {docs.length} document{docs.length!==1?'s':''}</Button>{docs.map((docUrl: string,index: number) => { const fileName=docUrl.split('/').pop()||`Document ${index+1}`; const fileExt=fileName.split('.').pop()?.toLowerCase()||''; const isPdf=fileExt==='pdf'; const isExcel=['xlsx','xls','csv'].includes(fileExt); return (<div key={index} className="flex items-center gap-1 max-w-full overflow-hidden"><Button onClick={() => openFileViewer(docUrl)} size="sm" variant="outline" className="h-7 px-2 text-xs bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700 hover:text-blue-700 flex-1 min-w-0 overflow-hidden" title={`View ${fileName}`} data-testid={`button-view-broker-doc-${deal.id}-${index}`}>{isPdf?<FileText size={12} className="mr-1 shrink-0" />:isExcel?<BarChart3 size={12} className="mr-1 shrink-0" />:<Eye size={12} className="mr-1 shrink-0" />}<span className="truncate">{fileName}</span></Button><Button onClick={() => handleRenameFile(deal.id,docUrl,true)} size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50" title="Rename file" data-testid={`button-rename-broker-doc-${deal.id}-${index}`}><Edit2 size={12} /></Button><Button onClick={() => handleDeleteBrokerFile(deal.id,docUrl)} size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0 text-gray-500 hover:text-red-600 hover:bg-red-50" title="Delete file" data-testid={`button-delete-broker-doc-${deal.id}-${index}`}><Trash2 size={12} /></Button></div>); })}</>)}</>); })()}</div>
             )}
-            <div><input type="file" id={`broker-file-upload-${deal.id}`} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg" onChange={(e) => handleBrokerFileUpload(e,deal.id)} data-testid={`input-broker-file-upload-${deal.id}`} /><Button onClick={() => document.getElementById(`broker-file-upload-${deal.id}`)?.click()} size="sm" variant="outline" className="h-7 px-2 text-xs bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] transition-colors" title="Upload broker document" data-testid={`button-upload-broker-doc-${deal.id}`}>Upload</Button></div>
+            <div><input type="file" id={`broker-file-upload-${deal.id}`} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg" onChange={(e) => handleBrokerFileUpload(e,deal.id)} data-testid={`input-broker-file-upload-${deal.id}`} /><Button onClick={() => document.getElementById(`broker-file-upload-${deal.id}`)?.click()} size="sm" variant="outline" className="h-7 px-2 text-xs bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border border-catalyst-blue transition-colors" title="Upload broker document" data-testid={`button-upload-broker-doc-${deal.id}`}>Upload</Button></div>
           </div>
         </td>
       );
@@ -5569,7 +5569,7 @@ export default function AnalystDashboard() {
             {Array.isArray(d.analystDocumentUrls)&&d.analystDocumentUrls.length>0&&(
               <div className="flex flex-col gap-1">{(() => { const docs=d.analystDocumentUrls as string[]; const isExpanded=expandedAnalystDocs.has(deal.id); return (<>{!isExpanded&&(<Button onClick={() => { const s=new Set(expandedAnalystDocs); s.add(deal.id); setExpandedAnalystDocs(s); }} size="sm" variant="outline" className="h-7 px-2 text-xs bg-green-50 hover:bg-green-500 hover:text-white border-green-200 text-green-700" data-testid={`button-expand-analyst-docs-${deal.id}`}><FileText size={12} className="mr-1" />{docs.length} Doc{docs.length!==1?'s':''}<ChevronDown size={12} className="ml-1" /></Button>)}{isExpanded&&(<><Button onClick={() => { const s=new Set(expandedAnalystDocs); s.delete(deal.id); setExpandedAnalystDocs(s); }} size="sm" variant="ghost" className="h-6 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 w-full justify-center mb-1" data-testid={`button-collapse-analyst-docs-${deal.id}`}><ChevronUp size={12} className="mr-1" />Hide {docs.length} document{docs.length!==1?'s':''}</Button>{docs.map((docUrl: string,index: number) => { const fileName=docUrl.split('/').pop()||`Document ${index+1}`; const fileExt=fileName.split('.').pop()?.toLowerCase()||''; const isPdf=fileExt==='pdf'; const isExcel=['xlsx','xls','csv'].includes(fileExt); return (<div key={index} className="flex items-center gap-1 max-w-full overflow-hidden"><Button onClick={() => openFileViewer(docUrl)} size="sm" variant="outline" className="h-7 px-2 text-xs bg-green-50 hover:bg-green-100 border-green-200 text-green-700 hover:text-green-700 flex-1 min-w-0 overflow-hidden" title={`View ${fileName}`} data-testid={`button-view-analyst-doc-${deal.id}-${index}`}>{isPdf?<FileText size={12} className="mr-1 shrink-0" />:isExcel?<BarChart3 size={12} className="mr-1 shrink-0" />:<Eye size={12} className="mr-1 shrink-0" />}<span className="truncate">{fileName}</span></Button><Button onClick={() => handleRenameFile(deal.id,docUrl,false)} size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50" title="Rename file" data-testid={`button-rename-analyst-doc-${deal.id}-${index}`}><Edit2 size={12} /></Button><Button onClick={() => handleDeleteAnalystFile(deal.id,docUrl)} size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0 text-gray-500 hover:text-red-600 hover:bg-red-50" title="Delete file" data-testid={`button-delete-analyst-doc-${deal.id}-${index}`}><Trash2 size={12} /></Button></div>); })}</>)}</>); })()}</div>
             )}
-            <div><input type="file" id={`analyst-file-upload-${deal.id}`} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg" onChange={(e) => handleFileUpload(e,deal.id)} data-testid={`input-analyst-file-upload-${deal.id}`} /><Button onClick={() => document.getElementById(`analyst-file-upload-${deal.id}`)?.click()} size="sm" variant="outline" className="h-7 px-3 text-xs bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] transition-colors" title="Upload analyst document" data-testid={`button-upload-analyst-doc-${deal.id}`}>Upload</Button></div>
+            <div><input type="file" id={`analyst-file-upload-${deal.id}`} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg" onChange={(e) => handleFileUpload(e,deal.id)} data-testid={`input-analyst-file-upload-${deal.id}`} /><Button onClick={() => document.getElementById(`analyst-file-upload-${deal.id}`)?.click()} size="sm" variant="outline" className="h-7 px-3 text-xs bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border border-catalyst-blue transition-colors" title="Upload analyst document" data-testid={`button-upload-analyst-doc-${deal.id}`}>Upload</Button></div>
           </div>
         </td>
       );
@@ -5677,7 +5677,7 @@ export default function AnalystDashboard() {
       case 'wetlandNotes': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           {d.wetlandNotes ? (
-            <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] hover:scale-100 transform-gpu" onClick={() => setWetlandNotesModal({dealId:deal.id,address:deal.address||'Property',notes:d.wetlandNotes||'',isEditing:false})}><FileText size={12} />Notes</Button>
+            <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border border-catalyst-blue hover:scale-100 transform-gpu" onClick={() => setWetlandNotesModal({dealId:deal.id,address:deal.address||'Property',notes:d.wetlandNotes||'',isEditing:false})}><FileText size={12} />Notes</Button>
           ) : (
             <div className="text-gray-400 italic text-xs cursor-pointer px-1" onClick={() => { wetlandNotesEditRef.current=''; setWetlandNotesModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true}); }}>Click to add...</div>
           )}
@@ -5945,7 +5945,7 @@ export default function AnalystDashboard() {
                     {viewMode === 'table' && (<>
                       <Popover open={colPickerOpen} onOpenChange={setColPickerOpen}>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-medium border-[#4A90E2] text-[#4A90E2] hover:bg-[#4A90E2] hover:text-white transition-colors">
+                          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-medium border-catalyst-blue text-catalyst-blue hover:bg-catalyst-blue hover:text-white transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3h18"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M3 21h18"/><rect x="10" y="6" width="4" height="12" rx="1" fill="currentColor" fillOpacity=".2"/></svg>
                             Columns
                             {visibleColumns.size < ALL_COLUMNS.length && (
@@ -5965,7 +5965,7 @@ export default function AnalystDashboard() {
                               >
                                 A→Z
                               </button>
-                              <button onClick={resetColumns} className="text-[11px] text-[#4A90E2] hover:underline">Reset</button>
+                              <button onClick={resetColumns} className="text-[11px] text-catalyst-blue hover:underline">Reset</button>
                             </div>
                           </div>
 

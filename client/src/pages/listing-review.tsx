@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
   CheckCircle2, XCircle, ExternalLink, MapPin, DollarSign, Ruler,
@@ -88,28 +89,6 @@ function fmtAc(v: number | string | null) {
   return `${n.toFixed(2)} ac`;
 }
 
-// ─── Pill button (no shadcn hover conflict) ───────────────────────────────────
-function Btn({
-  children, onClick, disabled, variant = "primary", size = "sm",
-}: {
-  children: React.ReactNode; onClick?: () => void; disabled?: boolean;
-  variant?: "primary" | "ghost" | "outline"; size?: "sm" | "xs";
-}) {
-  const base = "inline-flex items-center justify-center font-medium transition-colors rounded-md disabled:opacity-50 disabled:pointer-events-none focus:outline-none";
-  const sz = size === "xs" ? "px-2 py-1 text-xs gap-1" : "px-3 py-1.5 text-sm gap-1.5";
-  const v =
-    variant === "primary"
-      ? "bg-[#4A90E2] text-white hover:bg-[#2f73c7] active:bg-[#2563b0]"
-      : variant === "ghost"
-      ? "text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
-      : "border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800";
-  return (
-    <button className={`${base} ${sz} ${v}`} onClick={onClick} disabled={disabled}>
-      {children}
-    </button>
-  );
-}
-
 // ─── Listing Card ─────────────────────────────────────────────────────────────
 function ListingCard({
   l, onAdd, onSkip, added, skipped, isPending,
@@ -145,7 +124,7 @@ function ListingCard({
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 {loopnetUrl ? (
                   <a href={loopnetUrl} target="_blank" rel="noopener noreferrer"
-                    className="font-semibold text-[#4A90E2] hover:text-[#2f73c7] hover:underline text-sm font-mono flex items-center gap-1">
+                    className="font-semibold text-catalyst-blue hover:text-[#2f73c7] hover:underline text-sm font-mono flex items-center gap-1">
                     #{l.listingId}
                     <ExternalLink className="h-3 w-3 opacity-60" />
                   </a>
@@ -179,7 +158,7 @@ function ListingCard({
               {/* Metrics — price/acres/type/images link to LoopNet (API doesn't expose these) */}
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-2">
                 <a href={loopnetUrl} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[#4A90E2] hover:text-[#2f73c7] hover:underline">
+                  className="flex items-center gap-1 text-catalyst-blue hover:text-[#2f73c7] hover:underline">
                   <DollarSign className="h-3 w-3" />Price
                 </a>
                 <a href={loopnetUrl} target="_blank" rel="noopener noreferrer"
@@ -219,12 +198,12 @@ function ListingCard({
                 </Badge>
               ) : (
                 <>
-                  <Btn variant="primary" size="xs" disabled={isPending} onClick={onAdd}>
+                  <Button variant="default" size="xs" disabled={isPending} onClick={onAdd}>
                     <CheckCircle2 className="h-3.5 w-3.5" /> Add
-                  </Btn>
-                  <Btn variant="ghost" size="xs" disabled={isPending} onClick={onSkip}>
+                  </Button>
+                  <Button variant="ghost" size="xs" disabled={isPending} onClick={onSkip}>
                     <XCircle className="h-3.5 w-3.5" /> Skip
-                  </Btn>
+                  </Button>
                 </>
               )}
             </div>
@@ -259,7 +238,7 @@ function StagedCard({ l, onApprove, onReject, isPending }: {
           </div>
           <div className="flex flex-col gap-1.5 shrink-0 items-end">
             {l.sourceUrl && (
-              <a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-[#4A90E2] hover:text-[#2f73c7]">
+              <a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-catalyst-blue hover:text-[#2f73c7]">
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
             )}
@@ -267,12 +246,12 @@ function StagedCard({ l, onApprove, onReject, isPending }: {
               <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">In Pipeline</Badge>
             ) : (
               <>
-                <Btn variant="primary" size="xs" disabled={isPending} onClick={onApprove}>
+                <Button variant="default" size="xs" disabled={isPending} onClick={onApprove}>
                   <CheckCircle2 className="h-3.5 w-3.5" /> Add
-                </Btn>
-                <Btn variant="ghost" size="xs" disabled={isPending} onClick={onReject}>
+                </Button>
+                <Button variant="ghost" size="xs" disabled={isPending} onClick={onReject}>
                   <XCircle className="h-3.5 w-3.5" /> Skip
-                </Btn>
+                </Button>
               </>
             )}
           </div>
@@ -503,11 +482,11 @@ export default function ListingReview() {
                       </button>
                     )}
                   </div>
-                  <Btn variant="primary" onClick={handleSearch} disabled={searching}>
+                  <Button variant="default" onClick={handleSearch} disabled={searching}>
                     {searching
                       ? <><Loader2 className="h-4 w-4 animate-spin" /> Searching…</>
                       : <><Search className="h-4 w-4" /> Search LoopNet</>}
-                  </Btn>
+                  </Button>
                   {searchResults !== null && !searching && (
                     <span className="text-sm text-gray-500">
                       {searchTotal.toLocaleString()} listings found
@@ -520,7 +499,7 @@ export default function ListingReview() {
                   <p className="text-xs font-medium text-gray-500 mb-2">
                     Property Type / Land Use
                     {selectedPropTypes.length > 0 && (
-                      <button className="ml-2 text-[#4A90E2] hover:underline" onClick={() => setSelectedPropTypes([])}>
+                      <button className="ml-2 text-catalyst-blue hover:underline" onClick={() => setSelectedPropTypes([])}>
                         Clear ({selectedPropTypes.length})
                       </button>
                     )}
@@ -577,7 +556,7 @@ export default function ListingReview() {
                           onChange={e => setFilterMaxMiles(e.target.value)} className="h-8 text-xs" />
                       </div>
                       <div className="flex items-end">
-                        <Btn variant="outline" size="xs" onClick={clearPostFilters}>Clear filters</Btn>
+                        <Button variant="outline" size="xs" onClick={clearPostFilters}>Clear filters</Button>
                       </div>
                     </div>
                   )}
@@ -609,7 +588,7 @@ export default function ListingReview() {
                     ? "No listings match your filters."
                     : "No for-sale listings found in NC, SC, FL, GA, TN, or VA. The API may be temporarily returning off-target data."}
                 </p>
-                {activePostFilterCount > 0 && <Btn variant="outline" size="xs" onClick={clearPostFilters}>Clear filters</Btn>}
+                {activePostFilterCount > 0 && <Button variant="outline" size="xs" onClick={clearPostFilters}>Clear filters</Button>}
               </div>
             )}
 
@@ -623,9 +602,9 @@ export default function ListingReview() {
                     {" — click "}
                     <strong>View</strong> to open on LoopNet, <strong>Add</strong> to pipeline, <strong>Skip</strong> to hide
                   </p>
-                  <Btn variant="outline" size="xs" onClick={handleSearch}>
+                  <Button variant="outline" size="xs" onClick={handleSearch}>
                     <RefreshCw className="h-3 w-3" /> Refresh
-                  </Btn>
+                  </Button>
                 </div>
                 {displayResults.map(l => (
                   <ListingCard
@@ -654,8 +633,8 @@ export default function ListingReview() {
                     <CardDescription>Listings staged from the Data Hub for review before pipeline.</CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Btn variant={stagedStatus === "pending" ? "primary" : "outline"} size="xs" onClick={() => setStagedStatus("pending")}>Pending</Btn>
-                    <Btn variant={stagedStatus === "approved" ? "primary" : "outline"} size="xs" onClick={() => setStagedStatus("approved")}>Approved</Btn>
+                    <Button variant={stagedStatus === "pending" ? "default" : "outline"} size="xs" onClick={() => setStagedStatus("pending")}>Pending</Button>
+                    <Button variant={stagedStatus === "approved" ? "default" : "outline"} size="xs" onClick={() => setStagedStatus("approved")}>Approved</Button>
                   </div>
                 </div>
               </CardHeader>
@@ -670,7 +649,7 @@ export default function ListingReview() {
                 <Inbox className="h-10 w-10 opacity-30" />
                 <p className="text-sm">{stagedStatus === "pending" ? "No listings waiting for review." : "No approved listings yet."}</p>
                 {stagedStatus === "pending" && (
-                  <a href="/data-hub" className="text-[#4A90E2] hover:underline text-sm">→ Stage listings from Data Hub / Live Listings</a>
+                  <a href="/data-hub" className="text-catalyst-blue hover:underline text-sm">→ Stage listings from Data Hub / Live Listings</a>
                 )}
               </div>
             ) : (

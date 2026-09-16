@@ -76,7 +76,7 @@ export default function SMSOptIn() {
               </p>
             </div>
             <a href="/" className="inline-block">
-              <Button className="bg-[#4A90E2] text-white border-2 border-[#4A90E2] hover:bg-white hover:text-[#4A90E2] transition-colors" data-testid="button-go-home">
+              <Button className="bg-catalyst-blue text-white border-2 border-catalyst-blue hover:bg-white hover:text-catalyst-blue transition-colors" data-testid="button-go-home">
                 Return to Home
               </Button>
             </a>
@@ -207,7 +207,7 @@ export default function SMSOptIn() {
 
           {/* Footer Link */}
           <div className="mt-6 text-center">
-            <a href="/" className="text-sm text-[#4A90E2] hover:underline" data-testid="link-home">
+            <a href="/" className="text-sm text-catalyst-blue hover:underline" data-testid="link-home">
               ← Back to Home
             </a>
           </div>

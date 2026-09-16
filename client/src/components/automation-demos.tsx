@@ -578,7 +578,7 @@ export default function AutomationDemos() {
             <p className="text-sm md:text-base text-gray-200 mb-4 md:mb-6 leading-relaxed">
               <span className="allow-wrap">Join LandLinq and access all submission methods - dashboard, email, and SMS - with professional automation for every deal.</span>
             </p>
-            <a href="#registration" className="inline-flex items-center px-6 md:px-8 py-2 md:py-3 text-base md:text-lg font-semibold bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border-2 border-[#4A90E2] hover:border-[#4A90E2] transition-all duration-300 rounded-md">
+            <a href="#registration" className="inline-flex items-center px-6 md:px-8 py-2 md:py-3 text-base md:text-lg font-semibold bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border-2 border-catalyst-blue hover:border-catalyst-blue transition-all duration-300 rounded-md">
               <span className="allow-wrap">Join LandLinq</span>
             </a>
           </div>

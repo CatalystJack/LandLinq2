@@ -47,7 +47,7 @@ export default function ProductEcosystemDiagram() {
         return (
           <div
             key={index}
-            className={`flex items-center gap-4 p-4 rounded-lg border bg-white transition-all duration-700 ease-out group hover:shadow-lg hover:border-[#4A90E2] cursor-pointer ${
+            className={`flex items-center gap-4 p-4 rounded-lg border bg-white transition-all duration-700 ease-out group hover:shadow-lg hover:border-catalyst-blue cursor-pointer ${
               isAnimated 
                 ? 'opacity-100 translate-x-0' 
                 : 'opacity-0 -translate-x-12'

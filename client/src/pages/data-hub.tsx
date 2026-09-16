@@ -196,7 +196,7 @@ export default function DataHub() {
         title: "Staged for review",
         description: `${l.address} added to your review queue.`,
         action: (
-          <a href="/listing-review" className="text-[#4A90E2] underline text-xs font-medium whitespace-nowrap">
+          <a href="/listing-review" className="text-catalyst-blue underline text-xs font-medium whitespace-nowrap">
             Review now →
           </a>
         ) as any,
@@ -900,7 +900,7 @@ export default function DataHub() {
                       )}
                       <a
                         href="/listing-review"
-                        className="inline-flex items-center gap-1.5 text-sm font-medium text-[#4A90E2] hover:text-[#357abd] border border-[#4A90E2] rounded-md px-3 py-1.5 hover:bg-blue-50 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium text-catalyst-blue hover:text-catalyst-blue border border-catalyst-blue rounded-md px-3 py-1.5 hover:bg-blue-50 transition-colors"
                       >
                         <span>Review Queue</span>
                         <span className="text-xs opacity-70">→</span>
@@ -952,7 +952,7 @@ export default function DataHub() {
                         <SelectItem value="lease">For Lease</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Button onClick={searchLoopNet} disabled={listingSearching} className="bg-[#4A90E2] hover:bg-[#357abd]">
+                    <Button onClick={searchLoopNet} disabled={listingSearching} className="bg-catalyst-blue hover:bg-catalyst-blue">
                       {listingSearching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
                       Search
                     </Button>

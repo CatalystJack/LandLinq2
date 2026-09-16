@@ -439,7 +439,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                <option value="all">Rep: All</option>
                {availableAssignedTo.map((person) => <option key={person} value={person}>{person}</option>)}
              </select>
-             {hasActiveFilters && <button type="button" onClick={clearFilters} className="h-8 rounded-md px-2 text-xs font-medium text-[#4A90E2] hover:bg-[#edf4fa]">Clear filters</button>}
+             {hasActiveFilters && <button type="button" onClick={clearFilters} className="h-8 rounded-md px-2 text-xs font-medium text-catalyst-blue hover:bg-[#edf4fa]">Clear filters</button>}
               {!adminMode && (
                 <>
                   <button
@@ -552,7 +552,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                              <X className="h-3 w-3 shrink-0 text-[#8298a8]" />
                            </button>
                          ))}
-                         {!adminMode && <button type="button" onClick={() => openTagEditor([contact.id], "add")} className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-[#4A90E2] hover:bg-[#edf4fa]"><Plus className="h-3 w-3" />Add</button>}
+                         {!adminMode && <button type="button" onClick={() => openTagEditor([contact.id], "add")} className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-catalyst-blue hover:bg-[#edf4fa]"><Plus className="h-3 w-3" />Add</button>}
                          {!contact.crmTags?.length && adminMode && <span className="text-sm text-[#9aa9b4]">—</span>}
                        </div>
                      </TableCell>

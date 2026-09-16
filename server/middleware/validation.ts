@@ -185,9 +185,9 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' https://replit.com https://i.replit.com",
     "script-src-elem 'self' 'unsafe-inline' https://replit.com https://i.replit.com",
-    "style-src 'self' 'unsafe-inline'",
+     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: https:",
-    "font-src 'self'",
+     "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com",
     "connect-src 'self' ws: wss:",
     "frame-ancestors 'none'"
   ].join('; '));

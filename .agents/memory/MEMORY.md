@@ -43,3 +43,4 @@
 - [Development Passport sessions](development-passport-sessions.md) — development login must use Passport req.login and save the session; hand-written passport user objects cannot be deserialized.
 - [Runtime schema migrations](migration-runner-disabled.md) — the general migration runner is disabled; required new tables need an idempotent startup schema path.
 - [Table scrollbar consolidation](table-scrollbar-consolidation.md) — wide tables need one shared class with a nonzero horizontal scrollbar height; zero-height WebKit scrollbars hide usable overflow.
+- [Google font CSP allowlist](google-font-csp.md) — font links need every active CSP middleware path to allow both the stylesheet and font hosts.

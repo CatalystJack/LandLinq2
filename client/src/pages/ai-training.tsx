@@ -104,7 +104,7 @@ function EditableList({ items, onSave, color }: { items: string[]; onSave: (item
           placeholder="One item per line"
         />
         <div className="flex gap-2">
-          <Button size="sm" className="h-7 text-xs bg-[#4A90E2] hover:bg-[#357ABD] text-white" onClick={() => {
+          <Button size="sm" className="h-7 text-xs bg-catalyst-blue hover:bg-catalyst-blue text-white" onClick={() => {
             onSave(editText.split("\n").map(s => s.trim()).filter(Boolean));
             setEditing(false);
           }}>
@@ -215,7 +215,7 @@ function MentionCard({ mention, deals, onUpdate }: { mention: DealMention; deals
               <Badge className={decisionColors[mention.teamDecision || ""] || "bg-gray-100 text-gray-700"}>
                 {mention.teamDecision ? DECISION_OPTIONS.find(o => o.value === mention.teamDecision)?.label || mention.teamDecision : "Not set"}
               </Badge>
-              <Button size="sm" variant="ghost" className="h-6 text-xs text-gray-500 hover:text-[#4A90E2]" onClick={() => setEditingDecision(true)}>
+              <Button size="sm" variant="ghost" className="h-6 text-xs text-gray-500 hover:text-catalyst-blue" onClick={() => setEditingDecision(true)}>
                 <Edit size={12} />
               </Button>
             </div>
@@ -272,7 +272,7 @@ function MentionCard({ mention, deals, onUpdate }: { mention: DealMention; deals
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm font-medium text-gray-600">Decision Rationale:</span>
             {!editingRationale && (
-              <Button size="sm" variant="ghost" className="h-6 text-xs text-gray-500 hover:text-[#4A90E2]" onClick={() => setEditingRationale(true)}>
+              <Button size="sm" variant="ghost" className="h-6 text-xs text-gray-500 hover:text-catalyst-blue" onClick={() => setEditingRationale(true)}>
                 <Edit size={12} className="mr-1" /> Edit
               </Button>
             )}
@@ -286,7 +286,7 @@ function MentionCard({ mention, deals, onUpdate }: { mention: DealMention; deals
                 placeholder="Why did the team make this decision?"
               />
               <div className="flex gap-2">
-                <Button size="sm" className="h-7 text-xs bg-[#4A90E2] hover:bg-[#357ABD] text-white" onClick={() => {
+                <Button size="sm" className="h-7 text-xs bg-catalyst-blue hover:bg-catalyst-blue text-white" onClick={() => {
                   onUpdate(mention.id, { decisionRationale: rationale });
                   setEditingRationale(false);
                 }}>
@@ -457,7 +457,7 @@ export default function AITraining() {
             </div>
             <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-[#4A90E2] hover:bg-[#07172A]">
+                <Button className="bg-catalyst-blue hover:bg-[#07172A]">
                   <Plus className="h-4 w-4 mr-2" />
                   Upload Transcript
                 </Button>
@@ -542,7 +542,7 @@ export default function AITraining() {
                     <Button type="button" variant="outline" onClick={() => setIsUploadOpen(false)}>
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={uploadMutation.isPending} className="bg-[#4A90E2] hover:bg-[#07172A]">
+                    <Button type="submit" disabled={uploadMutation.isPending} className="bg-catalyst-blue hover:bg-[#07172A]">
                       {uploadMutation.isPending ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -564,7 +564,7 @@ export default function AITraining() {
           {selectedTranscript && selectedTranscriptData ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" className="text-[#4A90E2] hover:bg-blue-50" onClick={() => setSelectedTranscript(null)}>
+                <Button variant="ghost" className="text-catalyst-blue hover:bg-blue-50" onClick={() => setSelectedTranscript(null)}>
                   <ArrowLeft size={16} className="mr-1" /> Back to Transcripts
                 </Button>
               </div>
@@ -660,7 +660,7 @@ export default function AITraining() {
                         <p className="text-gray-500 mb-4">
                           Upload your first pipeline review transcript to start training the AI
                         </p>
-                        <Button onClick={() => setIsUploadOpen(true)} className="bg-[#4A90E2] hover:bg-[#07172A]">
+                        <Button onClick={() => setIsUploadOpen(true)} className="bg-catalyst-blue hover:bg-[#07172A]">
                           <Plus className="h-4 w-4 mr-2" />
                           Upload Transcript
                         </Button>

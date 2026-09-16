@@ -440,7 +440,7 @@ export function xssProtection(req: Request, res: Response, next: NextFunction) {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'X-XSS-Protection': '1; mode=block',
-    'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://replit.com https://i.replit.com; script-src-elem 'self' 'unsafe-inline' https://replit.com https://i.replit.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: ws: wss:; media-src 'self'; object-src 'none'; frame-src https://www.google.com; child-src https://www.google.com; worker-src 'self'; manifest-src 'self';",
+    'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://replit.com https://i.replit.com; script-src-elem 'self' 'unsafe-inline' https://replit.com https://i.replit.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https: ws: wss:; media-src 'self'; object-src 'none'; frame-src https://www.google.com; child-src https://www.google.com; worker-src 'self'; manifest-src 'self';",
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
   });
