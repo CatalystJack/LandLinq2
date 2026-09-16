@@ -1,0 +1,23 @@
+Roll out the same design-system consistency pass already applied to the developer/investment-company pages to the admin-facing pages. This assumes the shared PageHeader component (client/src/components/ui/page-header.tsx) and the Button component fixes (xs size, iconSm size, hover text-color fix on the outline and white variants) already exist — if they don't yet, apply that foundation work first (see the earlier prompt that created page-header.tsx and fixed button.tsx).
+
+Apply PageHeader + consistent Button usage to these admin pages:
+
+- client/src/pages/executive-dashboard.tsx (the "Platform Dashboard" / System-Wide view)
+- client/src/pages/admin-dashboard.tsx
+- client/src/pages/admin-investment-companies.tsx
+- client/src/pages/admin-sales-pipeline.tsx
+- client/src/pages/database-management.tsx
+- client/src/pages/api-keys-admin.tsx
+- client/src/pages/api-monitoring.tsx
+- client/src/pages/user-management.tsx
+- client/src/pages/developer-user-management.tsx
+- client/src/pages/partner-brokers-admin.tsx
+- client/src/pages/partner-developers-admin.tsx
+
+For each page, same rules as before:
+1. Replace the page's top-level hand-rolled title block (the <h1> plus any subtitle text and header-row action buttons like "Manage Partners" / "Refresh" / "All Deal Pipeline") with <PageHeader title="..." description="..." actions={...} />, moving existing action buttons into the actions prop. Keep existing copy exactly as-is.
+2. Convert any button using one-off className height/padding overrides (h-7, h-8, h-9, custom px-*) to the Button component's size prop (xs, sm, icon, iconSm) instead, matching current visual size as closely as possible.
+3. Convert any raw <button> elements to <Button> with the closest matching variant/size, preserving onClick handlers and content exactly.
+4. Leave the small tab toggle control (e.g. "LandLinq Overview" / "System-Wide" on the Platform Dashboard) as-is unless it's using a raw <button> — if so, convert it to Button with variant="outline" or variant="ghost" depending on which one looks closer to its current unselected/selected styling.
+
+Don't touch business logic, data fetching, or any non-visual behavior. Don't touch pages outside this list.
