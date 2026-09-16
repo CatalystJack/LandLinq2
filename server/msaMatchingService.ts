@@ -18,7 +18,7 @@ const STATE_ABBREVIATIONS: Record<string, string> = {
 };
 
 // Normalize state to 2-letter abbreviation
-function normalizeState(state: string): string {
+export function normalizeState(state: string): string {
   if (!state) return '';
   const trimmed = state.trim();
   

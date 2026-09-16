@@ -1,0 +1,18 @@
+Fix the developer assistant chat ("Truss") throwing "The assistant could not answer that question" on questions that require counting or filtering deals by state (e.g. "how many deals are in north carolina").
+
+1. In server/aiEmailParser.ts, answerDeveloperAssistantQuestion (around line 303-321): raise max_completion_tokens from 500 to 1200, matching the headroom already given to planDeveloperAssistantQuestion just above it in this file. Add a comment above it: "// GPT-5 spends completion tokens on reasoning (e.g. counting items) before writing the answer text — keep headroom or content comes back empty." This is the direct cause of the crash: a counting question burns the 500-token budget on reasoning, content comes back empty, and the empty-answer check on the next lines throws, which the route's catch block turns into the generic error.
+
+2. In server/routes.ts, in the /api/developer-profile/me/assistant/query handler, when tool === "getMyDeals" and the result is an array, pass { items: result, count: result.length } as the result into answerDeveloperAssistantQuestion instead of the raw array. This means the model can read the count directly instead of re-deriving it by reasoning over the array, which both reduces token pressure and makes count answers reliably correct. Do this for getMyContacts too (pass { items: result, count: result.length }).
+
+3. In server/msaMatchingService.ts, export the existing normalizeState function (around line 21) instead of leaving it module-private — change "function normalizeState" to "export function normalizeState".
+
+4. In server/developerAssistantData.ts, getMyDeals currently filters by a single generic "search" string that does a LIKE against address/city/state combined (around line 60-66). Add a new optional "state" filter to MyDealFilters: {status?: string; search?: string; state?: string; limit?: number}. Import normalizeState from ./msaMatchingService, and when filters.state is provided, normalize it to its 2-letter abbreviation and add "AND UPPER(COALESCE(d.state, '')) = ${normalizedState}" to the WHERE clause (as its own condition, not mixed into the search LIKE). Keep the existing search behavior unchanged for when state isn't provided.
+
+5. In server/aiEmailParser.ts, planDeveloperAssistantQuestion's system prompt (around line 235), update the getMyDeals tool documentation from:
+   "- getMyDeals: args {status?: "Pursuing"|"Passed"|"Review", search?: string}"
+   to:
+   "- getMyDeals: args {status?: "Pursuing"|"Passed"|"Review", search?: string, state?: string} — use state for questions about deals in a specific state (full name or abbreviation both fine, e.g. "north carolina" or "NC"); use search only for address/city text matching."
+
+6. In server/routes.ts, in the same handler where args.status and args.search are currently read for the getMyDeals case (around line 14672-14678), also read args.state the same way (typeof args.state === "string" ? args.state.trim().slice(0, 100) : undefined) and pass it through to getMyDeals as the new state filter.
+
+After these changes, "how many deals are in north carolina" should route to getMyDeals with state: "north carolina", get normalized to NC server-side, return a pre-counted result, and the answer step should have enough token headroom to actually respond. Don't change any other assistant tools or the action-confirmation flow.

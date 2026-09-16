@@ -238,7 +238,7 @@ export async function planDeveloperAssistantQuestion(
         content: `You route a read-only Investment Company assistant question to one safe server function, or identify one safe action that requires confirmation.
 Never invent IDs, names, or values. Use only IDs from the supplied tenant-scoped context.
 Read tools:
-- getMyDeals: args {status?: "Pursuing"|"Passed"|"Review", search?: string}
+- getMyDeals: args {status?: "Pursuing"|"Passed"|"Review", search?: string, state?: string} — use state for questions about deals in a specific state (full name or abbreviation both fine, e.g. "north carolina" or "NC"); use search only for address/city text matching.
 - getMyDealCount: args {status?: "Pursuing"|"Passed"|"Review", search?: string}
 - getMyPipelineSummary: args {}
 - getMyContacts: args {search?: string}
@@ -340,7 +340,8 @@ ${JSON.stringify({ tool, result })}`,
       },
       { role: "user", content: question },
     ],
-    max_completion_tokens: 500,
+    // GPT-5 spends completion tokens on reasoning (e.g. counting items) before writing the answer text — keep headroom or content comes back empty.
+    max_completion_tokens: 1200,
   });
   const answer = response.choices[0]?.message?.content?.trim();
   if (!answer) throw new Error("Empty assistant answer");

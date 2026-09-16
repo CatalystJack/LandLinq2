@@ -5,6 +5,7 @@ import { haversineMiles } from "./automatedDealEmailPipeline";
 export type MyDealFilters = {
   status?: string;
   search?: string;
+  state?: string;
   limit?: number;
 };
 
