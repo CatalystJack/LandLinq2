@@ -14684,7 +14684,9 @@ RULES:
             ? requestedStatus
             : undefined;
           const search = typeof args.search === "string" ? args.search.trim().slice(0, 200) : undefined;
-          result = await getMyDeals(developerProfileId, { status, search, limit: 100 });
+          const state = typeof args.state === "string" ? args.state.trim().slice(0, 100) : undefined;
+          const deals = await getMyDeals(developerProfileId, { status, search, state, limit: 100 });
+          result = Array.isArray(deals) ? { items: deals, count: deals.length } : deals;
           break;
         }
          case "getMyDealCount": {
@@ -14705,7 +14707,8 @@ RULES:
           break;
         case "getMyContacts": {
           const search = typeof args.search === "string" ? args.search.trim().slice(0, 200) : "";
-          result = await getMyContacts(developerProfileId, search);
+          const contacts = await getMyContacts(developerProfileId, search);
+          result = Array.isArray(contacts) ? { items: contacts, count: contacts.length } : contacts;
           break;
         }
          case "getMyContactCount": {

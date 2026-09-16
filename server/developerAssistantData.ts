@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { haversineMiles } from "./automatedDealEmailPipeline";
+import { normalizeState } from "./msaMatchingService";
 
 export type MyDealFilters = {
   status?: string;
@@ -36,6 +37,7 @@ function normalizeStatus(status: unknown): string | null {
 export async function getMyDeals(developerProfileId: string, filters: MyDealFilters = {}) {
   const status = normalizeStatus(filters.status);
   const search = String(filters.search || "").trim();
+  const state = filters.state ? normalizeState(String(filters.state).trim()) : "";
   const limit = Math.min(Math.max(Number(filters.limit) || 50, 1), 100);
   const result = await db.execute(sql`
     WITH visible_deals AS (
@@ -62,6 +64,7 @@ export async function getMyDeals(developerProfileId: string, filters: MyDealFilt
         pds.developer_profile_id = ${developerProfileId}
         OR (pds.developer_profile_id IS NULL AND pd.developer_profile_id = ${developerProfileId})
       )
+        AND (${state === ""} OR UPPER(COALESCE(d.state, '')) = ${state})
       ORDER BY d.id, pds.matched_at DESC NULLS LAST, pd.created_at DESC NULLS LAST
     )
     SELECT id, address, city, state, source_status, developer_status,
