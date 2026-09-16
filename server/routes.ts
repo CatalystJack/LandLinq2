@@ -45,8 +45,9 @@ import {
   outreachSenders,
   emailIntakeQueue,
   propertyData,
+  dealShareTokens,
 } from "@shared/schema";
-import { or, like, ilike, eq, ne, desc, asc, gte, lte, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
+import { or, like, ilike, eq, ne, desc, asc, gte, lte, gt, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
 import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
@@ -2859,12 +2860,14 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       '/company',
       '/unsubscribe',
       '/sms-opt-in',
+      '/shared-deal',
     ];
     const isPublicPath =
       publicPaths.includes(req.path) ||
       /^\/developer\/[^/]+\/login$/.test(req.path) ||
       req.path === '/deals' ||
-      req.path.startsWith('/deals/');
+      req.path.startsWith('/deals/') ||
+      req.path.startsWith('/shared-deal/');
 
     if (isPublicPath) return next();
 
@@ -8111,11 +8114,19 @@ Provide your analysis in this exact JSON format:
       const token = randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       const userId = req.user?.id || req.user?.claims?.sub || null;
-      await db.execute(sql`
-        INSERT INTO deal_share_tokens (token, deal_id, created_by, expires_at)
-        VALUES (${token}, ${id}, ${userId}, ${expiresAt})
-      `);
-      return res.status(201).json({ token, expiresAt: expiresAt.toISOString() });
+      const [createdToken] = await db.insert(dealShareTokens).values({
+        token,
+        dealId: id,
+        createdBy: userId,
+        expiresAt,
+      }).returning({
+        token: dealShareTokens.token,
+        expiresAt: dealShareTokens.expiresAt,
+      });
+      return res.status(201).json({
+        token: createdToken.token,
+        expiresAt: createdToken.expiresAt.toISOString(),
+      });
     } catch (error) {
       console.error("Error creating deal share token:", error);
       return res.status(500).json({ message: "Failed to create share link" });
@@ -8180,6 +8191,89 @@ Provide your analysis in this exact JSON format:
     } catch (error) {
       console.error("Error fetching deal:", error);
       res.status(500).json({ message: "Failed to fetch deal" });
+    }
+  });
+
+  // Dedicated public read-only view for seven-day deal share links. This
+  // response intentionally excludes broker contact data, internal notes,
+  // assignments, documents, and analyst-only workflow fields.
+  app.get("/api/shared-deals/:token", async (req, res) => {
+    try {
+      const token = String(req.params.token || "");
+      if (!/^[0-9a-f]{64}$/i.test(token)) {
+        return res.status(404).json({ message: "This link has expired or is invalid" });
+      }
+
+      const [validToken] = await db
+        .select({
+          dealId: dealShareTokens.dealId,
+          expiresAt: dealShareTokens.expiresAt,
+        })
+        .from(dealShareTokens)
+        .where(and(
+          eq(dealShareTokens.token, token),
+          gt(dealShareTokens.expiresAt, new Date()),
+        ))
+        .limit(1);
+
+      if (!validToken) {
+        return res.status(404).json({ message: "This link has expired or is invalid" });
+      }
+
+      const deal = await storage.getDealById(validToken.dealId);
+      if (!deal) {
+        return res.status(404).json({ message: "This link has expired or is invalid" });
+      }
+
+      const property = await storage.getPropertyDataByDealId(validToken.dealId);
+      const analysis = (deal.aiAnalysisData || {}) as Record<string, any>;
+      const rawComparables = Array.isArray(deal.comparablesJson) ? deal.comparablesJson : [];
+      const comparables = rawComparables.slice(0, 10).map((comp: any) => ({
+        propertyName: comp.propertyName || comp.name || comp.address || null,
+        address: comp.address || null,
+        city: comp.city || null,
+        state: comp.state || null,
+        yearBuilt: comp.yearBuilt || null,
+        unitCount: comp.unitCount || comp.units || null,
+        rentPSF: comp.rentPSF ?? comp.rentPerSqFt ?? comp.rentPerSF ?? null,
+        rentPerUnit: comp.rentPerUnit ?? comp.averageRent ?? comp.rent ?? null,
+        distance: comp.distance ?? comp.distanceMiles ?? null,
+      }));
+
+      return res.json({
+        address: deal.address,
+        propertyName: deal.propertyName,
+        city: deal.city,
+        state: deal.state,
+        zip: deal.zip,
+        acreage: deal.sizeAcres,
+        askingPrice: deal.askingPrice,
+        pricePerAcre: (deal as any).pricePerAcre || null,
+        unitCount: deal.unitCount,
+        productTypes: deal.productTypes,
+        zoning: deal.zoning,
+        sewerAvailable: deal.sewerAvailable,
+        rent: {
+          topRentPSF: deal.topRentPSF,
+          avgRentPSF: deal.avgRentPSF,
+          topRentPerUnit: deal.topRentPerUnit,
+          avgRentPerUnit: deal.avgRentPerUnit,
+        },
+        comparableCount: deal.comparableCount || comparables.length,
+        comparableNotes: deal.comparableNotes || null,
+        comparables,
+        environmental: {
+          floodZone: property?.floodZone || analysis.floodZone?.zoneCode || analysis.floodZone?.zone || null,
+          wetlands: property?.wetlands ?? null,
+          wetlandNotes: deal.wetlandNotes || null,
+          soilType: property?.soilType || null,
+          environmentalConstraints: property?.environmentalConstraints || null,
+        },
+        expiresAt: validToken.expiresAt.toISOString(),
+      });
+    } catch (error) {
+      console.error("Error fetching shared deal:", error);
+      return res.status(500).json({ message: "Unable to load this shared deal" });
     }
   });
 

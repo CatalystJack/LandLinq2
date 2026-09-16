@@ -34,6 +34,7 @@ const Privacy = lazy(() => import("@/pages/privacy"));
 const Terms = lazy(() => import("@/pages/terms"));
 const ContactPage = lazy(() => import("@/pages/contact"));
 const DealDetails = lazy(() => import("@/pages/deal-details"));
+const SharedDealPage = lazy(() => import("@/pages/shared-deal"));
 const UnsubscribePage = lazy(() => import("@/pages/unsubscribe"));
 const SMSOptIn = lazy(() => import("@/pages/sms-opt-in"));
 
@@ -148,9 +149,22 @@ function DeveloperHomeEntry() {
 }
 
 function Router() {
+  const [location] = useLocation();
   const { isAuthenticated, isLoading, isInitialized, user, userRole } = useAuth();
   // Automatically scroll to top on route changes
   useScrollToTop();
+
+  // Shared deal links are public even when the browser also has an
+  // authenticated session. Keep them outside every role-specific route table.
+  if (location.startsWith("/shared-deal/")) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <Switch>
+          <Route path="/shared-deal/:token" component={SharedDealPage} />
+        </Switch>
+      </Suspense>
+    );
+  }
 
   // Resolve authentication before selecting any role-specific route table.
   // Without this guard, a direct visit to /developer/dashboard can briefly

@@ -37,7 +37,8 @@ import {
   ChevronLeft,
   List,
   Upload,
-  Loader2
+  Loader2,
+  Link as LinkIcon
 } from "lucide-react";
 
 interface DealWithBroker extends Deal {
@@ -60,6 +61,7 @@ export default function DealDetails() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [showIntakeBody, setShowIntakeBody] = useState(false);
   const shareToken = new URLSearchParams(window.location.search).get("token");
 
@@ -121,7 +123,8 @@ export default function DealDetails() {
   const nextDeal = currentIndex < allDeals.length - 1 ? allDeals[currentIndex + 1] : null;
 
   const handleShareDeal = async () => {
-    if (!deal) return;
+    if (!deal || !id || isSharing) return;
+    setIsSharing(true);
     try {
       const response = await fetch(`/api/deals/${id}/share`, {
         method: "POST",
@@ -130,29 +133,20 @@ export default function DealDetails() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || "Could not create share link");
-      const shareUrl = `${window.location.origin}/deals/${id}?token=${encodeURIComponent(payload.token)}`;
-    
-    // Create formatted email
-    const subject = `Investment Opportunity: ${deal.address}`;
-    const body = `Hi,
-
-I wanted to share this land development opportunity with you:
-
-📍 Property: ${deal.address}
-💰 Price: ${formatPrice(deal.askingPrice)}
-📏 Size: ${deal.sizeAcres || 'N/A'} Acres
-${deal.classification === 'green' ? '✅ Status: Pursuing' : deal.classification === 'yellow' ? '⏱️ Status: Under Review' : ''}
-
-View full details here:
-${shareUrl}
-
-Best regards`;
-
-    // Open email client with pre-filled content
-    const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.location.href = mailtoLink;
+      const shareUrl = `${window.location.origin}/shared-deal/${encodeURIComponent(payload.token)}`;
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: "Share link copied",
+        description: "Anyone with this link can view the read-only deal summary for 7 days.",
+      });
     } catch (error: any) {
-      toast({ title: "Could not share deal", description: error.message, variant: "destructive" });
+      toast({
+        title: "Could not share deal",
+        description: error.message || "Unable to create or copy the share link.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -699,10 +693,11 @@ Best regards`;
                     onClick={handleShareDeal}
                     variant="outline"
                     size="sm"
+                    disabled={isSharing}
                     data-testid="button-share"
                   >
-                    <Mail className="mr-2" size={16} />
-                    Share via Email
+                    <LinkIcon className="mr-2" size={16} />
+                    {isSharing ? "Creating link..." : "Share"}
                   </Button>
                   <Button
                     onClick={generateDealSummaryPdf}
