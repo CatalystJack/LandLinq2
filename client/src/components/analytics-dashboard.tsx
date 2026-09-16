@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, MapPin, DollarSign, Calendar, PieChart, AlertCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, MapPin, DollarSign, Calendar, PieChart, AlertCircle, Settings2 } from "lucide-react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -269,19 +269,33 @@ export default function AnalyticsDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Bar data={pipelineData} options={{
-              responsive: true,
-              plugins: {
-                legend: {
-                  display: false,
+            {analyticsData.pipelineValue?.length ? (
+              <Bar data={pipelineData} options={{
+                responsive: true,
+                plugins: {
+                  legend: {
+                    display: false,
+                  }
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                  }
                 }
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                }
-              }
-            }} />
+              }} />
+            ) : (
+              <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-catalyst-gray-200 px-6 text-center">
+                <div className="mb-3 rounded-full bg-catalyst-blue/10 p-3 text-catalyst-blue">
+                  <Settings2 className="h-6 w-6" />
+                </div>
+                <p className="text-sm font-semibold text-catalyst-navy">No pipeline stages configured yet.</p>
+                {typeof window !== "undefined" && window.location.pathname.startsWith("/developer") && (
+                  <a href="/developer/pipeline" className="mt-2 text-sm font-medium text-catalyst-blue hover:underline">
+                    Configure pipeline stages
+                  </a>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 

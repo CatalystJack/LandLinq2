@@ -10,10 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { useAuth } from "@/hooks/useAuth";
+import { Cell, Pie, PieChart as RechartsPieChart } from "recharts";
 import {
-  Activity, BriefcaseBusiness, Building, DollarSign, Download, Filter, MapPin,
-  PieChart, Shield, Target, TrendingUp, Users, Zap,
+  Activity, ArrowDownRight, ArrowUpRight, BriefcaseBusiness, Building, DollarSign, Download, Filter, MapPin,
+  PieChart, Shield, Target, TrendingUp, Users, Zap, Settings2,
 } from "lucide-react";
 
 interface Deal {
@@ -56,6 +58,13 @@ async function loadAnalytics(): Promise<AnalyticsData> {
   if (!response.ok) throw new Error("Failed to load analytics");
   return response.json();
 }
+
+const analyticsCardClass = "rounded-2xl border-slate-200 bg-white shadow-sm";
+const statusChartConfig = {
+  Passed: { label: "Passed", color: "#ef4444" },
+  Review: { label: "Review", color: "#f59e0b" },
+  Pursuing: { label: "Pursuing", color: "#22c55e" },
+};
 
 export default function DeveloperAnalytics() {
   const { isAuthenticated, user } = useAuth();
@@ -161,26 +170,106 @@ export default function DeveloperAnalytics() {
           </div>
         </div>
 
-        <div className="section-gap-md grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="section-gap-md grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[
             ["Total Deals", analytics.totalDeals, "Based on filtered data", Building],
             ["Total Pipeline Value", `$${(analytics.totalValue / 1000000).toFixed(1)}M`, "Based on filtered data", DollarSign],
             ["Avg Deal Size", `$${(analytics.avgDealSize / 1000000).toFixed(1)}M`, "Based on filtered data", Target],
             ["Conversion Rate", `${analytics.conversionRate.toFixed(1)}%`, "Pursuing / total deals", TrendingUp],
-         ].map(([label, value, help, Icon]) => <Card key={String(label)}><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-catalyst-gray-500">{label}</p><p className="font-serif text-4xl font-normal text-catalyst-navy">{value}</p><p className="mt-1 text-xs text-catalyst-gray-500">{help}</p></div><Icon className="h-8 w-8 text-catalyst-gray-400" /></div></CardContent></Card>)}
+          ].map(([label, value, help, Icon]) => (
+            <Card key={String(label)} className={`${analyticsCardClass} overflow-hidden`}>
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">{label}</p>
+                    <p className="mt-2 text-3xl font-bold tracking-tight text-[#081729]">{value}</p>
+                    <p className="mt-1 text-xs text-slate-400">{help}</p>
+                  </div>
+                  <div className="rounded-xl bg-[#498EDE]/15 p-3 text-[#498EDE]">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4"><TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="markets">Markets</TabsTrigger><TabsTrigger value="brokers">Brokers</TabsTrigger><TabsTrigger value="trends">Trends</TabsTrigger></TabsList>
           <TabsContent value="overview" className="space-y-6"><div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card><CardHeader><CardTitle className="flex items-center gap-2"><PieChart className="h-5 w-5" />Deal Status Distribution</CardTitle></CardHeader><CardContent className="space-y-4">{analytics.statusBreakdown.map((item) => <div key={item.status} className="flex items-center justify-between"><div className="flex items-center gap-3"><div className={`h-3 w-3 rounded-full ${item.status === "Pursuing" ? "bg-green-500" : item.status === "Passed" ? "bg-red-500" : "bg-yellow-500"}`} /><span className="text-sm font-medium">{item.status}</span></div><div className="text-right"><div className="text-sm font-bold">{item.count}</div><div className="text-xs text-gray-500">{item.percentage.toFixed(1)}%</div></div></div>)}</CardContent></Card>
-             <Card><CardHeader><CardTitle className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5" />Pipeline Stages This Month</CardTitle></CardHeader><CardContent className="space-y-3">{(data?.pipelineStageBreakdown || []).length ? (data?.pipelineStageBreakdown || []).map((item) => <div key={item.stage} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"><span className="text-sm font-medium">{item.stage}</span><Badge variant="outline">{item.count}</Badge></div>) : <p className="text-sm text-slate-500">No pipeline stages configured yet.</p>}</CardContent></Card>
-            <Card><CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5" />Key Performance Metrics</CardTitle></CardHeader><CardContent className="space-y-4">{analytics.marketInsights.map((item) => <div key={item.metric} className="flex items-center justify-between rounded-lg bg-gray-50 p-3"><div><div className="text-sm font-medium">{item.metric}</div><div className="text-xs text-gray-500">{item.description}</div></div><div className="text-right"><div className="text-lg font-bold">{item.value}</div><div className="flex items-center gap-1 text-xs text-gray-500"><TrendingUp className="h-3 w-3" />{Math.abs(item.trend)}%</div></div></div>)}</CardContent></Card>
-          </div><Card><CardHeader><CardTitle>Advanced Analytics Dashboard</CardTitle></CardHeader><CardContent><AnalyticsDashboard dataOverride={data?.advancedDashboard} allowFetch={false} /></CardContent></Card>
-          <Card><CardHeader><CardTitle>Outreach Engagement</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">{[["Sent", outreach.sent], ["Opens", outreach.opens], ["Clicks", outreach.clicks], ["Replies", outreach.replies]].map(([label, value]) => <div key={String(label)} className="rounded-lg bg-gray-50 p-4"><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold">{value}</p></div>)}</CardContent></Card></TabsContent>
-          <TabsContent value="markets"><Card><CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />Market Heat Map</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-6 lg:grid-cols-2"><div><h3 className="mb-4 text-lg font-semibold">Top Markets by Volume</h3>{analytics.cityDistribution.slice(0, 8).map((city, index) => <div key={city.city} className="mb-3 flex items-center justify-between rounded-lg bg-gray-50 p-3"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-catalyst-blue text-sm font-bold text-white">{index + 1}</div><div><div className="font-medium">{city.city}</div><div className="text-sm text-gray-500">{city.count} deals</div></div></div><div className="text-right font-bold">${(city.avgValue / 1000000).toFixed(1)}M</div></div>)}</div><div className="space-y-4"><h3 className="text-lg font-semibold">Market Activity Trends</h3>{["High Growth Markets", "Emerging Opportunities", "Market Saturation"].map((item, index) => <div key={item} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"><div className="mb-2 flex items-center justify-between"><span className="font-medium">{item}</span><Badge variant="secondary">{index === 0 ? "Active" : index === 1 ? "Watch" : "Caution"}</Badge></div><p className="text-sm text-gray-600">Based on your current deal flow data</p></div>)}</div></CardContent></Card></TabsContent>
-          <TabsContent value="brokers"><Card><CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" />Broker Performance Analytics</CardTitle></CardHeader><CardContent><div className="table-scroll-container"><table className="w-full"><thead><tr className="border-b"><th className="px-4 py-3 text-left">Broker</th><th className="px-4 py-3 text-left">Deals</th><th className="px-4 py-3 text-left">Total Value</th><th className="px-4 py-3 text-left">Avg Deal Size</th></tr></thead><tbody>{analytics.brokerPerformance.map((broker) => <tr key={broker.broker} className="border-b"><td className="px-4 py-3 font-medium">{broker.broker}</td><td className="px-4 py-3"><Badge variant="outline">{broker.deals}</Badge></td><td className="px-4 py-3 font-semibold">${(broker.totalValue / 1000000).toFixed(1)}M</td><td className="px-4 py-3">${((broker.totalValue / broker.deals) / 1000000).toFixed(1)}M</td></tr>)}</tbody></table></div></CardContent></Card></TabsContent>
-          <TabsContent value="trends"><Card><CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5" />Market Trends & Forecasting</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-6 md:grid-cols-3">{[["Deal Velocity", `${analytics.totalDeals} deals`, "Total deals processed", Zap], ["Price Trends", `$${(analytics.avgDealSize / 1000000).toFixed(1)}M`, "Based on deal data analysis", DollarSign], ["Success Rate", `${analytics.conversionRate.toFixed(1)}%`, "Deals conversion rate", Target]].map(([label, value, help, Icon]) => <div key={String(label)} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"><div className="mb-3 flex items-center gap-2"><Icon className="h-5 w-5 text-blue-600" /><h3 className="font-semibold">{label}</h3></div><p className="mb-1 text-2xl font-bold">{value}</p><p className="text-sm text-gray-600">{help}</p></div>)}</CardContent></Card></TabsContent>
+             <Card className={analyticsCardClass}>
+               <CardHeader><CardTitle className="flex items-center gap-2 text-[#081729]"><PieChart className="h-5 w-5 text-[#498EDE]" />Deal Status Distribution</CardTitle></CardHeader>
+               <CardContent className="pt-0">
+                 {analytics.statusBreakdown.length === 0 ? (
+                   <div className="flex min-h-64 items-center justify-center rounded-xl border border-dashed border-slate-200 text-sm text-slate-500">No deal status data available for this view.</div>
+                 ) : (
+                   <>
+                     <ChartContainer config={statusChartConfig} className="mx-auto h-[220px] w-full max-w-[300px] aspect-auto">
+                       <RechartsPieChart>
+                         <ChartTooltip cursor={false} content={<ChartTooltipContent nameKey="status" hideLabel />} />
+                         <Pie data={analytics.statusBreakdown} dataKey="count" nameKey="status" innerRadius={62} outerRadius={88} paddingAngle={3} strokeWidth={2} stroke="#ffffff">
+                           {analytics.statusBreakdown.map((item) => (
+                             <Cell key={item.status} fill={statusChartConfig[item.status as keyof typeof statusChartConfig]?.color || "#498EDE"} />
+                           ))}
+                         </Pie>
+                       </RechartsPieChart>
+                     </ChartContainer>
+                     <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                       {analytics.statusBreakdown.map((item) => (
+                         <div key={item.status} className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2">
+                           <div className="flex items-center gap-2">
+                             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: statusChartConfig[item.status as keyof typeof statusChartConfig]?.color || "#498EDE" }} />
+                             <span className="truncate text-xs font-medium text-slate-600">{item.status}</span>
+                           </div>
+                           <div className="mt-1 flex items-baseline justify-between gap-2"><span className="text-sm font-bold text-[#081729]">{item.count}</span><span className="text-xs text-slate-400">{item.percentage.toFixed(1)}%</span></div>
+                         </div>
+                       ))}
+                     </div>
+                   </>
+                 )}
+               </CardContent>
+             </Card>
+             <Card className={analyticsCardClass}>
+               <CardHeader><CardTitle className="flex items-center gap-2 text-[#081729]"><BriefcaseBusiness className="h-5 w-5 text-[#498EDE]" />Pipeline Stages This Month</CardTitle></CardHeader>
+               <CardContent className="space-y-3">
+                 {(data?.pipelineStageBreakdown || []).length ? (data?.pipelineStageBreakdown || []).map((item) => (
+                   <div key={item.stage} className="flex items-center justify-between rounded-xl bg-slate-50/80 px-3 py-2"><span className="text-sm font-medium text-slate-700">{item.stage}</span><Badge variant="outline">{item.count}</Badge></div>
+                 )) : (
+                   <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center">
+                     <div className="mb-3 rounded-full bg-[#498EDE]/10 p-3 text-[#498EDE]"><Settings2 className="h-5 w-5" /></div>
+                     <p className="text-sm font-semibold text-[#081729]">No pipeline stages configured yet.</p>
+                     <a href="/developer/pipeline" className="mt-2 text-sm font-medium text-[#498EDE] hover:underline">Configure pipeline stages</a>
+                   </div>
+                 )}
+               </CardContent>
+             </Card>
+             <Card className={analyticsCardClass}>
+               <CardHeader><CardTitle className="flex items-center gap-2 text-[#081729]"><Activity className="h-5 w-5 text-[#498EDE]" />Key Performance Metrics</CardTitle></CardHeader>
+               <CardContent className="pt-0">
+                 {analytics.marketInsights.length === 0 ? (
+                   <div className="flex min-h-64 items-center justify-center rounded-xl border border-dashed border-slate-200 text-sm text-slate-500">No market insights available for this view.</div>
+                 ) : (
+                   <div className="grid gap-3 sm:grid-cols-2">
+                     {analytics.marketInsights.map((item) => {
+                       const isPositive = item.trend >= 0;
+                       const TrendIcon = isPositive ? ArrowUpRight : ArrowDownRight;
+                       return (
+                         <div key={item.metric} className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+                           <div className="flex items-start justify-between gap-3"><p className="text-sm font-semibold text-[#081729]">{item.metric}</p><div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? "text-emerald-600" : "text-red-600"}`}><TrendIcon className="h-4 w-4" />{Math.abs(item.trend)}%</div></div>
+                           <p className="mt-3 text-2xl font-bold tracking-tight text-[#081729]">{item.value}</p>
+                           <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p>
+                         </div>
+                       );
+                     })}
+                   </div>
+                 )}
+               </CardContent>
+             </Card>
+           </div><Card className={analyticsCardClass}><CardHeader><CardTitle className="text-[#081729]">Advanced Analytics Dashboard</CardTitle></CardHeader><CardContent><AnalyticsDashboard dataOverride={data?.advancedDashboard} allowFetch={false} /></CardContent></Card>
+           <Card className={analyticsCardClass}><CardHeader><CardTitle className="text-[#081729]">Outreach Engagement</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">{[["Sent", outreach.sent], ["Opens", outreach.opens], ["Clicks", outreach.clicks], ["Replies", outreach.replies]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-[#081729]">{value}</p></div>)}</CardContent></Card></TabsContent>
+           <TabsContent value="markets"><Card className={analyticsCardClass}><CardHeader><CardTitle className="flex items-center gap-2 text-[#081729]"><MapPin className="h-5 w-5 text-[#498EDE]" />Market Heat Map</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-6 lg:grid-cols-2"><div><h3 className="mb-4 text-lg font-semibold text-[#081729]">Top Markets by Volume</h3>{analytics.cityDistribution.slice(0, 8).map((city, index) => <div key={city.city} className="mb-3 flex items-center justify-between rounded-xl bg-slate-50/80 p-3"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#498EDE] text-sm font-bold text-white">{index + 1}</div><div><div className="font-medium text-slate-800">{city.city}</div><div className="text-sm text-slate-500">{city.count} deals</div></div></div><div className="text-right font-bold text-[#081729]">${(city.avgValue / 1000000).toFixed(1)}M</div></div>)}</div><div className="space-y-4"><h3 className="text-lg font-semibold text-[#081729]">Market Activity Trends</h3>{["High Growth Markets", "Emerging Opportunities", "Market Saturation"].map((item, index) => <div key={item} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="mb-2 flex items-center justify-between"><span className="font-medium text-slate-800">{item}</span><Badge variant="secondary">{index === 0 ? "Active" : index === 1 ? "Watch" : "Caution"}</Badge></div><p className="text-sm text-slate-600">Based on your current deal flow data</p></div>)}</div></CardContent></Card></TabsContent>
+           <TabsContent value="brokers"><Card className={analyticsCardClass}><CardHeader><CardTitle className="flex items-center gap-2 text-[#081729]"><Users className="h-5 w-5 text-[#498EDE]" />Broker Performance Analytics</CardTitle></CardHeader><CardContent><div className="table-scroll-container"><table className="w-full"><thead><tr className="border-b border-slate-200"><th className="px-4 py-3 text-left text-slate-500">Broker</th><th className="px-4 py-3 text-left text-slate-500">Deals</th><th className="px-4 py-3 text-left text-slate-500">Total Value</th><th className="px-4 py-3 text-left text-slate-500">Avg Deal Size</th></tr></thead><tbody>{analytics.brokerPerformance.map((broker) => <tr key={broker.broker} className="border-b border-slate-100"><td className="px-4 py-3 font-medium text-slate-800">{broker.broker}</td><td className="px-4 py-3"><Badge variant="outline">{broker.deals}</Badge></td><td className="px-4 py-3 font-semibold text-[#081729]">${(broker.totalValue / 1000000).toFixed(1)}M</td><td className="px-4 py-3 text-slate-700">${((broker.totalValue / broker.deals) / 1000000).toFixed(1)}M</td></tr>)}</tbody></table></div></CardContent></Card></TabsContent>
+           <TabsContent value="trends"><Card className={analyticsCardClass}><CardHeader><CardTitle className="flex items-center gap-2 text-[#081729]"><TrendingUp className="h-5 w-5 text-[#498EDE]" />Market Trends & Forecasting</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-6 md:grid-cols-3">{[["Deal Velocity", `${analytics.totalDeals} deals`, "Total deals processed", Zap], ["Price Trends", `$${(analytics.avgDealSize / 1000000).toFixed(1)}M`, "Based on deal data analysis", DollarSign], ["Success Rate", `${analytics.conversionRate.toFixed(1)}%`, "Deals conversion rate", Target]].map(([label, value, help, Icon]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="mb-3 flex items-center gap-2"><Icon className="h-5 w-5 text-[#498EDE]" /><h3 className="font-semibold text-[#081729]">{label}</h3></div><p className="mb-1 text-2xl font-bold text-[#081729]">{value}</p><p className="text-sm text-slate-600">{help}</p></div>)}</CardContent></Card></TabsContent>
         </Tabs>
       </div>
 

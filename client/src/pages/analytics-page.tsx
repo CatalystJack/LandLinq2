@@ -10,8 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { useAuth } from "@/hooks/useAuth";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
+import { Cell, Pie, PieChart as RechartsPieChart } from "recharts";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -27,7 +29,9 @@ import {
   Filter,
   Zap,
   Shield,
-  AlertTriangle
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight
 } from "lucide-react";
 
 interface Deal {
@@ -80,6 +84,23 @@ interface EmailIntakePerformance {
   averageOverallConfidence: number | null;
   manualReviewReasons: Array<{ reason: string; count: number }>;
 }
+
+const analyticsCardClass = "rounded-2xl border-slate-200 bg-white shadow-sm";
+
+const statusChartConfig = {
+  high_priority: { label: "High Priority", color: "#22c55e" },
+  unclassified: { label: "Unclassified", color: "#f59e0b" },
+  other: { label: "Other", color: "#ef4444" },
+};
+
+const getStatusChartColor = (status: string) => {
+  if (status === "high_priority") return statusChartConfig.high_priority.color;
+  if (status === "unclassified") return statusChartConfig.unclassified.color;
+  return statusChartConfig.other.color;
+};
+
+const formatStatusLabel = (status: string) =>
+  status.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
 
 export default function AnalyticsPage() {
   const { user, isAuthenticated } = useAuth();
@@ -405,68 +426,56 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Key Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white border-catalyst-gray-200 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-catalyst-gray-500">Total Deals</p>
-                  <p className="text-3xl font-bold text-catalyst-navy">{realTimeAnalytics.totalDeals}</p>
-                  <p className="text-xs text-catalyst-gray-500 mt-1">Based on filtered data</p>
+        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              label: "Total Deals",
+              value: realTimeAnalytics.totalDeals,
+              help: "Based on filtered data",
+              icon: Building,
+              iconClass: "bg-[#498EDE]/15 text-[#498EDE]",
+            },
+            {
+              label: "Total Pipeline Value",
+              value: `$${realTimeAnalytics.totalValue > 0 ? (realTimeAnalytics.totalValue / 1000000).toFixed(1) : "0.0"}M`,
+              help: "Based on filtered data",
+              icon: DollarSign,
+              iconClass: "bg-[#498EDE]/15 text-[#498EDE]",
+            },
+            {
+              label: "Avg Deal Size",
+              value: `$${realTimeAnalytics.avgDealSize > 0 ? (realTimeAnalytics.avgDealSize / 1000000).toFixed(1) : "0.0"}M`,
+              help: "Based on filtered data",
+              icon: Target,
+              iconClass: "bg-[#498EDE]/15 text-[#498EDE]",
+            },
+            {
+              label: "Conversion Rate",
+              value: `${isNaN(realTimeAnalytics.conversionRate) ? "0.0" : realTimeAnalytics.conversionRate.toFixed(1)}%`,
+              help: "Based on filtered data",
+              icon: TrendingUp,
+              iconClass: "bg-[#498EDE]/15 text-[#498EDE]",
+            },
+          ].map(({ label, value, help, icon: Icon, iconClass }) => (
+            <Card key={label} className={`${analyticsCardClass} overflow-hidden`}>
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">{label}</p>
+                    <p className="mt-2 text-3xl font-bold tracking-tight text-[#081729]">{value}</p>
+                    <p className="mt-1 text-xs text-slate-400">{help}</p>
+                  </div>
+                  <div className={`rounded-xl p-3 ${iconClass}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
                 </div>
-                <Building className="h-8 w-8 text-catalyst-gray-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border-catalyst-gray-200 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-catalyst-gray-500">Total Pipeline Value</p>
-                  <p className="text-3xl font-bold text-catalyst-navy">
-                    ${realTimeAnalytics.totalValue > 0 ? (realTimeAnalytics.totalValue / 1000000).toFixed(1) : '0.0'}M
-                  </p>
-                  <p className="text-xs text-catalyst-gray-500 mt-1">Based on filtered data</p>
-                </div>
-                <DollarSign className="h-8 w-8 text-catalyst-gold" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border-catalyst-gray-200 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-catalyst-gray-500">Avg Deal Size</p>
-                  <p className="text-3xl font-bold text-catalyst-navy">
-                    ${realTimeAnalytics.avgDealSize > 0 ? (realTimeAnalytics.avgDealSize / 1000000).toFixed(1) : '0.0'}M
-                  </p>
-                  <p className="text-xs text-catalyst-gray-500 mt-1">Based on filtered data</p>
-                </div>
-                <Target className="h-8 w-8 text-catalyst-gray-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border-catalyst-gray-200 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-catalyst-gray-500">Conversion Rate</p>
-                  <p className="text-3xl font-bold text-catalyst-navy">
-                    {isNaN(realTimeAnalytics.conversionRate) ? '0.0' : realTimeAnalytics.conversionRate.toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-catalyst-gray-500 mt-1">Based on filtered data</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-catalyst-gray-400" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Email Intake Performance */}
-        {isPlatformAdmin && <Card className="mb-8 bg-white border-catalyst-gray-200 shadow-sm" data-testid="card-email-intake-performance">
+        {isPlatformAdmin && <Card className={`${analyticsCardClass} mb-8`} data-testid="card-email-intake-performance">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-catalyst-gold" />
@@ -561,72 +570,106 @@ export default function AnalyticsPage() {
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Status Distribution */}
-              <Card>
+              <Card className={analyticsCardClass}>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <PieChart className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-[#081729]">
+                    <PieChart className="h-5 w-5 text-[#498EDE]" />
                     Deal Status Distribution
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {realTimeAnalytics.statusBreakdown.map((item, index) => (
-                      <div key={item.status} className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-3 h-3 rounded-full ${
-                            item.status === 'high_priority' ? 'bg-green-500' :
-                            item.status === 'unclassified' ? 'bg-yellow-500' : 'bg-red-500'
-                          }`} />
-                          <span className="text-sm font-medium capitalize">
-                            {item.status.replace('_', ' ')}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-bold">{item.count}</div>
-                          <div className="text-xs text-gray-500">{item.percentage.toFixed(1)}%</div>
-                        </div>
+                <CardContent className="pt-0">
+                  {realTimeAnalytics.statusBreakdown.length === 0 ? (
+                    <div className="flex min-h-64 items-center justify-center rounded-xl border border-dashed border-slate-200 text-sm text-slate-500">
+                      No deal status data available for this view.
+                    </div>
+                  ) : (
+                    <>
+                      <ChartContainer config={statusChartConfig} className="mx-auto h-[220px] w-full max-w-[300px] aspect-auto">
+                        <RechartsPieChart>
+                          <ChartTooltip
+                            cursor={false}
+                            content={<ChartTooltipContent nameKey="status" hideLabel />}
+                          />
+                          <Pie
+                            data={realTimeAnalytics.statusBreakdown}
+                            dataKey="count"
+                            nameKey="status"
+                            innerRadius={62}
+                            outerRadius={88}
+                            paddingAngle={3}
+                            strokeWidth={2}
+                            stroke="#ffffff"
+                          >
+                            {realTimeAnalytics.statusBreakdown.map((item) => (
+                              <Cell key={item.status} fill={getStatusChartColor(item.status)} />
+                            ))}
+                          </Pie>
+                        </RechartsPieChart>
+                      </ChartContainer>
+                      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        {realTimeAnalytics.statusBreakdown.map((item) => (
+                          <div key={item.status} className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: getStatusChartColor(item.status) }}
+                              />
+                              <span className="truncate text-xs font-medium text-slate-600">{formatStatusLabel(item.status)}</span>
+                            </div>
+                            <div className="mt-1 flex items-baseline justify-between gap-2">
+                              <span className="text-sm font-bold text-[#081729]">{item.count}</span>
+                              <span className="text-xs text-slate-400">{item.percentage.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
               {/* Market Insights */}
-              <Card>
+              <Card className={analyticsCardClass}>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-[#081729]">
+                    <Activity className="h-5 w-5 text-[#498EDE]" />
                     Key Performance Metrics
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {realTimeAnalytics.marketInsights.map((insight, index) => (
-                      <div key={`insight-${insight.metric}-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <div className="text-sm font-medium">{insight.metric}</div>
-                          <div className="text-xs text-gray-500">{insight.description}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold">{insight.value}</div>
-                          <div className={`text-xs flex items-center gap-1 ${
-                            insight.trend > 0 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            <TrendingUp className="h-3 w-3" />
-                            {Math.abs(insight.trend)}%
+                <CardContent className="pt-0">
+                  {realTimeAnalytics.marketInsights.length === 0 ? (
+                    <div className="flex min-h-64 items-center justify-center rounded-xl border border-dashed border-slate-200 text-sm text-slate-500">
+                      No market insights available for this view.
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {realTimeAnalytics.marketInsights.map((insight, index) => {
+                        const isPositive = insight.trend >= 0;
+                        const TrendIcon = isPositive ? ArrowUpRight : ArrowDownRight;
+                        return (
+                          <div key={`insight-${insight.metric}-${index}`} className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-sm font-semibold text-[#081729]">{insight.metric}</p>
+                              <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? "text-emerald-600" : "text-red-600"}`}>
+                                <TrendIcon className="h-4 w-4" />
+                                {Math.abs(insight.trend)}%
+                              </div>
+                            </div>
+                            <p className="mt-3 text-2xl font-bold tracking-tight text-[#081729]">{insight.value}</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">{insight.description}</p>
                           </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
 
             {/* Integrated Charts */}
-            <Card>
+            <Card className={analyticsCardClass}>
               <CardHeader>
-                <CardTitle>Advanced Analytics Dashboard</CardTitle>
+                <CardTitle className="text-[#081729]">Advanced Analytics Dashboard</CardTitle>
               </CardHeader>
               <CardContent>
                 <AnalyticsDashboard />
@@ -636,10 +679,10 @@ export default function AnalyticsPage() {
 
           {/* Markets Tab */}
           <TabsContent value="markets" className="space-y-6">
-            <Card>
+            <Card className={analyticsCardClass}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-[#081729]">
+                  <MapPin className="h-5 w-5 text-[#498EDE]" />
                   Market Heat Map
                 </CardTitle>
               </CardHeader>
@@ -709,10 +752,10 @@ export default function AnalyticsPage() {
 
           {/* Brokers Tab */}
           <TabsContent value="brokers" className="space-y-6">
-            <Card>
+            <Card className={analyticsCardClass}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-[#081729]">
+                  <Users className="h-5 w-5 text-[#498EDE]" />
                   Broker Performance Analytics
                 </CardTitle>
               </CardHeader>
@@ -774,10 +817,10 @@ export default function AnalyticsPage() {
 
           {/* Trends Tab */}
           <TabsContent value="trends" className="space-y-6">
-            <Card>
+            <Card className={analyticsCardClass}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-[#081729]">
+                  <TrendingUp className="h-5 w-5 text-[#498EDE]" />
                   Market Trends & Forecasting
                 </CardTitle>
               </CardHeader>

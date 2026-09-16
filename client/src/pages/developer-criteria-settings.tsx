@@ -467,21 +467,47 @@ export default function DeveloperCriteriaSettings() {
               ) : senderQuery.isError ? (
                 <p className="text-sm text-red-600">Unable to load the broker notification sender.</p>
               ) : senderQuery.data?.effectiveSender?.email ? (
-                <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sender address</p>
-                    <p className="mt-1 font-semibold text-slate-900">{senderQuery.data.effectiveSender.email}</p>
-                    <p className="mt-1 text-xs text-slate-500">{senderQuery.data.effectiveSender.name}</p>
+                connectedNotificationSenders.length >= 2 ? (
+                  <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <Label htmlFor="notification-sender-select" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Sender address
+                      </Label>
+                      <Select
+                        value={selectedNotificationSender?.id || ""}
+                        onValueChange={(senderId) => notificationSenderMutation.mutate(senderId)}
+                        disabled={notificationSenderMutation.isPending || !selectedNotificationSender}
+                      >
+                        <SelectTrigger id="notification-sender-select" className="mt-1 bg-white">
+                          <SelectValue placeholder="Select a connected sender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {connectedNotificationSenders.map((sender) => (
+                            <SelectItem key={sender.id} value={sender.id}>
+                              {sender.name} — {sender.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <Badge
-                    variant="secondary"
-                    className={senderQuery.data.effectiveSender.source === "company_outlook"
-                      ? "w-fit bg-emerald-50 text-emerald-700"
-                      : "w-fit bg-amber-50 text-amber-700"}
-                  >
-                    {senderQuery.data.effectiveSender.source === "company_outlook" ? "Outlook connected" : "Platform fallback"}
-                  </Badge>
-                </div>
+                ) : (
+                  <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sender address</p>
+                      <p className="mt-1 font-semibold text-slate-900">{senderQuery.data.effectiveSender.email}</p>
+                      <p className="mt-1 text-xs text-slate-500">{senderQuery.data.effectiveSender.name}</p>
+                    </div>
+                    <Badge
+                      variant="secondary"
+                      className={senderQuery.data.effectiveSender.source === "company_outlook"
+                        ? "w-fit bg-emerald-50 text-emerald-700"
+                        : "w-fit bg-amber-50 text-amber-700"}
+                    >
+                      {senderQuery.data.effectiveSender.source === "company_outlook" ? "Outlook connected" : "Platform fallback"}
+                    </Badge>
+                  </div>
+                )
               ) : (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                   No connected Outlook sender is configured. Connect Outlook in Outreach to enable broker notification delivery from your company mailbox.
@@ -494,9 +520,11 @@ export default function DeveloperCriteriaSettings() {
                     : "No company Outlook sender is configured, so broker notifications currently come from the platform address above."}
                 </p>
               )}
-              <p className="mt-3 text-xs text-slate-500">
-                This is display-only. Manage the connected account from Outreach.
-              </p>
+              {connectedNotificationSenders.length < 2 && (
+                <p className="mt-3 text-xs text-slate-500">
+                  This is display-only. Manage the connected account from Outreach.
+                </p>
+              )}
             </CardContent>
           </Card>
 
