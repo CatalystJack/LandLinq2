@@ -13,10 +13,10 @@ import {
   Users,
 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
-import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
 import Footer from "@/components/footer";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -112,7 +112,7 @@ function TagEditor({
       <div className="mt-2 min-h-10 rounded-md border border-slate-200 bg-white p-2 focus-within:ring-2 focus-within:ring-slate-300">
         <div className="flex flex-wrap gap-1.5">
           {values.map((value) => (
-            <Badge key={value} variant="secondary" className="gap-1 bg-slate-100 text-slate-700">
+            <Badge key={value} variant="outline" className="gap-1 border-catalyst-blue/20 bg-catalyst-blue/10 text-catalyst-navy">
               {value}
               <button
                 type="button"
@@ -433,11 +433,11 @@ export default function DeveloperCriteriaSettings() {
     <div className="min-h-screen bg-slate-50">
       <DeveloperNavigation />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <DeveloperPageHeader
+        <PageHeader
           title={form.profileType === "general_sales" ? "Company settings" : "Acquisition criteria"}
           description={form.profileType === "general_sales" ? `Manage ${form.companyName} team access and account settings.` : `Control how ${form.companyName} evaluates and receives deals.`}
           actions={
-            <Button onClick={save} disabled={saveMutation.isPending} className={developerHeaderButtonClass}>
+            <Button onClick={save} disabled={saveMutation.isPending} style={{ backgroundColor: primaryColor }} className="text-white">
               {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save settings
             </Button>
@@ -445,7 +445,7 @@ export default function DeveloperCriteriaSettings() {
         />
 
         <div className="space-y-6">
-          <Card className="border-slate-200 shadow-sm">
+          <Card className="rounded-2xl border-slate-200 shadow-sm">
             <CardHeader>
               <div className="flex items-start gap-3">
                 <div className="rounded-lg p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>
@@ -536,7 +536,7 @@ export default function DeveloperCriteriaSettings() {
             </CardContent>
           </Card>
 
-          {form.profileType === "real_estate" && <Card className="border-slate-200 shadow-sm">
+          {form.profileType === "real_estate" && <Card className="rounded-2xl border-slate-200 shadow-sm">
             <CardHeader>
               <div className="flex items-start gap-3">
                 <div className="rounded-lg p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}><Settings2 className="h-5 w-5" /></div>
@@ -600,7 +600,7 @@ export default function DeveloperCriteriaSettings() {
                 ) : (
                   <div className="space-y-3">
                     {form.productTypes.map((productType, index) => (
-                      <div key={productType.id || index} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div key={productType.id || index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_auto] lg:items-end">
                           <div>
                             <Label>Product type <span className="text-red-500">*</span></Label>
@@ -647,7 +647,7 @@ export default function DeveloperCriteriaSettings() {
             </CardContent>
           </Card>}
 
-          {form.profileType === "real_estate" && <Card className="border-slate-200 shadow-sm">
+          {form.profileType === "real_estate" && <Card className="rounded-2xl border-slate-200 shadow-sm">
             <CardHeader className="cursor-pointer" onClick={() => setOverridesOpen((open) => !open)}>
               <div className="flex items-center justify-between">
                 <div><CardTitle>Rent minimum overrides</CardTitle><CardDescription>Allow qualifying public programs to bypass rent minimums.</CardDescription></div>
@@ -669,7 +669,7 @@ export default function DeveloperCriteriaSettings() {
             </CardContent>}
           </Card>}
 
-          <Card className="border-slate-200 shadow-sm">
+          <Card className="rounded-2xl border-slate-200 shadow-sm">
             <CardHeader className="cursor-pointer" onClick={() => setTeamOpen((open) => !open)}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3"><div className="rounded-lg bg-slate-100 p-2 text-slate-600"><Users className="h-5 w-5" /></div><div><CardTitle>Team</CardTitle><CardDescription>LandLinq/Apex approves and creates all company accounts.</CardDescription></div></div>
