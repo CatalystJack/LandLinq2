@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
 import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, SlidersHorizontal, Pencil, Plus, X } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
+import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
 import { useAuth } from "@/hooks/useAuth";
@@ -359,24 +360,16 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     <div className="min-h-[100dvh] bg-[#f3f6f9] text-[#172b3d]">
       {adminMode ? <Navigation /> : <DeveloperNavigation />}
       <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
-        <div className="section-gap-md flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-          <div>
-            {adminMode ? (
-              <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: secondaryColor }}>
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: secondaryColor }} /> Relationship management
-              </div>
-            ) : null}
-            <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[#10283b] sm:text-4xl">Company contacts</h1>
-            <p className="mt-2 max-w-xl text-sm text-[#6e8192]">A focused directory for the relationships your team is building across the LandLinq network.</p>
-          </div>
-          <Button
-            onClick={() => setImportOpen(true)}
-            style={{ backgroundColor: primaryColor }}
-            className="h-10 rounded-full border-2 border-transparent px-4 text-white shadow-sm transition-colors hover:!border-[#8CC8FF] hover:!bg-white hover:!text-[#4A90E2]"
-          >
-            <Upload className="mr-2 h-4 w-4" />Import Contacts
-          </Button>
-        </div>
+        <DeveloperPageHeader
+          title="Company contacts"
+          description="A focused directory for the relationships your team is building across the LandLinq network."
+          eyebrow={adminMode ? "Relationship management" : undefined}
+          actions={
+            <Button onClick={() => setImportOpen(true)} className={developerHeaderButtonClass}>
+              <Upload className="mr-2 h-4 w-4" />Import Contacts
+            </Button>
+          }
+        />
 
         <Card className="overflow-hidden rounded-xl border-[#dce5eb] bg-[#fbfcfd] shadow-[0_12px_30px_rgba(25,53,74,0.06)]">
           <div className="flex flex-col gap-4 border-b border-[#e3e9ee] bg-[#f8fafb] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
