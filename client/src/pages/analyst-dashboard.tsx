@@ -6945,18 +6945,19 @@ export default function AnalystDashboard() {
                         {/* Dynamic reorderable columns */}
                         {columnOrder.map(k => renderHeaderCell(k))}
                         <th
-                          className="text-center px-2 py-1 font-semibold text-xs text-gray-700 min-w-[160px] bg-gray-100 z-40 border-l border-gray-200"
+                          className="text-center px-2 py-1 font-semibold text-xs text-gray-700 min-w-[104px] bg-gray-100 z-40 border-l border-gray-200"
                           style={{ position: 'sticky', right: 0, boxShadow: '-6px 0 8px -4px rgba(0,0,0,0.22)' }}
                         >
                           {headerLabel('Actions')}
                         </th>
+                        <th className="min-w-[104px] bg-gray-100" aria-hidden="true" />
                       </tr>
                     </thead>
                     <tbody>
                       {/* Loading State - only show when no cached data */}
                       {isLoading && (
                         <tr>
-                          <td colSpan={ALL_COLUMNS.length + 2} className="p-8 text-center text-gray-500">
+                          <td colSpan={ALL_COLUMNS.length + 3} className="p-8 text-center text-gray-500">
                             <div className="flex items-center justify-center space-x-2">
                               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#4A90E2]"></div>
                               <span>Loading deals...</span>
@@ -7383,7 +7384,7 @@ export default function AnalystDashboard() {
                             <span className="text-xs text-gray-500">--</span>
                           </td>
                           <td
-                            className="p-2 min-w-[160px] border-l border-gray-200 bg-white z-20"
+                            className="p-2 min-w-[104px] border-l border-gray-200 bg-white z-20"
                             style={{ position: 'sticky', right: 0, boxShadow: '-6px 0 8px -4px rgba(0,0,0,0.22)' }}
                           >
                             <div className="flex items-center gap-1 whitespace-nowrap">
@@ -7407,13 +7408,14 @@ export default function AnalystDashboard() {
                               </Button>
                             </div>
                           </td>
+                          <td className="min-w-[104px] bg-white" aria-hidden="true" />
                         </tr>
                       )}
                       
                       {/* Empty State Row when no deals and not loading */}
                       {!isLoading && filteredAndSortedDeals.length === 0 && editingRow !== 'new-deal-temp' && (
                         <tr className="border-b">
-                          <td colSpan={ALL_COLUMNS.length + 2} className="p-8 text-center text-gray-500">
+                          <td colSpan={ALL_COLUMNS.length + 3} className="p-8 text-center text-gray-500">
                             <div className="flex flex-col items-center space-y-4">
                               <FileText className="h-12 w-12 text-gray-400" />
                               <div>
@@ -7769,7 +7771,7 @@ export default function AnalystDashboard() {
                           
                           {/* 34. Actions (Delete + Re-Run Analysis) */}
                           <td
-                            className={`p-2 min-w-[160px] border-l border-gray-200 z-20 ${selectedDeals.includes(deal.id) ? 'bg-blue-50' : 'bg-white'}`}
+                            className={`p-2 min-w-[104px] border-l border-gray-200 z-20 ${selectedDeals.includes(deal.id) ? 'bg-blue-50' : 'bg-white'}`}
                             style={{ position: 'sticky', right: 0, boxShadow: '-6px 0 8px -4px rgba(0,0,0,0.22)' }}
                           >
                             <div className="flex items-center gap-1 whitespace-nowrap">
@@ -7824,11 +7826,12 @@ export default function AnalystDashboard() {
                                     size="sm"
                                     variant="outline"
                                     disabled={rerunningDealId !== null}
-                                    className="text-xs px-2 py-1 bg-white border border-blue-500 text-blue-500 hover:bg-blue-50 hover:border-blue-600 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="h-8 w-8 p-0 bg-white border border-blue-500 text-blue-500 hover:bg-blue-50 hover:border-blue-600 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title={rerunningDealId === deal.id ? 'Processing…' : 'Re-run analysis'}
+                                    aria-label={rerunningDealId === deal.id ? 'Processing…' : 'Re-run analysis'}
                                     data-testid={`button-rerun-analysis-${deal.id}`}
                                   >
-                                    <RefreshCw size={12} className={`mr-1 ${rerunningDealId === deal.id ? 'animate-spin' : ''}`} />
-                                    {rerunningDealId === deal.id ? 'Processing...' : 'RE-RUN'}
+                                    <RefreshCw size={16} className={rerunningDealId === deal.id ? 'animate-spin' : ''} />
                                   </Button>
                                   <Button
                                     onClick={() => handleDeleteDeal(deal.id, deal.address || 'Unknown Address')}
@@ -7849,6 +7852,10 @@ export default function AnalystDashboard() {
                               )}
                             </div>
                           </td>
+                          <td
+                            className={`min-w-[104px] ${selectedDeals.includes(deal.id) ? 'bg-blue-50' : 'bg-white'}`}
+                            aria-hidden="true"
+                          />
                         </tr>
                       ))}
                     </tbody>
