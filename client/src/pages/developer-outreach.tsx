@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { CheckCircle2, Edit3, Loader2, Mail, MapPin, MessageSquare, Paperclip, Plus, Rocket, Send, Sparkles, Tag, Trash2, Users } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import Footer from "@/components/footer";
@@ -148,6 +149,7 @@ export default function DeveloperOutreach() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const profile = (user as any)?.developerProfile;
   const secondaryColor = profile?.secondaryColor || "#4A90E2";
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -523,7 +525,10 @@ export default function DeveloperOutreach() {
                       </div>
                     ) : <p className="mt-2 text-xs text-amber-700">No signature is configured yet.</p>}
                   </div>
-                  <Button variant="outline" onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending}>Reconnect</Button>
+                  <Button variant="outline" onClick={() => navigate("/outreach-onboarding")}>
+                    <Edit3 className="mr-2 h-4 w-4" />
+                    Edit
+                  </Button>
                 </div>
               ) : (
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
