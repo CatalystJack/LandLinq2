@@ -2,38 +2,22 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, MapPin, DollarSign, Calendar, PieChart, AlertCircle, Settings2 } from "lucide-react";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  ArcElement,
-} from 'chart.js';
-import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import { TrendingUp, MapPin, DollarSign, Calendar, PieChart, AlertCircle, Settings2 } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
   Legend,
-  BarElement,
-  ArcElement
-);
-
-// Set global font configuration for all charts
-ChartJS.defaults.font.family = '"Inter", sans-serif';
-ChartJS.defaults.font.size = 12;
-ChartJS.defaults.color = '#374151';
+  Pie,
+  PieChart as RechartsPieChart,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 interface AnalyticsData {
   dailySubmissions: { date: string; count: number; value: number }[];
@@ -89,8 +73,7 @@ export default function AnalyticsDashboard({
       <div className="space-y-6">
         {/* Time Range Selector */}
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-catalyst-navy">Analytics Dashboard</h3>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center justify-end gap-2">
             {(['7d', '30d', '90d', '1y'] as const).map((range) => (
               <Button
                 key={range}
@@ -120,74 +103,30 @@ export default function AnalyticsDashboard({
     );
   }
 
-  // Chart data configurations
-  const dailySubmissionsData = {
-    labels: analyticsData.dailySubmissions.map((d: { date: string; count: number; value: number }) => {
-      const date = new Date(d.date);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }),
-    datasets: [
-      {
-        label: 'Daily Submissions',
-        data: analyticsData.dailySubmissions.map((d: { date: string; count: number; value: number }) => d.count),
-        borderColor: '#1f2937',
-        backgroundColor: 'rgba(31, 41, 55, 0.1)',
-        tension: 0.4,
-      },
-    ]
-  };
-
-  const productTypeData = {
-    labels: analyticsData.productTypeDistribution.map((p: { type: string; count: number; totalValue: number }) => p.type),
-    datasets: [{
-      data: analyticsData.productTypeDistribution.map((p: { type: string; count: number; totalValue: number }) => p.count),
-      backgroundColor: [
-        '#1e3a8a', // Conventional - Catalyst Navy (main brand blue)
-        '#d4af37', // Build-to-Rent - Catalyst Gold (keep gold accent)
-        '#2563eb', // Active Adult - Bright Blue
-        '#60a5fa', // Affordable - Light Blue
-        '#93c5fd', // Lot Development - Lighter Blue
-      ],
-      borderWidth: 2,
-      borderColor: '#ffffff',
-    }]
-  };
-
-  const pipelineData = {
-    labels: analyticsData.pipelineValue.map((p: { stage: string; count: number; value: number }) => p.stage),
-    datasets: [
-      {
-        label: 'Count',
-        data: analyticsData.pipelineValue.map((p: { stage: string; count: number; value: number }) => p.count),
-        backgroundColor: ['#22C55E', '#F59E0B', '#EF4444'], // Keep status colors: Pursuing (green), Reviewing (yellow), Passed (red)
-        borderRadius: 4,
-      }
-    ]
-  };
-
-  const monthlyTrendData = {
-    labels: analyticsData.monthlyTrends.map((m: { month: string; submissions: number; closings: number; revenue: number }) => m.month),
-    datasets: [
-      {
-        label: 'Submissions',
-        data: analyticsData.monthlyTrends.map((m: { month: string; submissions: number; closings: number; revenue: number }) => m.submissions),
-        backgroundColor: '#1e3a8a', // Catalyst Navy
-        borderRadius: 4,
-      },
-      {
-        label: 'Closings',
-        data: analyticsData.monthlyTrends.map((m: { month: string; submissions: number; closings: number; revenue: number }) => m.closings),
-        backgroundColor: '#2563eb', // Bright Blue
-        borderRadius: 4,
-      }
-    ]
-  };
+  const dailySubmissionsData = analyticsData.dailySubmissions.map((item) => ({
+    date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    count: item.count,
+  }));
+  const productTypeData = analyticsData.productTypeDistribution.map((item) => ({
+    type: item.type,
+    count: item.count,
+  }));
+  const pipelineData = analyticsData.pipelineValue.map((item) => ({
+    stage: item.stage,
+    count: item.count,
+  }));
+  const monthlyTrendData = analyticsData.monthlyTrends.map((item) => ({
+    month: item.month,
+    submissions: item.submissions,
+    closings: item.closings,
+  }));
+  const productTypeColors = ['#1e3a8a', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd'];
+  const pipelineColors = ['#22C55E', '#F59E0B', '#EF4444'];
 
   return (
     <div className="space-y-6">
       {/* Time Range Selector */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-catalyst-navy">Analytics Dashboard</h3>
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-2">
           {(['7d', '30d', '90d', '1y'] as const).map((range) => (
             <Button
@@ -209,7 +148,7 @@ export default function AnalyticsDashboard({
       {/* Chart Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Daily Activity Trend */}
-        <Card>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
@@ -217,31 +156,31 @@ export default function AnalyticsDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Line data={dailySubmissionsData} options={{
-              responsive: true,
-              interaction: {
-                mode: 'index' as const,
-                intersect: false,
-              },
-              plugins: {
-                legend: {
-                  position: 'top' as const,
-                }
-              },
-              scales: {
-                y: {
-                  type: 'linear' as const,
-                  display: true,
-                  position: 'left' as const,
-                  beginAtZero: true,
-                },
-              }
-            }} />
+            <ChartContainer
+              config={{ count: { label: "Submissions", color: "#1e3a8a" } }}
+              className="h-[260px] w-full"
+            >
+              <LineChart data={dailySubmissionsData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={36} />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#1e3a8a"
+                  strokeWidth={2.5}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+              </LineChart>
+            </ChartContainer>
           </CardContent>
         </Card>
 
         {/* Product Type Distribution */}
-        <Card>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PieChart className="h-5 w-5" />
@@ -249,19 +188,36 @@ export default function AnalyticsDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Doughnut data={productTypeData} options={{
-              responsive: true,
-              plugins: {
-                legend: {
-                  position: 'bottom' as const,
-                }
-              }
-            }} />
+            <ChartContainer
+              config={{
+                count: { label: "Deals", color: "#1e3a8a" },
+              }}
+              className="mx-auto h-[260px] w-full max-w-[360px]"
+            >
+              <RechartsPieChart>
+                <ChartTooltip cursor={false} content={<ChartTooltipContent nameKey="type" hideLabel />} />
+                <Pie
+                  data={productTypeData}
+                  dataKey="count"
+                  nameKey="type"
+                  innerRadius={62}
+                  outerRadius={92}
+                  paddingAngle={3}
+                  stroke="#ffffff"
+                  strokeWidth={2}
+                >
+                  {productTypeData.map((item, index) => (
+                    <Cell key={item.type} fill={productTypeColors[index % productTypeColors.length]} />
+                  ))}
+                </Pie>
+                <Legend />
+              </RechartsPieChart>
+            </ChartContainer>
           </CardContent>
         </Card>
 
         {/* Pipeline Value */}
-        <Card>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
@@ -270,19 +226,22 @@ export default function AnalyticsDashboard({
           </CardHeader>
           <CardContent>
             {analyticsData.pipelineValue?.length ? (
-              <Bar data={pipelineData} options={{
-                responsive: true,
-                plugins: {
-                  legend: {
-                    display: false,
-                  }
-                },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                  }
-                }
-              }} />
+              <ChartContainer
+                config={{ count: { label: "Deals", color: "#498EDE" } }}
+                className="h-[260px] w-full"
+              >
+                <BarChart data={pipelineData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="stage" tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={36} />
+                  <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {pipelineData.map((item, index) => (
+                      <Cell key={item.stage} fill={pipelineColors[index % pipelineColors.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
             ) : (
               <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-catalyst-gray-200 px-6 text-center">
                 <div className="mb-3 rounded-full bg-catalyst-blue/10 p-3 text-catalyst-blue">
@@ -300,7 +259,7 @@ export default function AnalyticsDashboard({
         </Card>
 
         {/* Monthly Performance */}
-        <Card>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
@@ -308,25 +267,29 @@ export default function AnalyticsDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Bar data={monthlyTrendData} options={{
-              responsive: true,
-              plugins: {
-                legend: {
-                  position: 'top' as const,
-                }
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                }
-              }
-            }} />
+            <ChartContainer
+              config={{
+                submissions: { label: "Submissions", color: "#1e3a8a" },
+                closings: { label: "Closings", color: "#2563eb" },
+              }}
+              className="h-[260px] w-full"
+            >
+              <BarChart data={monthlyTrendData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={36} />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                <Legend />
+                <Bar dataKey="submissions" fill="#1e3a8a" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="closings" fill="#2563eb" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
           </CardContent>
         </Card>
       </div>
 
       {/* Regional Activity Overview */}
-      <Card>
+      <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
@@ -353,8 +316,8 @@ export default function AnalyticsDashboard({
                       key={region.region}
                       className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                         selectedRegion === region.region
-                          ? 'border-catalyst-gold bg-catalyst-gold/10'
-                          : 'border-catalyst-gray-200 hover:border-catalyst-gold/50'
+                          ? 'border-catalyst-blue bg-catalyst-blue/10'
+                          : 'border-catalyst-gray-200 hover:border-catalyst-blue/50'
                       }`}
                       onClick={() => setSelectedRegion(selectedRegion === region.region ? null : region.region)}
                       data-testid={`card-region-${region.region.toLowerCase().replace(/\s+/g, '-')}`}
