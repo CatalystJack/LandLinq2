@@ -5,6 +5,7 @@ import OpenAI from "openai";
 import { apiCallTracker } from './apiCallTracker.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const developerAssistantModel = "gpt-4o-mini";
 
 export interface OutreachEmailDraftContext {
   companyName: string;
@@ -47,7 +48,7 @@ export async function draftOutreachEmailWithAI(
   userMessage: string,
 ): Promise<OutreachEmailDraftResult> {
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: developerAssistantModel,
     messages: [
       {
         role: "system",
@@ -263,9 +264,7 @@ ${question}`,
       { role: "user", content: question },
     ],
     response_format: { type: "json_object" },
-    // GPT-5 may spend completion tokens on reasoning before returning the
-    // short JSON route. Keep enough headroom to avoid an empty message.
-    max_completion_tokens: 1600,
+    max_completion_tokens: 800,
   });
   const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty assistant routing response");
@@ -301,7 +300,7 @@ export async function answerDeveloperAssistantQuestion(
   result: unknown,
 ): Promise<string> {
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: developerAssistantModel,
     messages: [
       {
         role: "system",

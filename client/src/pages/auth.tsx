@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { clearLocalAuthState, useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { Eye, EyeOff } from "lucide-react";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
 
@@ -18,7 +18,6 @@ export default function AuthPage() {
   const { isAuthenticated, isLoading, isInitialized, user, userRole } = useAuth();
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
-  const [preparingFreshLogin, setPreparingFreshLogin] = useState(false);
   
   // Get the auth mode from URL params
   const searchParams = new URLSearchParams(window.location.search);
@@ -47,32 +46,6 @@ export default function AuthPage() {
       setLocation(redirectUrl);
     }
   }, [isInitialized, isLoading, isAuthenticated, isExplicitLoginEntry, setLocation, redirectUrl]);
-
-  useEffect(() => {
-    if (!isExplicitLoginEntry || !isInitialized || isLoading || !isAuthenticated || preparingFreshLogin) {
-      return;
-    }
-
-    let cancelled = false;
-    setPreparingFreshLogin(true);
-    fetch("/api/logout", {
-      method: "POST",
-      credentials: "include",
-    })
-      .catch(() => {
-        // Clear the local state even if the server-side session is already gone.
-      })
-      .finally(() => {
-        if (cancelled) return;
-        queryClient.removeQueries({ queryKey: ["/api/user"] });
-        clearLocalAuthState();
-        setPreparingFreshLogin(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isExplicitLoginEntry, isInitialized, isLoading, isAuthenticated, preparingFreshLogin]);
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
@@ -180,7 +153,6 @@ export default function AuthPage() {
   });
 
   if (
-    preparingFreshLogin ||
     !isInitialized ||
     isLoading ||
     (!isExplicitLoginEntry && isAuthenticated)
@@ -190,7 +162,7 @@ export default function AuthPage() {
         <div className="text-center text-slate-600">
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-catalyst-gold" />
           <p className="mt-3 text-sm">
-            {isExplicitLoginEntry ? "Preparing sign in…" : "Redirecting to your workspace…"}
+            Loading sign in…
           </p>
         </div>
       </div>
