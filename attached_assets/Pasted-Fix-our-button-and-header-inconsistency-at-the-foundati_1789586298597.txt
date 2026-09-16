@@ -1,0 +1,37 @@
+Fix our button and header inconsistency at the foundation level before touching individual pages.
+
+1. Add the Google Font "Newsreader" (weights 400,500,600,700) via a <link> in client/index.html (preconnect to fonts.googleapis.com and fonts.gstatic.com, then the stylesheet link). In tailwind.config.ts, change fontFamily.serif from ["Inter", "sans-serif"] to ["Newsreader", "serif"]. Leave fontFamily.sans as Inter. This gives us a real serif for display headings, similar to how Harvey (the legal AI product) uses a serif headline font over a clean sans UI.
+
+2. In client/src/components/ui/button.tsx, the size variants only define default/sm/lg/icon, but "xs" is used as a size prop in several places in the codebase and currently does nothing (no height/padding classes apply). Add a real xs size to the cva size variants: xs: "h-7 px-3 text-xs". Also add an iconSm size: "h-8 w-8 p-1.5 text-xs" for compact icon-only buttons.
+
+3. In client/src/pages/listing-review.tsx there's a local function called Btn (around line 92) that reimplements a button from scratch instead of using the shared Button component from @/components/ui/button. Replace every usage of Btn in that file with the shared Button component, mapping its variant prop (primary/ghost/outline) to Button's variant prop (default/ghost/outline) and its size prop (xs) to Button's new xs size. Remove the local Btn function once nothing references it.
+
+4. Search the whole client/src/pages and client/src/components tree for hardcoded hex colors #4A90E2, #0d2d4e, and #357ABD used on buttons or button-like elements (bg-, border-, text-, hover:bg-, hover:text-, hover:border- classes). These are drift from our actual brand tokens, which are --catalyst-blue (#498EDE) and --catalyst-navy (#081729), already defined in client/src/index.css and exposed as Tailwind classes bg-catalyst-blue / text-catalyst-navy / border-catalyst-navy etc. Replace those hardcoded hex classes with the catalyst-blue / catalyst-navy Tailwind classes so every button pulls color from the same two tokens. Do this file by file and don't change layout/spacing, only the color source.
+
+5. Create a new shared component at client/src/components/ui/page-header.tsx:
+
+   export function PageHeader({ eyebrow, title, description, actions }: {
+     eyebrow?: string;
+     title: string;
+     description?: string;
+     actions?: React.ReactNode;
+   }) {
+     return (
+       <div className="flex items-start justify-between gap-4 pb-6 mb-8 border-b border-catalyst-gray-200">
+         <div>
+           {eyebrow && (
+             <div className="text-xs font-semibold uppercase tracking-wide text-catalyst-blue mb-1">{eyebrow}</div>
+           )}
+           <h1 className="font-serif text-3xl font-semibold text-catalyst-navy tracking-tight">{title}</h1>
+           {description && (
+             <p className="text-sm text-catalyst-gray-500 mt-1">{description}</p>
+           )}
+         </div>
+         {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+       </div>
+     );
+   }
+
+   Don't wire it into any pages yet — that's a separate step. Just create the component and make sure it builds with no type errors.
+
+Do these five things only. Don't touch any page files besides listing-review.tsx (step 3) and the hex-color sweep (step 4).
