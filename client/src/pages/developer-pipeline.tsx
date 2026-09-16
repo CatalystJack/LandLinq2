@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DeveloperNavigation from "@/components/developer-navigation";
+import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
 import Footer from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -227,17 +228,21 @@ export default function DeveloperPipeline() {
     <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="section-gap-md flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#4A90E2]">Sales workspace</p>
-            <h1 className="mt-1 flex items-center gap-3 font-serif text-4xl font-bold text-[#0A2B4A]"><BriefcaseBusiness className="h-8 w-8 text-[#4A90E2]" />Pipeline</h1>
-            <p className="mt-2 text-slate-600">Track opportunities from first contact through close, independent of deal classification.</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setManageOpen(true)}><Settings2 className="mr-2 h-4 w-4" />Manage Stages</Button>
-            <Button onClick={openNewOpportunity} disabled={!activeStages.length} style={{ backgroundColor: "#0A2B4A" }}><Plus className="mr-2 h-4 w-4" />New Opportunity</Button>
-          </div>
-        </div>
+        <DeveloperPageHeader
+          title="Pipeline"
+          description="Track opportunities from first contact through close, independent of deal classification."
+          eyebrow="Sales workspace"
+          actions={
+            <>
+              <Button variant="outline" onClick={() => setManageOpen(true)} className={developerHeaderButtonClass}>
+                <Settings2 className="mr-2 h-4 w-4" />Manage Stages
+              </Button>
+              <Button onClick={openNewOpportunity} disabled={!activeStages.length} className={developerHeaderButtonClass}>
+                <Plus className="mr-2 h-4 w-4" />New Opportunity
+              </Button>
+            </>
+          }
+        />
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="flex flex-col gap-5">

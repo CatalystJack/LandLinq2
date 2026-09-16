@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Mail, ShieldCheck, Users, Loader2 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
+import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
 import Footer from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,16 +35,16 @@ export default function DeveloperUserManagement() {
     <div className="min-h-screen bg-slate-50">
       <DeveloperNavigation />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#4A90E2]">Organization</p>
-            <h1 className="mt-1 text-3xl font-bold text-slate-950">User Management</h1>
-            <p className="mt-2 text-slate-500">View the users who belong to your company portal.</p>
-          </div>
-          <Button asChild className="bg-primary text-primary-foreground hover:bg-background hover:text-primary hover:ring-1 hover:ring-primary">
-            <a href={requestHref}><Mail className="mr-2 h-4 w-4" /> Request teammate addition</a>
-          </Button>
-        </div>
+        <DeveloperPageHeader
+          title="User Management"
+          description="View the users who belong to your company portal."
+          eyebrow="Organization"
+          actions={
+            <Button asChild className={developerHeaderButtonClass}>
+              <a href={requestHref}><Mail className="mr-2 h-4 w-4" /> Request teammate addition</a>
+            </Button>
+          }
+        />
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader className="border-b border-slate-100">

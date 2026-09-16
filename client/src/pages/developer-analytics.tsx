@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DeveloperNavigation from "@/components/developer-navigation";
+import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
 import Footer from "@/components/footer";
 import AnalyticsDashboard from "@/components/analytics-dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -157,18 +158,30 @@ export default function DeveloperAnalytics() {
     <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="section-gap-md flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div><h1 className="font-serif text-4xl font-normal text-catalyst-gray-900">Analytics Dashboard</h1><p className="mt-2 text-lg text-catalyst-gray-600">Your company’s deal flow, markets, brokers, and outreach performance</p></div>
-          <div className="flex gap-2">
-            <Dialog open={showFilters} onOpenChange={setShowFilters}><DialogTrigger asChild><Button variant="outline" size="sm"><Filter className="mr-2 h-4 w-4" />Filters</Button></DialogTrigger><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Filter Analytics Data</DialogTitle></DialogHeader><div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 items-center gap-4"><Label>Status:</Label><Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}><SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All Statuses</SelectItem>{["Passed", "Review", "Pursuing"].map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent></Select></div>
-              <div className="grid grid-cols-2 items-center gap-4"><Label>City:</Label><Select value={filters.city} onValueChange={(value) => setFilters({ ...filters, city: value })}><SelectTrigger><SelectValue placeholder="All cities" /></SelectTrigger><SelectContent><SelectItem value="all">All Cities</SelectItem>{uniqueCities.map((city) => <SelectItem key={city} value={city}>{city}</SelectItem>)}</SelectContent></Select></div>
-              <div className="grid grid-cols-2 items-center gap-4"><Label>Broker:</Label><Select value={filters.broker} onValueChange={(value) => setFilters({ ...filters, broker: value })}><SelectTrigger><SelectValue placeholder="All brokers" /></SelectTrigger><SelectContent><SelectItem value="all">All Brokers</SelectItem>{uniqueBrokers.map((broker) => <SelectItem key={broker} value={broker}>{broker}</SelectItem>)}</SelectContent></Select></div>
-              <div className="grid grid-cols-2 items-center gap-4"><Label>Date Range:</Label><Select value={filters.dateRange} onValueChange={(value) => setFilters({ ...filters, dateRange: value })}><SelectTrigger><SelectValue placeholder="All dates" /></SelectTrigger><SelectContent><SelectItem value="all">All Time</SelectItem><SelectItem value="7">Last 7 days</SelectItem><SelectItem value="30">Last 30 days</SelectItem><SelectItem value="90">Last 90 days</SelectItem></SelectContent></Select></div>
-            </div></DialogContent></Dialog>
-            <Button variant="outline" size="sm" onClick={exportToCSV}><Download className="mr-2 h-4 w-4" />Export</Button>
-          </div>
-        </div>
+        <DeveloperPageHeader
+          title="Analytics Dashboard"
+          description="Your company’s deal flow, markets, brokers, and outreach performance"
+          actions={
+            <>
+              <Dialog open={showFilters} onOpenChange={setShowFilters}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className={developerHeaderButtonClass}>
+                    <Filter className="mr-2 h-4 w-4" />Filters
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Filter Analytics Data</DialogTitle></DialogHeader><div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 items-center gap-4"><Label>Status:</Label><Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}><SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All Statuses</SelectItem>{["Passed", "Review", "Pursuing"].map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="grid grid-cols-2 items-center gap-4"><Label>City:</Label><Select value={filters.city} onValueChange={(value) => setFilters({ ...filters, city: value })}><SelectTrigger><SelectValue placeholder="All cities" /></SelectTrigger><SelectContent><SelectItem value="all">All Cities</SelectItem>{uniqueCities.map((city) => <SelectItem key={city} value={city}>{city}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="grid grid-cols-2 items-center gap-4"><Label>Broker:</Label><Select value={filters.broker} onValueChange={(value) => setFilters({ ...filters, broker: value })}><SelectTrigger><SelectValue placeholder="All brokers" /></SelectTrigger><SelectContent><SelectItem value="all">All Brokers</SelectItem>{uniqueBrokers.map((broker) => <SelectItem key={broker} value={broker}>{broker}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="grid grid-cols-2 items-center gap-4"><Label>Date Range:</Label><Select value={filters.dateRange} onValueChange={(value) => setFilters({ ...filters, dateRange: value })}><SelectTrigger><SelectValue placeholder="All dates" /></SelectTrigger><SelectContent><SelectItem value="all">All Time</SelectItem><SelectItem value="7">Last 7 days</SelectItem><SelectItem value="30">Last 30 days</SelectItem><SelectItem value="90">Last 90 days</SelectItem></SelectContent></Select></div>
+                </div></DialogContent>
+              </Dialog>
+              <Button variant="outline" size="sm" onClick={exportToCSV} className={developerHeaderButtonClass}>
+                <Download className="mr-2 h-4 w-4" />Export
+              </Button>
+            </>
+          }
+        />
 
         <div className="section-gap-md grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[

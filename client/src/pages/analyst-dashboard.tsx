@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import Navigation from "@/components/navigation";
 import DeveloperNavigation from "@/components/developer-navigation";
+import { developerHeaderButtonClass } from "@/components/developer-page-header";
 import SEO from "@/components/SEO";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5796,7 +5797,7 @@ export default function AnalystDashboard() {
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <Button
                   onClick={addNewDeal}
-                  className="w-full sm:w-auto font-bold uppercase tracking-wider bg-[#4A90E2] text-white hover:bg-white hover:text-[#4A90E2] border border-[#4A90E2] hover:border-[#4A90E2] transition-all duration-200"
+                  className={`${developerHeaderButtonClass} w-full sm:w-auto uppercase tracking-wider`}
                   data-testid="button-add-deal"
                 >
                   <Plus size={16} className="mr-2" />
@@ -5807,7 +5808,7 @@ export default function AnalystDashboard() {
                     onClick={() => exportToExcelMutation.mutate()}
                     disabled={exportToExcelMutation.isPending}
                     variant="outline"
-                    className="font-bold uppercase tracking-wider border-[#4A90E2] text-[#2f73bb] hover:bg-[#4A90E2] hover:text-white transition-all duration-200"
+                    className={`${developerHeaderButtonClass} uppercase tracking-wider`}
                     data-testid="button-export-excel"
                   >
                     <Download size={16} className="mr-2" />

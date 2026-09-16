@@ -19,6 +19,7 @@ import {
   Upload,
 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
+import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
 import Footer from "@/components/footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -359,31 +360,27 @@ export default function DeveloperDashboard() {
     <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
       <main className="mx-auto max-w-[1600px] px-3 py-5 sm:px-5 lg:px-6">
-        <div className="section-gap-sm flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: secondaryColor }}>
-              Investment Company Portal
-            </p>
-            <h1 className="mt-1 font-serif text-3xl font-bold text-slate-950">Deal Dashboard</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Review, analyze, and manage deals shared with {profile?.companyName || "your company"}.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => setImportOpen(true)} className="text-white shadow-sm" style={{ backgroundColor: primaryColor }}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Import Deals
-            </Button>
-            <Button size="sm" variant="outline" onClick={exportDeals} className="border-[#4A90E2] text-[#2f73bb]">
-              <Download className="mr-1.5 h-3.5 w-3.5" />
-              Export CSV
-            </Button>
-            <Button size="sm" variant="outline" onClick={refreshDeals} disabled={refreshing}>
-              <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-          </div>
-        </div>
+        <DeveloperPageHeader
+          title="Deal Dashboard"
+          description={`Review, analyze, and manage deals shared with ${profile?.companyName || "your company"}.`}
+          eyebrow="Investment Company Portal"
+          actions={
+            <>
+              <Button size="sm" onClick={() => setImportOpen(true)} className={developerHeaderButtonClass}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Import Deals
+              </Button>
+              <Button size="sm" variant="outline" onClick={exportDeals} className={developerHeaderButtonClass}>
+                <Download className="mr-1.5 h-3.5 w-3.5" />
+                Export CSV
+              </Button>
+              <Button size="sm" variant="outline" onClick={refreshDeals} disabled={refreshing} className={developerHeaderButtonClass}>
+                <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            </>
+          }
+        />
 
         <div className="section-gap-sm grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {[

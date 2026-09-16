@@ -1,6 +1,11 @@
 import { Link } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Footer() {
+  const { isAuthenticated } = useAuth();
+
+  if (isAuthenticated) return null;
+
   return (
     <footer className="bg-primary px-5 py-14 text-white sm:px-8 sm:py-20 lg:px-10">
       <div className="mx-auto grid max-w-7xl gap-12 md:grid-cols-[1.5fr_1fr_1fr_1fr]">

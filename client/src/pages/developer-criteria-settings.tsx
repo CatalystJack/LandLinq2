@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
+import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
 import Footer from "@/components/footer";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -432,16 +433,16 @@ export default function DeveloperCriteriaSettings() {
     <div className="min-h-screen bg-slate-50">
       <DeveloperNavigation />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <h1 className="mt-1 text-3xl font-bold text-slate-950">{form.profileType === "general_sales" ? "Company settings" : "Acquisition criteria"}</h1>
-            <p className="mt-2 text-slate-500">{form.profileType === "general_sales" ? `Manage ${form.companyName} team access and account settings.` : `Control how ${form.companyName} evaluates and receives deals.`}</p>
-          </div>
-          <Button onClick={save} disabled={saveMutation.isPending} style={{ backgroundColor: primaryColor }} className="text-white">
-            {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Save settings
-          </Button>
-        </div>
+        <DeveloperPageHeader
+          title={form.profileType === "general_sales" ? "Company settings" : "Acquisition criteria"}
+          description={form.profileType === "general_sales" ? `Manage ${form.companyName} team access and account settings.` : `Control how ${form.companyName} evaluates and receives deals.`}
+          actions={
+            <Button onClick={save} disabled={saveMutation.isPending} className={developerHeaderButtonClass}>
+              {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Save settings
+            </Button>
+          }
+        />
 
         <div className="space-y-6">
           <Card className="border-slate-200 shadow-sm">
