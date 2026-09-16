@@ -6969,7 +6969,7 @@ export default function AnalystDashboard() {
                       {/* Subtle loading indicator for pagination while showing cached data */}
                       {isFetching && !isLoading && (
                         <tr>
-                          <td colSpan={ALL_COLUMNS.length + 2} className="p-0">
+                          <td colSpan={ALL_COLUMNS.length + 3} className="p-0">
                             <div className="w-full h-1 bg-gray-100 overflow-hidden">
                               <div className="h-full bg-[#4A90E2] animate-pulse"></div>
                             </div>

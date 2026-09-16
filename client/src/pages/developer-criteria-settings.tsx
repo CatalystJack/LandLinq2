@@ -490,6 +490,9 @@ export default function DeveloperCriteriaSettings() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <Badge variant="secondary" className="w-fit bg-emerald-50 text-emerald-700">
+                      Outlook connected
+                    </Badge>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -520,9 +523,13 @@ export default function DeveloperCriteriaSettings() {
                     : "No company Outlook sender is configured, so broker notifications currently come from the platform address above."}
                 </p>
               )}
-              {connectedNotificationSenders.length < 2 && (
+              {connectedNotificationSenders.length <= 1 ? (
                 <p className="mt-3 text-xs text-slate-500">
                   This is display-only. Manage the connected account from Outreach.
+                </p>
+              ) : (
+                <p className="mt-3 text-xs text-slate-500">
+                  Choose which connected mailbox sends broker notifications.
                 </p>
               )}
             </CardContent>
