@@ -25615,7 +25615,14 @@ RULES:
   app.post('/api/webhooks/email-inbound', express.raw({type: '*/*', limit: '10mb'}), webhookRateLimit, async (req, res) => {
     // EMAIL SCRAPING DISABLED — return 200 so SendGrid does not retry
     console.log('📧 [DISABLED] /api/webhooks/email-inbound received but email-to-deal scraping is turned off.');
+    console.log('🔍 [DUPLICATE-DEBUG] Disabled webhook source details:', {
+      timestamp: new Date().toISOString(),
+      sourceIP: req.ip || req.connection?.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
+      userAgent: req.get('user-agent') || 'unknown',
+      contentType: req.get('content-type') || 'unknown',
+    });
     return res.status(200).json({ message: 'Email received. Automatic deal creation is currently disabled.' });
+    /*
     try {
       console.log('\n' + '='.repeat(100));
       console.log('📧 INBOUND EMAIL WEBHOOK RECEIVED');
@@ -25881,6 +25888,7 @@ RULES:
       console.error('❌ Error processing inbound email:', error);
       res.status(500).json({ error: 'Internal server error processing email' });
     }
+    */
   });
 
   // SENDGRID INBOUND PARSE WEBHOOK - Proper multipart handling for deals@landlinq.ai
