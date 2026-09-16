@@ -70,7 +70,6 @@ import {
   TrendingUp,
   BarChart2
 } from "lucide-react";
-import { SiHubspot } from "react-icons/si";
 
 interface OutreachSender {
   id: string;
@@ -1024,9 +1023,6 @@ export default function OutreachOnboarding() {
   const [currentStep, setCurrentStep] = useState(1);
   const [editingSender, setEditingSender] = useState<OutreachSender | null>(null);
   const [newSenderData, setNewSenderData] = useState({ name: "", email: "", role: "partner" });
-  const [hubspotOwnerIds, setHubspotOwnerIds] = useState<Record<string, string>>({});
-  const [crmStats, setCrmStats] = useState<{ total: number; byAssignee: { name: string; count: number }[]; emailsSentToday: number; dailyLimit: number } | null>(null);
-  const [crmSyncing, setCrmSyncing] = useState(false);
   const [showAddSender, setShowAddSender] = useState(false);
   const [campaignSteps, setCampaignSteps] = useState<CampaignStep[]>([]);
   const [templateStepsByTag, setTemplateStepsByTag] = useState<Record<string, CampaignStep[]>>({});
@@ -1074,15 +1070,6 @@ export default function OutreachOnboarding() {
     }
   }, [signaturePopoverOpen, editingSender?.id, editingSender?.signatureHtml]);
 
-  useEffect(() => {
-    if (currentStep === 3) {
-      fetch('/api/crm/outreach-stats', { credentials: 'include' })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => { if (data?.byAssignee) setCrmStats(data); })
-        .catch(() => {});
-    }
-  }, [currentStep]);
-  
   // Helper to clean HTML from Windows clipboard markers and problematic content
   // Jan 13, 2026: ULTRA-CONSERVATIVE - preserve almost everything from Outlook
   const cleanSignatureHtml = (html: string): string => {
@@ -1576,7 +1563,7 @@ export default function OutreachOnboarding() {
     }
   };
 
-  const totalSteps = 3;
+  const totalSteps = 2;
   const progressPercent = (currentStep / totalSteps) * 100;
 
   // Helper function to safely parse hubspotTriggerTags (handles Postgres array strings like "{tag1,tag2}")
@@ -2038,7 +2025,7 @@ export default function OutreachOnboarding() {
   const renderStepIndicator = () => (
     <div className="mb-8">
       <div className="flex items-center mb-4">
-        {[1, 2, 3].map((step, index) => (
+        {[1, 2].map((step) => (
           <div key={step} className="flex items-center flex-1 last:flex-none">
             <div
               className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all flex-shrink-0 ${
@@ -2051,7 +2038,7 @@ export default function OutreachOnboarding() {
             >
               {step < currentStep ? <CheckCircle className="h-5 w-5" /> : step}
             </div>
-            {step < 3 && (
+            {step < 2 && (
               <div
                 className={`flex-1 h-1 ${
                   step < currentStep ? "bg-green-500" : "bg-gray-200"
@@ -2064,7 +2051,6 @@ export default function OutreachOnboarding() {
       <div className="flex justify-between text-sm text-gray-600">
         <span>Team Setup</span>
         <span className="text-center">Email Integration</span>
-        <span>CRM Sync</span>
       </div>
       <Progress value={progressPercent} className="mt-4" />
     </div>
@@ -2498,173 +2484,22 @@ export default function OutreachOnboarding() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <Button onClick={() => setCurrentStep(3)} data-testid="step2-next">
-            Continue to CRM Sync
-            <ArrowRight className="h-4 w-4 ml-2" />
+          <Button
+            onClick={() => {
+              toast({ title: "Setup Complete!", description: "Your outreach team is configured. Campaigns will start sending from connected accounts." });
+            }}
+            data-testid="step2-complete"
+            className="bg-green-600 text-white hover:bg-green-700"
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Complete Setup
           </Button>
         </CardFooter>
       </Card>
     );
   };
 
-  // Step 3: Internal CRM Sync
-  const renderStep3 = () => {
-    const previewSync = async () => {
-      setCrmSyncing(true);
-      try {
-        const res = await fetch('/api/crm/outreach-stats', { credentials: 'include' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (!data?.byAssignee) throw new Error('Invalid response');
-        setCrmStats(data);
-        toast({
-          title: "CRM Synced",
-          description: `${(data.total || 0).toLocaleString()} contacts ready — ${data.dailyLimit} emails will go out per day.`,
-        });
-      } catch {
-        toast({ title: "Sync failed", description: "Could not load CRM stats", variant: "destructive" });
-      }
-      setCrmSyncing(false);
-    };
-
-    return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-blue-600" />
-          CRM Sync
-        </CardTitle>
-        <CardDescription>
-          Your internal CRM is the source of truth for outreach. Configure the daily send rate and confirm contact assignments before launching.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-
-        {/* CRM Overview */}
-        <div className="border rounded-lg p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-semibold">Contact Overview</h4>
-            {crmStats && (
-              <Badge variant="secondary" className="text-sm">
-                {crmStats.total.toLocaleString()} total contacts
-              </Badge>
-            )}
-          </div>
-          <Separator />
-          {!crmStats ? (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading CRM stats…
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {(crmStats.byAssignee || []).length === 0 ? (
-                <p className="text-sm text-gray-500">No contacts with assigned team members yet. Import your contacts first.</p>
-              ) : (
-                (crmStats.byAssignee || []).map(row => (
-                  <div key={row.name || 'unknown'} className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                      {(row.name || '?').split(" ").map((n: string) => n[0] || '').join("").slice(0, 2).toUpperCase() || '?'}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between text-sm mb-0.5">
-                        <span className="font-medium">{row.name}</span>
-                        <span className="text-gray-500">{row.count.toLocaleString()} contacts</span>
-                      </div>
-                      <div className="w-full bg-gray-100 rounded-full h-1.5">
-                        <div
-                          className="h-1.5 rounded-full bg-blue-500"
-                          style={{ width: `${Math.round((row.count / crmStats.total) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    <span className="text-xs text-gray-400 w-8 text-right">
-                      {Math.round((row.count / crmStats.total) * 100)}%
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          <div className="flex gap-2 pt-1">
-            <Button
-              variant="outline"
-              className="flex-1"
-              data-testid="sync-crm"
-              onClick={previewSync}
-              disabled={crmSyncing}
-            >
-              {crmSyncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-              Refresh Stats
-            </Button>
-          </div>
-        </div>
-
-        {/* Daily limit */}
-        <CrmDailyLimitCard />
-
-        {/* Team member → sender mapping */}
-        <div className="border rounded-lg p-4">
-          <h4 className="font-semibold mb-1">Team Member Senders</h4>
-          <p className="text-sm text-gray-500 mb-4">
-            Each team member's contacts will be emailed from their connected Outlook account.
-            The "Assigned To" field in the CRM determines routing.
-          </p>
-          <div className="space-y-3">
-            {(senders || []).map((sender) => {
-              const assigneeRow = crmStats?.byAssignee.find(r =>
-                r.name.toLowerCase().includes(sender.name.split(" ")[0].toLowerCase())
-              );
-              return (
-                <div key={sender.id} className="flex items-center gap-4 py-2 border-b last:border-0">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0">
-                    {sender.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{sender.name}</p>
-                    <p className="text-xs text-gray-500">{sender.email}</p>
-                  </div>
-                  <div className="text-right">
-                    {assigneeRow ? (
-                      <>
-                        <p className="text-sm font-semibold text-blue-700">{assigneeRow.count.toLocaleString()}</p>
-                        <p className="text-xs text-gray-400">contacts</p>
-                      </>
-                    ) : (
-                      <p className="text-xs text-gray-400">—</p>
-                    )}
-                  </div>
-                  <Badge variant={sender.outlookConnected ? "default" : "outline"} className="text-xs">
-                    {sender.outlookConnected ? "Outlook ✓" : "No Outlook"}
-                  </Badge>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-      </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={() => setCurrentStep(2)}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        <Button
-          onClick={() => {
-            toast({ title: "Setup Complete!", description: "Your outreach team is configured. Campaigns will start sending at the configured daily rate." });
-          }}
-          data-testid="step3-complete"
-          className="bg-green-600 hover:bg-green-700 text-white"
-        >
-          <CheckCircle className="h-4 w-4 mr-2" />
-          Complete Setup
-        </Button>
-      </CardFooter>
-    </Card>
-    );
-  };
-
-  // Sender edit modal with HubSpot tagging automation
+  // Sender edit modal with CRM tag automation
   const renderEditSenderModal = () => {
     if (!editingSender) return null;
 
