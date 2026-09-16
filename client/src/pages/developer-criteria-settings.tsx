@@ -21,6 +21,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Profile = {
   companyName: string;
@@ -57,10 +64,12 @@ type TeamMember = {
 };
 
 type NotificationSender = {
+  id: string;
   name: string;
   email: string;
   outlookConnected: boolean;
   hasMicrosoftToken?: boolean;
+  isNotificationSender?: boolean;
   isActive?: boolean;
 };
 
@@ -253,6 +262,34 @@ export default function DeveloperCriteriaSettings() {
     queryKey: ["/api/developer-profile/me/outreach/sender"],
     queryFn: () => jsonRequest("/api/developer-profile/me/outreach/sender"),
   });
+  const senderListQuery = useQuery<{ senders: NotificationSender[] }>({
+    queryKey: ["/api/developer-profile/me/outreach/senders"],
+    queryFn: () => jsonRequest("/api/developer-profile/me/outreach/senders"),
+  });
+  const notificationSenderMutation = useMutation({
+    mutationFn: (senderId: string) =>
+      jsonRequest("/api/developer-profile/me/outreach/notification-sender", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ senderId }),
+      }),
+    onSuccess: () => {
+      toast({ title: "Notification sender updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/outreach/sender"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/outreach/senders"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Unable to update notification sender", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const connectedNotificationSenders = (senderListQuery.data?.senders || []).filter(
+    (sender) => sender.outlookConnected && sender.hasMicrosoftToken && sender.isActive !== false,
+  );
+  const selectedNotificationSender =
+    connectedNotificationSenders.find((sender) => sender.isNotificationSender) ||
+    connectedNotificationSenders.find((sender) => sender.email === senderQuery.data?.effectiveSender?.email) ||
+    connectedNotificationSenders[0];
 
   useEffect(() => {
     if (profileQuery.data?.profile) {

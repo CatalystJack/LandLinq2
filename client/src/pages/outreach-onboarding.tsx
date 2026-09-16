@@ -3082,6 +3082,7 @@ export default function OutreachOnboarding() {
               <div className="space-y-2 mb-3">
                 {(parseHubspotTags(editingSender) || []).map((tag, index) => {
                   const matchingTemplate = findMatchingTemplate(tag);
+                  const tagExistsInCrm = crmTags.includes(tag);
                   return (
                     <div key={index} className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -3134,11 +3135,27 @@ export default function OutreachOnboarding() {
                                     fetchTemplateStepsForTag(tag);
                                   }
                                 }}
-                                className="text-xs text-green-600 flex items-center gap-1 hover:text-green-800 transition-colors w-full text-left"
+                                 className={`text-xs flex items-center gap-1 transition-colors w-full text-left ${
+                                   tagExistsInCrm
+                                     ? 'text-green-600 hover:text-green-800'
+                                     : 'text-amber-600 hover:text-amber-800'
+                                 }`}
                               >
                                 <ChevronRight className={`h-3 w-3 transition-transform ${expandedTags[tag] ? 'rotate-90' : ''}`} />
-                                <CheckCircle className="h-3 w-3" />
-                                Routes to: <strong>{matchingTemplate.name}</strong>
+                                 {tagExistsInCrm ? (
+                                   <>
+                                     <CheckCircle className="h-3 w-3" />
+                                     Routes to: <strong>{matchingTemplate.name}</strong>
+                                   </>
+                                 ) : (
+                                   <>
+                                     <AlertTriangle className="h-3 w-3 shrink-0" />
+                                     <span>
+                                       ⚠ Tag not found in your CRM — no contacts currently have this tag, so this trigger will not fire.
+                                       <span className="ml-1">Would route to: <strong>{matchingTemplate.name}</strong></span>
+                                     </span>
+                                   </>
+                                 )}
                                 {!matchingTemplate.isActive && <Badge variant="outline" className="text-xs ml-1">Inactive</Badge>}
                                 <span className="text-gray-500 ml-1">({(templateStepsByTag[tag] || []).length} steps)</span>
                               </button>

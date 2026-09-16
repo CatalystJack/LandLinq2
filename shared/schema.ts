@@ -2802,6 +2802,7 @@ export const outreachSenders = pgTable("outreach_senders", {
   lastHealthCheckDate: date("last_health_check_date"), // Last time health metrics were evaluated
   // Status
   isActive: boolean("is_active").default(true),
+  isNotificationSender: boolean("is_notification_sender").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

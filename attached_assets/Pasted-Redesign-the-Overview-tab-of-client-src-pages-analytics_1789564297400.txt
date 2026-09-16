@@ -1,0 +1,11 @@
+Redesign the Overview tab of client/src/pages/analytics-page.tsx (the investment-company Analytics Dashboard) for a more polished, chart-driven look, while keeping all the same underlying data (realTimeAnalytics.totalDeals / totalValue / avgDealSize / conversionRate / statusBreakdown[] / marketInsights[], plus whatever <AnalyticsDashboard /> from components/analytics-dashboard.tsx already provides for pipeline stages). Don't change any data-fetching logic — this is a visual rebuild only.
+
+1. Restyle the 4 top stat cards (Total Deals, Total Pipeline Value, Avg Deal Size, Conversion Rate) with the same navy (#081729) / blue (#498EDE) accent palette used on the redesigned marketing pages (see client/src/pages/company.tsx for reference), rounded-2xl cards, and icon badges with tinted backgrounds instead of plain gray icons.
+
+2. Replace the plain-text "Deal Status Distribution" list (colored dot + label + count/percentage rows) with an actual donut/pie chart using recharts (already a dependency) — this app already has a themed chart wrapper at client/src/components/ui/chart.tsx, use that for consistent theming/tooltips instead of raw recharts primitives. Keep a compact legend below or beside the chart showing each status, its count, and percentage.
+
+3. Replace the plain "Key Performance Metrics" / market-insights rows with a small grid of stat tiles, each showing the metric name, its value, a trend arrow/percentage (insight.trend is already available — up arrow + green when positive, down arrow + red when negative), and the description as a subtle caption.
+
+4. Find wherever "Pipeline Stages This Month" (or its equivalent inside <AnalyticsDashboard />) renders its "No pipeline stages configured yet" empty state, and redesign that empty state: centered icon, a clear one-line message, and — if pipeline stages are configurable somewhere in the app — a text link/button pointing there instead of a bare gray sentence.
+
+5. Keep the Markets / Brokers / Trends tabs functionally identical for now — just carry the same visual language (card styling, spacing, color palette) into their existing charts/tables so the whole page feels like one cohesive design instead of a mix of the old gray shadcn defaults and the newer brand colors.

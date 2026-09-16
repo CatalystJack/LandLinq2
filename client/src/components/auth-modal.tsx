@@ -74,7 +74,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = 'login' }: AuthModalP
     onError: (error: Error) => {
       toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
     },
-  });
+  }, queryClient);
 
   const registerMutation = useMutation({
     mutationFn: async (userData: {
@@ -108,7 +108,7 @@ export function AuthModal({ isOpen, onClose, defaultMode = 'login' }: AuthModalP
     onError: (error: Error) => {
       toast({ title: "Registration failed", description: error.message, variant: "destructive" });
     },
-  });
+  }, queryClient);
 
   const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

@@ -15157,23 +15157,95 @@ RULES:
           microsoft_token_expiry as "microsoftTokenExpiry",
           (microsoft_access_token IS NOT NULL OR microsoft_refresh_token IS NOT NULL) as "hasMicrosoftToken",
           microsoft_refresh_token IS NOT NULL as "hasRefreshToken",
-          signature_html as "signatureHtml", is_active as "isActive"
+          signature_html as "signatureHtml", is_active as "isActive",
+          is_notification_sender as "isNotificationSender"
         FROM outreach_senders
         WHERE developer_profile_id = ${developerProfileId}
         ORDER BY created_at DESC
-        LIMIT 1
       `);
-      const sender = result.rows?.[0] || null;
-      const senderIsUsable = Boolean(sender?.outlookConnected && sender?.hasMicrosoftToken);
+      const senders = (result.rows || []) as any[];
+      const senderIsUsable = (sender: any) => Boolean(sender?.outlookConnected && sender?.hasMicrosoftToken);
+      const designatedSender = senders.find(sender => sender.isNotificationSender && senderIsUsable(sender));
+      const fallbackSender = senders.find(sender => senderIsUsable(sender));
+      const effectiveCompanySender = designatedSender || fallbackSender || null;
       return res.json({
-        sender,
-        effectiveSender: senderIsUsable
-          ? { email: sender.email, name: sender.name, source: "company_outlook" }
+        sender: effectiveCompanySender || senders[0] || null,
+        effectiveSender: effectiveCompanySender
+          ? { email: effectiveCompanySender.email, name: effectiveCompanySender.name, source: "company_outlook" }
           : { email: PUBLIC_TRANSACTIONAL_EMAIL, name: PUBLIC_TRANSACTIONAL_NAME, source: "platform_fallback" },
       });
     } catch (error) {
       console.error('[developer outreach sender] Error:', error);
       return res.status(500).json({ error: 'Failed to load email connection' });
+    }
+  });
+
+  app.get("/api/developer-profile/me/outreach/senders", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const result = await db.execute(sql`
+        SELECT id, name, email, outlook_connected as "outlookConnected",
+          (microsoft_access_token IS NOT NULL OR microsoft_refresh_token IS NOT NULL) as "hasMicrosoftToken",
+          is_notification_sender as "isNotificationSender",
+          is_active as "isActive"
+        FROM outreach_senders
+        WHERE developer_profile_id = ${developerProfileId}
+        ORDER BY created_at DESC
+      `);
+      return res.json({ senders: result.rows || [] });
+    } catch (error) {
+      console.error('[developer outreach senders] Error:', error);
+      return res.status(500).json({ error: 'Failed to load email connections' });
+    }
+  });
+
+  app.post("/api/developer-profile/me/outreach/notification-sender", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const senderId = typeof req.body?.senderId === "string" ? req.body.senderId.trim() : "";
+      if (!senderId) return res.status(400).json({ error: "senderId is required" });
+
+      const senderResult = await db.execute(sql`
+        SELECT id, name, email, outlook_connected as "outlookConnected",
+          (microsoft_access_token IS NOT NULL OR microsoft_refresh_token IS NOT NULL) as "hasMicrosoftToken",
+          is_notification_sender as "isNotificationSender",
+          is_active as "isActive"
+        FROM outreach_senders
+        WHERE id = ${senderId} AND developer_profile_id = ${developerProfileId}
+        LIMIT 1
+      `);
+      const sender = senderResult.rows?.[0] as any;
+      if (!sender) return res.status(404).json({ error: "Sender not found for this company" });
+      if (!sender.outlookConnected || !sender.hasMicrosoftToken || sender.isActive === false) {
+        return res.status(400).json({ error: "Selected sender must have a connected, usable Outlook account" });
+      }
+
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`
+          UPDATE outreach_senders
+          SET is_notification_sender = false, updated_at = NOW()
+          WHERE developer_profile_id = ${developerProfileId}
+        `);
+        await tx.execute(sql`
+          UPDATE outreach_senders
+          SET is_notification_sender = true, updated_at = NOW()
+          WHERE id = ${senderId} AND developer_profile_id = ${developerProfileId}
+        `);
+      });
+
+      return res.json({
+        sender: {
+          ...sender,
+          isNotificationSender: true,
+        },
+      });
+    } catch (error) {
+      console.error('[developer outreach notification sender] Error:', error);
+      return res.status(500).json({ error: 'Failed to set notification sender' });
     }
   });
 

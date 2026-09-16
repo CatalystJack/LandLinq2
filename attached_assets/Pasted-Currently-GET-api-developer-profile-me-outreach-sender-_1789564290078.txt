@@ -1,0 +1,11 @@
+Currently, GET /api/developer-profile/me/outreach/sender in server/routes.ts (~line 15150) picks a company's notification sender with `ORDER BY created_at DESC LIMIT 1` on outreach_senders — whichever team member most recently connected their Outlook account wins, with no way to choose. Fix this:
+
+1. Schema (shared/schema.ts, outreachSenders table ~line 2766): add a new column `isNotificationSender: boolean("is_notification_sender").default(false)`. Run `npm run db:push` after.
+
+2. New endpoints in server/routes.ts near the existing sender routes:
+   - GET /api/developer-profile/me/outreach/senders (plural) — returns ALL outreach_senders rows for the current developerProfileId (id, name, email, outlookConnected, hasMicrosoftToken usability, isNotificationSender), not just the latest one.
+   - POST /api/developer-profile/me/outreach/notification-sender — body { senderId }. Validate senderId belongs to this developerProfileId and is connected/usable (outlookConnected && hasMicrosoftToken), then in one update: set is_notification_sender = false for all senders on this developerProfileId, and true for the given senderId.
+
+3. Update the existing GET /api/developer-profile/me/outreach/sender (singular) handler: when computing `effectiveSender`, first look for the row where is_notification_sender = true AND it's usable; only fall back to the current "most recently created usable sender" logic if no sender is explicitly designated; only fall back further to PUBLIC_TRANSACTIONAL_EMAIL/NAME if nothing usable exists at all.
+
+4. Frontend, client/src/pages/developer-criteria-settings.tsx, "Broker notifications" card (~line 412-462): fetch the new senders list (GET .../senders). If there's only one connected sender, keep the current display-only view. If there are 2+, replace the static "Sender Address" block with a Select dropdown listing each connected sender's name/email, defaulting to whichever is currently `isNotificationSender` (or the effective sender if none is set yet), calling the new POST endpoint on change and invalidating both the singular and plural sender queries on success. Keep the "Outlook connected" badge and the "This is display-only" caption only for the single-sender case.
