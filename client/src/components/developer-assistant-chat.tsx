@@ -114,19 +114,19 @@ export default function DeveloperAssistantChat() {
       {isOpen && (
         <section
           className="mb-3 flex h-[min(34rem,calc(100vh-7rem))] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
-          aria-label="Investment Company assistant"
+          aria-label="Truss — Your multifamily development copilot"
           data-testid="developer-assistant-panel"
         >
           <header className="flex items-center justify-between bg-[#081729] px-4 py-3 text-white">
             <div>
-              <h2 className="text-sm font-semibold">Company assistant</h2>
-              <p className="mt-0.5 text-xs text-slate-300">Ask about your company data</p>
+               <h2 className="text-sm font-semibold">Truss</h2>
+               <p className="mt-0.5 text-xs text-slate-300">Your multifamily development copilot</p>
             </div>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
               className="rounded-md p-1.5 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
-              aria-label="Close company assistant"
+               aria-label="Close Truss"
               data-testid="button-close-developer-assistant"
             >
               <X className="h-4 w-4" />
@@ -231,7 +231,7 @@ export default function DeveloperAssistantChat() {
         type="button"
         onClick={() => setIsOpen((open) => !open)}
         className="ml-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#0A2B4A] text-white shadow-xl ring-1 ring-white/20 transition-all hover:bg-white hover:text-[#4A90E2] hover:ring-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:ring-offset-2"
-        aria-label={isOpen ? "Close company assistant" : "Open company assistant"}
+         aria-label={isOpen ? "Close Truss" : "Open Truss"}
         aria-expanded={isOpen}
         data-testid="button-open-developer-assistant"
       >
