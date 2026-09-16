@@ -110,7 +110,7 @@ export default function DeveloperAssistantChat() {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-[70] sm:bottom-6 sm:right-6" data-testid="developer-assistant-chat">
+    <div className="fixed inset-x-4 bottom-4 z-[70] flex justify-end sm:inset-x-auto sm:bottom-6 sm:right-6" data-testid="developer-assistant-chat">
       {isOpen && (
         <section
           className="mb-3 flex h-[min(34rem,calc(100vh-7rem))] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"

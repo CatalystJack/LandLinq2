@@ -77,9 +77,12 @@ import {
   addMyContactTag,
   createMyPipelineOpportunity,
   getCompsForDeal,
+  getMyContactCount,
   getMyContacts,
   getMyCriteria,
+  getMyDealCount,
   getMyDeals,
+  getNearbyDeals,
   getMyPipelineSummary,
   markMyDealPursuing,
 } from "./developerAssistantData";
@@ -14556,9 +14559,11 @@ RULES:
         await saveSession();
       }
 
-      const [dealsForContext, contactsForContext, pipelineSummary] = await Promise.all([
+       const [dealsForContext, dealCount, contactsForContext, contactCount, pipelineSummary] = await Promise.all([
         getMyDeals(developerProfileId, { limit: 100 }),
+         getMyDealCount(developerProfileId),
         getMyContacts(developerProfileId),
+         getMyContactCount(developerProfileId),
         getMyPipelineSummary(developerProfileId),
       ]);
 
@@ -14570,12 +14575,14 @@ RULES:
           state: deal.state,
           status: deal.status,
         })),
+         dealCount,
         contacts: contactsForContext.map((contact) => ({
           id: contact.id,
           name: contact.name,
           email: contact.email,
           brokerage: contact.brokerage,
         })),
+         contactCount,
         pipelineStages: pipelineSummary.stages.map((stage) => ({
           id: stage.id,
           name: stage.name,
@@ -14584,8 +14591,11 @@ RULES:
 
       const readOnlyTools = new Set([
         "getMyDeals",
+         "getMyDealCount",
         "getMyPipelineSummary",
         "getMyContacts",
+         "getMyContactCount",
+         "getNearbyDeals",
         "getCompsForDeal",
         "getMyCriteria",
       ]);
@@ -14677,6 +14687,19 @@ RULES:
           result = await getMyDeals(developerProfileId, { status, search, limit: 100 });
           break;
         }
+         case "getMyDealCount": {
+           const requestedStatus = typeof args.status === "string" ? args.status.trim() : undefined;
+           const status = requestedStatus && ["Pursuing", "Passed", "Review"].includes(requestedStatus)
+             ? requestedStatus
+             : undefined;
+           const search = typeof args.search === "string" ? args.search.trim().slice(0, 200) : undefined;
+           result = {
+             count: await getMyDealCount(developerProfileId, { status, search }),
+             status: status || null,
+             search: search || null,
+           };
+           break;
+         }
         case "getMyPipelineSummary":
           result = await getMyPipelineSummary(developerProfileId);
           break;
@@ -14685,6 +14708,28 @@ RULES:
           result = await getMyContacts(developerProfileId, search);
           break;
         }
+         case "getMyContactCount": {
+           const search = typeof args.search === "string" ? args.search.trim().slice(0, 200) : "";
+           result = {
+             count: await getMyContactCount(developerProfileId, search),
+             search: search || null,
+           };
+           break;
+         }
+         case "getNearbyDeals": {
+           const dealId = typeof args.dealId === "string" ? args.dealId.trim() : "";
+           const search = typeof args.search === "string" ? args.search.trim().slice(0, 200) : "";
+           const rawRadius = args.radiusMiles === undefined || args.radiusMiles === null || args.radiusMiles === ""
+             ? 20
+             : Number(args.radiusMiles);
+           const radiusMiles = Number.isFinite(rawRadius) ? rawRadius : 20;
+           result = await getNearbyDeals(developerProfileId, {
+             ...(dealId ? { dealId } : {}),
+             ...(search ? { search } : {}),
+             radiusMiles,
+           });
+           break;
+         }
         case "getCompsForDeal": {
           const dealId = typeof args.dealId === "string" ? args.dealId.trim() : "";
           result = dealId ? await getCompsForDeal(developerProfileId, dealId) : null;

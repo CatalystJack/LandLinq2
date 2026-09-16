@@ -207,8 +207,11 @@ export type DeveloperAssistantPlan = {
   kind: "answer" | "action";
   tool:
     | "getMyDeals"
+    | "getMyDealCount"
     | "getMyPipelineSummary"
     | "getMyContacts"
+    | "getMyContactCount"
+    | "getNearbyDeals"
     | "getCompsForDeal"
     | "getMyCriteria"
     | "markDealPursuing"
@@ -221,7 +224,9 @@ export async function planDeveloperAssistantQuestion(
   question: string,
   context: {
     deals: Array<{ id: string; address: string; city: string; state: string; status: string }>;
+    dealCount: number;
     contacts: Array<{ id: string; name: string; email: string | null; brokerage: string | null }>;
+    contactCount: number;
     pipelineStages: Array<{ id: string; name: string }>;
   },
 ): Promise<DeveloperAssistantPlan> {
@@ -234,8 +239,11 @@ export async function planDeveloperAssistantQuestion(
 Never invent IDs, names, or values. Use only IDs from the supplied tenant-scoped context.
 Read tools:
 - getMyDeals: args {status?: "Pursuing"|"Passed"|"Review", search?: string}
+- getMyDealCount: args {status?: "Pursuing"|"Passed"|"Review", search?: string}
 - getMyPipelineSummary: args {}
 - getMyContacts: args {search?: string}
+- getMyContactCount: args {search?: string}
+- getNearbyDeals: args {dealId?: string, search?: string, radiusMiles?: number}
 - getCompsForDeal: args {dealId: string}
 - getMyCriteria: args {}
 Action tools:
@@ -246,14 +254,23 @@ Choose kind "action" only when the user explicitly asks to perform one of the th
 For a request to mark a deal, match the requested address to the supplied deals.
 For a contact tag request, match the contact by name or email and preserve the requested tag exactly.
 For a pipeline opportunity, match the contact and stage when supplied. Do not choose an unrelated contact.
+Use the exact count tools for questions asking how many deals or contacts exist.
+Use getNearbyDeals for radius/proximity questions. Only provide dealId from the supplied context or an exact address/search phrase from the user's question.
+If the user says "this deal" without identifying a verified deal, choose getNearbyDeals with no reference and let the server ask for the deal address; never guess.
 Return JSON only:
 {"kind":"answer"|"action","tool":"...","args":{...}}
 
 Tenant-scoped deals:
 ${JSON.stringify(context.deals)}
 
+Verified tenant-scoped deal count:
+${context.dealCount}
+
 Tenant-scoped contacts:
 ${JSON.stringify(context.contacts)}
+
+Verified tenant-scoped contact count:
+${context.contactCount}
 
 Tenant-scoped pipeline stages:
 ${JSON.stringify(context.pipelineStages)}
@@ -271,8 +288,11 @@ ${question}`,
   const parsed = JSON.parse(raw) as Partial<DeveloperAssistantPlan>;
   const allowedTools = new Set<DeveloperAssistantPlan["tool"]>([
     "getMyDeals",
+    "getMyDealCount",
     "getMyPipelineSummary",
     "getMyContacts",
+    "getMyContactCount",
+    "getNearbyDeals",
     "getCompsForDeal",
     "getMyCriteria",
     "markDealPursuing",
@@ -309,6 +329,10 @@ Be concise and natural. State exact counts, names, statuses, or values present i
 Do not invent or infer missing facts. If the result is empty or null, say that no matching
 tenant-owned records were found. Never mention internal tool names, database details, or other
 companies. This is read-only Q&A unless the server has separately returned a confirmation prompt.
+For a nearby-deals result with needsReferenceDeal=true, clearly ask the user for the deal
+address or name and do not say that there are zero nearby deals. For a nearby-deals result
+with a missing verified coordinate, explain that the reference deal needs verified location
+data instead of guessing a distance.
 
 Question: ${question}
 Verified read result:

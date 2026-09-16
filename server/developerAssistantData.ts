@@ -1,10 +1,17 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { haversineMiles } from "./automatedDealEmailPipeline";
 
 export type MyDealFilters = {
   status?: string;
   search?: string;
   limit?: number;
+};
+
+export type NearbyDealFilters = {
+  dealId?: string;
+  search?: string;
+  radiusMiles?: number;
 };
 
 export type MyCampaign = {
@@ -39,6 +46,8 @@ export async function getMyDeals(developerProfileId: string, filters: MyDealFilt
         d.status AS source_status,
         d.asking_price,
         d.created_at,
+        d.latitude,
+        d.longitude,
         d.comparables_json,
         CASE
           WHEN pds.green_flagged_by_developer = true THEN 'Pursuing'
@@ -76,7 +85,46 @@ export async function getMyDeals(developerProfileId: string, filters: MyDealFilt
     sourceStatus: row.source_status || null,
     askingPrice: row.asking_price === null ? null : Number(row.asking_price),
     createdAt: row.created_at || null,
+    latitude: row.latitude === null ? null : Number(row.latitude),
+    longitude: row.longitude === null ? null : Number(row.longitude),
   }));
+}
+
+export async function getMyDealCount(developerProfileId: string, filters: Omit<MyDealFilters, "limit"> = {}) {
+  const status = normalizeStatus(filters.status);
+  const search = String(filters.search || "").trim();
+  const result = await db.execute(sql`
+    WITH visible_deals AS (
+      SELECT DISTINCT ON (d.id)
+        d.id,
+        d.address,
+        d.city,
+        d.state,
+        CASE
+          WHEN pds.green_flagged_by_developer = true THEN 'Pursuing'
+          WHEN LOWER(COALESCE(pds.classification, '')) IN ('green', 'passed', 'accepted') THEN 'Passed'
+          ELSE 'Review'
+        END AS developer_status
+      FROM deals d
+      INNER JOIN partner_developer_sends pds ON pds.deal_id = d.id
+      LEFT JOIN partner_developers pd ON pd.id = pds.developer_id
+      WHERE (
+        pds.developer_profile_id = ${developerProfileId}
+        OR (pds.developer_profile_id IS NULL AND pd.developer_profile_id = ${developerProfileId})
+      )
+      ORDER BY d.id, pds.matched_at DESC NULLS LAST, pd.created_at DESC NULLS LAST
+    )
+    SELECT COUNT(*)::int AS total_count
+    FROM visible_deals
+    WHERE (${status === null} OR LOWER(developer_status) = ${status})
+      AND (
+        ${search === ""}
+        OR LOWER(COALESCE(address, '')) LIKE LOWER(${"%" + search + "%"})
+        OR LOWER(COALESCE(city, '')) LIKE LOWER(${"%" + search + "%"})
+        OR LOWER(COALESCE(state, '')) LIKE LOWER(${"%" + search + "%"})
+      )
+  `);
+  return Number((result.rows?.[0] as any)?.total_count) || 0;
 }
 
 export async function getMyPipelineSummary(developerProfileId: string) {
@@ -142,6 +190,147 @@ export async function getMyContacts(developerProfileId: string, search = "") {
     state: row.state_region || null,
     tags: Array.isArray(row.crm_tags) ? row.crm_tags : [],
   }));
+}
+
+export async function getMyContactCount(developerProfileId: string, search = "") {
+  const normalizedSearch = String(search || "").trim();
+  const result = await db.execute(sql`
+    SELECT COUNT(*)::int AS total_count
+    FROM brokers b
+    WHERE b.is_active = true
+      AND (b.owner_developer_profile_id = ${developerProfileId} OR b.owner_developer_profile_id IS NULL)
+      AND NOT EXISTS (
+        SELECT 1
+        FROM users demo_owner
+        WHERE demo_owner.id = b.user_id
+          AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+      )
+      AND (
+        ${normalizedSearch === ""}
+        OR LOWER(COALESCE(b.first_name, '')) LIKE LOWER(${"%" + normalizedSearch + "%"})
+        OR LOWER(COALESCE(b.last_name, '')) LIKE LOWER(${"%" + normalizedSearch + "%"})
+        OR LOWER(COALESCE(b.email, '')) LIKE LOWER(${"%" + normalizedSearch + "%"})
+        OR LOWER(COALESCE(b.brokerage, '')) LIKE LOWER(${"%" + normalizedSearch + "%"})
+      )
+  `);
+  return Number((result.rows?.[0] as any)?.total_count) || 0;
+}
+
+export async function getNearbyDeals(developerProfileId: string, filters: NearbyDealFilters = {}) {
+  const dealId = String(filters.dealId || "").trim();
+  const search = String(filters.search || "").trim().toLowerCase();
+  const radiusMiles = Math.min(Math.max(Number(filters.radiusMiles) || 20, 0.1), 500);
+  const result = await db.execute(sql`
+    WITH visible_deals AS (
+      SELECT DISTINCT ON (d.id)
+        d.id,
+        d.address,
+        d.city,
+        d.state,
+        d.latitude,
+        d.longitude,
+        CASE
+          WHEN pds.green_flagged_by_developer = true THEN 'Pursuing'
+          WHEN LOWER(COALESCE(pds.classification, '')) IN ('green', 'passed', 'accepted') THEN 'Passed'
+          ELSE 'Review'
+        END AS developer_status
+      FROM deals d
+      INNER JOIN partner_developer_sends pds ON pds.deal_id = d.id
+      LEFT JOIN partner_developers pd ON pd.id = pds.developer_id
+      WHERE (
+        pds.developer_profile_id = ${developerProfileId}
+        OR (pds.developer_profile_id IS NULL AND pd.developer_profile_id = ${developerProfileId})
+      )
+      ORDER BY d.id, pds.matched_at DESC NULLS LAST, pd.created_at DESC NULLS LAST
+    )
+    SELECT id, address, city, state, latitude, longitude, developer_status
+    FROM visible_deals
+  `);
+  const visibleDeals = (result.rows || []).map((row: any) => ({
+    id: String(row.id),
+    address: row.address || "",
+    city: row.city || "",
+    state: row.state || "",
+    status: row.developer_status || "Review",
+    latitude: row.latitude === null ? null : Number(row.latitude),
+    longitude: row.longitude === null ? null : Number(row.longitude),
+  }));
+
+  const anchor = dealId
+    ? visibleDeals.find((deal) => deal.id === dealId)
+    : search
+      ? visibleDeals.find((deal) => {
+          const address = deal.address.toLowerCase();
+          const location = [deal.address, deal.city, deal.state].filter(Boolean).join(", ").toLowerCase();
+          return address === search || location === search || location.includes(search);
+        })
+      : undefined;
+
+  if (!anchor) {
+    return {
+      needsReferenceDeal: true,
+      radiusMiles,
+      referenceDeal: null,
+      nearbyDeals: [],
+      count: null,
+      reason: "A verified deal address or deal ID is required to calculate a radius.",
+    };
+  }
+
+  if (
+    anchor.latitude === null
+    || anchor.longitude === null
+    || !Number.isFinite(anchor.latitude)
+    || !Number.isFinite(anchor.longitude)
+  ) {
+    return {
+      needsReferenceDeal: false,
+      radiusMiles,
+      referenceDeal: {
+        id: anchor.id,
+        address: anchor.address,
+        city: anchor.city,
+        state: anchor.state,
+        status: anchor.status,
+      },
+      nearbyDeals: [],
+      count: null,
+      reason: "The reference deal does not have verified coordinates.",
+    };
+  }
+
+  const nearbyDeals = visibleDeals
+    .filter((deal) => deal.id !== anchor.id && deal.latitude !== null && deal.longitude !== null)
+    .map((deal) => ({
+      ...deal,
+      distanceMiles: haversineMiles(
+        { latitude: anchor.latitude as number, longitude: anchor.longitude as number },
+        { latitude: deal.latitude as number, longitude: deal.longitude as number },
+      ),
+    }))
+    .filter((deal) => deal.distanceMiles <= radiusMiles)
+    .sort((a, b) => a.distanceMiles - b.distanceMiles);
+
+  return {
+    needsReferenceDeal: false,
+    radiusMiles,
+    referenceDeal: {
+      id: anchor.id,
+      address: anchor.address,
+      city: anchor.city,
+      state: anchor.state,
+      status: anchor.status,
+    },
+    count: nearbyDeals.length,
+    nearbyDeals: nearbyDeals.slice(0, 100).map((deal) => ({
+      id: deal.id,
+      address: deal.address,
+      city: deal.city,
+      state: deal.state,
+      status: deal.status,
+      distanceMiles: Number(deal.distanceMiles.toFixed(2)),
+    })),
+  };
 }
 
 export async function getCompsForDeal(developerProfileId: string, dealId: string) {
