@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -435,18 +436,13 @@ export default function ExecutiveDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
       <Navigation />
       <div className="p-6 max-w-[1800px] mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-[#081729]" data-testid="text-dashboard-title">
-               {isPlatformAdmin ? "Platform Dashboard" : "Executive Dashboard"}
-            </h1>
-            <p className="text-gray-500 mt-1">
-              {isPlatformAdmin
-                ? "A parent view of every Investment Company, developer, deal, and platform activity"
-                : "Real-time insights into LandLinq performance"}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
+        <PageHeader
+          title={isPlatformAdmin ? "Platform Dashboard" : "Executive Dashboard"}
+          description={isPlatformAdmin
+            ? "A parent view of every Investment Company, developer, deal, and platform activity"
+            : "Real-time insights into LandLinq performance"}
+          actions={
+            <div className="flex items-center gap-4">
             {isPlatformAdmin && (
               <Link href="/admin/investment-companies">
                 <Button variant="outline" className="gap-2" data-testid="button-manage-development-partners">
@@ -487,13 +483,16 @@ export default function ExecutiveDashboard() {
                           className="px-3 py-1 flex items-center gap-1"
                         >
                           {keyword}
-                          <button
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="iconSm"
                             onClick={() => handleRemoveKeyword(keyword)}
-                            className="ml-1 hover:text-red-500"
+                            className="ml-1 h-5 w-5 hover:text-red-500"
                             data-testid={`button-remove-keyword-${keyword.replace(/\s+/g, '-')}`}
                           >
                             <X size={12} />
-                          </button>
+                          </Button>
                         </Badge>
                       ))}
                     </div>
@@ -543,12 +542,15 @@ export default function ExecutiveDashboard() {
                           className="px-3 py-1 flex items-center gap-1 border-red-200 bg-red-50 text-red-700"
                         >
                           {domain}
-                          <button
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="iconSm"
                             onClick={() => handleRemoveExcludedDomain(domain)}
-                            className="ml-1 hover:text-red-900"
+                            className="ml-1 h-5 w-5 hover:text-red-900"
                           >
                             <X size={12} />
-                          </button>
+                          </Button>
                         </Badge>
                       ))}
                       {localPrefs.excludedDomains.length === 0 && (
@@ -586,8 +588,9 @@ export default function ExecutiveDashboard() {
                  {isPlatformAdmin ? "All Deal Pipeline" : "Deal Dashboard"}
               </Button>
             </Link>
-          </div>
-        </div>
+            </div>
+          }
+        />
 
          <Tabs defaultValue={isPlatformAdmin ? "system-wide" : "overview"} className="space-y-6">
           <TabsList className={`grid w-full max-w-md ${isPlatformAdmin ? "grid-cols-2" : "grid-cols-1"}`}>

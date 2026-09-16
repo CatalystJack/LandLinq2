@@ -1,0 +1,13 @@
+Apply the shared PageHeader component and consistent Button usage to client/src/pages/developer-criteria-settings.tsx.
+
+1. Replace the title block around line 435-444 (the <h1> "Acquisition criteria" / "Company settings", its description <p>, and the "Save settings" Button) with <PageHeader title={...} description={...} actions={<Button onClick={save} disabled={saveMutation.isPending} style={{ backgroundColor: primaryColor }} className="text-white">...Save settings</Button>} />, keeping the existing conditional title/description text for profileType === "general_sales" exactly as-is.
+
+2. Every Card in this file (Broker notifications ~447, Criteria ~538, Rent minimum overrides, Team ~665) currently uses className="border-slate-200 shadow-sm". Add rounded-2xl to that className on all of them so they match the rounded-2xl card treatment already used on the redesigned Analytics pages.
+
+3. The "Product types" row (around line 594-624) uses rounded-xl border border-slate-200 bg-slate-50 — change bg-slate-50 to bg-white and rounded-xl to rounded-2xl so it's visually consistent with the outer cards, and add a subtle shadow-sm.
+
+4. The Target states / Target counties chip inputs (TagEditor and CountyMarketEditor components, rendered around line 546-553) currently render chips as plain gray pills (seen in the screenshot as "NC ×", "SC ×" etc. in flat gray). Find the TagEditor component definition and restyle its chip pills to bg-catalyst-blue/10 text-catalyst-navy border border-catalyst-blue/20 instead of whatever flat gray/slate classes it currently uses, so they read as branded tags rather than generic form pills. Do the same for CountyMarketEditor's chips if it renders its own.
+
+5. The "Add product type" button (line ~586) and "Request Team Member" button (line ~672) already use the Button component correctly — leave those as-is, just confirm they still render correctly after the PageHeader change.
+
+Don't touch the Team table, the Rent minimum overrides checkboxes, or any form logic/validation — this is a visual pass only.

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -199,18 +200,11 @@ export default function ApiKeysAdmin() {
       <Navigation />
       <div className="max-w-5xl mx-auto px-4 py-8">
 
-        {/* Header */}
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <Key className="h-7 w-7 text-slate-700" />
-              <h1 className="text-2xl font-bold text-slate-900">LandLinq API Keys</h1>
-            </div>
-            <p className="text-slate-500 text-sm">
-              Generate and manage API keys for external integrations (Make.com, Zapier, custom automations).
-            </p>
-          </div>
-          <div className="flex gap-2">
+        <PageHeader
+          title="LandLinq API Keys"
+          description="Generate and manage API keys for external integrations (Make.com, Zapier, custom automations)."
+          actions={
+            <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setShowDocs(!showDocs)}>
               <Code2 className="h-4 w-4 mr-1.5" /> {showDocs ? "Hide" : "API"} Reference
             </Button>
@@ -252,8 +246,9 @@ export default function ApiKeysAdmin() {
                 </div>
               </DialogContent>
             </Dialog>
-          </div>
-        </div>
+            </div>
+          }
+        />
 
         {/* Newly created key — show once */}
         {revealed && (
@@ -309,8 +304,9 @@ export default function ApiKeysAdmin() {
               {/* Endpoints */}
               {ENDPOINTS.map((ep, i) => (
                 <div key={i} className="border border-slate-200 rounded-lg overflow-hidden">
-                  <button
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+                  <Button
+                    variant="ghost"
+                    className="h-auto w-full justify-start gap-3 rounded-none px-4 py-3 text-left hover:bg-slate-50"
                     onClick={() => setExpandedEndpoint(expandedEndpoint === i ? null : i)}
                   >
                     <Badge className={`text-xs flex-shrink-0 ${
@@ -320,7 +316,7 @@ export default function ApiKeysAdmin() {
                     <code className="text-sm font-mono text-slate-800 flex-1">{ep.path}</code>
                     <span className="text-xs text-slate-400 hidden sm:inline">{ep.desc}</span>
                     {expandedEndpoint === i ? <ChevronUp className="h-4 w-4 text-slate-400 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-slate-400 flex-shrink-0" />}
-                  </button>
+                  </Button>
                   {expandedEndpoint === i && (
                     <div className="border-t border-slate-100 p-4 space-y-3 bg-slate-50">
                       <p className="text-sm text-slate-600">{ep.desc}</p>
@@ -335,7 +331,7 @@ export default function ApiKeysAdmin() {
                         <pre className="text-xs bg-slate-800 text-green-300 rounded p-3 overflow-x-auto whitespace-pre-wrap">{ep.returns}</pre>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="text-xs h-7"
+                        <Button size="xs" variant="outline"
                           onClick={() => copyToClipboard(`${ep.method} ${ep.path}`, "Endpoint")}>
                           <Copy className="h-3 w-3 mr-1" /> Copy
                         </Button>
@@ -505,14 +501,16 @@ function ApiKeyCard({
                 {k.keyPlaintext ?? k.keyPrefix}
               </code>
               {k.isActive && (
-                <button
-                  className="flex items-center gap-1 text-xs text-slate-500 hover:text-teal-600 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 rounded px-2 py-0.5 transition-colors"
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="gap-1 text-xs text-slate-500 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-600"
                   onClick={onCopy}
                   title="Copy full key"
                 >
                   <Copy className="h-3 w-3" />
                   Copy
-                </button>
+                </Button>
               )}
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-400">
@@ -533,13 +531,13 @@ function ApiKeyCard({
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             {k.isActive && onRevoke && (
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs border-orange-200 text-orange-600 hover:bg-orange-50"
+              <Button variant="outline" size="xs" className="border-orange-200 text-orange-600 hover:bg-orange-50"
                 onClick={onRevoke} disabled={revoking}>
                 <ShieldOff className="h-3.5 w-3.5 mr-1" /> Revoke
               </Button>
             )}
             {!k.isActive && onActivate && (
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+              <Button variant="outline" size="xs" className="border-emerald-200 text-emerald-600 hover:bg-emerald-50"
                 onClick={onActivate} disabled={activating}>
                 <ShieldCheck className="h-3.5 w-3.5 mr-1" /> Reactivate
               </Button>
@@ -547,15 +545,15 @@ function ApiKeyCard({
             {showConfirmDelete ? (
               <div className="flex items-center gap-1">
                 <span className="text-xs text-red-600">Sure?</span>
-                <Button size="sm" variant="destructive" className="h-7 px-2 text-xs"
+                <Button size="xs" variant="destructive"
                   onClick={() => { onDelete(); setShowConfirmDelete(false); }} disabled={deleting}>
                   Yes, delete
                 </Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
+                <Button size="xs" variant="ghost"
                   onClick={() => setShowConfirmDelete(false)}>Cancel</Button>
               </div>
             ) : (
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-red-400 hover:text-red-600"
+              <Button variant="ghost" size="xs" className="text-red-400 hover:text-red-600"
                 onClick={() => setShowConfirmDelete(true)}>
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>

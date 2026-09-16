@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -169,10 +170,7 @@ export default function DatabaseManagement() {
   if (healthLoading) {
     return (
       <div className="container mx-auto p-6">
-        <div className="flex items-center gap-2 mb-6">
-          <Database className="h-6 w-6" />
-          <h1 className="text-3xl font-bold">Database Management</h1>
-        </div>
+        <PageHeader title="Database Management" />
         <div className="flex items-center justify-center h-64">
           <RefreshCw className="h-8 w-8 animate-spin" />
           <span className="ml-2">Loading database status...</span>
@@ -183,18 +181,20 @@ export default function DatabaseManagement() {
 
   return (
     <div className="container mx-auto p-6" data-testid="database-management-page">
-      <div className="flex items-center gap-2 mb-6">
-        <Database className="h-6 w-6" />
-        <h1 className="text-3xl font-bold">Database Management</h1>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => refetchHealth()}
-          data-testid="refresh-health-button"
-        >
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-      </div>
+      <PageHeader
+        title="Database Management"
+        actions={
+          <Button
+            variant="outline"
+            size="iconSm"
+            onClick={() => refetchHealth()}
+            data-testid="refresh-health-button"
+            aria-label="Refresh database health"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        }
+      />
 
       {health && (
         <div className="grid gap-6">

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Mail, ShieldCheck, Users, Loader2 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
+import { PageHeader } from "@/components/ui/page-header";
 import Footer from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,7 @@ export default function DeveloperUserManagement() {
     <div className="min-h-screen bg-slate-50">
       <DeveloperNavigation />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <DeveloperPageHeader
+        <PageHeader
           title="User Management"
           description="View the users who belong to your company portal."
           eyebrow="Organization"

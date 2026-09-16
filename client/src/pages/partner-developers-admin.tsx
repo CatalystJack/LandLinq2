@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -192,9 +193,9 @@ function ComposeSendDialog({
             <h3 className="font-bold text-catalyst-navy text-sm">{label}</h3>
             <p className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">{addr}</p>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+          <Button type="button" variant="ghost" size="iconSm" onClick={onClose} className="text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
         <div className="px-5 py-4 space-y-4">
           <div>
@@ -229,11 +230,12 @@ function ComposeSendDialog({
           </div>
         </div>
         <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-gray-100">
-          <Button variant="outline" onClick={onClose} className="h-8 text-sm">Cancel</Button>
+          <Button variant="outline" size="xs" onClick={onClose}>Cancel</Button>
           <Button
             onClick={handleSend}
             disabled={sending}
-            className="h-8 text-sm bg-catalyst-navy hover:bg-catalyst-navy/90 text-white gap-1.5"
+            size="xs"
+            className="bg-catalyst-navy hover:bg-catalyst-navy/90 text-white gap-1.5"
           >
             {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
             {sending ? "Sending…" : "Send Email"}
@@ -290,13 +292,15 @@ function DealRow({ deal, devEmail, devContactName }: { deal: MatchingDeal; devEm
             ))}
           </div>
         </div>
-        <button
+        <Button
+          type="button"
+          size="xs"
           onClick={() => setOpen(true)}
-          className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-white bg-catalyst-navy hover:bg-catalyst-navy/90 px-3 py-1.5 rounded-lg transition-colors"
+          className="flex-shrink-0 bg-catalyst-navy text-xs font-semibold text-white hover:bg-catalyst-navy/90"
         >
           <Mail className="w-3 h-3" />
           {deal.investmentMemoUrl ? "Send + Memo" : "Send"}
-        </button>
+        </Button>
       </div>
     </>
   );
@@ -316,7 +320,10 @@ function AutoSendToggle({ dev }: { dev: PartnerDeveloper }) {
 
   const enabled = dev.autoSendEnabled;
   return (
-    <button
+    <Button
+      type="button"
+      variant="outline"
+      size="xs"
       onClick={e => { e.stopPropagation(); mutation.mutate(!enabled); }}
       disabled={mutation.isPending}
       title={enabled ? "Auto-send ON — click to disable" : "Auto-send OFF — click to enable"}
@@ -334,7 +341,7 @@ function AutoSendToggle({ dev }: { dev: PartnerDeveloper }) {
         <ZapOff className="w-2.5 h-2.5" />
       )}
       {enabled ? "Auto-send ON" : "Auto-send OFF"}
-    </button>
+    </Button>
   );
 }
 
@@ -420,12 +427,12 @@ function DeveloperRow({ dev, routingData, onEdit, onDelete }: {
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-            <button onClick={() => onEdit(dev)} className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors" title="Edit">
+            <Button type="button" variant="ghost" size="iconSm" onClick={() => onEdit(dev)} className="text-gray-400 hover:bg-blue-50 hover:text-blue-600" title="Edit">
               <Pencil className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={() => onDelete(dev)} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors" title="Delete">
+            </Button>
+            <Button type="button" variant="ghost" size="iconSm" onClick={() => onDelete(dev)} className="text-gray-400 hover:bg-red-50 hover:text-red-600" title="Delete">
               <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            </Button>
             {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
           </div>
         </td>
@@ -534,13 +541,15 @@ function EmailAllButton({ deal, developers, className }: { deal: MatchingDeal; d
           onClose={() => setOpen(false)}
         />
       )}
-      <button
+      <Button
+        type="button"
+        size="xs"
         onClick={() => setOpen(true)}
-        className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${className}`}
+        className={`text-xs font-semibold whitespace-nowrap ${className}`}
       >
         <Mail className="w-3 h-3" />
         {deal.investmentMemoUrl ? `Email All + Memo (${developers.length})` : `Email All (${developers.length})`}
-      </button>
+      </Button>
     </>
   );
 }
@@ -688,7 +697,7 @@ function EditDeveloperModal({ dev, onClose }: { dev: PartnerDeveloper; onClose: 
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10">
           <h2 className="font-bold text-catalyst-navy text-base">Edit Developer Profile</h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+          <Button type="button" variant="ghost" size="iconSm" onClick={onClose} className="text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X className="w-4 h-4" /></Button>
         </div>
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
           <div className="grid grid-cols-2 gap-4">
@@ -701,10 +710,10 @@ function EditDeveloperModal({ dev, onClose }: { dev: PartnerDeveloper; onClose: 
             <label className="block text-xs font-semibold text-gray-600 mb-1">Deal Preference</label>
             <div className="flex gap-2">
               {["land","acquisition","both"].map(opt => (
-                <button key={opt} type="button" onClick={() => setForm(f => ({ ...f, dealPreference: opt }))}
-                  className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${form.dealPreference === opt ? "bg-catalyst-navy text-white border-catalyst-navy" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
+                <Button key={opt} type="button" variant="outline" size="xs" onClick={() => setForm(f => ({ ...f, dealPreference: opt }))}
+                  className={`rounded text-xs font-medium transition-colors ${form.dealPreference === opt ? "bg-catalyst-navy text-white border-catalyst-navy" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
                   {opt === "both" ? "Land + Acq" : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -712,10 +721,10 @@ function EditDeveloperModal({ dev, onClose }: { dev: PartnerDeveloper; onClose: 
             <label className="block text-xs font-semibold text-gray-600 mb-2">Target States</label>
             <div className="flex flex-wrap gap-1">
               {STATE_OPTIONS.map(s => (
-                <button key={s} type="button" onClick={() => setForm(f => ({ ...f, targetStates: toggleArrayItem(f.targetStates, s) }))}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${form.targetStates.includes(s) ? "bg-catalyst-navy text-white border-catalyst-navy" : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"}`}>
+                <Button key={s} type="button" variant="outline" size="xs" onClick={() => setForm(f => ({ ...f, targetStates: toggleArrayItem(f.targetStates, s) }))}
+                  className={`rounded text-[10px] font-medium transition-colors ${form.targetStates.includes(s) ? "bg-catalyst-navy text-white border-catalyst-navy" : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"}`}>
                   {s}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -732,10 +741,10 @@ function EditDeveloperModal({ dev, onClose }: { dev: PartnerDeveloper; onClose: 
                 )}
               </label>
               {form.targetMsas.length > 0 && (
-                <button type="button" onClick={() => setForm(f => ({ ...f, targetMsas: [] }))}
+                <Button type="button" variant="ghost" size="xs" onClick={() => setForm(f => ({ ...f, targetMsas: [] }))}
                   className="text-[10px] text-red-500 hover:text-red-700 font-medium">
                   Clear all
-                </button>
+                </Button>
               )}
             </div>
 
@@ -743,12 +752,12 @@ function EditDeveloperModal({ dev, onClose }: { dev: PartnerDeveloper; onClose: 
             {form.targetMsas.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-2 p-2 bg-teal-50 border border-teal-100 rounded-lg">
                 {form.targetMsas.map(msa => (
-                  <button key={msa} type="button"
+                  <Button key={msa} type="button" size="xs"
                     onClick={() => setForm(f => ({ ...f, targetMsas: f.targetMsas.filter(m => m !== msa) }))}
-                    className="flex items-center gap-1 bg-catalyst-navy text-white text-[10px] font-medium px-2 py-0.5 rounded-full hover:bg-red-600 transition-colors group">
+                    className="flex items-center gap-1 rounded-full bg-catalyst-navy text-[10px] font-medium text-white hover:bg-red-600 transition-colors group">
                     {msa}
                     <X className="w-2.5 h-2.5 opacity-70 group-hover:opacity-100" />
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
@@ -765,9 +774,9 @@ function EditDeveloperModal({ dev, onClose }: { dev: PartnerDeveloper; onClose: 
                   className="flex-1 text-xs bg-transparent outline-none text-gray-700 placeholder-gray-400"
                 />
                 {msaSearch && (
-                  <button type="button" onClick={() => setMsaSearch("")} className="text-gray-400 hover:text-gray-600">
+                  <Button type="button" variant="ghost" size="iconSm" onClick={() => setMsaSearch("")} className="h-5 w-5 text-gray-400 hover:text-gray-600">
                     <X className="w-3 h-3" />
-                  </button>
+                  </Button>
                 )}
               </div>
               <div className="max-h-48 overflow-y-auto p-2 space-y-3">
@@ -806,15 +815,15 @@ function EditDeveloperModal({ dev, onClose }: { dev: PartnerDeveloper; onClose: 
                         {msas.map(msa => {
                           const selected = form.targetMsas.includes(msa);
                           return (
-                            <button key={msa} type="button"
+                            <Button key={msa} type="button" variant="outline" size="xs"
                               onClick={() => setForm(f => ({ ...f, targetMsas: toggleArrayItem(f.targetMsas, msa) }))}
-                              className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
+                              className={`rounded text-[10px] font-medium transition-colors ${
                                 selected
                                   ? "bg-catalyst-navy text-white border-catalyst-navy"
                                   : "bg-white text-gray-600 border-gray-200 hover:border-catalyst-navy hover:text-catalyst-navy"
                               }`}>
                               {msa}
-                            </button>
+                            </Button>
                           );
                         })}
                       </div>
@@ -834,10 +843,10 @@ function EditDeveloperModal({ dev, onClose }: { dev: PartnerDeveloper; onClose: 
             <label className="block text-xs font-semibold text-gray-600 mb-2">Product Types</label>
             <div className="flex flex-wrap gap-2">
               {PRODUCT_TYPE_OPTIONS.map(pt => (
-                <button key={pt} type="button" onClick={() => setForm(f => ({ ...f, productTypes: toggleArrayItem(f.productTypes, pt) }))}
-                  className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${form.productTypes.includes(pt) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
+                <Button key={pt} type="button" variant="outline" size="xs" onClick={() => setForm(f => ({ ...f, productTypes: toggleArrayItem(f.productTypes, pt) }))}
+                  className={`rounded text-xs font-medium transition-colors ${form.productTypes.includes(pt) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
                   {pt}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -860,8 +869,8 @@ function EditDeveloperModal({ dev, onClose }: { dev: PartnerDeveloper; onClose: 
             <label htmlFor="isActive" className="text-sm text-gray-700 font-medium">Active</label>
           </div>
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
-            <Button type="button" variant="outline" onClick={onClose} className="h-8 text-sm">Cancel</Button>
-            <Button type="submit" disabled={updateMutation.isPending} className="h-8 text-sm bg-catalyst-navy hover:bg-catalyst-navy/90 text-white">
+            <Button type="button" variant="outline" size="xs" onClick={onClose}>Cancel</Button>
+            <Button type="submit" size="xs" disabled={updateMutation.isPending} className="bg-catalyst-navy hover:bg-catalyst-navy/90 text-white">
               {updateMutation.isPending ? "Saving…" : "Save Changes"}
             </Button>
           </div>
@@ -1009,28 +1018,36 @@ function OutboxRow({ rec, onSent, onDismiss }: {
             </span>
           ) : (
             <>
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
                 onClick={() => setExpanded(e => !e)}
-                className="text-xs text-gray-500 hover:text-catalyst-navy px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+                className="text-xs text-gray-500 hover:bg-gray-100 hover:text-catalyst-navy"
               >
                 {expanded ? "Collapse ▲" : "Edit ▼"}
-              </button>
-              <button
+              </Button>
+              <Button
+                type="button"
+                size="xs"
                 onClick={handleSaveAndSend}
                 disabled={sending}
-                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-catalyst-navy hover:bg-catalyst-navy/90 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
+                className="flex items-center gap-1.5 rounded-lg bg-catalyst-navy text-xs font-semibold text-white hover:bg-catalyst-navy/90 disabled:opacity-60"
               >
                 {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
                 {sending ? "Sending…" : "Send"}
-              </button>
-              <button
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="iconSm"
                 onClick={() => dismissMutation.mutate()}
                 disabled={dismissMutation.isPending}
-                className="p-1.5 rounded hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
+                className="text-gray-300 hover:bg-red-50 hover:text-red-500"
                 title="Dismiss"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -1279,23 +1296,28 @@ function OutboxRow({ rec, onSent, onDismiss }: {
               </a>
             )}
             {dirty && (
-              <button
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
                 onClick={() => saveMutation.mutate()}
                 disabled={saveMutation.isPending}
-                className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 hover:border-catalyst-navy hover:text-catalyst-navy px-3 py-1.5 rounded-lg transition-colors ml-auto"
+                className="ml-auto flex items-center gap-1.5 rounded-lg text-xs font-medium text-gray-600 hover:border-catalyst-navy hover:text-catalyst-navy"
               >
                 {saveMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                 Save draft
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              type="button"
+              size="xs"
               onClick={handleSaveAndSend}
               disabled={sending}
-              className="flex items-center gap-1.5 text-xs font-semibold text-white bg-catalyst-navy hover:bg-catalyst-navy/90 px-4 py-1.5 rounded-lg transition-colors disabled:opacity-60 ml-auto"
+              className="ml-auto flex items-center gap-1.5 rounded-lg bg-catalyst-navy text-xs font-semibold text-white hover:bg-catalyst-navy/90 disabled:opacity-60"
             >
               {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
               {sending ? "Sending…" : `Send to ${rec.devCompanyName}`}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -1346,21 +1368,26 @@ function OutboxTab() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {sent.length > 0 && (
-            <button
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
               onClick={() => setShowSent(s => !s)}
-              className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${showSent ? "bg-gray-100 border-gray-300 text-gray-700" : "bg-white border-gray-200 text-gray-500 hover:border-gray-400"}`}
+              className={`rounded-lg text-xs font-medium transition-colors ${showSent ? "bg-gray-100 border-gray-300 text-gray-700" : "bg-white border-gray-200 text-gray-500 hover:border-gray-400"}`}
             >
               {showSent ? "Hide sent" : `Show sent (${sent.length})`}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            type="button"
+            size="xs"
             onClick={() => backfillMutation.mutate()}
             disabled={backfillMutation.isPending}
-            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-catalyst-navy hover:bg-catalyst-navy/90 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
+            className="flex items-center gap-1.5 rounded-lg bg-catalyst-navy text-xs font-semibold text-white hover:bg-catalyst-navy/90 disabled:opacity-60"
           >
             {backfillMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
             {backfillMutation.isPending ? "Scanning…" : "Scan Existing Deals"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1372,14 +1399,16 @@ function OutboxTab() {
             Click <span className="font-semibold text-catalyst-navy">Scan Existing Deals</span> to match your 300+ deals against developer buy boxes.
             Going forward, new deals will queue automatically once classified.
           </p>
-          <button
+          <Button
+            type="button"
+            size="sm"
             onClick={() => backfillMutation.mutate()}
             disabled={backfillMutation.isPending}
-            className="flex items-center gap-1.5 text-sm font-semibold text-white bg-catalyst-navy hover:bg-catalyst-navy/90 px-4 py-2 rounded-lg transition-colors disabled:opacity-60 mx-auto"
+            className="mx-auto flex items-center gap-1.5 rounded-lg bg-catalyst-navy text-sm font-semibold text-white hover:bg-catalyst-navy/90 disabled:opacity-60"
           >
             {backfillMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             {backfillMutation.isPending ? "Scanning 300+ deals…" : "Scan Existing Deals"}
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="space-y-2">
@@ -1468,14 +1497,13 @@ export default function PartnerDevelopersAdmin() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <h1 className="text-lg font-bold text-catalyst-navy leading-tight">Partner Developers</h1>
-              <p className="text-xs text-gray-500">Buy box registrations & automatic deal routing</p>
-            </div>
+       <div className="bg-white border-b border-gray-200">
+         <div className="container mx-auto px-4 py-4">
+           <PageHeader
+             title="Partner Developers"
+             description="Buy box registrations & automatic deal routing"
+           />
+           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="hidden sm:flex items-center gap-5 text-center">
               <div>
                 <div className="text-lg font-bold text-catalyst-navy leading-tight">{developers.length}</div>
@@ -1495,7 +1523,7 @@ export default function PartnerDevelopersAdmin() {
           </div>
 
           <div className="flex gap-1 mt-4 border-b border-gray-200 -mb-px">
-            <button onClick={() => setTab("outbox")}
+             <Button variant="ghost" onClick={() => setTab("outbox")}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${tab === "outbox" ? "border-catalyst-navy text-catalyst-navy" : "border-transparent text-gray-500 hover:text-catalyst-navy"}`}>
               <Inbox className="w-3.5 h-3.5" />
               Outbox
@@ -1504,15 +1532,15 @@ export default function PartnerDevelopersAdmin() {
                   {pendingCount}
                 </span>
               )}
-            </button>
-            <button onClick={() => setTab("buyers")}
+             </Button>
+             <Button variant="ghost" onClick={() => setTab("buyers")}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === "buyers" ? "border-catalyst-navy text-catalyst-navy" : "border-transparent text-gray-500 hover:text-catalyst-navy"}`}>
               Developers ({developers.length})
-            </button>
-            <button onClick={() => setTab("routing")}
+             </Button>
+             <Button variant="ghost" onClick={() => setTab("routing")}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${tab === "routing" ? "border-catalyst-navy text-catalyst-navy" : "border-transparent text-gray-500 hover:text-catalyst-navy"}`}>
               Deal Routing
-            </button>
+             </Button>
           </div>
         </div>
       </div>

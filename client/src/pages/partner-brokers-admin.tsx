@@ -2,6 +2,7 @@ import { useState } from "react";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Input } from "@/components/ui/input";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -157,9 +158,9 @@ function AccountModal({
           <h2 className="font-bold text-catalyst-navy text-base">
             {isEdit ? "Edit Broker Account" : "Create Broker Account"}
           </h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+          <Button type="button" variant="ghost" size="iconSm" onClick={onClose} className="text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
@@ -204,10 +205,10 @@ function AccountModal({
             <label className="block text-xs font-semibold text-gray-600 mb-1">Status</label>
             <div className="flex gap-2">
               {(["active", "pending", "inactive"] as const).map(s => (
-                <button key={s} type="button" onClick={() => setForm(f => ({ ...f, status: s }))}
+                <Button key={s} type="button" variant="outline" size="xs" onClick={() => setForm(f => ({ ...f, status: s }))}
                   className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors capitalize ${form.status === s ? "bg-catalyst-navy text-white border-catalyst-navy" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
                   {s}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -216,10 +217,10 @@ function AccountModal({
             <label className="block text-xs font-semibold text-gray-600 mb-2">Target States</label>
             <div className="flex flex-wrap gap-1">
               {STATE_OPTIONS.map(s => (
-                <button key={s} type="button" onClick={() => toggleState(s)}
+                <Button key={s} type="button" variant="outline" size="xs" onClick={() => toggleState(s)}
                   className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${form.targetStates.includes(s) ? "bg-catalyst-navy text-white border-catalyst-navy" : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"}`}>
                   {s}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -235,15 +236,15 @@ function AccountModal({
                   placeholder="e.g. Raleigh-Durham"
                   className="h-7 text-xs"
                 />
-                <Button type="button" onClick={addMsa} variant="outline" size="sm" className="h-7 px-2 text-xs">Add</Button>
+                <Button type="button" onClick={addMsa} variant="outline" size="xs">Add</Button>
               </div>
               <div className="flex flex-wrap gap-1">
                 {form.targetMsas.map(m => (
                   <span key={m} className="inline-flex items-center gap-1 text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
                     {m}
-                    <button type="button" onClick={() => setForm(f => ({ ...f, targetMsas: f.targetMsas.filter(x => x !== m) }))}>
+                    <Button type="button" variant="ghost" size="iconSm" onClick={() => setForm(f => ({ ...f, targetMsas: f.targetMsas.filter(x => x !== m) }))} className="h-4 w-4">
                       <X className="w-2.5 h-2.5" />
-                    </button>
+                    </Button>
                   </span>
                 ))}
               </div>
@@ -258,15 +259,15 @@ function AccountModal({
                   placeholder="e.g. Charlotte"
                   className="h-7 text-xs"
                 />
-                <Button type="button" onClick={addCity} variant="outline" size="sm" className="h-7 px-2 text-xs">Add</Button>
+                <Button type="button" onClick={addCity} variant="outline" size="xs">Add</Button>
               </div>
               <div className="flex flex-wrap gap-1">
                 {form.targetCities.map(c => (
                   <span key={c} className="inline-flex items-center gap-1 text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">
                     {c}
-                    <button type="button" onClick={() => setForm(f => ({ ...f, targetCities: f.targetCities.filter(x => x !== c) }))}>
+                    <Button type="button" variant="ghost" size="iconSm" onClick={() => setForm(f => ({ ...f, targetCities: f.targetCities.filter(x => x !== c) }))} className="h-4 w-4">
                       <X className="w-2.5 h-2.5" />
-                    </button>
+                    </Button>
                   </span>
                 ))}
               </div>
@@ -284,8 +285,8 @@ function AccountModal({
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
-            <Button type="button" variant="outline" onClick={onClose} className="h-8 text-sm">Cancel</Button>
-            <Button type="submit" disabled={mutation.isPending} className="h-8 text-sm bg-catalyst-navy hover:bg-catalyst-navy/90 text-white">
+            <Button type="button" variant="outline" size="xs" onClick={onClose}>Cancel</Button>
+            <Button type="submit" size="xs" disabled={mutation.isPending} className="bg-catalyst-navy hover:bg-catalyst-navy/90 text-white">
               {mutation.isPending ? "Saving..." : isEdit ? "Save Changes" : "Create Account"}
             </Button>
           </div>
@@ -385,7 +386,10 @@ function DealApprovalsTab() {
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
               disabled={isPending}
               onClick={() => {
                 setApprovingId(deal.id);
@@ -398,7 +402,7 @@ function DealApprovalsTab() {
               }`}
             >
               {isPending ? "..." : isApproved ? "Remove" : "Approve & Notify"}
-            </button>
+            </Button>
           </div>
         </td>
       </tr>
@@ -516,11 +520,10 @@ export default function PartnerBrokersAdmin() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <h1 className="text-lg font-bold text-catalyst-navy leading-tight">Partner Broker Portal</h1>
-              <p className="text-xs text-gray-500">Manage broker accounts and approve deals for the portal</p>
-            </div>
+           <PageHeader
+             title="Partner Broker Portal"
+             description="Manage broker accounts and approve deals for the portal"
+             actions={
             <div className="flex items-center gap-4">
               <div className="hidden sm:flex items-center gap-5 text-center">
                 <div>
@@ -543,30 +546,34 @@ export default function PartnerBrokersAdmin() {
                 )}
               </div>
               {tab === "accounts" && (
-                <Button
+                 <Button
+                   size="sm"
                   onClick={() => setEditingAccount("new")}
-                  className="h-8 text-sm bg-catalyst-navy hover:bg-catalyst-navy/90 text-white gap-1.5"
+                   className="bg-catalyst-navy hover:bg-catalyst-navy/90 text-white gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add Broker
                 </Button>
               )}
             </div>
-          </div>
+             }
+           />
 
           {/* Tabs */}
           <div className="flex gap-0 mt-4 border-b border-gray-200 -mb-px">
-            <button
+             <Button
+               variant="ghost"
               onClick={() => setTab("accounts")}
               className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === "accounts" ? "border-catalyst-navy text-catalyst-navy" : "border-transparent text-gray-500 hover:text-gray-700"}`}
             >
               <Users className="w-4 h-4" /> Broker Accounts
-            </button>
-            <button
+             </Button>
+             <Button
+               variant="ghost"
               onClick={() => setTab("approvals")}
               className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === "approvals" ? "border-catalyst-navy text-catalyst-navy" : "border-transparent text-gray-500 hover:text-gray-700"}`}
             >
               <Building2 className="w-4 h-4" /> Deal Approvals
-            </button>
+             </Button>
           </div>
         </div>
       </div>
@@ -672,20 +679,26 @@ export default function PartnerBrokersAdmin() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
-                              <button
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="iconSm"
                                 onClick={() => setEditingAccount(account)}
-                                className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+                                className="text-gray-400 hover:bg-blue-50 hover:text-blue-600"
                                 title="Edit"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="iconSm"
                                 onClick={() => setDeletingAccount(account)}
-                                className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                                className="text-gray-400 hover:bg-red-50 hover:text-red-600"
                                 title="Delete"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              </Button>
                             </div>
                           </td>
                         </tr>

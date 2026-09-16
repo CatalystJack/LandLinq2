@@ -6,6 +6,7 @@ import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -996,17 +997,10 @@ export default function AdminDashboard() {
       <Navigation />
       
       <div className="container mx-auto px-4 py-8 space-y-6">
-        {/* Header Section */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-[#07172A] mb-2">
-              {user?.role === 'SUPER_ADMIN' ? 'Admin Dashboard' : 'Deal Analysis Dashboard'}
-            </h1>
-            <p className="text-gray-600">
-              {user?.role === 'SUPER_ADMIN' ? 'Manage deals and acquisition markets' : 'Review, analyze and manage property submissions'}
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title={user?.role === 'SUPER_ADMIN' ? 'Admin Dashboard' : 'Deal Analysis Dashboard'}
+          description={user?.role === 'SUPER_ADMIN' ? 'Manage deals and acquisition markets' : 'Review, analyze and manage property submissions'}
+        />
         
         {/* Tabs for all authenticated users */}
         {user ? (
@@ -1536,16 +1530,19 @@ export default function AdminDashboard() {
                         </td>
                         {/* Dev Summary */}
                         <td className="px-4 py-4">
-                          <button
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
                             onClick={() => setSummaryDeal({ id: deal.id, address: deal.address || '', summary: (deal as any).developerSummary || '' })}
-                            className={`text-xs px-2 py-1 rounded border transition-colors ${
+                            className={`transition-colors ${
                               (deal as any).developerSummary
                                 ? 'border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 font-semibold'
                                 : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50'
                             }`}
                           >
                             {(deal as any).developerSummary ? '📝 View/Edit' : '+ Add'}
-                          </button>
+                          </Button>
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex gap-2">
@@ -2138,9 +2135,9 @@ export default function AdminDashboard() {
                   <h3 className="text-base font-bold text-catalyst-navy">Developer Summary</h3>
                   <p className="text-xs text-gray-500 mt-0.5 truncate max-w-sm">{summaryDeal.address}</p>
                 </div>
-                <button onClick={() => setSummaryDeal(null)} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                <Button type="button" variant="ghost" size="iconSm" onClick={() => setSummaryDeal(null)} className="text-gray-400 hover:bg-gray-100 hover:text-gray-600">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                </button>
+                </Button>
               </div>
               <div className="px-6 py-5">
                 <p className="text-xs text-gray-500 mb-2">This summary will be included in deal emails sent to partner developers.</p>

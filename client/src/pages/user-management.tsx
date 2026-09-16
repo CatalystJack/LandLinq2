@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -352,12 +353,10 @@ export default function UserManagement() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Navigation />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900" data-testid="user-management-title">
-            User Management
-          </h1>
-          <p className="text-slate-600 mt-2">Manage user accounts, broker profiles, roles, and permissions</p>
-        </div>
+        <PageHeader
+          title="User Management"
+          description="Manage user accounts, broker profiles, roles, and permissions"
+        />
 
         <Tabs defaultValue="users" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3" data-testid="user-management-tabs">
@@ -742,9 +741,9 @@ export default function UserManagement() {
                           </span>
                         )}
                       </div>
-                      <button onClick={() => refetchPending()} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                      <Button onClick={() => refetchPending()} variant="ghost" size="xs" className="text-xs text-gray-400 hover:text-gray-600">
                         Refresh
-                      </button>
+                      </Button>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Brokers who registered via the Partner Broker Portal and are waiting for access.

@@ -8,6 +8,7 @@ import { isPlatformAdminEmail } from "@shared/admin-auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -153,17 +154,17 @@ export default function AdminSalesPipeline() {
     <div className="min-h-screen bg-[#fbfaf8]">
       <Navigation />
       <main className="mx-auto max-w-[1700px] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#5da9df]"><Users className="h-4 w-4" /> LandLinq sales</div>
-            <h1 className="font-serif text-4xl font-bold tracking-tight text-[#102d4c]">Company pipeline</h1>
-            <p className="mt-2 max-w-2xl text-sm text-[#52677d]">Manage prospective companies, next steps, follow-up emails, and signing-ready documents in one internal workspace.</p>
-          </div>
-          <div className="flex gap-2">
+        <PageHeader
+          eyebrow="LandLinq sales"
+          title="Company pipeline"
+          description="Manage prospective companies, next steps, follow-up emails, and signing-ready documents in one internal workspace."
+          actions={
+            <div className="flex gap-2">
             <Button variant="outline" className="gap-2 border-[#b8cee5] bg-white" onClick={() => refresh()} disabled={pipelineQuery.isFetching}><RefreshCw className={`h-4 w-4 ${pipelineQuery.isFetching ? "animate-spin" : ""}`} /> Refresh</Button>
             <Button className="gap-2 bg-[#0a2b4a] hover:bg-white hover:text-[#5da9df] hover:border-[#5da9df]" onClick={() => setShowNew((value) => !value)}><Plus className="h-4 w-4" /> Add prospect</Button>
-          </div>
-        </div>
+            </div>
+          }
+        />
 
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
@@ -198,10 +199,10 @@ export default function AdminSalesPipeline() {
                 return <section key={stage.id} className="w-[230px] shrink-0 rounded-xl border border-[#d8e4ee] bg-[#edf3f7]/75 p-3">
                   <div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold text-[#102d4c]">{stage.name}</h2><span className="text-xs text-[#7890a5]">{prospects.length} prospect{prospects.length === 1 ? "" : "s"}</span></div><Badge variant="outline" className="border-[#b8cee5] bg-white text-[#5a7187]">{stage.sortOrder}</Badge></div>
                   <div className="space-y-3">
-                    {prospects.map((prospect) => <button key={prospect.id} className={`w-full rounded-lg border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#5da9df] ${selectedId === prospect.id ? "border-[#5da9df] ring-2 ring-[#5da9df]/20" : "border-[#d8e4ee]"}`} onClick={() => setSelectedId(prospect.id)}>
+                     {prospects.map((prospect) => <Button key={prospect.id} type="button" variant="ghost" className={`h-auto w-full justify-start rounded-lg border bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#5da9df] ${selectedId === prospect.id ? "border-[#5da9df] ring-2 ring-[#5da9df]/20" : "border-[#d8e4ee]"}`} onClick={() => setSelectedId(prospect.id)}>
                       <div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dcecf6] text-xs font-bold text-[#17628b]">{initials(prospect)}</div><div className="min-w-0"><div className="truncate font-semibold text-[#102d4c]">{prospect.companyName}</div><div className="mt-0.5 truncate text-xs text-[#7890a5]">{prospect.contactName || prospect.industry || "No contact yet"}</div></div></div>
                       <div className="mt-3 flex items-center justify-between text-xs"><span className="font-medium text-[#52677d]">{prospect.estimatedValue ? `$${Number(prospect.estimatedValue).toLocaleString()}` : "Value TBD"}</span><span className={prospect.nextFollowUpAt && new Date(prospect.nextFollowUpAt) <= new Date() ? "font-semibold text-[#c77d35]" : "text-[#7890a5]"}>{prospect.nextFollowUpAt ? dateLabel(prospect.nextFollowUpAt) : "No follow-up"}</span></div>
-                    </button>)}
+                     </Button>)}
                     {!prospects.length && <div className="rounded-lg border border-dashed border-[#c5d5e2] p-5 text-center text-xs text-[#7890a5]">No prospects here</div>}
                   </div>
                 </section>;
