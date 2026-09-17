@@ -46,11 +46,31 @@ type DealRecord = {
   city: string | null;
   county: string | null;
   state: string | null;
+  zip?: string | null;
   sizeAcres: string | null;
   topRentPSF: string | null;
   avgRentPerUnit: string | null;
   askingPrice: string | null;
   productTypes: string[] | null;
+  qctStatus?: string | null;
+  ozStatus?: string | null;
+  ddaStatus?: string | null;
+  ddaFmr?: number | null;
+  ddaVlil?: number | null;
+  ddaLihtcMaxRent?: number | null;
+  censusTractFips?: string | null;
+  censusMedianIncome?: number | null;
+  censusRenterRate?: string | number | null;
+  hudData?: {
+    status: "matched" | "not_configured" | "location_unresolved" | "unavailable";
+    areaName: string | null;
+    entityId: string | null;
+    fmrTwoBedroom: number | null;
+    medianIncome: number | null;
+    lowIncomeLimitFourPerson: number | null;
+    veryLowIncomeLimitFourPerson: number | null;
+    lookedUpAt: string;
+  };
 };
 
 type DeveloperDeal = {
@@ -89,6 +109,23 @@ function money(value: string | null): string {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(number);
+}
+
+function monthlyMoney(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  return `${money(String(value))}/mo`;
+}
+
+function isAffordabilityProgram(value: string | null | undefined): boolean {
+  return ["yes", "true", "mdda", "nmdda", "qct", "oz"].includes(String(value || "").trim().toLowerCase());
+}
+
+function dealPrograms(deal: DealRecord): string[] {
+  const programs: string[] = [];
+  if (isAffordabilityProgram(deal.qctStatus)) programs.push("QCT");
+  if (isAffordabilityProgram(deal.ddaStatus)) programs.push("DDA");
+  if (isAffordabilityProgram(deal.ozStatus)) programs.push("OZ");
+  return programs;
 }
 
 function DealStatus({ row }: { row: DeveloperDeal }) {
@@ -144,6 +181,7 @@ export default function DeveloperDashboard() {
   const [viewMode, setViewMode] = useState<"table" | "map">("table");
   const [statusFilter, setStatusFilter] = useState("all");
   const [productTypeFilter, setProductTypeFilter] = useState("all");
+  const [programFilter, setProgramFilter] = useState("all");
   const [showColumns, setShowColumns] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -300,9 +338,14 @@ export default function DeveloperDashboard() {
         (statusFilter === "passed" && row.classification !== "review" && !row.greenFlaggedByDeveloper);
       const productTypes = [...(row.matchedProductTypes || []), ...(row.deal.productTypes || [])];
       const matchesProductType = productTypeFilter === "all" || productTypes.includes(productTypeFilter);
-      return matchesSearch && matchesStatus && matchesProductType;
+      const programs = dealPrograms(row.deal);
+      const matchesProgram =
+        programFilter === "all"
+        || (programFilter === "none" && programs.length === 0)
+        || programs.includes(programFilter);
+      return matchesSearch && matchesStatus && matchesProductType && matchesProgram;
     });
-  }, [rows, search, statusFilter, productTypeFilter]);
+  }, [rows, search, statusFilter, productTypeFilter, programFilter]);
 
   const counts = useMemo(() => ({
     total: rows.length,
@@ -315,7 +358,7 @@ export default function DeveloperDashboard() {
 
   const exportDeals = () => {
     const escapeCsv = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-    const header = ["Property", "City", "County", "State", "Acreage", "Rent", "Status", "Product Type"];
+    const header = ["Property", "City", "County", "State", "Acreage", "Rent", "Status", "Product Type", "HUD FMR (2BR)", "HUD 4-Person Income Limit", "Programs"];
     const body = filteredRows.map((row) => [
       row.deal.address,
       row.deal.city,
@@ -325,6 +368,9 @@ export default function DeveloperDashboard() {
       rentText(row.deal),
       row.greenFlaggedByDeveloper ? "Pursuing" : row.classification === "review" ? "Review" : "Passed",
       (row.matchedProductTypes || row.deal.productTypes || []).join(", "),
+      row.deal.hudData?.fmrTwoBedroom ?? "",
+      row.deal.hudData?.lowIncomeLimitFourPerson ?? "",
+      dealPrograms(row.deal).join(", "),
     ]);
     const csv = [header, ...body].map((line) => line.map(escapeCsv).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
@@ -453,6 +499,16 @@ export default function DeveloperDashboard() {
                     {productTypeOptions.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <Select value={programFilter} onValueChange={setProgramFilter}>
+                  <SelectTrigger className="h-8 w-[126px] text-xs"><SelectValue placeholder="Programs" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All programs</SelectItem>
+                    <SelectItem value="QCT">QCT</SelectItem>
+                    <SelectItem value="DDA">DDA</SelectItem>
+                    <SelectItem value="OZ">Opportunity Zone</SelectItem>
+                    <SelectItem value="none">No designation</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button type="button" size="sm" variant="outline" className="h-8 px-2.5 text-xs" onClick={() => setShowColumns((open) => !open)}>
                   <Columns3 className="mr-1 h-3 w-3" />
                   Columns
@@ -462,7 +518,7 @@ export default function DeveloperDashboard() {
             {showColumns && (
               <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-2 text-xs text-slate-500">
                 <Columns3 className="h-3.5 w-3.5" />
-                Showing Property, Market, Acreage, Rent, Status, and Action columns
+                Showing HUD FMR, HUD income limit, and program columns
               </div>
             )}
           </div>
@@ -489,9 +545,9 @@ export default function DeveloperDashboard() {
           ) : filteredRows.length === 0 ? (
             <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
               <FileSpreadsheet className="mb-3 h-10 w-10 text-slate-300" />
-              <h3 className="font-semibold text-slate-800">{search || statusFilter !== "all" || productTypeFilter !== "all" ? "No matching deals" : "No deals yet"}</h3>
+               <h3 className="font-semibold text-slate-800">{search || statusFilter !== "all" || productTypeFilter !== "all" || programFilter !== "all" ? "No matching deals" : "No deals yet"}</h3>
               <p className="mt-1 max-w-md text-sm text-slate-500">
-                {search || statusFilter !== "all" || productTypeFilter !== "all" ? "Try clearing a filter or changing your search." : "Shared and imported deals will appear here."}
+                 {search || statusFilter !== "all" || productTypeFilter !== "all" || programFilter !== "all" ? "Try clearing a filter or changing your search." : "Shared and imported deals will appear here."}
               </p>
             </div>
           ) : (
@@ -503,6 +559,9 @@ export default function DeveloperDashboard() {
                     <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Market</TableHead>
                     <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Acreage</TableHead>
                     <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Rent</TableHead>
+                     {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">HUD FMR</TableHead>}
+                     {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">HUD Income Limit</TableHead>}
+                     {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Programs</TableHead>}
                     <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Status</TableHead>
                     <TableHead className="h-9 whitespace-nowrap text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">Action</TableHead>
                   </TableRow>
@@ -522,6 +581,17 @@ export default function DeveloperDashboard() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.sizeAcres ? `${Number(row.deal.sizeAcres).toLocaleString()} ac` : "—"}</TableCell>
                       <TableCell className="whitespace-nowrap py-2.5 text-xs">{rentText(row.deal)}</TableCell>
+                      {showColumns && <TableCell className="whitespace-nowrap py-2.5 text-xs">{monthlyMoney(row.deal.hudData?.fmrTwoBedroom)}</TableCell>}
+                      {showColumns && <TableCell className="whitespace-nowrap py-2.5 text-xs">{monthlyMoney(row.deal.hudData?.lowIncomeLimitFourPerson)}</TableCell>}
+                      {showColumns && (
+                        <TableCell className="py-2.5">
+                          <div className="flex flex-wrap gap-1">
+                            {dealPrograms(row.deal).length
+                              ? dealPrograms(row.deal).map((program) => <Badge key={program} variant="outline" className="text-[10px]">{program}</Badge>)
+                              : <span className="text-xs text-slate-400">—</span>}
+                          </div>
+                        </TableCell>
+                      )}
                       <TableCell className="py-2.5"><DealStatus row={row} /></TableCell>
                       <TableCell className="py-2.5 text-right">
                         <Button

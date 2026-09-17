@@ -87,6 +87,7 @@ import {
   markMyDealPursuing,
 } from "./developerAssistantData";
 import { sendDripEmailViaMicrosoft } from "./microsoftAuth";
+import { lookupHudDataForDeal } from "./hudService";
 
 const DEFAULT_PIPELINE_STAGES = [
   { name: "New Lead", sortOrder: 1 },
@@ -16461,12 +16462,19 @@ RULES:
         ))
         .orderBy(desc(partnerDeveloperSends.matchedAt), desc(deals.createdAt));
 
-      return res.json({
-        deals: rows.map(({ send, deal }) => ({
-          ...send,
-          deal,
-        })),
-      });
+      const enrichedDeals = await Promise.all(rows.map(async ({ send, deal }) => ({
+        ...send,
+        deal: {
+          ...deal,
+          hudData: await lookupHudDataForDeal({
+            state: deal.state,
+            county: deal.county,
+            censusTractFips: deal.censusTractFips,
+          }),
+        },
+      })));
+
+      return res.json({ deals: enrichedDeals });
     } catch (error: any) {
       console.error('[developer-profile/me/deals] Error:', error);
       return res.status(500).json({ error: 'Failed to load deals' });
