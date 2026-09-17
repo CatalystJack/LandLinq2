@@ -1,20 +1,28 @@
 import type { HTMLAttributes, ReactNode } from "react";
+import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EmptyCellProps extends HTMLAttributes<HTMLSpanElement> {
   children?: ReactNode;
 }
 
-export function EmptyCell({ children = "Click to add...", className, ...props }: EmptyCellProps) {
+export function EmptyCell({ children, className, ...props }: EmptyCellProps) {
+  const isDefault = children === undefined;
+
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded border border-dashed border-gray-300 px-2 py-0.5 text-xs text-gray-400",
+        "inline-flex items-center text-gray-300",
         className,
       )}
       {...props}
     >
-      {children}
+      {isDefault ? (
+        <>
+          <span>–</span>
+          <Plus className="ml-0.5 h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+        </>
+      ) : children}
     </span>
   );
 }
