@@ -359,7 +359,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   return (
     <div className="min-h-[100dvh] bg-[#f3f6f9] text-[#172b3d]">
       {adminMode ? <Navigation /> : <DeveloperNavigation />}
-      <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
+      <main className="mx-auto max-w-[1680px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
         <PageHeader
           title="Company contacts"
           description="A focused directory for the relationships your team is building across the LandLinq network."

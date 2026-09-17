@@ -481,7 +481,7 @@ export default function DeveloperCriteriaSettings() {
   return (
     <div className="min-h-screen bg-slate-50">
       <DeveloperNavigation />
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-[1680px] px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
           title={form.profileType === "general_sales" ? "Company settings" : "Acquisition criteria"}
           description={form.profileType === "general_sales" ? `Manage ${form.companyName} team access and account settings.` : `Control how ${form.companyName} evaluates and receives deals.`}
@@ -494,6 +494,7 @@ export default function DeveloperCriteriaSettings() {
         />
 
         <div className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2">
           <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <div className="flex items-start gap-3">
@@ -651,6 +652,8 @@ export default function DeveloperCriteriaSettings() {
               </div>
             </CardContent>
           </Card>
+
+          </div>
 
           {form.profileType === "real_estate" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>
