@@ -5503,13 +5503,12 @@ export default function AnalystDashboard() {
             if (!fema) return <span className="text-gray-400" aria-label="FEMA data not available">—</span>;
             const inFloodZone = fema.isInFloodZone ?? fema.is_in_flood_zone;
             return (
-              <Badge
-                variant="outline"
-                className={`text-xs px-2 py-0 ${inFloodZone ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}
+              <StatusBadge
+                status={inFloodZone ? 'flag' : 'yes'}
                 title={fema.description || fema.floodZoneDescription || undefined}
               >
                 {inFloodZone ? 'Flag' : 'Clear'}
-              </Badge>
+              </StatusBadge>
             );
           })()}
         </td>
@@ -5531,9 +5530,9 @@ export default function AnalystDashboard() {
       case 'wetlands': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           {d.wetlands === true || d.wetlands === false ? (
-            <Badge variant="outline" className={`text-xs px-2 py-0 ${d.wetlands ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+            <StatusBadge status={d.wetlands ? 'flag' : 'no'}>
               {d.wetlands ? 'Yes' : 'No'}
-            </Badge>
+            </StatusBadge>
           ) : <span className="text-gray-400" aria-label="Wetlands data not available">—</span>}
         </td>
       );
@@ -5549,9 +5548,9 @@ export default function AnalystDashboard() {
             return (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge variant="outline" className={`cursor-help text-xs px-2 py-0 ${epa.contaminationFlag ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`} title={detail}>
+                  <StatusBadge status={epa.contaminationFlag ? 'flag' : 'yes'} className="cursor-help" title={detail}>
                     {epa.contaminationFlag ? 'Flag' : 'Clear'}
-                  </Badge>
+                  </StatusBadge>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs text-xs">{detail}</TooltipContent>
               </Tooltip>
@@ -5708,7 +5707,9 @@ export default function AnalystDashboard() {
             </Select>
           ) : (
             <div className="cursor-pointer hover:bg-gray-100" onClick={() => startCellEdit(deal.id,'hasEntitlements',deal.hasEntitlements===true?'with':deal.hasEntitlements===false?'without':'with')}>
-              <span className={`px-2 py-1 rounded text-xs ${deal.hasEntitlements===true?'bg-green-100 text-green-700':deal.hasEntitlements===false?'bg-red-100 text-red-700':'bg-gray-50 text-gray-500'}`}>{deal.hasEntitlements===true?'With Entitlements':deal.hasEntitlements===false?'Without Entitlements':<span className="text-gray-400">-</span>}</span>
+              <StatusBadge status={deal.hasEntitlements===true?'yes':deal.hasEntitlements===false?'no':'na'}>
+                {deal.hasEntitlements===true?'With Entitlements':deal.hasEntitlements===false?'Without Entitlements':'N/A'}
+              </StatusBadge>
             </div>
           )}
         </td>
@@ -7451,7 +7452,7 @@ export default function AnalystDashboard() {
                       
                       {/* Regular Deal Rows */}
                       {!isLoading && filteredAndSortedDeals.map((deal: DealWithBroker) => (
-                        <tr key={deal.id} id={`deal-${deal.id}`} className={`border-b transition-colors duration-150 ${selectedDeals.includes(deal.id) ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`}>
+                        <tr key={deal.id} id={`deal-${deal.id}`} className={`group border-b transition-colors duration-150 [&>td]:py-2 ${selectedDeals.includes(deal.id) ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`}>
                           {/* Row selection — kept outside the paged data so selections persist across pages */}
                           <td className={`w-[36px] min-w-[36px] px-1 py-1 text-center border-r border-gray-200 z-10 shadow-lg ${selectedDeals.includes(deal.id) ? 'bg-blue-50' : 'bg-white'}`} style={{position: 'sticky', left: 0}}>
                             <Checkbox
@@ -7836,7 +7837,7 @@ export default function AnalystDashboard() {
                                     size="sm"
                                     variant="outline"
                                     disabled={rerunningDealId !== null}
-                                    className="h-8 w-8 p-0 bg-white border border-blue-500 text-blue-500 hover:bg-blue-50 hover:border-blue-600 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="h-8 w-8 p-0 bg-white border border-blue-500 text-blue-500 opacity-50 transition-opacity hover:bg-blue-50 hover:border-blue-600 hover:text-blue-600 group-hover:opacity-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     title={rerunningDealId === deal.id ? 'Processing…' : 'Re-run analysis'}
                                     aria-label={rerunningDealId === deal.id ? 'Processing…' : 'Re-run analysis'}
                                     data-testid={`button-rerun-analysis-${deal.id}`}
@@ -7848,7 +7849,7 @@ export default function AnalystDashboard() {
                                     disabled={deleteDealMutation.isPending}
                                     variant="ghost"
                                     size="sm"
-                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-800 hover:bg-red-50 transition-colors"
+                                    className="h-8 w-8 p-0 text-red-600 opacity-50 transition-opacity hover:text-red-800 hover:bg-red-50 group-hover:opacity-100"
                                     title="Delete Deal"
                                     data-testid={`button-delete-${deal.id}`}
                                   >
