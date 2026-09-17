@@ -1,0 +1,921 @@
+Skip to main content
+
+An official website of the United States government
+
+Here's how you know
+HUD User Email Icon HUD User Forums Icon HUD User Facebook Icon HUD Youtube Icon HUD User X Icon HUD User Linkedin Icon HUD Flicker Icon HUD Instagram Icon Quicklinks Events Contact Us  
+Home
+ABOUT PD&R
+RESEARCH & PUBLICATIONS
+DATASETS
+Search HUD User
+Search
+Dataset Banner Image
+HUD Fair Market Rents and Income Limits Data API
+Dataset
+/
+HUD Fair Market Rents and Income Limits Data API
+Fair Market Rents & Income Limits API
+Click here to view Terms of Service of the HUD User API
+
+Important Notice: FIPS Code Update for Income Limits 2025
+FIPS codes for counties of some of the states have been updated for the Income Limits 2025 dataset and may differ from those used in previous years. To retrieve the updated FIPS codes applicable to IL 2025, please use the new updated=2025 query parameter in your "listCounties" API request. Eg:
+GET fmr/listCounties/CT?updated=2025
+
+Getting an Access Token
+Follow these steps to create an account and get an access token:
+
+Sign up for an account and select the Datasets API you want to access.
+Confirm your account, if it's new - Check your inbox for a confirmation email from HUD User.
+After log in, Get an access token by clicking on Create New Token.
+Use it in the Authorization: Bearer header to make API calls.
+Base URL
+The base URL for all FMR API endpoints is
+
+https://www.huduser.gov/hudapi/public/fmr
+
+The table below shows the path that completes the URI for each endpoint.
+To..	Endpoint
+Get a list of all states
+
+fmr/listStates
+
+Get a list of all counties in a state
+to Get a list of all counties in a state for Income Limits 2025
+
+fmr/listCounties/{stateid}
+fmr/listCounties/{stateid}?updated=2025
+
+Get a list of all Metropolitan areas
+to Get a list of all Metropolitan areas for Income Limits 2025
+
+fmr/listMetroAreas
+fmr/listMetroAreas?updated=2025
+
+Get FMR data for a town(in NE state), county or metropolitan area.
+
+fmr/data/{entityid}
+
+Get FMR data for a state.
+
+fmr/statedata/{statecode}
+
+Get IL data for a town(in NE state), county or metropolitan area.
+
+il/data/{entityid}
+
+Get IL data for a state.
+
+il/statedata/{statecode}
+
+Get MTSP IL data for a town(in NE state), county or metropolitan area.
+
+mtspil/data/{entityid}
+
+Response Codes
+One of the following response codes will be returned with every request:
+
+code	description
+200
+
+Request was successful
+
+400
+
+An invalid value was specified for one of the query parameters in the request URI.
+
+401
+
+Authentication failure
+
+403
+
+Not allowed to access this dataset API because you have not registered for it.
+
+404
+
+No data found using '(value you entered)'
+
+405
+
+Unsupported method, only GET is supported
+
+406
+
+Unsupported Accept Header value, must be application/json
+
+500
+
+Internal server error occurred
+
+Input parameters
+These parameters appear after a question mark (?) in the endpoint. They are separated using the ampersand (&) character.
+
+name	description
+year
+
+Year of the data to retrieve E.g. 2017. Default is latest year. Optional
+
+Example Call
+Pass the accesstoken in the header to make API calls. An example using the command-line client curl is shown below:
+
+  curl -H "Authorization: Bearer YOUR_API_KEY" https://www.huduser.gov/hudapi/public/fmr/data/0801499999 
+
+API Tester
+Use the API Tester to make API calls to Datasets. The API Tester requires an access token. If you have forgotten or do not have a token, click here.
+
+
+
+
+
+
+
+
+
+
+
+
+Response Structure for /listStates
+property	type	description
+state_name
+
+string
+
+State name
+
+state_code
+
+string
+
+State code
+
+state_num
+
+string
+
+State number
+
+category
+
+string
+
+Value is "State"
+
+Response Example for /listStates
+API call:
+
+https://www.huduser.gov/hudapi/public/fmr/listStates
+		"data":[
+		{
+		"state_name": "Alabama",
+		"state_code": "AL",
+		"state_num": "1",
+		"category": "State"
+		},	
+		{
+		"state_name": "Alaska",
+		"state_code": "AK",
+		"state_num": "2",
+		"category": "State"
+		},
+		{
+		"state_name": "American Samoa",
+		"state_code": "AS",
+		"state_num": "60",
+		"category": "State"
+		},
+		...
+		]
+	
+
+
+Response Structure for /listCounties/{state_code}
+property	type	description
+state_code
+
+string
+
+State code
+
+fips_code
+
+string
+
+fips code of the county
+
+county_name
+
+string
+
+County name
+
+town_name
+
+string
+
+Town name - applicable for North East regions
+
+category
+
+string
+
+Value is "County"
+
+Response Example for /listCounties/{state_code}
+API call:
+
+https://www.huduser.gov/hudapi/public/fmr/listCounties/VA
+		"data":[
+		{
+		"state_code": "VA",
+		"fips_code": "5100199999",
+		"county_name": "Accomack County",
+		"town_name": "",
+		"category": "County"
+		},
+		{
+		"state_code": "VA",
+		"fips_code": "5100399999",
+		"county_name": "Albemarle County",
+		"town_name": "",
+		"category": "County"
+		},
+		{
+		"state_code": "VA",
+		"fips_code": "5151099999",
+		"county_name": "Alexandria city",
+		"town_name": "",
+		"category": "County"
+		},
+		...
+		]
+	
+
+
+Response Structure for /listMetroAreas
+property	type	description
+cbsa_code
+
+string
+
+cbsa code of the Metropolitan Area
+
+area_name
+
+string
+
+area name
+
+category
+
+string
+
+Value is "MetroArea"
+
+Response Example for /listMetroAreas
+API call:
+
+https://www.huduser.gov/hudapi/public/fmr/listMetroAreas
+		"data":[
+		{
+		"cbsa_code": "METRO10180M10180",
+		"area_name": "Abilene, TX MSA",
+		"category": "MetroArea"
+		},
+		{
+		"cbsa_code": "METRO29180N22001",
+		"area_name": "Acadia Parish, LA HUD Metro FMR Area",
+		"category": "MetroArea"
+		},
+		{
+		"cbsa_code": "METRO10380M10380",
+		"area_name": "Aguadilla-Isabela, PR HUD Metro FMR Area",
+		"category": "MetroArea"
+		},
+		...
+		]
+	
+
+
+Response Structure for fmr/data/{entityid}?year=2017
+property	type	description
+county_name
+
+string
+
+Name of the county if it is a county.
+
+counties_msa
+
+string
+
+Names of all counties belonging to the Metro Area if it is a Metro Area (MSA).
+
+town_name
+
+string
+
+Town name - applicable for North East regions
+
+metro_status
+
+string
+
+value will be "1" if it is a metropolitan county. Otherwise value will be "0".
+
+metro_name
+
+string
+
+Metro area name if metro_status is "1"
+
+smallarea_status
+
+string
+
+value will be "1" if it is a small area. Otherwise value will be "0".
+
+basicdata
+
+object
+
+Data for the requested year.
+
+Efficiency
+
+string
+
+Efficiency FMR
+
+One-Bedroom
+
+string
+
+1-bedroom FMR
+
+Two-Bedroom
+
+string
+
+2-bedroom FMR
+
+Three-Bedroom
+
+string
+
+3-bedroom FMR
+
+Four-Bedroom
+
+string
+
+4-bedroom FMR
+
+year
+
+string
+
+Value of year
+
+Response Example for fmr/data/{entityid}?year=2017
+API call:
+
+https://www.huduser.gov/hudapi/public/fmr/data/5002175925?year=2017
+		"data": {
+        "county_name": "Rutland County, VT",
+        "counties_msa": "",
+        "town_name": "Wallingford town",
+        "metro_status": "0",
+        "metro_name": "",
+        "basicdata": {
+		"Efficiency": "758.0",
+		"One-Bedroom": "769.0",
+		"Two-Bedroom": "948.0",
+		"Three-Bedroom": "1186.0",
+		"Four-Bedroom": "1386.0",
+		"year": "2017"
+        },
+        
+		}
+	
+
+
+Response Example for fmr/data/{entityid} if entity will use Small Area FMRs as defined by ZIP codes.
+Note: The field "zip_code": "MSA level" has been added to the API to provide MSA-level data for regions utilizing Small Area FMRs.
+API call:
+
+https://www.huduser.gov/hudapi/public/fmr/data/METRO47900M47900
+	"data": {
+		"county_name": "",
+		"counties_msa": "Alexandria city, VA; Arlington County, VA; Calvert County, MD; Charles County, MD; Clarke County, VA; District of Columbia, DC; Fairfax city, VA; Fairfax County, VA; Falls Church city, VA; Fauquier County, VA; Frederick County, MD; Fredericksburg city, VA; Loudoun County, VA; Manassas city, VA; Manassas Park city, VA; Montgomery County, MD; Prince George's County, MD; Prince William County, VA; Spotsylvania County, VA; and Stafford County, VA",
+		"town_name": "",
+		"metro_status": "1",
+		"metro_name": "Washington-Arlington-Alexandria, DC-VA-MD-WV",
+		"area_name": "Washington-Arlington-Alexandria, DC-VA-MD HUD Metro FMR Area",
+		"smallarea_status": "1",
+		"year": "2024",
+		"basicdata": [
+			{
+				"zip_code": "MSA level",
+				"Efficiency": 1772,
+				"One-Bedroom": 1803,
+				"Two-Bedroom": 2045,
+				"Three-Bedroom": 2544,
+				"Four-Bedroom": 3015
+			},
+			{
+				"zip_code": "20001",
+				"Efficiency": 2460,
+				"One-Bedroom": 2500,
+				"Two-Bedroom": 2840,
+				"Three-Bedroom": 3530,
+				"Four-Bedroom": 4190
+			},
+			{
+				"zip_code": "20002",
+				"Efficiency": 1750,
+				"One-Bedroom": 1780,
+				"Two-Bedroom": 2020,
+				"Three-Bedroom": 2510,
+				"Four-Bedroom": 2980
+			},
+			{
+				"zip_code": "20003",
+				"Efficiency": 2660,
+				"One-Bedroom": 2710,
+				"Two-Bedroom": 3070,
+				"Three-Bedroom": 3820,
+				"Four-Bedroom": 4530
+			},
+		...
+		]
+		}
+	
+
+
+Response Structure for fmr/statedata/{statecode}?year=2017
+property	type	description
+year
+
+String
+
+The year of the data being displayed
+
+metroareas
+
+array
+
+Data of all metro areas in this State
+
+counties
+
+array
+
+Data of all counties in this State
+
+code
+
+string
+
+code of cbsa/county
+
+name
+
+string
+
+Name of the cbsa/county
+
+Efficiency
+
+string
+
+Efficiency FMR
+
+One-Bedroom
+
+string
+
+1-bedroom FMR
+
+Two-Bedroom
+
+string
+
+2-bedroom FMR
+
+Three-Bedroom
+
+string
+
+3-bedroom FMR
+
+Four-Bedroom
+
+string
+
+4-bedroom FMR
+
+statename
+
+string
+
+state name
+
+state_code
+
+string
+
+state code
+
+town_name
+
+string
+
+Town name - applicable for North East States
+
+smallarea_status
+
+string
+
+value will be "1" if it is a small area. Otherwise value will be "0".
+
+Response Example for fmr/statedata/{statecode}
+API call:
+
+https://www.huduser.gov/hudapi/public/fmr/statedata/MA
+		"data": {
+        "year": "2018",
+        "metroareas": [
+		{
+		"code": "METRO12700M12700",
+		"name": "Barnstable Town, MA MSA",
+		"state_name": "Massachusetts",
+		"state_code": "MA",
+		"Efficiency": "925.0",
+		"One-Bedroom": "1048.0",
+		"Two-Bedroom": "1394.0",
+		"Three-Bedroom": "1757.0",
+		"Four-Bedroom": "1919.0",
+		"smallarea_status": 0
+		},
+		{
+		"code": "METRO38340N25003",
+		"name": "Berkshire County, MA (part) HUD Metro FMR Area",
+		"state_name": "Massachusetts",
+		"state_code": "MA",
+		"Efficiency": "836.0",
+		"One-Bedroom": "849.0",
+		"Two-Bedroom": "988.0",
+		"Three-Bedroom": "1239.0",
+		"Four-Bedroom": "1441.0",
+		"smallarea_status": 0
+		},
+    	...
+		]
+		,
+		"counties": [
+		{
+		"town_name": "Abington town",
+		"county_name": "Plymouth County",
+		"metro_name": "Brockton, MA HUD Metro FMR Area",
+		"fips_code": "2502300170",
+		"Efficiency": 1064,
+		"One-Bedroom": 1160,
+		"Two-Bedroom": 1528,
+		"Three-Bedroom": 1918,
+		"Four-Bedroom": 2240,
+		"FMR Percentile": 40,
+		"statename": "Massachusetts",
+		"statecode": "MA",
+		"smallarea_status": 0
+		},
+		{
+		"town_name": "Acton town",
+		"county_name": "Middlesex County",
+		"metro_name": "Boston-Cambridge-Quincy, MA-NH HUD Metro FMR Area",
+		"fips_code": "2501700380",
+		"Efficiency": 1715,
+		"One-Bedroom": 1900,
+		"Two-Bedroom": 2311,
+		"Three-Bedroom": 2880,
+		"Four-Bedroom": 3131,
+		"FMR Percentile": 40,
+		"statename": "Massachusetts",
+		"statecode": "MA",
+		"smallarea_status": 0
+		},
+    	...
+    	]
+		]
+	
+
+
+Response Structure for il/data/{entityid}?year=2017
+property	type	description
+county_name
+
+string
+
+Name of the county if it is a county.
+
+counties_msa
+
+string
+
+Names of all counties belonging to the Metro Area if it is a Metro Area (MSA).
+
+town_name
+
+string
+
+Town name - applicable for North East regions
+
+metro_status
+
+string
+
+value will be "1" if it is a metropolitan county. Otherwise value will be "0".
+
+metro_name
+
+string
+
+Metro area name if metro_status is "1"
+
+year
+
+string
+
+year of the data
+
+median_income
+
+string
+
+Median Income for the area
+
+object
+
+Very Low (50%) Income Limits
+
+object
+
+Extremely Low (30%) Income Limits
+
+object
+
+Low (80%) Income Limits
+
+Response Example for il/data/0100199999
+API call:
+
+https://www.huduser.gov/hudapi/public/il/data/0100199999
+		"data": {
+        "county_name": "Autauga County, AL",
+        "counties_msa": "",
+        "town_name": "",
+        "metro_status": "1",
+        "metro_name": "Montgomery, AL MSA",
+        "area_name": "Montgomery, AL MSA",
+        "year": "2019",
+        "median_income": 65900,
+        "very_low": {
+		"il50_p1": 23100,
+		"il50_p2": 26400,
+		"il50_p3": 29700,
+		"il50_p4": 32950,
+		"il50_p5": 35600,
+		"il50_p6": 38250,
+		"il50_p7": 40900,
+		"il50_p8": 43500
+        },
+        "extremely_low": {
+		"il30_p1": 13850,
+		"il30_p2": 16910,
+		"il30_p3": 21330,
+		"il30_p4": 25750,
+		"il30_p5": 30170,
+		"il30_p6": 34590,
+		"il30_p7": 39010,
+		"il30_p8": 43430
+        },
+        "low": {
+		"il80_p1": 36900,
+		"il80_p2": 42200,
+		"il80_p3": 47450,
+		"il80_p4": 52700,
+		"il80_p5": 56950,
+		"il80_p6": 61150,
+		"il80_p7": 65350,
+		"il80_p8": 69600
+        }
+		}
+	
+
+Response Structure for mtspil/data/{entityid}?year=2024
+property	type	description
+county_name
+
+string
+
+Name of the county if it is a county.
+
+counties_msa
+
+string
+
+Names of all counties belonging to the Metro Area if it is a Metro Area (MSA).
+
+town_name
+
+string
+
+Town name - applicable for North East regions
+
+metro_status
+
+string
+
+value will be "1" if it is a metropolitan county. Otherwise value will be "0".
+
+metro_name
+
+string
+
+Metro area name if metro_status is "1"
+
+year
+
+string
+
+year of the data
+
+median_income
+
+string
+
+Median Income for the area
+
+
+80percent
+object
+80 Percent MTSP Income Limits
+
+70percent
+object
+70 Percent MTSP Income Limits
+
+60percent
+object
+60 Percent MTSP Income Limits
+
+50percent
+object
+50 Percent MTSP Income Limits
+
+40percent
+object
+40 Percent MTSP Income Limits
+
+30percent
+object
+30 Percent MTSP Income Limits
+
+20percent
+object
+20 Percent MTSP Income Limits
+
+hera_special_50percent
+object
+50 Percent HERA Special Income Limits
+
+hera_special_60percent
+object
+60 Percent HERA Special Income Limits
+Response Example for mtspil/data/METRO11020M11020
+API call:
+
+https://www.huduser.gov/hudapi/public/mtspil/data/METRO11020M11020
+		{
+            "data": {
+                "county_name": "",
+                "counties_msa": "Blair County, PA; ",
+                "town_name": "",
+                "metro_status": "1",
+                "metro_name": "Altoona, PA",
+                "area_name": "Altoona, PA MSA",
+                "year": "2024",
+                "median_income": 86900,
+                "80percent": {
+                    "il80_p1": 47600,
+                    "il80_p2": 54320,
+                    "il80_p3": 61120,
+                    "il80_p4": 67920,
+                    "il80_p5": 73360,
+                    "il80_p6": 78800,
+                    "il80_p7": 84240,
+                    "il80_p8": 89680
+                },
+                "70percent": {
+                    "il70_p1": 41650,
+                    "il70_p2": 47530,
+                    "il70_p3": 53480,
+                    "il70_p4": 59430,
+                    "il70_p5": 64190,
+                    "il70_p6": 68950,
+                    "il70_p7": 73710,
+                    "il70_p8": 78470
+                },
+                "60percent": {
+                    "il60_p1": 35700,
+                    "il60_p2": 40740,
+                    "il60_p3": 45840,
+                    "il60_p4": 50940,
+                    "il60_p5": 55020,
+                    "il60_p6": 59100,
+                    "il60_p7": 63180,
+                    "il60_p8": 67260
+                },
+                "50percent": {
+                   ...
+                },
+                "40percent": {
+                   ...
+                },
+                "30percent": {
+                   ...
+                },
+                "20percent": {
+                    ...
+                },
+                "hera_special_50percent": {
+                    "hera_special_il50_p1": 30950,
+                    "hera_special_il50_p2": 35350,
+                    "hera_special_il50_p3": 39750,
+                    "hera_special_il50_p4": 44150,
+                    "hera_special_il50_p5": 47700,
+                    "hera_special_il50_p6": 51250,
+                    "hera_special_il50_p7": 54750,
+                    "hera_special_il50_p8": 58300
+                },
+                "hera_special_60percent": {
+                    "hera_special_il60_p1": 37140,
+                    "hera_special_il60_p2": 42420,
+                    "hera_special_il60_p3": 47700,
+                    "hera_special_il60_p4": 52980,
+                    "hera_special_il60_p5": 57240,
+                    "hera_special_il60_p6": 61500,
+                    "hera_special_il60_p7": 65700,
+                    "hera_special_il60_p8": 69960
+                }
+            }
+        }	
+
+ 
+
+
+
+
+
+Tags: Datasets Fair Market Rents Income Limits
+ 
+About PD&R
+
+PD&R Mission
+Organization Chart
+PD&R Events
+PD&R Guidelines & Brochures
+HUD Secretary's Awards
+Disclaimer of Liability and Endorsement
+
+Reference
+
+Contact Us
+First Time Visitor
+HUD User eBookstore
+HUD User Archives
+Webstore
+
+Research
+
+Case Studies
+Datasets
+Periodicals
+Regulatory Barriers Clearinghouse
+Research & Reports
+
+Note: Guidance documents, except when based on statutory or regulatory authority or law, do not have the force and effect of law and are not meant to bind the public in any way. Guidance documents are intended only to provide clarity to the public regarding existing requirements under the law or agency policies.
+
+Accessibility | Contact Info | Privacy Policy | FOIA | Web Management and Web Policies | Inspector General | No Fear Act | PaymentAccuracy.gov
+
+
+HUD User Social Media Icons
+
+
+HUD USER
+P.O. Box 23268, Washington, DC 20026-3268
+Toll Free: 1-800-245-2691    
+TDD: 1-800-927-7589
+Local: 1-703-964-0670    Fax: 1-202-708-9981
+
+HUD USER footer
