@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Mail, ShieldCheck, Users, Loader2 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
-import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
 import { PageHeader } from "@/components/ui/page-header";
 import Footer from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +40,7 @@ export default function DeveloperUserManagement() {
           description="View the users who belong to your company portal."
           eyebrow="Organization"
           actions={
-            <Button asChild className={developerHeaderButtonClass}>
+            <Button asChild size="sm" variant="outline">
               <a href={requestHref}><Mail className="mr-2 h-4 w-4" /> Request teammate addition</a>
             </Button>
           }

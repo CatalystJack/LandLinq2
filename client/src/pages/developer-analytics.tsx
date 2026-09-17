@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DeveloperNavigation from "@/components/developer-navigation";
-import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
+import { PageHeader } from "@/components/ui/page-header";
 import Footer from "@/components/footer";
 import AnalyticsDashboard from "@/components/analytics-dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,7 +36,7 @@ interface Deal {
 
 interface AnalyticsData {
   deals: Deal[];
-  outreachStats: { sent: number; opens: number; clicks: number; replies: number };
+  outreachStats: { sent: number };
   pipelineStageBreakdown?: { stage: string; count: number }[];
   advancedDashboard?: {
     dailySubmissions: { date: string; count: number; value: number }[];
@@ -140,7 +140,7 @@ export default function DeveloperAnalytics() {
 
   const uniqueCities = Array.from(new Set(deals.map(cityName)));
   const uniqueBrokers = Array.from(new Set(deals.map(brokerName))).filter((broker) => broker !== "Unknown Broker");
-  const outreach = data?.outreachStats || { sent: 0, opens: 0, clicks: 0, replies: 0 };
+  const outreach = data?.outreachStats || { sent: 0 };
   const exportToCSV = () => {
     const rows = [
       ["Address", "Asking Price", "Status", "Classification", "Broker", "Submitted Date", "City"],
@@ -158,14 +158,14 @@ export default function DeveloperAnalytics() {
     <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <DeveloperPageHeader
+        <PageHeader
           title="Analytics Dashboard"
           description="Your company’s deal flow, markets, brokers, and outreach performance"
           actions={
             <>
               <Dialog open={showFilters} onOpenChange={setShowFilters}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className={developerHeaderButtonClass}>
+                  <Button variant="outline" size="sm">
                     <Filter className="mr-2 h-4 w-4" />Filters
                   </Button>
                 </DialogTrigger>
@@ -176,7 +176,7 @@ export default function DeveloperAnalytics() {
                   <div className="grid grid-cols-2 items-center gap-4"><Label>Date Range:</Label><Select value={filters.dateRange} onValueChange={(value) => setFilters({ ...filters, dateRange: value })}><SelectTrigger><SelectValue placeholder="All dates" /></SelectTrigger><SelectContent><SelectItem value="all">All Time</SelectItem><SelectItem value="7">Last 7 days</SelectItem><SelectItem value="30">Last 30 days</SelectItem><SelectItem value="90">Last 90 days</SelectItem></SelectContent></Select></div>
                 </div></DialogContent>
               </Dialog>
-              <Button variant="outline" size="sm" onClick={exportToCSV} className={developerHeaderButtonClass}>
+              <Button variant="outline" size="sm" onClick={exportToCSV}>
                 <Download className="mr-2 h-4 w-4" />Export
               </Button>
             </>
@@ -279,7 +279,7 @@ export default function DeveloperAnalytics() {
                </CardContent>
              </Card>
            </div><Card className={analyticsCardClass}><CardHeader><CardTitle className="text-[#081729]">Advanced Analytics Dashboard</CardTitle></CardHeader><CardContent><AnalyticsDashboard dataOverride={data?.advancedDashboard} allowFetch={false} /></CardContent></Card>
-           <Card className={analyticsCardClass}><CardHeader><CardTitle className="text-[#081729]">Outreach Engagement</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">{[["Sent", outreach.sent], ["Opens", outreach.opens], ["Clicks", outreach.clicks], ["Replies", outreach.replies]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-[#081729]">{value}</p></div>)}</CardContent></Card></TabsContent>
+          <Card className={analyticsCardClass}><CardHeader><CardTitle className="text-[#081729]">Outreach Sent</CardTitle></CardHeader><CardContent><div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4"><p className="text-sm text-slate-500">Messages sent</p><p className="mt-1 text-2xl font-bold text-[#081729]">{outreach.sent}</p></div></CardContent></Card></TabsContent>
            <TabsContent value="markets"><Card className={analyticsCardClass}><CardHeader><CardTitle className="flex items-center gap-2 text-[#081729]"><MapPin className="h-5 w-5 text-[#498EDE]" />Market Heat Map</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-6 lg:grid-cols-2"><div><h3 className="mb-4 text-lg font-semibold text-[#081729]">Top Markets by Volume</h3>{analytics.cityDistribution.slice(0, 8).map((city, index) => <div key={city.city} className="mb-3 flex items-center justify-between rounded-xl bg-slate-50/80 p-3"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#498EDE] text-sm font-bold text-white">{index + 1}</div><div><div className="font-medium text-slate-800">{city.city}</div><div className="text-sm text-slate-500">{city.count} deals</div></div></div><div className="text-right font-bold text-[#081729]">${(city.avgValue / 1000000).toFixed(1)}M</div></div>)}</div><div className="space-y-4"><h3 className="text-lg font-semibold text-[#081729]">Market Activity Trends</h3>{["High Growth Markets", "Emerging Opportunities", "Market Saturation"].map((item, index) => <div key={item} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="mb-2 flex items-center justify-between"><span className="font-medium text-slate-800">{item}</span><Badge variant="secondary">{index === 0 ? "Active" : index === 1 ? "Watch" : "Caution"}</Badge></div><p className="text-sm text-slate-600">Based on your current deal flow data</p></div>)}</div></CardContent></Card></TabsContent>
            <TabsContent value="brokers"><Card className={analyticsCardClass}><CardHeader><CardTitle className="flex items-center gap-2 text-[#081729]"><Users className="h-5 w-5 text-[#498EDE]" />Broker Performance Analytics</CardTitle></CardHeader><CardContent><div className="table-scroll-container"><table className="w-full"><thead><tr className="border-b border-slate-200"><th className="px-4 py-3 text-left text-slate-500">Broker</th><th className="px-4 py-3 text-left text-slate-500">Deals</th><th className="px-4 py-3 text-left text-slate-500">Total Value</th><th className="px-4 py-3 text-left text-slate-500">Avg Deal Size</th></tr></thead><tbody>{analytics.brokerPerformance.map((broker) => <tr key={broker.broker} className="border-b border-slate-100"><td className="px-4 py-3 font-medium text-slate-800">{broker.broker}</td><td className="px-4 py-3"><Badge variant="outline">{broker.deals}</Badge></td><td className="px-4 py-3 font-semibold text-[#081729]">${(broker.totalValue / 1000000).toFixed(1)}M</td><td className="px-4 py-3 text-slate-700">${((broker.totalValue / broker.deals) / 1000000).toFixed(1)}M</td></tr>)}</tbody></table></div></CardContent></Card></TabsContent>
            <TabsContent value="trends"><Card className={analyticsCardClass}><CardHeader><CardTitle className="flex items-center gap-2 text-[#081729]"><TrendingUp className="h-5 w-5 text-[#498EDE]" />Market Trends & Forecasting</CardTitle></CardHeader><CardContent className="grid grid-cols-1 gap-6 md:grid-cols-3">{[["Deal Velocity", `${analytics.totalDeals} deals`, "Total deals processed", Zap], ["Price Trends", `$${(analytics.avgDealSize / 1000000).toFixed(1)}M`, "Based on deal data analysis", DollarSign], ["Success Rate", `${analytics.conversionRate.toFixed(1)}%`, "Deals conversion rate", Target]].map(([label, value, help, Icon]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="mb-3 flex items-center gap-2"><Icon className="h-5 w-5 text-[#498EDE]" /><h3 className="font-semibold text-[#081729]">{label}</h3></div><p className="mb-1 text-2xl font-bold text-[#081729]">{value}</p><p className="text-sm text-slate-600">{help}</p></div>)}</CardContent></Card></TabsContent>

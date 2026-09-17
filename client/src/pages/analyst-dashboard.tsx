@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import Navigation from "@/components/navigation";
 import DeveloperNavigation from "@/components/developer-navigation";
-import { developerHeaderButtonClass } from "@/components/developer-page-header";
+import { PageHeader } from "@/components/ui/page-header";
 import SEO from "@/components/SEO";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5786,18 +5786,15 @@ export default function AnalystDashboard() {
       
       <main className="pt-20 pb-16 px-4">
         <div className="max-w-[2200px] mx-auto">
-          {/* Header */}
-          <header className="section-gap-md">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#07172A] tracking-tight">
-                  Analyst Dashboard
-                </h1>
-              </div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <PageHeader
+            title="Analyst Dashboard"
+            actions={
+              <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
                 <Button
                   onClick={addNewDeal}
-                  className={`${developerHeaderButtonClass} w-full sm:w-auto uppercase tracking-wider`}
+                  size="sm"
+                  variant="outline"
+                  className="w-full uppercase tracking-wider sm:w-auto"
                   data-testid="button-add-deal"
                 >
                   <Plus size={16} className="mr-2" />
@@ -5807,8 +5804,9 @@ export default function AnalystDashboard() {
                   <Button
                     onClick={() => exportToExcelMutation.mutate()}
                     disabled={exportToExcelMutation.isPending}
+                    size="sm"
                     variant="outline"
-                    className={`${developerHeaderButtonClass} uppercase tracking-wider`}
+                    className="uppercase tracking-wider"
                     data-testid="button-export-excel"
                   >
                     <Download size={16} className="mr-2" />
@@ -5816,8 +5814,8 @@ export default function AnalystDashboard() {
                   </Button>
                 </div>
               </div>
-            </div>
-          </header>
+            }
+          />
 
           {onboardingStatus && !onboardingStatus.complete && isDeveloperUser && (
             <Card className="section-gap-sm overflow-hidden border-[#b8d8f5] bg-white shadow-sm" data-testid="card-developer-onboarding-checklist">

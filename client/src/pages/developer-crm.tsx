@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
 import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, SlidersHorizontal, Pencil, Plus, X } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
-import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
+import { PageHeader } from "@/components/ui/page-header";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
 import { useAuth } from "@/hooks/useAuth";
@@ -360,12 +360,12 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     <div className="min-h-[100dvh] bg-[#f3f6f9] text-[#172b3d]">
       {adminMode ? <Navigation /> : <DeveloperNavigation />}
       <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
-        <DeveloperPageHeader
+        <PageHeader
           title="Company contacts"
           description="A focused directory for the relationships your team is building across the LandLinq network."
           eyebrow={adminMode ? "Relationship management" : undefined}
           actions={
-            <Button onClick={() => setImportOpen(true)} className={developerHeaderButtonClass}>
+            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
               <Upload className="mr-2 h-4 w-4" />Import Contacts
             </Button>
           }

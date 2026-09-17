@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { CheckCircle2, Edit3, Loader2, Mail, MapPin, MessageSquare, Paperclip, Plus, Rocket, Send, Sparkles, Tag, Trash2, Users } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
-import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
+import { PageHeader } from "@/components/ui/page-header";
 import Footer from "@/components/footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -497,11 +497,11 @@ export default function DeveloperOutreach() {
     <div className="min-h-screen bg-slate-50">
       <DeveloperNavigation />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <DeveloperPageHeader
+        <PageHeader
           title="Campaigns"
           description="Build drip campaigns for your approved contact audience."
           actions={
-            <Button variant="outline" onClick={openNewCampaignChoice} disabled={!sender?.outlookConnected} className={developerHeaderButtonClass}>
+            <Button variant="outline" size="sm" onClick={openNewCampaignChoice} disabled={!sender?.outlookConnected}>
               <Plus className="mr-2 h-4 w-4" />New Campaign
             </Button>
           }

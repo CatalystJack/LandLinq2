@@ -12871,9 +12871,6 @@ RULES:
           COALESCE(deal_stats.sourced_deals, 0) AS sourced_deals,
           COALESCE(contact_stats.crm_contact_count, 0) AS crm_contact_count,
           COALESCE(outreach_stats.sent, 0) AS outreach_sent,
-          COALESCE(outreach_stats.opens, 0) AS outreach_opens,
-          COALESCE(outreach_stats.clicks, 0) AS outreach_clicks,
-          COALESCE(outreach_stats.replies, 0) AS outreach_replies,
           GREATEST(
             p.updated_at,
             deal_stats.last_deal_activity,
@@ -12918,16 +12915,11 @@ RULES:
         ) contact_stats ON true
         LEFT JOIN LATERAL (
           SELECT
-            COUNT(*) FILTER (WHERE ev.event_type = 'sent') AS sent,
-            COUNT(*) FILTER (WHERE ev.event_type = 'opened') AS opens,
-            COUNT(*) FILTER (WHERE ev.event_type = 'clicked') AS clicks,
-            COUNT(*) FILTER (WHERE ev.event_type = 'replied') AS replies,
-            MAX(ev.event_timestamp) AS last_outreach_activity
-          FROM outreach_message_events ev
-          INNER JOIN outreach_senders sender ON sender.id = ev.sender_id
-          INNER JOIN outreach_campaigns campaign ON campaign.id = ev.campaign_id
-          WHERE sender.developer_profile_id = p.id
-            AND campaign.developer_profile_id = p.id
+            COUNT(*) FILTER (WHERE m.status = 'sent') AS sent,
+            MAX(COALESCE(m.sent_at, m.created_at)) AS last_outreach_activity
+          FROM outreach_messages m
+          INNER JOIN outreach_campaigns campaign ON campaign.id = m.campaign_id
+          WHERE campaign.developer_profile_id = p.id
             AND COALESCE(campaign.is_archived, false) = false
         ) outreach_stats ON true
         LEFT JOIN LATERAL (
@@ -12941,8 +12933,6 @@ RULES:
 
       const profiles = (result.rows || []).map((row: any) => {
         const sent = Number(row.outreach_sent) || 0;
-        const opens = Number(row.outreach_opens) || 0;
-        const replies = Number(row.outreach_replies) || 0;
         return {
           id: row.id,
           companyName: row.company_name,
@@ -12961,11 +12951,6 @@ RULES:
           },
           outreach: {
             sent,
-            opens,
-            clicks: Number(row.outreach_clicks) || 0,
-            replies,
-            openRate: sent ? opens / sent * 100 : 0,
-            replyRate: sent ? replies / sent * 100 : 0,
           },
           crmContactCount: Number(row.crm_contact_count) || 0,
           lastActivityAt: row.last_activity_at || null,
@@ -16384,15 +16369,10 @@ RULES:
 
       const engagementResult = await db.execute(sql`
         SELECT
-          COUNT(*) FILTER (WHERE ev.event_type = 'sent') AS sent,
-          COUNT(*) FILTER (WHERE ev.event_type = 'opened') AS opens,
-          COUNT(*) FILTER (WHERE ev.event_type = 'clicked') AS clicks,
-          COUNT(*) FILTER (WHERE ev.event_type = 'replied') AS replies
-        FROM outreach_message_events ev
-        INNER JOIN outreach_senders s ON s.id = ev.sender_id
-        INNER JOIN outreach_campaigns c ON c.id = ev.campaign_id
-        WHERE s.developer_profile_id = ${developerProfileId}
-          AND c.developer_profile_id = ${developerProfileId}
+          COUNT(*) FILTER (WHERE m.status = 'sent') AS sent
+        FROM outreach_messages m
+        INNER JOIN outreach_campaigns c ON c.id = m.campaign_id
+        WHERE c.developer_profile_id = ${developerProfileId}
           AND COALESCE(c.is_archived, false) = false
       `);
       const engagement = (engagementResult.rows?.[0] || {}) as any;
@@ -16436,9 +16416,6 @@ RULES:
         ],
         outreachStats: {
           sent: Number(engagement.sent) || 0,
-          opens: Number(engagement.opens) || 0,
-          clicks: Number(engagement.clicks) || 0,
-          replies: Number(engagement.replies) || 0,
         },
         pipelineStageBreakdown,
         advancedDashboard,
@@ -23159,10 +23136,19 @@ RULES:
         </div>
       `;
 
-      // For now, just return success as this is a test endpoint  
-      // await emailService.sendEmail(email, 'LandLinq - Branding Settings Test Email', testEmailContent);
+      const sent = await sendNotificationEmail({
+        to: email,
+        subject: "LandLinq - Branding Settings Test Email",
+        html: testEmailContent,
+        text: "Branding settings test email",
+        type: "test",
+        priority: "high",
+      });
+      if (!sent) {
+        return res.status(500).json({ success: false, error: "Failed to send branding settings test email" });
+      }
 
-      res.json({ success: true, message: 'Test email sent successfully' });
+      res.json({ success: true });
     } catch (error: any) {
       console.error('Error sending test email:', error);
       res.status(500).json({ error: 'Failed to send test email' });

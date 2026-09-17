@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DeveloperNavigation from "@/components/developer-navigation";
-import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
+import { PageHeader } from "@/components/ui/page-header";
 import Footer from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -228,16 +228,16 @@ export default function DeveloperPipeline() {
     <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <DeveloperPageHeader
+        <PageHeader
           title="Pipeline"
           description="Track opportunities from first contact through close, independent of deal classification."
           eyebrow="Sales workspace"
           actions={
             <>
-              <Button variant="outline" onClick={() => setManageOpen(true)} className={developerHeaderButtonClass}>
+              <Button variant="outline" size="sm" onClick={() => setManageOpen(true)}>
                 <Settings2 className="mr-2 h-4 w-4" />Manage Stages
               </Button>
-              <Button onClick={openNewOpportunity} disabled={!activeStages.length} className={developerHeaderButtonClass}>
+              <Button variant="outline" size="sm" onClick={openNewOpportunity} disabled={!activeStages.length}>
                 <Plus className="mr-2 h-4 w-4" />New Opportunity
               </Button>
             </>

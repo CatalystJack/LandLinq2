@@ -19,7 +19,7 @@ import {
   Upload,
 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
-import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";
+import { PageHeader } from "@/components/ui/page-header";
 import Footer from "@/components/footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -360,21 +360,21 @@ export default function DeveloperDashboard() {
     <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
       <main className="mx-auto max-w-[1600px] px-3 py-5 sm:px-5 lg:px-6">
-        <DeveloperPageHeader
+        <PageHeader
           title="Deal Dashboard"
           description={`Review, analyze, and manage deals shared with ${profile?.companyName || "your company"}.`}
           eyebrow="Investment Company Portal"
           actions={
             <>
-              <Button size="sm" onClick={() => setImportOpen(true)} className={developerHeaderButtonClass}>
+              <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
                 Import Deals
               </Button>
-              <Button size="sm" variant="outline" onClick={exportDeals} className={developerHeaderButtonClass}>
+              <Button size="sm" variant="outline" onClick={exportDeals}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 Export CSV
               </Button>
-              <Button size="sm" variant="outline" onClick={refreshDeals} disabled={refreshing} className={developerHeaderButtonClass}>
+              <Button size="sm" variant="outline" onClick={refreshDeals} disabled={refreshing}>
                 <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
