@@ -371,7 +371,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           }
         />
 
-        <Card className="overflow-hidden rounded-xl border-[#dce5eb] bg-[#fbfcfd] shadow-[0_12px_30px_rgba(25,53,74,0.06)]">
+        <Card className="overflow-hidden rounded-2xl border-[#dce5eb] bg-[#fbfcfd] shadow-sm">
           <div className="flex flex-col gap-4 border-b border-[#e3e9ee] bg-[#f8fafb] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg text-white" style={{ backgroundColor: primaryColor }}><Users className="h-5 w-5" /></div>
@@ -474,7 +474,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           ) : contactsQuery.isError ? (
             <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center"><p className="text-sm font-medium text-[#9b4545]">{(contactsQuery.error as Error).message}</p><Button variant="outline" className="mt-4 h-9" onClick={() => contactsQuery.refetch()}><RefreshCw className="mr-2 h-3.5 w-3.5" />Try again</Button></div>
            ) : filteredContacts.length === 0 ? (
-             <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search.trim() || hasActiveFilters ? "No matching contacts" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search.trim() || hasActiveFilters ? "Try clearing a filter or broadening your search." : "Import a contact list to get started."}</p>{(search.trim() || hasActiveFilters) && <Button variant="outline" onClick={() => { setSearch(""); clearFilters(); }} className="mt-4 h-9">Clear search and filters</Button>}</div>
+             <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search.trim() || hasActiveFilters ? "No matching contacts" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search.trim() || hasActiveFilters ? "Try clearing a filter or broadening your search." : "Import a contact list to get started."}</p>{(search.trim() || hasActiveFilters) && <Button variant="outline" onClick={() => { setSearch(""); clearFilters(); }} className="mt-4 h-9">Clear search and filters</Button>}</div>
           ) : (
             <div className="table-scroll-container">
                <Table className="min-w-[1120px]">
@@ -570,7 +570,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           <DialogHeader><DialogTitle>Import Contacts</DialogTitle><DialogDescription>Upload a CSV or Excel file and map its columns. Email matches update only contacts owned by your company.</DialogDescription></DialogHeader>
           {!file ? (
             <div className="space-y-4 py-4">
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center"><FileSpreadsheet className="mx-auto mb-3 h-10 w-10 text-slate-400" /><Label htmlFor="developer-contact-file" className="cursor-pointer font-semibold text-slate-800">Choose a CSV or Excel file</Label><Input id="developer-contact-file" type="file" accept=".csv,.xlsx,.xls" className="mx-auto mt-4 max-w-sm bg-white" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} /><p className="mt-3 text-xs text-slate-500">First row should contain column headers.</p></div>
+              <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center"><FileSpreadsheet className="mx-auto mb-3 h-10 w-10 text-slate-400" /><Label htmlFor="developer-contact-file" className="cursor-pointer font-semibold text-slate-800">Choose a CSV or Excel file</Label><Input id="developer-contact-file" type="file" accept=".csv,.xlsx,.xls" className="mx-auto mt-4 max-w-sm bg-white" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} /><p className="mt-3 text-xs text-slate-500">First row should contain column headers.</p></div>
               {parsing && <div className="flex items-center justify-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Reading spreadsheet…</div>}
             </div>
           ) : result ? (

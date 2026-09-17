@@ -508,8 +508,8 @@ export default function DeveloperOutreach() {
         />
 
         <div className="mb-6 grid gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-lg"><Mail className="h-5 w-5" />Sending account</CardTitle></CardHeader>
+          <Card className="lg:col-span-2 rounded-2xl border-slate-200 bg-white shadow-sm">
+            <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-lg"><div className="rounded-xl bg-[#498EDE]/15 p-2 text-[#498EDE]"><Mail className="h-4 w-4" /></div>Sending account</CardTitle></CardHeader>
             <CardContent>
               {senderQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : sender?.outlookConnected ? (
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -537,17 +537,17 @@ export default function DeveloperOutreach() {
               )}
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-lg"><Users className="h-5 w-5" />Target audience</CardTitle></CardHeader>
+          <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-lg"><div className="rounded-xl bg-[#498EDE]/15 p-2 text-[#498EDE]"><Users className="h-4 w-4" /></div>Target audience</CardTitle></CardHeader>
             <CardContent><p className="text-3xl font-bold text-slate-950">{targetsQuery.data?.count ?? "—"}</p><p className="mt-1 text-sm text-slate-500">Eligible owned and shared contacts</p><div className="mt-3 flex items-start gap-2 text-xs text-slate-600"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span>{scopeLabel}</span></div></CardContent>
           </Card>
         </div>
 
-        <Card>
-          <CardHeader className="border-b border-slate-100"><CardTitle className="text-lg">Your campaigns</CardTitle></CardHeader>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+          <CardHeader className="border-b border-slate-100"><CardTitle className="flex items-center gap-2 text-lg"><div className="rounded-xl bg-[#498EDE]/15 p-2 text-[#498EDE]"><Send className="h-4 w-4" /></div>Your campaigns</CardTitle></CardHeader>
           <CardContent className="p-0">
             {campaignsQuery.isLoading ? <div className="flex min-h-52 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div> : campaigns.length === 0 ? (
-              <div className="flex min-h-52 flex-col items-center justify-center px-6 text-center"><Send className="mb-3 h-10 w-10 text-slate-300" /><p className="font-semibold text-slate-800">No campaigns yet</p><p className="mt-1 text-sm text-slate-500">{sender?.outlookConnected ? "Create your first email campaign." : "Connect Outlook to get started."}</p></div>
+              <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><Send className="mb-3 h-10 w-10 text-slate-300" /><p className="font-semibold text-slate-800">No campaigns yet</p><p className="mt-1 text-sm text-slate-500">{sender?.outlookConnected ? "Create your first email campaign." : "Connect Outlook to get started."}</p></div>
             ) : (
               <div className="divide-y divide-slate-100">{campaigns.map((campaign) => (
                 <div key={campaign.id} className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
