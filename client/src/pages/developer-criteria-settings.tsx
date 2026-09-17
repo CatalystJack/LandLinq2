@@ -494,10 +494,10 @@ export default function DeveloperCriteriaSettings() {
         />
 
         <div className="space-y-6">
-          <Card className="rounded-2xl border-slate-200 shadow-sm">
+          <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <div className="flex items-start gap-3">
-                <div className="rounded-lg p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>
+                <div className="rounded-xl p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>
                   <Mail className="h-5 w-5" />
                 </div>
                 <div>
@@ -585,10 +585,10 @@ export default function DeveloperCriteriaSettings() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-slate-200 shadow-sm">
+          <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <div className="flex items-start gap-3">
-                <div className="rounded-lg p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>
+                <div className="rounded-xl p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>
                   <Mail className="h-5 w-5" />
                 </div>
                 <div>
@@ -652,10 +652,10 @@ export default function DeveloperCriteriaSettings() {
             </CardContent>
           </Card>
 
-          {form.profileType === "real_estate" && <Card className="rounded-2xl border-slate-200 shadow-sm">
+          {form.profileType === "real_estate" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <div className="flex items-start gap-3">
-                <div className="rounded-lg p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}><Settings2 className="h-5 w-5" /></div>
+                <div className="rounded-xl p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}><Settings2 className="h-5 w-5" /></div>
                 <div><CardTitle>Criteria</CardTitle><CardDescription>These rules determine each deal’s profile-specific classification.</CardDescription></div>
               </div>
             </CardHeader>
@@ -763,7 +763,7 @@ export default function DeveloperCriteriaSettings() {
             </CardContent>
           </Card>}
 
-          {form.profileType === "real_estate" && <Card className="rounded-2xl border-slate-200 shadow-sm">
+          {form.profileType === "real_estate" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader className="cursor-pointer" onClick={() => setOverridesOpen((open) => !open)}>
               <div className="flex items-center justify-between">
                 <div><CardTitle>Rent minimum overrides</CardTitle><CardDescription>Allow qualifying public programs to bypass rent minimums.</CardDescription></div>
@@ -785,10 +785,10 @@ export default function DeveloperCriteriaSettings() {
             </CardContent>}
           </Card>}
 
-          <Card className="rounded-2xl border-slate-200 shadow-sm">
+          <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader className="cursor-pointer" onClick={() => setTeamOpen((open) => !open)}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3"><div className="rounded-lg bg-slate-100 p-2 text-slate-600"><Users className="h-5 w-5" /></div><div><CardTitle>Team</CardTitle><CardDescription>LandLinq/Apex approves and creates all company accounts.</CardDescription></div></div>
+                <div className="flex items-center gap-3"><div className="rounded-xl bg-slate-100 p-2 text-slate-600"><Users className="h-5 w-5" /></div><div><CardTitle>Team</CardTitle><CardDescription>LandLinq/Apex approves and creates all company accounts.</CardDescription></div></div>
                 {teamOpen ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
               </div>
             </CardHeader>
