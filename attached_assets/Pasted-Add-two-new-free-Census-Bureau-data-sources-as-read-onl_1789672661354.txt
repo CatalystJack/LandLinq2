@@ -1,0 +1,40 @@
+Add two new free Census Bureau data sources as read-only context columns on the analyst deal dashboard — no changes to YOC, comps, or any existing column's logic.
+
+1. New service file server/censusDataService.ts (model it on the existing server/hellodataService.ts pattern — a plain service module the routes call into):
+
+getFipsForCoordinates(lat, lng): calls the free, keyless Census Geocoder — https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=<lng>&y=<lat>&benchmark=Public_AR_Current&vintage=Current_Current&format=json — and pulls the state FIPS, county FIPS, and tract FIPS out of the response's Census Tracts block. Return null if the deal has no lat/lng yet, or if the call fails or returns no geographies (don't throw).
+getAcsDataForTract(stateFips, countyFips, tractFips): calls the ACS 5-year API — https://api.census.gov/data/2023/acs/acs5?get=B01003_001E,B19013_001E,B25003_001E,B25003_002E,B25003_003E,B01002_001E&for=tract:<tract>&in=state:<state>+county:<county>&key=<CENSUS_API_KEY> — parses the response into { population, medianHouseholdIncome, ownerOccupiedUnits, renterOccupiedUnits, medianAge }. Compute renterOccupiedPct and ownerOccupiedPct from the occupied-unit counts. Also make a second call to the 2019 5-year vintage (.../2019/acs/acs5?...) for the same tract to get that period's population, and compute a rough populationGrowthPct from the two. If either call fails, still return whatever succeeded — never let a missing vintage null out the whole result.
+getRecentBuildingPermits(stateFips, countyFips): the Building Permits Survey does NOT have a JSON API — it publishes one flat CSV per month at a fixed URL pattern (e.g. https://www2.census.gov/econ/bps/County/co<YYMM>y.txt, comma-separated). Fetch the current month's file, cache it in memory (or a small new table — your call, whichever is simpler in this codebase — but cache it, don't refetch per deal) for 24 hours, then look up the row matching this deal's state+county FIPS and sum the total residential unit columns to get "permits issued, trailing 12 months." If the file can't be fetched or parsed, or the county isn't found, return null — never throw, never block the rest of the deal from loading.
+
+Wrap every one of the above in try/catch. A failure in any Census call must never break deal loading, never block deal creation/editing, and must just result in — shown in the UI for that deal.
+
+2. Schema (shared/schema.ts) — add to the deals table only:
+
+censusDataJson: jsonb("census_data_json") — stores { population, medianHouseholdIncome, renterOccupiedPct, ownerOccupiedPct, medianAge, populationGrowthPct, permitsTrailing12Mo, stateFips, countyFips, tractFips }
+censusDataFetchedAt: timestamp("census_data_fetched_at")
+
+Push this with the project's normal migration process — additive nullable columns only, no backfill required, no changes to any existing column.
+
+3. Wire it up in server/routes.ts, following the exact same pattern already used for comparablesFetchedAt (search for that field to find the caching check around line 32778): when a deal is opened/refreshed, if censusDataFetchedAt is missing or older than 30 days, call the three service functions above (using the deal's existing latitude/longitude, or geocode from zip+county if lat/lng is missing), save the result into censusDataJson + censusDataFetchedAt, and don't block the response if it fails — just leave those fields null and move on. Do not change how comps, YOC, or any other existing field is fetched or cached.
+
+4. Dashboard columns (client/src/pages/analyst-dashboard.tsx) — add two entries to the ALL_COLUMNS array (around line 118), right after sewer:
+
+{ key: 'areaDemographics', label: 'Area Demographics', defaultVisible: false },
+{ key: 'nearbyPermits', label: 'Nearby Permits (12mo)', defaultVisible: false },
+
+Set defaultVisible: false on both so nothing changes for anyone until they opt in via the columns toggle — this avoids any layout/width surprises on an already-dense table.
+
+Then add two new case entries in the cell-rendering switch (same switch that has case 'sewer':, case 'zoning':, etc.):
+
+case 'areaDemographics': read from deal.censusDataJson. If null, render the same empty-state (EmptyCell or –) already used elsewhere in this switch. If present, show something compact like "$78k HHI · 62% renter · pop +4.1%" in a tooltip-on-hover cell (reuse whatever tooltip pattern the reason column already uses).
+case 'nearbyPermits': read deal.censusDataJson?.permitsTrailing12Mo. If null, show the empty-state. If present, show the number, e.g. "142 permits".
+
+5. Explicit non-regression requirements (call these out to the agent directly):
+
+Do not touch PRODUCT_TYPE_YOC_PRESETS, calculateYOCForProductTypes, or any other YOC/underwriting code.
+Do not touch the existing comps/HelloData fetch logic or its caching.
+Do not change any existing column's key, label, or default visibility.
+Both new fields must be nullable and additive — a deal that has never had a Census fetch run must render exactly as it does today (empty-state cells, no errors, no layout shift).
+If CENSUS_API_KEY is not set in environment secrets, getAcsDataForTract should fail gracefully (return null) rather than crash — building permits and geocoding don't need a key at all, only the ACS call does.
+
+One thing you'll need to do yourself: sign up for a free Census API key at https://api.census.gov/data/key_signup.html (instant, no approval wait) and add it to Replit's secrets as CENSUS_API_KEY before this goes live — everything else here needs no key and no cost.
