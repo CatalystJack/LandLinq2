@@ -12870,12 +12870,13 @@ RULES:
           COALESCE(deal_stats.bulk_imported_deals, 0) AS bulk_imported_deals,
           COALESCE(deal_stats.sourced_deals, 0) AS sourced_deals,
           COALESCE(contact_stats.crm_contact_count, 0) AS crm_contact_count,
-          COALESCE(outreach_stats.sent, 0) AS outreach_sent,
+           COALESCE(outreach_stats.sent, 0) + COALESCE(drip_stats.sent, 0) AS outreach_sent,
           GREATEST(
             p.updated_at,
             deal_stats.last_deal_activity,
             contact_stats.last_contact_activity,
-            outreach_stats.last_outreach_activity,
+             outreach_stats.last_outreach_activity,
+             drip_stats.last_outreach_activity,
             user_stats.last_user_activity
           ) AS last_activity_at
         FROM developer_profiles p
@@ -12922,6 +12923,14 @@ RULES:
           WHERE campaign.developer_profile_id = p.id
             AND COALESCE(campaign.is_archived, false) = false
         ) outreach_stats ON true
+         LEFT JOIN LATERAL (
+           SELECT
+             COALESCE(SUM(dce.total_steps_sent), 0) AS sent,
+             MAX(dce.last_sent_at) AS last_outreach_activity
+           FROM drip_campaign_enrollments dce
+           INNER JOIN outreach_senders sender ON sender.id = dce.sender_id
+           WHERE sender.developer_profile_id = p.id
+         ) drip_stats ON true
         LEFT JOIN LATERAL (
           SELECT MAX(u.updated_at) AS last_user_activity
           FROM users u
@@ -16369,7 +16378,12 @@ RULES:
 
       const engagementResult = await db.execute(sql`
         SELECT
-          COUNT(*) FILTER (WHERE m.status = 'sent') AS sent
+          COUNT(*) FILTER (WHERE m.status = 'sent') + COALESCE((
+            SELECT SUM(dce.total_steps_sent)
+            FROM drip_campaign_enrollments dce
+            INNER JOIN outreach_senders sender ON sender.id = dce.sender_id
+            WHERE sender.developer_profile_id = ${developerProfileId}
+          ), 0) AS sent
         FROM outreach_messages m
         INNER JOIN outreach_campaigns c ON c.id = m.campaign_id
         WHERE c.developer_profile_id = ${developerProfileId}
