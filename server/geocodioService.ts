@@ -179,7 +179,7 @@ interface DemographicsResult {
 
 export class GeocodioService {
   private apiKey: string;
-  private baseUrl = 'https://api.geocod.io/v1.9';
+  private baseUrl = 'https://api.geocod.io/v2';
 
   constructor() {
     this.apiKey = process.env.GEOCODIO_API_KEY || '';
@@ -293,8 +293,10 @@ export class GeocodioService {
       };
     }
 
-    // Not an intersection - use standard geocoding
-    return this.geocodeAddressInternal(address);
+    // Not an intersection - include the caller-supplied locality. Without it,
+    // street-only addresses can resolve to the wrong state or city.
+    const fullAddress = cityStateZip ? `${address}, ${cityStateZip}` : address;
+    return this.geocodeAddressInternal(fullAddress);
   }
 
   private async geocodeAddressInternal(address: string): Promise<{
@@ -314,7 +316,7 @@ export class GeocodioService {
       console.log(`🔍 Geocoding address: ${address}`);
       
       // Geocodio requires census fields to get tract information
-      const url = `${this.baseUrl}/geocode?q=${encodeURIComponent(address)}&fields=census2020&api_key=${this.apiKey}`;
+      const url = `${this.baseUrl}/geocode?q=${encodeURIComponent(address)}&country=USA&fields=census2020&api_key=${this.apiKey}`;
       
       // Use retry logic with 15-second timeout per attempt (prevents hanging)
       const startTime = Date.now();
