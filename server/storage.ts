@@ -1479,6 +1479,8 @@ export class DatabaseStorage implements IStorage {
         population55Plus5Mile: deals.population55Plus5Mile,
         income75Plus55Plus: deals.income75Plus55Plus,
         demographicsNotes: deals.demographicsNotes,
+         censusDataJson: deals.censusDataJson,
+         censusDataFetchedAt: deals.censusDataFetchedAt,
         assignedAnalyst: deals.assignedAnalyst,
         assignedJrAnalyst: deals.assignedJrAnalyst,
         assignedDeveloper: deals.assignedDeveloper,

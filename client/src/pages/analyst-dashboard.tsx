@@ -160,6 +160,8 @@ const ALL_COLUMNS = [
   { key: 'entitlements', label: 'Entitlements', defaultVisible: false },
   { key: 'pricePerUnit', label: 'Price/Unit', defaultVisible: false },
   { key: 'sewer', label: 'Sewer', defaultVisible: false },
+  { key: 'areaDemographics', label: 'Area Demographics', defaultVisible: false },
+  { key: 'nearbyPermits', label: 'Nearby Permits (12mo)', defaultVisible: false },
   { key: 'brokerName', label: 'Broker Name', defaultVisible: true },
   { key: 'brokerEmail', label: 'Broker Email', defaultVisible: false },
   { key: 'brokerPhone', label: 'Broker Phone', defaultVisible: true },
@@ -5240,6 +5242,8 @@ export default function AnalystDashboard() {
       case 'entitlements': return <th key={key} className={`${thBase} min-w-[80px]`} style={{display: vis?'':'none'}}>{sortBtn('Entitlements','hasEntitlements')}</th>;
       case 'pricePerUnit': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}>{headerLabel('Price/Unit')}</th>;
       case 'sewer': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{headerLabel('Sewer')}</th>;
+      case 'areaDemographics': return <th key={key} className={`${thBase} min-w-[170px]`} style={{display: vis?'':'none'}}>{headerLabel('Area Demographics')}</th>;
+      case 'nearbyPermits': return <th key={key} className={`${thBase} min-w-[115px]`} style={{display: vis?'':'none'}}>{headerLabel('Nearby Permits (12mo)')}</th>;
       case 'brokerName': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{sortBtn('Broker Name','broker.firstName')}</th>;
       case 'brokerEmail': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{headerLabel('Broker Email')}</th>;
       case 'brokerPhone': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{headerLabel('Broker Phone')}</th>;
@@ -5736,6 +5740,66 @@ export default function AnalystDashboard() {
               {deal.sewerAvailable===true?<StatusBadge status="yes" />:deal.sewerAvailable===false?<StatusBadge status="no" />:<EmptyCell />}
             </div>
           )}
+        </td>
+      );
+      case 'areaDemographics': return (
+        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+          {(() => {
+            const census = d.censusDataJson && typeof d.censusDataJson === 'object'
+              ? d.censusDataJson
+              : null;
+            if (!census) return <EmptyCell />;
+
+            const formatIncome = (value: unknown) => {
+              const income = Number(value);
+              if (!Number.isFinite(income)) return null;
+              return `$${Math.round(income / 1000)}k HHI`;
+            };
+            const formatPct = (value: unknown, suffix: string) => {
+              const pct = Number(value);
+              return Number.isFinite(pct) ? `${Math.round(pct)}% ${suffix}` : null;
+            };
+            const formatGrowth = (value: unknown) => {
+              const growth = Number(value);
+              return Number.isFinite(growth)
+                ? `pop ${growth >= 0 ? '+' : ''}${growth.toFixed(1)}%`
+                : null;
+            };
+            const parts = [
+              formatIncome(census.medianHouseholdIncome),
+              formatPct(census.renterOccupiedPct, 'renter'),
+              formatGrowth(census.populationGrowthPct),
+            ].filter(Boolean);
+            if (parts.length === 0) return <EmptyCell />;
+
+            const detail = [
+              census.population != null ? `Population: ${Number(census.population).toLocaleString()}` : null,
+              census.medianAge != null ? `Median age: ${Number(census.medianAge).toFixed(1)}` : null,
+              census.ownerOccupiedPct != null ? `Owner occupied: ${Math.round(Number(census.ownerOccupiedPct))}%` : null,
+              census.renterOccupiedPct != null ? `Renter occupied: ${Math.round(Number(census.renterOccupiedPct))}%` : null,
+            ].filter(Boolean).join(' · ');
+            return (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="cursor-help whitespace-nowrap" title={detail}>{parts.join(' · ')}</span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs">{detail || 'Census area demographics'}</TooltipContent>
+              </Tooltip>
+            );
+          })()}
+        </td>
+      );
+      case 'nearbyPermits': return (
+        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+          {(() => {
+            const census = d.censusDataJson && typeof d.censusDataJson === 'object'
+              ? d.censusDataJson
+              : null;
+            const permits = Number(census?.permitsTrailing12Mo);
+            return Number.isFinite(permits)
+              ? <span>{permits.toLocaleString()} permits</span>
+              : <EmptyCell />;
+          })()}
         </td>
       );
       case 'brokerName': return (

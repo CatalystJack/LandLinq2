@@ -487,6 +487,8 @@ export const deals = pgTable("deals", {
   censusRenterRate: decimal("census_renter_rate", { precision: 5, scale: 2 }), // Renter-occupied housing %
   censusPopGrowth: decimal("census_pop_growth", { precision: 5, scale: 2 }), // Population growth rate %
   censusTractId: varchar("census_tract_id"), // Census tract FIPS code for reference
+  censusDataJson: jsonb("census_data_json"),
+  censusDataFetchedAt: timestamp("census_data_fetched_at"),
   // Automated routing assignments
   assignedAnalyst: varchar("assigned_analyst"),
   assignedJrAnalyst: varchar("assigned_jr_analyst"),

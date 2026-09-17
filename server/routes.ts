@@ -88,6 +88,11 @@ import {
 } from "./developerAssistantData";
 import { sendDripEmailViaMicrosoft } from "./microsoftAuth";
 import { lookupHudDataForDeal } from "./hudService";
+import {
+  getAcsDataForTract,
+  getFipsForCoordinates,
+  getRecentBuildingPermits,
+} from "./censusDataService";
 
 const DEFAULT_PIPELINE_STAGES = [
   { name: "New Lead", sortOrder: 1 },
@@ -96,6 +101,96 @@ const DEFAULT_PIPELINE_STAGES = [
   { name: "Won", sortOrder: 4 },
   { name: "Lost", sortOrder: 5 },
 ] as const;
+
+const CENSUS_DATA_REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
+
+function validCoordinate(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function refreshCensusDataIfStale(deal: any): Promise<void> {
+  try {
+    const fetchedAt = deal.censusDataFetchedAt
+      ? new Date(deal.censusDataFetchedAt)
+      : null;
+    if (
+      fetchedAt &&
+      !Number.isNaN(fetchedAt.getTime()) &&
+      Date.now() - fetchedAt.getTime() < CENSUS_DATA_REFRESH_MS
+    ) {
+      return;
+    }
+
+    let latitude = validCoordinate(deal.latitude);
+    let longitude = validCoordinate(deal.longitude);
+
+    if (latitude === null || longitude === null) {
+      const address = [
+        deal.address,
+        deal.city,
+        deal.county,
+        deal.state,
+        deal.zip,
+      ].filter(Boolean).join(", ");
+      if (!address) return;
+
+      try {
+        const geocoded = await geocodioService.geocodeAddress(address);
+        latitude = validCoordinate((geocoded as any)?.lat ?? (geocoded as any)?.latitude);
+        longitude = validCoordinate((geocoded as any)?.lng ?? (geocoded as any)?.longitude);
+      } catch (error) {
+        console.warn(`[CENSUS-DATA] Address geocode failed for deal ${deal.id}:`, error instanceof Error ? error.message : error);
+      }
+    }
+
+    if (latitude === null || longitude === null) return;
+
+    const fips = await getFipsForCoordinates(latitude, longitude);
+    if (!fips) return;
+
+    const [acsResult, permitsResult] = await Promise.allSettled([
+      getAcsDataForTract(fips.stateFips, fips.countyFips, fips.tractFips),
+      getRecentBuildingPermits(fips.stateFips, fips.countyFips),
+    ]);
+    const acs = acsResult.status === "fulfilled" ? acsResult.value : null;
+    const permits = permitsResult.status === "fulfilled" ? permitsResult.value : null;
+
+    const censusDataJson = {
+      population: acs?.population ?? null,
+      medianHouseholdIncome: acs?.medianHouseholdIncome ?? null,
+      renterOccupiedPct: acs?.renterOccupiedPct ?? null,
+      ownerOccupiedPct: acs?.ownerOccupiedPct ?? null,
+      medianAge: acs?.medianAge ?? null,
+      populationGrowthPct: acs?.populationGrowthPct ?? null,
+      permitsTrailing12Mo: permits,
+      stateFips: fips.stateFips,
+      countyFips: fips.countyFips,
+      tractFips: fips.tractFips,
+    };
+
+    await storage.updateDeal(deal.id, {
+      censusDataJson,
+      censusDataFetchedAt: new Date(),
+    } as any);
+    Object.assign(deal, { censusDataJson, censusDataFetchedAt: new Date() });
+  } catch (error) {
+    console.warn(`[CENSUS-DATA] Enrichment failed for deal ${deal.id}:`, error instanceof Error ? error.message : error);
+  }
+}
+
+async function refreshCensusDataForDeals(dealsToRefresh: any[]): Promise<void> {
+  if (dealsToRefresh.length === 0) return;
+
+  let nextIndex = 0;
+  const workerCount = Math.min(4, dealsToRefresh.length);
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < dealsToRefresh.length) {
+      const deal = dealsToRefresh[nextIndex++];
+      await refreshCensusDataIfStale(deal);
+    }
+  }));
+}
 
 // Demo contacts are intentionally stored in the shared-contact shape so the
 // standalone demo can use the normal CRM APIs. Never expose them to real
@@ -6892,6 +6987,11 @@ Provide your analysis in this exact JSON format:
       
       const total = sortedDeals.length;
       const deals = sortedDeals.slice(offset, offset + limit);
+
+      // Census context is a read-only enrichment. Refresh stale rows before
+      // returning the page, with bounded concurrency so a large dashboard
+      // cannot fan out unbounded external requests.
+      void refreshCensusDataForDeals(deals);
       
       // DEBUG: Log demographics data being returned
       const dealsWithDemographics = deals.filter((d: any) => d.population55Plus5Mile || d.income75Plus55Plus);
@@ -7989,6 +8089,8 @@ Provide your analysis in this exact JSON format:
           lastValidationAt: deals.lastValidationAt,
           brokerId: deals.brokerId,
           assignedAnalyst: deals.assignedAnalyst,
+          censusDataJson: deals.censusDataJson,
+          censusDataFetchedAt: deals.censusDataFetchedAt,
           createdAt: deals.createdAt,
           updatedAt: deals.updatedAt
         })
@@ -8005,6 +8107,7 @@ Provide your analysis in this exact JSON format:
         .where(and(...conditions));
       
       const total = totalResult[0]?.count || 0;
+      void refreshCensusDataForDeals(flaggedDeals);
 
       res.json({
         deals: flaggedDeals,
