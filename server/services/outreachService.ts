@@ -2,6 +2,8 @@
 // Handles monthly broker outreach campaigns with rate limiting and compliance
 
 import { storage } from '../storage';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { sendNotificationEmail, transformTextToHTML } from '../emailService';
 import { sendSMS, SendSMSResult } from '../smsService';
 import { TemplateService, TemplateVariables } from '../templateService';
@@ -324,6 +326,20 @@ export class OutreachService {
     periodKey: string,
     dryRun: boolean
   ): Promise<{ success: boolean; error?: string }> {
+    // Test mode is enforced from the owning Investment Company profile so a
+    // campaign cannot send live messages just because its caller omitted dryRun.
+    let effectiveDryRun = dryRun;
+    if (campaign.developerProfileId) {
+      const profileResult = await db.execute(sql`
+        SELECT outreach_test_mode_enabled
+        FROM developer_profiles
+        WHERE id = ${campaign.developerProfileId}
+          AND is_active = true
+        LIMIT 1
+      `);
+      effectiveDryRun = effectiveDryRun ||
+        (profileResult.rows?.[0] as any)?.outreach_test_mode_enabled === true;
+    }
     
     // Create message record
     const templateKey = channel === 'email' ? campaign.emailTemplateKey : campaign.smsTemplateKey;
@@ -389,7 +405,7 @@ export class OutreachService {
           body: template.content
         });
         
-        if (dryRun) {
+        if (effectiveDryRun) {
           console.log(`📧 [DRY RUN] Would send email to ${broker.email}`);
           await storage.updateOutreachMessage(message.id, {
             status: 'sent',
@@ -432,7 +448,7 @@ export class OutreachService {
           body: smsContent
         });
         
-        if (dryRun) {
+        if (effectiveDryRun) {
           console.log(`📱 [DRY RUN] Would send SMS to ${broker.phone}`);
           await storage.updateOutreachMessage(message.id, {
             status: 'sent',

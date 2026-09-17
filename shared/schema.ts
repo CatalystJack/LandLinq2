@@ -40,6 +40,7 @@ export const developerProfiles = pgTable("developer_profiles", {
   primaryColor: varchar("primary_color").default("#0A2B4A"),
   secondaryColor: varchar("secondary_color").default("#4A90E2"),
   isInternal: boolean("is_internal").default(false),
+  outreachTestModeEnabled: boolean("outreach_test_mode_enabled").default(false).notNull(),
   knownEmailDomains: text("known_email_domains").array(),
 
   // Rent criteria — primary drives classification, secondary is reference only

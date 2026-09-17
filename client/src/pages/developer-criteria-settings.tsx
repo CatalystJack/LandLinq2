@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ type Profile = {
   profileType: "real_estate" | "general_sales";
   primaryColor: string | null;
   secondaryColor: string | null;
+  outreachTestModeEnabled: boolean;
   targetStates: string[];
   targetCounties: string[];
   rentMetric: "psf" | "per_unit";
@@ -245,6 +247,7 @@ export default function DeveloperCriteriaSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<Profile | null>(null);
+  const [testRecipientEmail, setTestRecipientEmail] = useState("");
   const [overridesOpen, setOverridesOpen] = useState(true);
   const [teamOpen, setTeamOpen] = useState(true);
 
@@ -327,6 +330,52 @@ export default function DeveloperCriteriaSettings() {
       toast({ title: "Settings saved", description: "Your company criteria are up to date." });
     },
     onError: (error: Error) => toast({ title: "Could not save settings", description: error.message, variant: "destructive" }),
+  });
+
+  const outreachTestModeMutation = useMutation({
+    mutationFn: (enabled: boolean) => jsonRequest("/api/developer-profile/me/outreach/test-mode", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    }),
+    onSuccess: (data: { outreachTestModeEnabled: boolean }) => {
+      queryClient.setQueryData(["/api/developer-profile/me"], (current: any) => current
+        ? { ...current, profile: { ...current.profile, outreachTestModeEnabled: data.outreachTestModeEnabled } }
+        : current);
+      setForm((current) => current
+        ? { ...current, outreachTestModeEnabled: data.outreachTestModeEnabled }
+        : current);
+      toast({
+        title: data.outreachTestModeEnabled ? "Outreach Test mode enabled" : "Outreach Live mode enabled",
+        description: data.outreachTestModeEnabled
+          ? "Recurring outreach will be recorded without delivering messages."
+          : "Recurring outreach can deliver messages normally.",
+      });
+    },
+    onError: (error: Error) => toast({
+      title: "Could not update outreach mode",
+      description: error.message,
+      variant: "destructive",
+    }),
+  });
+
+  const testEmailMutation = useMutation({
+    mutationFn: (testEmail: string) => jsonRequest("/api/send-test-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ testEmail }),
+    }),
+    onSuccess: () => {
+      toast({
+        title: "Test email sent",
+        description: `Check ${testRecipientEmail.trim()} for the current outreach email.`,
+      });
+    },
+    onError: (error: Error) => toast({
+      title: "Could not send test email",
+      description: error.message,
+      variant: "destructive",
+    }),
   });
 
   const update = <K extends keyof Profile>(key: K, value: Profile[K]) =>
@@ -533,6 +582,73 @@ export default function DeveloperCriteriaSettings() {
                   Choose which connected mailbox sends broker notifications.
                 </p>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-slate-200 shadow-sm">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>
+                  <Mail className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle>Outreach sending mode</CardTitle>
+                  <CardDescription>
+                    Test mode runs this company’s recurring outreach without delivering messages. Live mode sends to eligible brokers.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5 border-t border-slate-100 pt-5">
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 p-4">
+                <div>
+                  <p className="font-medium text-slate-900">
+                    {form.outreachTestModeEnabled ? "Test mode" : "Live mode"}
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    {form.outreachTestModeEnabled
+                      ? "Messages are recorded as dry runs and are not delivered."
+                      : "Messages may be delivered according to the outreach schedule."}
+                  </p>
+                </div>
+                <Switch
+                  checked={Boolean(form.outreachTestModeEnabled)}
+                  onCheckedChange={(checked) => outreachTestModeMutation.mutate(checked)}
+                  disabled={outreachTestModeMutation.isPending}
+                  aria-label="Toggle outreach Test mode"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="outreach-test-recipient">Send a live test email</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="outreach-test-recipient"
+                    type="email"
+                    value={testRecipientEmail}
+                    onChange={(event) => setTestRecipientEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    className="sm:flex-1"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      const recipient = testRecipientEmail.trim();
+                      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+                        toast({ title: "Enter a valid recipient email", variant: "destructive" });
+                        return;
+                      }
+                      testEmailMutation.mutate(recipient);
+                    }}
+                    disabled={!testRecipientEmail.trim() || testEmailMutation.isPending}
+                  >
+                    {testEmailMutation.isPending ? "Sending…" : "Send live test email"}
+                  </Button>
+                </div>
+                <p className="text-sm text-slate-500">
+                  Sends the company’s current outreach template from its configured outreach sender to this address.
+                </p>
+              </div>
             </CardContent>
           </Card>
 

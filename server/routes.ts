@@ -14237,6 +14237,32 @@ RULES:
     }
   });
 
+  app.patch("/api/developer-profile/me/outreach/test-mode", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const enabled = req.body?.enabled;
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ error: "enabled must be boolean" });
+      }
+
+      const result = await db.execute(sql`
+        UPDATE developer_profiles
+        SET outreach_test_mode_enabled = ${enabled}, updated_at = NOW()
+        WHERE id = ${developerProfileId} AND is_active = true
+        RETURNING outreach_test_mode_enabled
+      `);
+      const saved = result.rows?.[0] as any;
+      if (!saved) return res.status(404).json({ error: "Investment Company profile not found" });
+      return res.json({ outreachTestModeEnabled: saved.outreach_test_mode_enabled === true });
+    } catch (error: any) {
+      console.error("[developer-profile/me/outreach/test-mode PATCH] Error:", error);
+      return res.status(500).json({ error: "Failed to update outreach sending mode" });
+    }
+  });
+
   app.get("/api/developer-profile/me/team", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
@@ -23178,35 +23204,92 @@ RULES:
       const user = req.user as any;
       const userEmail = user?.email || '';
       const isAuthorized = isPlatformAdminEmail(userEmail);
-      
+      let developerProfileId: string | null = null;
+
       if (!isAuthorized) {
-        return res.status(403).json({ message: "Access denied. Admin privileges required." });
+        developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
       }
 
       const { templateType, variables, testEmail } = req.body;
       
-      if (!templateType || !testEmail) {
-        return res.status(400).json({ error: 'Template type and test email are required' });
+      if (!testEmail || typeof testEmail !== "string") {
+        return res.status(400).json({ error: 'A test email address is required' });
       }
 
-      // Generate the email using the template service
-      const template = await TemplateService.getEmailTemplate(templateType, variables);
-      
-      if (!template) {
-        return res.status(404).json({ 
-          error: `Email template '${templateType}' not found. Configure in outreach management.` 
-        });
+      let subject: string;
+      let html: string;
+      let text: string;
+      let fromEmail: string | undefined;
+      let fromName: string | undefined;
+
+      if (developerProfileId) {
+        const currentOutreach = await db.execute(sql`
+          SELECT
+            step.subject,
+            step.content,
+            sender.email as "senderEmail",
+            sender.name as "senderName",
+            sender.signature_html as "signatureHtml"
+          FROM outreach_campaigns campaign
+          LEFT JOIN outreach_campaign_templates campaign_template
+            ON campaign_template.id = campaign.broker_filter->>'templateId'
+           AND campaign_template.team_id = campaign.developer_profile_id
+          LEFT JOIN outreach_campaign_template_steps step
+            ON step.template_id = campaign_template.id
+           AND step.sequence_index = 0
+          LEFT JOIN outreach_senders sender
+            ON sender.id = (campaign.broker_filter->>'senderId')
+           AND sender.developer_profile_id = campaign.developer_profile_id
+           AND sender.is_active = true
+          WHERE campaign.developer_profile_id = ${developerProfileId}
+            AND COALESCE(campaign.is_archived, false) = false
+          ORDER BY (campaign.status = 'active') DESC, campaign.updated_at DESC NULLS LAST
+          LIMIT 1
+        `);
+        const row = currentOutreach.rows?.[0] as any;
+        if (!row?.content && !row?.subject) {
+          return res.status(404).json({ error: 'Set up an outreach campaign before sending a test email' });
+        }
+        subject = row.subject || "Outreach test";
+        text = row.content || "";
+        html = `${row.content || ""}${row.signatureHtml ? `<div style="margin-top:24px">${row.signatureHtml}</div>` : ""}`;
+        fromEmail = row.senderEmail || undefined;
+        fromName = row.senderName || undefined;
+      } else {
+        if (!templateType) {
+          return res.status(400).json({ error: 'Template type and test email are required' });
+        }
+        const template = await TemplateService.getEmailTemplate(templateType, variables);
+        if (!template) {
+          return res.status(404).json({
+            error: `Email template '${templateType}' not found. Configure in outreach management.`
+          });
+        }
+        subject = template.subject;
+        html = template.html;
+        text = template.content;
       }
 
-      // Send the test email using template service
-      const { EventDispatchService } = await import('./eventDispatch');
-      // For now, log instead of sending as emailService.sendEmail doesn't exist
-      console.log(`Would send test email to ${testEmail} with subject: ${template.subject}`);
+      const sent = await sendNotificationEmail({
+        to: testEmail.trim(),
+        subject,
+        html,
+        text,
+        fromEmail,
+        fromName,
+        type: "outreach_test",
+        priority: "high",
+      });
+      if (!sent) {
+        return res.status(502).json({ error: 'Email provider did not accept the test email' });
+      }
 
       res.json({ 
         success: true, 
         message: `Test email sent to ${testEmail}`,
-        subject: template.subject
+        subject
       });
     } catch (error: any) {
       console.error('Error sending test email:', error);
