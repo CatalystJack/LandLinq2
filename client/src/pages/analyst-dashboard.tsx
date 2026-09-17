@@ -10,6 +10,8 @@ import SEO from "@/components/SEO";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyCell } from "@/components/ui/empty-cell";
 import { Textarea } from "@/components/ui/textarea";
 import { FastTextarea } from "@/components/ui/fast-textarea";
 import { Input } from "@/components/ui/input";
@@ -5269,7 +5271,7 @@ export default function AnalystDashboard() {
       case 'developerSummary': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           <div className="max-w-[220px] cursor-pointer whitespace-pre-wrap hover:bg-gray-100" onClick={() => startCellEdit(deal.id, 'developerSummary', d.developerSummary || '')}>
-            {d.developerSummary || <span className="text-gray-400 italic">Click to add...</span>}
+            {d.developerSummary || <EmptyCell />}
           </div>
         </td>
       );
@@ -5279,7 +5281,7 @@ export default function AnalystDashboard() {
             <Input defaultValue={cellEditValue} onChange={(e) => { cellEditValueRef.current = e.target.value; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-8 text-xs" placeholder="Property name..." autoFocus />
           ) : (
             <div className={`cursor-pointer text-xs break-words whitespace-normal leading-snug ${!deal.propertyName?'':'hover:bg-gray-100'}`} onClick={() => startCellEdit(deal.id,'propertyName',deal.propertyName||'')}>
-              {deal.propertyName || <span className="text-gray-400 italic text-xs">Click to add...</span>}
+              {deal.propertyName || <EmptyCell />}
             </div>
           )}
         </td>
@@ -5290,7 +5292,7 @@ export default function AnalystDashboard() {
             <Input type="text" defaultValue={cellEditValue} onChange={(e) => { cellEditValueRef.current = e.target.value; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-8 text-xs w-full" placeholder="e.g. 8.5%" autoFocus />
           ) : (
             <div className="cursor-pointer hover:bg-blue-50 rounded px-1 py-0.5 min-h-[28px] flex items-center" onClick={() => startCellEdit(deal.id,'yieldOnCost',d.yieldOnCost?.toString()||'')} title={d.yieldOnCost?d.yieldOnCost:'Click to add YOC'}>
-              {d.yieldOnCost ? <span className="font-medium text-indigo-700">{d.yieldOnCost}</span> : <span className="text-gray-300 italic text-[11px]">+ add</span>}
+              {d.yieldOnCost ? <span className="font-medium text-indigo-700">{d.yieldOnCost}</span> : <EmptyCell>+ add</EmptyCell>}
             </div>
           )}
         </td>
@@ -5301,7 +5303,7 @@ export default function AnalystDashboard() {
             <Input type="text" defaultValue={cellEditValue} onChange={(e) => { cellEditValueRef.current = e.target.value; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-8 text-xs w-full" placeholder="e.g. 14.5%" autoFocus />
           ) : (
             <div className="cursor-pointer hover:bg-blue-50 rounded px-1 py-0.5 min-h-[28px] flex items-center" onClick={() => startCellEdit(deal.id,'irr',d.irr?.toString()||'')} title={d.irr?d.irr:'Click to add IRR'}>
-              {d.irr ? <span className="font-medium text-violet-700">{d.irr}</span> : <span className="text-gray-300 italic text-[11px]">+ add</span>}
+              {d.irr ? <span className="font-medium text-violet-700">{d.irr}</span> : <EmptyCell>+ add</EmptyCell>}
             </div>
           )}
         </td>
@@ -5386,7 +5388,7 @@ export default function AnalystDashboard() {
               <TooltipContent>Notes</TooltipContent>
             </Tooltip>
           ) : (
-            <div className="text-gray-400 italic text-xs cursor-pointer px-1" onClick={() => setAnalystNotesModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true})} data-testid={`button-add-analyst-notes-${deal.id}`}>Click to add...</div>
+            <div className="cursor-pointer px-1" onClick={() => setAnalystNotesModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true})} data-testid={`button-add-analyst-notes-${deal.id}`}><EmptyCell /></div>
           )}
         </td>
       );
@@ -5395,7 +5397,7 @@ export default function AnalystDashboard() {
           {d.dealSummary ? (
             <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border border-catalyst-blue hover:scale-100 transform-gpu" onClick={() => setDealSummaryModal({dealId:deal.id,address:deal.address||'Property',notes:d.dealSummary||'',isEditing:false})}><FileText size={12} />Summary</Button>
           ) : (
-            <div className="text-gray-400 italic text-xs cursor-pointer px-1" onClick={() => { dealSummaryEditRef.current=''; setDealSummaryModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true}); }}>Click to add...</div>
+            <div className="cursor-pointer px-1" onClick={() => { dealSummaryEditRef.current=''; setDealSummaryModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true}); }}><EmptyCell /></div>
           )}
         </td>
       );
@@ -5404,7 +5406,7 @@ export default function AnalystDashboard() {
           {d.developerNotes ? (
             <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border border-catalyst-blue hover:scale-100 transform-gpu" onClick={() => setDeveloperNotesModal({dealId:deal.id,address:deal.address||'Property',notes:d.developerNotes||'',isEditing:false})}><Building size={12} />Dev</Button>
           ) : (
-            <div className="text-gray-400 italic text-xs cursor-pointer px-1" onClick={() => setDeveloperNotesModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true})}>Click to add...</div>
+            <div className="cursor-pointer px-1" onClick={() => setDeveloperNotesModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true})}><EmptyCell /></div>
           )}
         </td>
       );
@@ -5457,16 +5459,23 @@ export default function AnalystDashboard() {
             </Select>
           ) : (
             <div className="cursor-pointer hover:bg-gray-100" onClick={() => startCellEdit(deal.id,'qctStatus',d.qctStatus||'N/A')}>
-              <Badge variant="outline" className={`text-xs px-2 py-0 ${(d.qctStatus==='YES'||d.qctStatus==='Yes')?'bg-green-50 text-green-700 border-green-200':(d.qctStatus==='NO'||d.qctStatus==='No')?'bg-gray-50 text-gray-700 border-gray-200':'bg-gray-100 text-gray-500'}`}>{d.qctStatus||'N/A'}</Badge>
+              <StatusBadge
+                status={(d.qctStatus==='YES'||d.qctStatus==='Yes')?'yes':(d.qctStatus==='NO'||d.qctStatus==='No')?'no':'na'}
+              >
+                {d.qctStatus||'N/A'}
+              </StatusBadge>
             </div>
           )}
         </td>
       );
       case 'dda': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
-          {d.ddaStatus&&d.ddaStatus!=='N/A' ? (
-            <Badge variant="outline" className={`text-xs px-2 py-0 ${d.ddaStatus==='MDDA'?'bg-purple-50 text-purple-700 border-purple-200':d.ddaStatus==='NMDDA'?'bg-blue-50 text-blue-700 border-blue-200':d.ddaStatus==='NO'?'bg-gray-50 text-gray-500 border-gray-200':'bg-gray-100 text-gray-400'}`} title={d.ddaStatus==='MDDA'?'Metropolitan Difficult Development Area (HUD 2026)':d.ddaStatus==='NMDDA'?'Non-Metropolitan Difficult Development Area (HUD 2026)':'Not a Difficult Development Area'}>{d.ddaStatus}</Badge>
-          ) : <span className="text-gray-300 text-[10px]">—</span>}
+          <StatusBadge
+            status={d.ddaStatus==='NO'?'no':d.ddaStatus&&d.ddaStatus!=='N/A'?'flag':'na'}
+            title={d.ddaStatus==='MDDA'?'Metropolitan Difficult Development Area (HUD 2026)':d.ddaStatus==='NMDDA'?'Non-Metropolitan Difficult Development Area (HUD 2026)':'Not a Difficult Development Area'}
+          >
+            {d.ddaStatus||'N/A'}
+          </StatusBadge>
         </td>
       );
       case 'oz': return (
@@ -5478,7 +5487,9 @@ export default function AnalystDashboard() {
             </Select>
           ) : (
             <div className="cursor-pointer hover:bg-gray-100" onClick={() => startCellEdit(deal.id,'ozStatus',d.ozStatus||'N/A')}>
-              <Badge variant="outline" className={`text-xs px-2 py-0 ${d.ozStatus==='YES'?'bg-amber-50 text-amber-700 border-amber-300':d.ozStatus==='NO'?'bg-gray-50 text-gray-500 border-gray-200':'bg-gray-100 text-gray-400'}`}>{d.ozStatus||'N/A'}</Badge>
+              <StatusBadge status={d.ozStatus==='YES'?'flag':d.ozStatus==='NO'?'no':'na'}>
+                {d.ozStatus||'N/A'}
+              </StatusBadge>
             </div>
           )}
         </td>
@@ -5596,7 +5607,7 @@ export default function AnalystDashboard() {
             <Input type="text" defaultValue={formatNumberWithCommas(cellEditValue)} onChange={(e) => { const n=parseNumberWithCommas(e.target.value); const f=formatNumberWithCommas(n); if(e.target.value!==f)e.target.value=f; cellEditValueRef.current=n; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-8 text-xs" placeholder="Price..." autoFocus />
           ) : (
             <div className={`cursor-pointer ${!d.askingPrice?'':'hover:bg-gray-100'}`} onClick={() => startCellEdit(deal.id,'askingPrice',d.askingPrice?.toString()||'')} title={d.askingPrice?formatPrice(d.askingPrice.toString()):'Click to add price'}>
-              {formatPrice(d.askingPrice?.toString()||'')==='N/A'?<span className="text-gray-400 italic text-xs">Click to add...</span>:formatPrice(d.askingPrice?.toString()||'')}
+              {formatPrice(d.askingPrice?.toString()||'')==='N/A'?<EmptyCell />:formatPrice(d.askingPrice?.toString()||'')}
             </div>
           )}
         </td>
@@ -5607,7 +5618,7 @@ export default function AnalystDashboard() {
             <Input type="text" defaultValue={formatNumberWithCommas(cellEditValue)} onChange={(e) => { const n=parseNumberWithCommas(e.target.value); const f=formatNumberWithCommas(n); if(e.target.value!==f)e.target.value=f; cellEditValueRef.current=n; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-8 text-xs" placeholder="Units..." autoFocus />
           ) : (
             <div className={`cursor-pointer ${!deal.unitCount?'':'hover:bg-gray-100'}`} onClick={() => startCellEdit(deal.id,'unitCount',deal.unitCount?.toString()||'')}>
-              {deal.unitCount||<span className="text-gray-400 italic text-xs">Click to add...</span>}
+              {deal.unitCount||<EmptyCell />}
             </div>
           )}
         </td>
@@ -5618,7 +5629,7 @@ export default function AnalystDashboard() {
             <Input type="text" defaultValue={formatNumberWithCommas(cellEditValue)} onChange={(e) => { const n=parseNumberWithCommas(e.target.value); const f=formatNumberWithCommas(n); if(e.target.value!==f)e.target.value=f; cellEditValueRef.current=n; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-8 text-xs" placeholder="Max units..." autoFocus />
           ) : (
             <div className="cursor-pointer hover:bg-gray-100" onClick={() => startCellEdit(deal.id,'maxUnitsByZoning',deal.maxUnitsByZoning?.toString()||'')}>
-              {deal.maxUnitsByZoning?deal.maxUnitsByZoning.toLocaleString():<span className="text-gray-400 italic text-xs">Click to add...</span>}
+              {deal.maxUnitsByZoning?deal.maxUnitsByZoning.toLocaleString():<EmptyCell />}
             </div>
           )}
         </td>
@@ -5629,7 +5640,7 @@ export default function AnalystDashboard() {
             <Input type="text" inputMode="numeric" defaultValue={cellEditValue} onChange={(e) => { const v=e.target.value.replace(/[^0-9]/g,''); if(e.target.value!==v)e.target.value=v; cellEditValueRef.current=v; if(v&&v.length===4){setTimeout(()=>{if(cellEditValueRef.current===v)autoSaveField(deal.id,'vintage',v);},300);} }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-8 text-xs" placeholder="Year..." autoFocus />
           ) : (
             <div className={`cursor-pointer ${!(deal.vintage||d.yearBuilt)?'':'hover:bg-gray-100'}`} onClick={() => startCellEdit(deal.id,'vintage',(deal.vintage||d.yearBuilt)?.toString()||'')}>
-              {deal.vintage||d.yearBuilt||<span className="text-gray-400 italic text-xs">Click to add...</span>}
+              {deal.vintage||d.yearBuilt||<EmptyCell />}
             </div>
           )}
         </td>
@@ -5640,7 +5651,7 @@ export default function AnalystDashboard() {
             <Input type="number" step="0.1" defaultValue={cellEditValue} onChange={(e) => { cellEditValueRef.current=e.target.value; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-8 text-xs" placeholder="Acres..." autoFocus />
           ) : (
             <div className={`cursor-pointer ${!deal.sizeAcres?'':'hover:bg-gray-100'}`} onClick={() => startCellEdit(deal.id,'sizeAcres',deal.sizeAcres?.toString()||'')} title={deal.sizeAcres?String(deal.sizeAcres):'Click to add acres'}>
-              {deal.sizeAcres||<span className="text-gray-400 italic text-xs">Click to add...</span>}
+              {deal.sizeAcres||<EmptyCell />}
             </div>
           )}
         </td>
@@ -5651,7 +5662,7 @@ export default function AnalystDashboard() {
             <Input type="number" step="0.1" defaultValue={cellEditValue} onChange={(e) => { cellEditValueRef.current=e.target.value; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-8 text-xs" placeholder="Net acres..." autoFocus />
           ) : (
             <div className={`cursor-pointer ${!d.netDevelopableAcres?'':'hover:bg-gray-100'}`} onClick={() => startCellEdit(deal.id,'netDevelopableAcres',d.netDevelopableAcres?.toString()||'')} title={d.netDevelopableAcres?String(d.netDevelopableAcres):'Click to add net developable acres'}>
-              {d.netDevelopableAcres||<span className="text-gray-400 italic text-xs">Click to add...</span>}
+              {d.netDevelopableAcres||<EmptyCell />}
             </div>
           )}
         </td>
@@ -5669,7 +5680,7 @@ export default function AnalystDashboard() {
             <Input type="text" defaultValue={cellEditValue} onChange={(e) => { cellEditValueRef.current=e.target.value; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-8 text-xs" placeholder="Zoning..." autoFocus />
           ) : (
             <div className={`cursor-pointer ${!deal.zoning?'':'hover:bg-gray-100'}`} onClick={() => startCellEdit(deal.id,'zoning',deal.zoning||'')} title={deal.zoning?deal.zoning:'Click to add zoning'}>
-              {deal.zoning||<span className="text-gray-400 italic text-xs">Click to add...</span>}
+              {deal.zoning||<EmptyCell />}
             </div>
           )}
         </td>
@@ -5679,7 +5690,7 @@ export default function AnalystDashboard() {
           {d.wetlandNotes ? (
             <Button variant="outline" size="sm" className="h-7 px-2 text-xs flex items-center justify-center gap-1 transition-colors bg-catalyst-blue text-white hover:bg-white hover:text-catalyst-blue border border-catalyst-blue hover:scale-100 transform-gpu" onClick={() => setWetlandNotesModal({dealId:deal.id,address:deal.address||'Property',notes:d.wetlandNotes||'',isEditing:false})}><FileText size={12} />Notes</Button>
           ) : (
-            <div className="text-gray-400 italic text-xs cursor-pointer px-1" onClick={() => { wetlandNotesEditRef.current=''; setWetlandNotesModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true}); }}>Click to add...</div>
+            <div className="cursor-pointer px-1" onClick={() => { wetlandNotesEditRef.current=''; setWetlandNotesModal({dealId:deal.id,address:deal.address||'Property',notes:'',isEditing:true}); }}><EmptyCell /></div>
           )}
         </td>
       );
@@ -5721,7 +5732,7 @@ export default function AnalystDashboard() {
             </Select>
           ) : (
             <div className="cursor-pointer hover:bg-gray-100" onClick={() => startCellEdit(deal.id,'sewerAvailable',deal.sewerAvailable===true?'yes':deal.sewerAvailable===false?'no':'none')}>
-              {deal.sewerAvailable===true?<span className="px-2 py-1 rounded text-xs bg-green-100 text-green-700">Yes</span>:deal.sewerAvailable===false?<span className="px-2 py-1 rounded text-xs bg-red-100 text-red-700">No</span>:<span className="text-gray-400 italic text-xs">Click to add...</span>}
+              {deal.sewerAvailable===true?<StatusBadge status="yes" />:deal.sewerAvailable===false?<StatusBadge status="no" />:<EmptyCell />}
             </div>
           )}
         </td>
@@ -5735,7 +5746,7 @@ export default function AnalystDashboard() {
             </div>
           ) : (
             <div className="max-w-[140px] truncate cursor-pointer hover:bg-gray-100 px-1 rounded" onClick={() => startCellEdit(deal.id,'brokerName',`${deal.broker?.firstName||''} ${deal.broker?.lastName||''}`.trim())} title={deal.broker?.firstName||deal.broker?.lastName?'Click to edit broker name':'Click to add broker name'}>
-              {deal.broker?.firstName||deal.broker?.lastName?`${deal.broker?.firstName||''} ${deal.broker?.lastName||''}`.trim():<span className="text-gray-400 italic text-xs">Click to add</span>}
+              {deal.broker?.firstName||deal.broker?.lastName?`${deal.broker?.firstName||''} ${deal.broker?.lastName||''}`.trim():<EmptyCell />}
             </div>
           )}
         </td>
@@ -5749,7 +5760,7 @@ export default function AnalystDashboard() {
             const crmBroker=(!rawEmail||isTemp)&&deal.brokerId?brokers.find((b: any) => b.id===deal.brokerId):null;
             const crmEmail=crmBroker?.email?.includes('@temp.landlinq.ai')?null:crmBroker?.email||null;
             const displayEmail=(!rawEmail||isTemp)?crmEmail:rawEmail;
-            return (<div className="max-w-[140px] truncate cursor-pointer hover:bg-gray-100 px-1 rounded" onClick={() => startCellEdit(deal.id,'brokerEmail',displayEmail||'')} title={displayEmail?'Click to edit':'Click to add email'}>{displayEmail||<span className="text-gray-400 italic text-xs">Click to add</span>}</div>);
+            return (<div className="max-w-[140px] truncate cursor-pointer hover:bg-gray-100 px-1 rounded" onClick={() => startCellEdit(deal.id,'brokerEmail',displayEmail||'')} title={displayEmail?'Click to edit':'Click to add email'}>{displayEmail||<EmptyCell />}</div>);
           })()}
         </td>
       );
@@ -5759,7 +5770,7 @@ export default function AnalystDashboard() {
             <Input defaultValue={cellEditValue} onChange={(e) => { cellEditValueRef.current=e.target.value; }} onBlur={saveCellEdit} onKeyDown={handleCellKeyPress} className="h-8 text-xs" placeholder="Enter broker phone" data-testid="input-broker-phone" autoFocus />
           ) : (
             <div className="max-w-[100px] truncate cursor-pointer hover:bg-gray-100 px-1 rounded" onClick={() => startCellEdit(deal.id,'brokerPhone',deal.broker?.phone||'')} title={deal.broker?.phone?'Click to edit':'Click to add phone'}>
-              {deal.broker?.phone||<span className="text-gray-400 italic text-xs">Click to add</span>}
+              {deal.broker?.phone||<EmptyCell />}
             </div>
           )}
         </td>

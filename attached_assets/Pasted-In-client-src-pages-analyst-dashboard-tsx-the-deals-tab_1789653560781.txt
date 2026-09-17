@@ -1,0 +1,13 @@
+In client/src/pages/analyst-dashboard.tsx, the deals table has no shared "badge" or "empty cell" component — every status pill and every "Click to add..." placeholder is a separate copy-pasted Tailwind class string scattered across the file (e.g. the QCT badge around line 5460, DDA around 5467, OZ around 5481, Sewer Yes/No around 5724, and 15+ separate instances of <span className="text-gray-400 italic text-xs">Click to add...</span>). That's why the table looks inconsistent. Please do NOT touch business logic, data fetching, or field names — this is a styling/consistency pass only.
+
+Create two small reusable components and use them everywhere in this file instead of the inline versions:
+
+a) StatusBadge (e.g. in client/src/components/ui/status-badge.tsx) — a small pill that takes a status of "yes" | "no" | "na" | "flag" and renders: yes = bg-green-50 text-green-700 border-green-200; no = bg-gray-50 text-gray-500 border-gray-200; na = bg-gray-50 text-gray-400 border-gray-200 (visually quieter than "no" — N/A means "not applicable," not "checked and it's a no"); flag = bg-amber-50 text-amber-700 border-amber-300 (for things needing attention, like OZ=YES which is currently amber-highlighted). Fixed height/padding (h-5, px-2, text-xs, rounded-full, border, font-medium) so every pill in the table is visually identical regardless of column. Replace the QCT, DDA, OZ, and Sewer badges with this component, mapping each field's values appropriately.
+
+b) EmptyCell (e.g. in client/src/components/ui/empty-cell.tsx) — replace every "Click to add..." span with this one component. Give it a dashed-border box look (border border-dashed border-gray-300 rounded px-2 py-0.5 text-gray-400 text-xs) so empty/editable cells are visually distinct from real data instead of looking like broken/missing data. Keep the click-to-edit behavior unchanged, only the visual wrapper.
+
+Increase row height slightly (roughly 4px more top/bottom cell padding) so the table feels less cramped. Don't change column widths or the column-visibility picker.
+Make the action icons (Re-run analysis / Delete, around line 7823-7849) lower-visual-weight by default and full opacity on row hover, instead of always full-strength. Keep all click handlers, titles, and data-testid attributes unchanged.
+Leave the toolbar (search bar, Table/Pipeline/Map toggle, Columns picker, Status/Priority/Type filters) as-is.
+
+After making these changes, grep the file for any remaining raw "Click to add" spans or inline status-pill classNames that weren't converted, and convert those too, so there's one place going forward that controls this styling.
