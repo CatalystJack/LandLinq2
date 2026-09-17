@@ -420,6 +420,11 @@ export const deals = pgTable("deals", {
   // Geocoded coordinates for map visualization
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
+  schoolDistrict: text("school_district"),
+  schoolDistrictFetchedAt: timestamp("school_district_fetched_at"),
+  nearbyPermitCount: integer("nearby_permit_count"),
+  nearbyPermitsStatus: varchar("nearby_permits_status"),
+  nearbyPermitsFetchedAt: timestamp("nearby_permits_fetched_at"),
   askingPrice: decimal("asking_price", { precision: 12, scale: 2 }), // Broker's asking price for the property
   sizeAcres: decimal("size_acres", { precision: 8, scale: 2 }),
   netDevelopableAcres: decimal("net_developable_acres", { precision: 8, scale: 2 }),

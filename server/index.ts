@@ -425,6 +425,14 @@ setTimeout(() => {
         await pool.query(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS net_developable_acres DECIMAL(8,2);`);
         await pool.query(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS deal_summary TEXT;`);
         await pool.query(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS senior_loan_pct DECIMAL(5,2);`);
+        await pool.query(`
+          ALTER TABLE deals
+            ADD COLUMN IF NOT EXISTS school_district TEXT,
+            ADD COLUMN IF NOT EXISTS school_district_fetched_at TIMESTAMP,
+            ADD COLUMN IF NOT EXISTS nearby_permit_count INTEGER,
+            ADD COLUMN IF NOT EXISTS nearby_permits_status VARCHAR,
+            ADD COLUMN IF NOT EXISTS nearby_permits_fetched_at TIMESTAMP;
+        `);
 
         // Backfill: API-uploaded attachments that were stored before the documentUrls sync fix.
         // For each lead_attachment with a storageKey, ensure its public URL exists in deals.documentUrls.

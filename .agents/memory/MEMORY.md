@@ -45,3 +45,4 @@
 - [Table scrollbar consolidation](table-scrollbar-consolidation.md) — wide tables need one shared class with a nonzero horizontal scrollbar height; zero-height WebKit scrollbars hide usable overflow.
 - [Google font CSP allowlist](google-font-csp.md) — font links need every active CSP middleware path to allow both the stylesheet and font hosts.
 - [HUD API response envelopes](hud-api-response-envelopes.md) — HUD list endpoints may return raw arrays while data endpoints may wrap payloads in data; normalize both shapes.
+- [City permit source migration](city-permit-source-migration.md) — Nashville and Raleigh permit portals migrated from Socrata to ArcGIS; Atlanta's published permit item is a historical CSV.

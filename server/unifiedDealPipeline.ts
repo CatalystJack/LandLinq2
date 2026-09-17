@@ -515,6 +515,56 @@ export class UnifiedDealPipeline {
       console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
       console.log(`✅ [PIPELINE-STEP-3.5b] CENSUS DEMOGRAPHICS ENRICHMENT - COMPLETE`);
       console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
+      // Step 3.5c: LOCATION CONTEXT ENRICHMENT
+      // Query public school-district and nearby-permit sources once, then cache
+      // both results on the deal so page renders never call these APIs directly.
+      if (deal.latitude && deal.longitude) {
+        try {
+          const latitude = Number(deal.latitude);
+          const longitude = Number(deal.longitude);
+          const needsSchoolDistrict = !deal.schoolDistrictFetchedAt;
+          const needsNearbyPermits = !deal.nearbyPermitsFetchedAt;
+          const updates: Record<string, unknown> = {};
+
+          const [schoolDistrictResult, nearbyPermitsResult] = await Promise.all([
+            needsSchoolDistrict
+              ? import('./schoolDistrictService.js').then(({ lookupSchoolDistrict }) => lookupSchoolDistrict(latitude, longitude))
+              : Promise.resolve(deal.schoolDistrict || null),
+            needsNearbyPermits
+              ? import('./nearbyPermitsService.js').then(({ lookupNearbyPermits }) =>
+                lookupNearbyPermits(deal.city, latitude, longitude))
+              : Promise.resolve({
+                count: deal.nearbyPermitCount ?? null,
+                status: deal.nearbyPermitsStatus || 'not_available',
+              }),
+          ]);
+
+          if (needsSchoolDistrict) {
+            updates.schoolDistrict = schoolDistrictResult;
+            updates.schoolDistrictFetchedAt = new Date();
+          }
+          if (needsNearbyPermits) {
+            updates.nearbyPermitCount = nearbyPermitsResult.count;
+            updates.nearbyPermitsStatus = nearbyPermitsResult.status;
+            updates.nearbyPermitsFetchedAt = new Date();
+          }
+
+          if (Object.keys(updates).length) {
+            await storage.updateDeal(deal.id, updates as any);
+            Object.assign(deal, updates);
+          }
+          console.log(`✅ [LOCATION-ENRICHMENT] Saved school district and nearby permit results`, {
+            schoolDistrict: schoolDistrictResult || 'not found',
+            nearbyPermitCount: nearbyPermitsResult.count,
+            nearbyPermitsStatus: nearbyPermitsResult.status,
+          });
+        } catch (locationError) {
+          console.warn(`⚠️ [LOCATION-ENRICHMENT] Non-blocking enrichment failed:`, locationError);
+        }
+      } else {
+        console.log(`⚠️ [LOCATION-ENRICHMENT] Skipping - no coordinates available`);
+      }
       
       // Step 3.6: EARLY MISSING INFO CHECK (BEFORE CONFIRMATION)
       // This sets the flag so sendInstantConfirmation can send missing info request
