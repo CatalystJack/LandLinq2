@@ -14695,8 +14695,9 @@ RULES:
              ? requestedStatus
              : undefined;
            const search = typeof args.search === "string" ? args.search.trim().slice(0, 200) : undefined;
+           const state = typeof args.state === "string" ? args.state.trim().slice(0, 100) : undefined;
            result = {
-             count: await getMyDealCount(developerProfileId, { status, search }),
+             count: await getMyDealCount(developerProfileId, { status, search, state }),
              status: status || null,
              search: search || null,
            };

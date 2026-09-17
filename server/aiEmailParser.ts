@@ -239,7 +239,7 @@ export async function planDeveloperAssistantQuestion(
 Never invent IDs, names, or values. Use only IDs from the supplied tenant-scoped context.
 Read tools:
 - getMyDeals: args {status?: "Pursuing"|"Passed"|"Review", search?: string, state?: string} — use state for questions about deals in a specific state (full name or abbreviation both fine, e.g. "north carolina" or "NC"); use search only for address/city text matching.
-- getMyDealCount: args {status?: "Pursuing"|"Passed"|"Review", search?: string}
+- getMyDealCount: args {status?: "Pursuing"|"Passed"|"Review", search?: string, state?: string} — use state for questions about deals in a specific state (full name or abbreviation both fine).
 - getMyPipelineSummary: args {}
 - getMyContacts: args {search?: string}
 - getMyContactCount: args {search?: string}

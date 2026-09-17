@@ -1,0 +1,12 @@
+Two small, unrelated fixes:
+
+1. In client/src/components/ui/button.tsx, the "outline" variant hover fills the background to brand blue but leaves the text dark, and the "white" variant's hover is a no-op (identical to its rest state). Fix both:
+   outline: currently "bg-white text-[#081729] border-[#b8c9d8] hover:bg-[#498EDE] hover:text-[#081729] hover:border-[#498EDE]" — change hover:text-[#081729] to hover:text-white.
+   white: currently "bg-white text-[#498EDE] border-white hover:bg-white hover:text-[#498EDE] hover:border-white" — change to "bg-white text-[#498EDE] border-white hover:bg-[#498EDE] hover:text-white hover:border-[#498EDE]" so it actually responds on hover, consistent with every other variant.
+
+2. In server/aiEmailParser.ts, the getMyDealCount tool documentation (around line 242: "- getMyDealCount: args {status?: "Pursuing"|"Passed"|"Review", search?: string}") has no state argument, unlike getMyDeals which was fixed to support one. This means a question like "how many deals are in North Carolina" can still fail or return a wrong count if the model picks getMyDealCount (the more natural tool for a "how many" question) — it has no way to filter by state, and even its search param does a raw LIKE with no state-name normalization. Fix this:
+   - Update the getMyDealCount tool doc line to: "- getMyDealCount: args {status?: "Pursuing"|"Passed"|"Review", search?: string, state?: string} — use state for questions about deals in a specific state (full name or abbreviation both fine)."
+   - In server/developerAssistantData.ts, getMyDealCount (around line 97) currently only destructures status and search from filters. Add state?: string to its filters, import normalizeState from ./msaMatchingService (same helper getMyDeals already uses), normalize it, and add "AND UPPER(COALESCE(state, '')) = ${normalizedState}" as its own WHERE condition, same pattern as getMyDeals.
+   - In server/routes.ts, in the getMyDealCount case (around line 14691), read args.state the same way getMyDeals does (typeof args.state === "string" ? args.state.trim().slice(0, 100) : undefined) and pass it through as the state filter.
+
+Don't touch anything else in either file.

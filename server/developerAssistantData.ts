@@ -97,6 +97,7 @@ export async function getMyDeals(developerProfileId: string, filters: MyDealFilt
 export async function getMyDealCount(developerProfileId: string, filters: Omit<MyDealFilters, "limit"> = {}) {
   const status = normalizeStatus(filters.status);
   const search = String(filters.search || "").trim();
+  const normalizedState = filters.state ? normalizeState(String(filters.state).trim()) : "";
   const result = await db.execute(sql`
     WITH visible_deals AS (
       SELECT DISTINCT ON (d.id)
@@ -116,6 +117,7 @@ export async function getMyDealCount(developerProfileId: string, filters: Omit<M
         pds.developer_profile_id = ${developerProfileId}
         OR (pds.developer_profile_id IS NULL AND pd.developer_profile_id = ${developerProfileId})
       )
+        AND (${normalizedState === ""} OR UPPER(COALESCE(d.state, '')) = ${normalizedState})
       ORDER BY d.id, pds.matched_at DESC NULLS LAST, pd.created_at DESC NULLS LAST
     )
     SELECT COUNT(*)::int AS total_count

@@ -1,0 +1,13 @@
+Add a per-investment-company toggle that switches their outreach sending between Live and Test mode, plus a button to fire one real test email, in the company's own Settings tab. (Also requested before but never applied — please make sure it lands this time.)
+
+1. In shared/schema.ts, add a new column to the developerProfiles table (around line 34-43, alongside isInternal): outreachTestModeEnabled: boolean("outreach_test_mode_enabled").default(false). Run npm run db:push (drizzle-kit push) to apply it.
+
+2. In server/services/outreachService.ts, wherever a campaign is about to send real messages (the sendMessage method, and wherever it's invoked with a dryRun option), look up the campaign's owning developer profile's outreachTestModeEnabled. If true, force this send to behave as a dry run (reuse the existing dryRun code path already in sendMessage) even if dryRun wasn't explicitly passed in. This protects a company's real brokers from receiving live outreach while that company is in test mode.
+
+3. Add a new route in server/routes.ts: PATCH /api/developer-profile/me/outreach/test-mode, requiring isAuthenticated, that takes { enabled: boolean } in the body and updates the current session's developer profile's outreachTestModeEnabled column, returning the updated value. Scope it to the caller's own developerProfileId, the same way the other /api/developer-profile/me/outreach/* routes do.
+
+4. In client/src/pages/developer-criteria-settings.tsx, add a new Card right after the "Broker notifications" card, titled "Outreach sending mode". It should show a Switch (from @/components/ui/switch) labeled "Test mode" with helper text: "When on, scheduled outreach campaigns won't send to real brokers — every send is logged as a dry run instead." Bind it to a query for the current profile's outreachTestModeEnabled and a mutation calling the new PATCH endpoint on toggle, with a toast confirming the change.
+
+5. In that same card, add a "Send live test email" button and a text input for a test recipient address. On click, POST to the /api/send-test-email endpoint (now fixed to really send, from the other prompt) using this company's current outreach email template and sender, and show a toast with the real success/failure result.
+
+Keep this scoped to the files listed above.
