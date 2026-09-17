@@ -8,3 +8,9 @@ All outbound transactional email should use the shared branded renderer and pass
 **Why:** Microsoft Graph and mailbox SMTP need final HTML, and a single inline shell keeps Outlook/Gmail branding consistent while avoiding dynamic-template substitutions and marketing footers on transactional messages. The project intentionally does not use SendGrid.
 
 **How to apply:** New transactional messages should use the shared wrapper, set `transactional: true`, and default to `help@landlinq.ai`. Do not add unsubscribe links to account setup, password reset, or contact-inquiry messages.
+
+Legacy SendGrid Dynamic Template IDs may remain in stored business settings even though the active dispatcher renders and delivers locally. Treat those IDs as stale configuration to audit, not evidence that the current transport uses SendGrid.
+
+**Why:** A prior audit found configured IDs and historical SendGrid delivery records after the runtime transport had already moved to Graph/SMTP; removing the service safely requires checking both code paths and stored settings.
+
+**How to apply:** Before canceling SendGrid, verify the active settings record has no intended SendGrid IDs and confirm no external inbound/webhook configuration still targets the application.
