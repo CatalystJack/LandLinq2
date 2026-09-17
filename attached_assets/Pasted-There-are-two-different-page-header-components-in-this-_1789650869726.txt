@@ -1,0 +1,13 @@
+There are two different page-header components in this codebase doing the same job with different colors. client/src/components/ui/page-header.tsx (PageHeader) is the correct one — it uses the real theme tokens (text-catalyst-navy, text-catalyst-blue, border-catalyst-gray-200) and is already used on every admin page and on developer-criteria-settings.tsx. But client/src/components/developer-page-header.tsx (DeveloperPageHeader) is a separate component still used on developer-analytics.tsx, developer-crm.tsx, developer-dashboard.tsx, developer-outreach.tsx, developer-page.tsx, developer-pipeline.tsx, and developer-user-management.tsx. It uses hardcoded hex colors that don't match our real brand tokens (#4A90E2 instead of the actual --catalyst-blue value #498EDE, #07172A instead of the actual --catalyst-navy value #081729) and a bolder heading weight (font-bold instead of font-semibold).
+
+Fix this by removing developer-page-header.tsx and switching every page that imports it over to the real PageHeader:
+
+1. In each of client/src/pages/developer-analytics.tsx, developer-crm.tsx, developer-dashboard.tsx, developer-outreach.tsx, developer-page.tsx, developer-pipeline.tsx, and developer-user-management.tsx: change the import from `import DeveloperPageHeader, { developerHeaderButtonClass } from "@/components/developer-page-header";` to `import { PageHeader } from "@/components/ui/page-header";`, and change every `<DeveloperPageHeader ... />` usage to `<PageHeader ... />` with the same props (title, description, eyebrow, actions).
+
+2. Wherever developerHeaderButtonClass was used on action buttons, replace it with the Button component's existing size/variant props instead (e.g. size="sm" variant="outline").
+
+3. Delete client/src/components/developer-page-header.tsx once nothing imports it.
+
+4. client/src/pages/analyst-dashboard.tsx still has no PageHeader — it has its own hand-rolled title block. Replace its top-level <h1>/description/action-button block with <PageHeader title="..." description="..." actions={...} />, keeping the existing title/description text and moving header action buttons into the actions prop.
+
+Please actually make these file changes — this exact request was sent twice before and neither time resulted in any file changes to developer-page-header.tsx or the seven pages that import it. Confirm when done which files were touched.
