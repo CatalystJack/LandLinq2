@@ -2532,7 +2532,6 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   .ll-step-analytics {
     grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
-    margin-left: 3.25rem;
   }
   .ll-route-line { left: 1.25rem; top: 4rem; bottom: 4rem; }
   .ll-step-marker { width: 2.25rem; height: 2.25rem; box-shadow: 0 0 0 6px #f5f8fa; font-size: 8px; }

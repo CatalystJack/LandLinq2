@@ -111,7 +111,7 @@ function DashboardMockup({ compact = false }: { compact?: boolean }) {
           <label className="ll-analyst-search"><Search /><input aria-label="Search deals" placeholder="Search deals, brokers, locations..." /></label>
           <div className="ll-analyst-views"><button type="button" className="is-selected"><Table2 /> Table</button><button type="button"><List /> Pipeline</button><button type="button"><Map /> Map</button></div>
           <button type="button" className="ll-analyst-columns">Columns <b>29/40</b></button>
-          {["STATUS", "PRIORITY", "TYPE", "NEXT"].map((filter) => <button type="button" key={filter} onClick={() => setActiveFilter(filter)} className={`ll-analyst-filter ${activeFilter === filter ? "is-active" : ""}`}>{filter}⌄</button>)}
+          {["STATUS", "PRIORITY", "TYPE", "NEXT"].map((filter) => <button type="button" key={filter} onClick={() => setActiveFilter(filter)} className={`ll-analyst-filter ${activeFilter === filter ? "is-active" : ""}`}>{filter}</button>)}
         </div>
         <div className="ll-analyst-table-scroll">
            <table className="ll-analyst-table"><thead><tr>{columns.map((column) => <th key={column}>{column}{column !== "ID" && <small>↕</small>}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`} className={`ll-cell-${index}`}>{index === 1 ? <b className={`ll-status ll-status-dot ${cell === "Qualified" ? "is-green" : "is-yellow"}`} aria-label={cell} title={cell}><span className="sr-only">{cell}</span></b> : index === 7 ? <b className="ll-type">{cell}</b> : index === 8 ? <b className="ll-notes">{cell}</b> : cell.includes("|") ? cell.split("|").map((line, i) => <span key={line} className={i === 0 ? "ll-address" : "ll-subaddress"}>{line}</span>) : cell}</td>)}</tr>)}</tbody></table>
@@ -260,44 +260,35 @@ export default function MarketingHome() {
                <p className="max-w-sm text-sm leading-7 text-[#647887] sm:text-base">The same workspace keeps deal review, relationships, outreach, and performance connected for your team.</p>
              </div>
              <div className="ll-journey-route">
-               <div className="ll-route-line" aria-hidden="true"><i /></div>
                <article className="ll-journey-step">
                  <div className="ll-step-copy">
-                   <div className="ll-step-marker">01</div>
                    <span className="ll-eyebrow">DEAL DASHBOARD</span>
                    <h3>See every opportunity clearly.</h3>
                    <p>Screen incoming land deals, compare the signals that matter, and move the strongest opportunities forward.</p>
-                   <div className="ll-step-meta"><span>AI screening</span><span>Table · Pipeline · Map</span></div>
                  </div>
                  <div className="ll-step-surface ll-surface-paper"><DashboardMockup compact /></div>
                </article>
                <article className="ll-journey-step ll-step-outreach">
                  <div className="ll-step-copy">
-                   <div className="ll-step-marker">02</div>
                    <span className="ll-eyebrow">CRM</span>
                    <h3>Keep the relationship in view.</h3>
                    <p>Give every broker, owner, and partner a clear record with the context your team needs before the next conversation.</p>
-                   <div className="ll-step-meta"><span>Shared contacts</span><span>Ownership</span></div>
                  </div>
                  <div className="ll-step-surface ll-surface-paper"><OutreachMockup /></div>
                </article>
                <article className="ll-journey-step">
                  <div className="ll-step-copy">
-                   <div className="ll-step-marker">03</div>
                    <span className="ll-eyebrow">CONTACT DETAIL</span>
                    <h3>Make the next conversation useful.</h3>
                    <p>See history, active campaigns, notes, and related deals together before your team reaches out.</p>
-                   <div className="ll-step-meta"><span>Activity history</span><span>Campaign context</span></div>
                  </div>
                  <div className="ll-step-surface ll-surface-navy"><PipelineMockup /></div>
                </article>
                <article className="ll-journey-step ll-step-analytics">
                  <div className="ll-step-copy">
-                   <div className="ll-step-marker">04</div>
                    <span className="ll-eyebrow">OUTREACH ANALYTICS</span>
                    <h3>Know what is moving.</h3>
                    <p>Track send activity, sender health, drip sequences, and the follow-up work that keeps the pipeline active.</p>
-                   <div className="ll-step-meta"><span>Send health</span><span>Drip status</span></div>
                  </div>
                  <div className="ll-step-surface ll-surface-paper"><OutreachAnalyticsMockup /></div>
                </article>
