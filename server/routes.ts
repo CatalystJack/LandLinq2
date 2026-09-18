@@ -53,6 +53,7 @@ import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail, isSuper
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
+import { generateDealMemoPdf, resolveDealMemoLogo } from "./dealMemoPdf";
 import { getAutomaticRouting, formatRoutingAssignments } from "./dealRouting";
 import { OpenAIService } from "./openaiService";
 import OpenAI from "openai";
@@ -8901,6 +8902,79 @@ Provide your analysis in this exact JSON format:
     } catch (err: any) {
       console.error('[analyst-memo]', err.message);
       res.status(500).json({ message: 'Failed to retrieve memo: ' + err.message });
+    }
+  });
+
+  // ── GET /api/deals/:id/memo-pdf — generate and download the one-page Deal Memo ──
+  app.get("/api/deals/:id/memo-pdf", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      if (!validateDealId(id)) return res.status(400).json({ message: "Invalid deal ID format" });
+
+      const role = String(req.user?.role || "").toUpperCase();
+      const userEmail = String(req.user?.email || req.user?.claims?.email || "").toLowerCase();
+      const isInternalViewer =
+        ["ADMIN", "SUPER_ADMIN", "ANALYST"].includes(role) ||
+        isPlatformAdminEmail(userEmail);
+      if (role !== "DEVELOPER" && !isInternalViewer) {
+        return res.status(403).json({ message: "You do not have permission to export Deal Memos" });
+      }
+
+      const [deal] = await db.select().from(deals).where(eq(deals.id, id)).limit(1);
+      if (!deal) return res.status(404).json({ message: "Deal not found" });
+
+      let branding = {
+        companyName: "LandLinq",
+        logoUrl: null as string | null,
+        primaryColor: "#081729",
+        secondaryColor: "#4A90E2",
+        whiteLabeled: false,
+      };
+
+      if (role === "DEVELOPER") {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        const [profile] = await db
+          .select({
+            companyName: developerProfiles.companyName,
+            logoUrl: developerProfiles.logoUrl,
+            primaryColor: developerProfiles.primaryColor,
+            secondaryColor: developerProfiles.secondaryColor,
+          })
+          .from(developerProfiles)
+          .where(and(
+            eq(developerProfiles.id, developerProfileId),
+            eq(developerProfiles.isActive, true),
+          ))
+          .limit(1);
+        if (!profile) return res.status(404).json({ message: "Investment Company profile not found" });
+        let embeddedLogo: string | null = null;
+        try {
+          embeddedLogo = await resolveDealMemoLogo(profile.logoUrl);
+        } catch (logoError) {
+          console.warn("[deal-memo-pdf] Unable to embed Investment Company logo:", logoError);
+        }
+        branding = { ...profile, logoUrl: embeddedLogo, whiteLabeled: true };
+      }
+
+      const pdf = await generateDealMemoPdf(deal as Record<string, unknown>, branding);
+      const safeAddress = String(deal.address || deal.propertyName || `deal-${id}`)
+        .replace(/[^a-zA-Z0-9_-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeAddress || "deal"}-Deal-Memo.pdf"`);
+      res.setHeader("Content-Length", pdf.length.toString());
+      res.setHeader("Cache-Control", "private, no-store");
+      return res.end(pdf);
+    } catch (err: any) {
+      console.error("[deal-memo-pdf] Error:", err);
+      if (!res.headersSent) {
+        if (err?.code === "DEAL_MEMO_BUSY") {
+          return res.status(503).json({ message: err.message });
+        }
+        return res.status(500).json({ message: "Failed to generate Deal Memo PDF" });
+      }
     }
   });
 
