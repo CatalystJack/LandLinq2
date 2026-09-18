@@ -1423,6 +1423,17 @@ export class DatabaseStorage implements IStorage {
     });
     
     const [newDeal] = await db.insert(deals).values(cleanDeal).returning();
+
+    // Automated YOC is server-owned. Deal creation may not yet have a
+    // developer send relationship, so this first pass uses the national
+    // fallback; a later profile send/update pass can recompute with overrides.
+    try {
+      const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
+      const computedDeal = await recomputeDealYoc(newDeal.id);
+      if (computedDeal) return computedDeal as Deal;
+    } catch (yocError) {
+      console.error(`[AUTO-YOC] Creation recompute failed for ${newDeal.id}:`, yocError);
+    }
     
     // AUTO-CLASSIFICATION COMPLETELY REMOVED per user requirement - all deals must be manually classified
     console.log(`✅ Deal ${newDeal.id} created (UUID: ${newDeal.id.length} chars) - NO automatic classification, requires manual analyst review`);
@@ -1761,6 +1772,21 @@ export class DatabaseStorage implements IStorage {
       console.error(`   This means the deal ID doesn't exist in the database`);
       console.error(`   Updates that were attempted:`, Object.keys(sanitizedUpdates).join(', '));
       throw new Error(`updateDeal failed: No deal found with ID ${id}`);
+    }
+
+    const yocInputFields = [
+      'productTypes', 'targetProductTypes', 'unitCount', 'estimatedUnits',
+      'sizeAcres', 'askingPrice', 'state', 'city', 'comparablesJson',
+      'avgRentPsf', 'topRentPsf', 'yocOverrides',
+    ];
+    if (yocInputFields.some((field) => field in sanitizedUpdates)) {
+      try {
+        const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
+        const computedDeal = await recomputeDealYoc(id);
+        if (computedDeal) return computedDeal as Deal;
+      } catch (yocError) {
+        console.error(`[AUTO-YOC] Update recompute failed for ${id}:`, yocError);
+      }
     }
 
     // Debug logging for productTypes after database operation

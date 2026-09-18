@@ -309,6 +309,44 @@ setTimeout(() => {
         ALTER TABLE deals
           ADD COLUMN IF NOT EXISTS census_data_json jsonb,
           ADD COLUMN IF NOT EXISTS census_data_fetched_at timestamp;
+        ALTER TABLE developer_product_types
+          ADD COLUMN IF NOT EXISTS dua numeric,
+          ADD COLUMN IF NOT EXISTS hard_cost_pu numeric,
+          ADD COLUMN IF NOT EXISTS assumed_land_cost_pu numeric,
+          ADD COLUMN IF NOT EXISTS assumed_land_cost_pu_coastal numeric,
+          ADD COLUMN IF NOT EXISTS soft_cost_pct numeric,
+          ADD COLUMN IF NOT EXISTS other_income_pum numeric,
+          ADD COLUMN IF NOT EXISTS fixed_opex_pu numeric,
+          ADD COLUMN IF NOT EXISTS insurance_pu_nc numeric,
+          ADD COLUMN IF NOT EXISTS insurance_pu_coastal numeric,
+          ADD COLUMN IF NOT EXISTS vacancy_pct numeric DEFAULT 0.05,
+          ADD COLUMN IF NOT EXISTS ltl_pct numeric DEFAULT 0.01,
+          ADD COLUMN IF NOT EXISTS concession_pct numeric DEFAULT 0.01,
+          ADD COLUMN IF NOT EXISTS bad_debt_pct numeric DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS mgmt_fee_pct numeric DEFAULT 0.0275,
+          ADD COLUMN IF NOT EXISTS unit_mix jsonb;
+        CREATE TABLE IF NOT EXISTS hello_data_raw_responses (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          endpoint varchar NOT NULL,
+          request_params jsonb NOT NULL,
+          raw_response jsonb NOT NULL,
+          deal_id varchar REFERENCES deals(id),
+          fetched_at timestamp NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS hello_data_raw_responses_deal_idx
+          ON hello_data_raw_responses (deal_id);
+        CREATE INDEX IF NOT EXISTS hello_data_raw_responses_fetched_idx
+          ON hello_data_raw_responses (fetched_at);
+        CREATE TABLE IF NOT EXISTS hello_data_property_cache (
+          id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+          property_key varchar NOT NULL,
+          endpoint varchar NOT NULL,
+          response_json jsonb NOT NULL,
+          fetched_at timestamp NOT NULL DEFAULT now(),
+          expires_at timestamp NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS hello_data_property_cache_lookup_idx
+          ON hello_data_property_cache (property_key, endpoint, expires_at);
         CREATE INDEX IF NOT EXISTS email_intake_automation_processed_idx
           ON email_intake_queue (automation_processed_at);
         CREATE TABLE IF NOT EXISTS email_intake_volume_alert_state (

@@ -7,7 +7,61 @@ import { GeocodioService } from './geocodioService.js';
 import { apiCallTracker } from './apiCallTracker.js';
 import { apiSafetyGuards } from './apiSafetyGuards.js';
 import { db } from './db.js';
-import { sql } from 'drizzle-orm';
+import { helloDataPropertyCache, helloDataRawResponses } from '@shared/schema';
+import { and, desc, eq, gt, sql } from 'drizzle-orm';
+
+const HELLODATA_PROPERTY_CACHE_TTL_MS = 21 * 24 * 60 * 60 * 1000;
+
+function normalizeHelloDataPropertyKey(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+async function getCachedHelloDataProperty(
+  propertyKey: unknown,
+  endpoint: string,
+): Promise<any | undefined> {
+  const normalizedKey = normalizeHelloDataPropertyKey(propertyKey);
+  if (!normalizedKey) return undefined;
+
+  try {
+    const [cached] = await db
+      .select({ responseJson: helloDataPropertyCache.responseJson })
+      .from(helloDataPropertyCache)
+      .where(and(
+        eq(helloDataPropertyCache.propertyKey, normalizedKey),
+        eq(helloDataPropertyCache.endpoint, endpoint),
+        gt(helloDataPropertyCache.expiresAt, new Date()),
+      ))
+      .orderBy(desc(helloDataPropertyCache.fetchedAt))
+      .limit(1);
+    return cached?.responseJson;
+  } catch (error) {
+    console.warn(`[HELLODATA CACHE] Read failed for ${endpoint}/${normalizedKey}; using live API:`, error);
+    return undefined;
+  }
+}
+
+async function cacheHelloDataProperty(
+  propertyKey: unknown,
+  endpoint: string,
+  responseJson: any,
+): Promise<void> {
+  const normalizedKey = normalizeHelloDataPropertyKey(propertyKey);
+  if (!normalizedKey) return;
+
+  try {
+    const fetchedAt = new Date();
+    await db.insert(helloDataPropertyCache).values({
+      propertyKey: normalizedKey,
+      endpoint,
+      responseJson,
+      fetchedAt,
+      expiresAt: new Date(fetchedAt.getTime() + HELLODATA_PROPERTY_CACHE_TTL_MS),
+    });
+  } catch (error) {
+    console.warn(`[HELLODATA CACHE] Write failed for ${endpoint}/${normalizedKey}; continuing without cache:`, error);
+  }
+}
 
 /**
  * Product-type-specific comparable search criteria
@@ -843,26 +897,31 @@ export class HelloDataService {
       
       // Use retry logic with 30s timeout for reliability
       const startTime = Date.now();
-      const data = await retryWithBackoff(async () => {
-        const response = await fetchWithTimeout(`${this.baseUrl}/property/${propertyId}`, {
-          method: 'GET',
-          headers: {
-            'X-API-Key': this.apiKey
+      const propertyCacheKey = propertyId;
+      let data = await getCachedHelloDataProperty(propertyCacheKey, 'property/:id');
+      if (data === undefined) {
+        data = await retryWithBackoff(async () => {
+          const response = await fetchWithTimeout(`${this.baseUrl}/property/${propertyId}`, {
+            method: 'GET',
+            headers: {
+              'X-API-Key': this.apiKey
+            }
+          }, 30000);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            const responseTime = Date.now() - startTime;
+            apiCallTracker.logCall('HelloData', 'property/{id}', false, responseTime, {
+              errorMessage: `${response.status} - ${errorText}`
+            });
+            console.error(`❌ [HELLODATA] Property details fetch failed:`, errorText);
+            throw new Error(`Property details fetch failed: ${response.status}`);
           }
-        }, 30000);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          const responseTime = Date.now() - startTime;
-          apiCallTracker.logCall('HelloData', 'property/{id}', false, responseTime, {
-            errorMessage: `${response.status} - ${errorText}`
-          });
-          console.error(`❌ [HELLODATA] Property details fetch failed:`, errorText);
-          throw new Error(`Property details fetch failed: ${response.status}`);
-        }
-
-        return await response.json();
-      });
+          return await response.json();
+        });
+        void cacheHelloDataProperty(propertyCacheKey, 'property/:id', data);
+      }
       
       const responseTime = Date.now() - startTime;
       apiCallTracker.logCall('HelloData', 'property/{id}', true, responseTime);
@@ -1665,21 +1724,26 @@ export class HelloDataService {
                 // Fetch pricing data
                 try {
                   const pricingStartTime = Date.now();
-                  const pricingResponse = await retryWithBackoff(async () => {
-                    const response = await fetchWithTimeout(`${this.baseUrl}/property/pricing`, {
-                      method: 'POST',
-                      headers: {
-                        'X-API-Key': this.apiKey,
-                        'Content-Type': 'application/json'
-                      },
-                      body: JSON.stringify({ subject: details })
-                    }, 30000);
+                  const pricingCacheKey = details.id || comp.id || details.street_address || comp.street_address;
+                  let pricingResponse = await getCachedHelloDataProperty(pricingCacheKey, 'property/pricing');
+                  if (pricingResponse === undefined) {
+                    pricingResponse = await retryWithBackoff(async () => {
+                      const response = await fetchWithTimeout(`${this.baseUrl}/property/pricing`, {
+                        method: 'POST',
+                        headers: {
+                          'X-API-Key': this.apiKey,
+                          'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ subject: details })
+                      }, 30000);
 
-                    if (!response.ok) {
-                      throw new Error(`Pricing fetch failed: ${response.status}`);
-                    }
-                    return await response.json();
-                  });
+                      if (!response.ok) {
+                        throw new Error(`Pricing fetch failed: ${response.status}`);
+                      }
+                      return await response.json();
+                    });
+                    void cacheHelloDataProperty(pricingCacheKey, 'property/pricing', pricingResponse);
+                  }
                   
                   const pricingResponseTime = Date.now() - pricingStartTime;
                   apiCallTracker.logCall('HelloData', 'property/pricing', true, pricingResponseTime);
@@ -1897,26 +1961,31 @@ export class HelloDataService {
 
           // Step 4b: Fetch pricing data with 30s timeout to get rent_psf
           const pricingStartTime = Date.now();
-          const pricingResponse = await retryWithBackoff(async () => {
-            const response = await fetchWithTimeout(`${this.baseUrl}/property/pricing`, {
-              method: 'POST',
-              headers: {
-                'X-API-Key': this.apiKey,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ subject: propertyDetails })
-            }, 30000);
+          const pricingCacheKey = propertyDetails.id || comp.id || propertyDetails.street_address || comp.street_address;
+          let pricingResponse = await getCachedHelloDataProperty(pricingCacheKey, 'property/pricing');
+          if (pricingResponse === undefined) {
+            pricingResponse = await retryWithBackoff(async () => {
+              const response = await fetchWithTimeout(`${this.baseUrl}/property/pricing`, {
+                method: 'POST',
+                headers: {
+                  'X-API-Key': this.apiKey,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ subject: propertyDetails })
+              }, 30000);
 
-            if (!response.ok) {
-              const pricingResponseTime = Date.now() - pricingStartTime;
-              apiCallTracker.logCall('HelloData', 'property/pricing', false, pricingResponseTime, {
-                errorMessage: `${response.status}`
-              });
-              throw new Error(`Pricing fetch failed: ${response.status}`);
-            }
+              if (!response.ok) {
+                const pricingResponseTime = Date.now() - pricingStartTime;
+                apiCallTracker.logCall('HelloData', 'property/pricing', false, pricingResponseTime, {
+                  errorMessage: `${response.status}`
+                });
+                throw new Error(`Pricing fetch failed: ${response.status}`);
+              }
 
-            return await response.json();
-          });
+              return await response.json();
+            });
+            void cacheHelloDataProperty(pricingCacheKey, 'property/pricing', pricingResponse);
+          }
           
           const pricingResponseTime = Date.now() - pricingStartTime;
           apiCallTracker.logCall('HelloData', 'property/pricing', true, pricingResponseTime);
@@ -2856,15 +2925,20 @@ export class HelloDataService {
               // Fetch pricing
               try {
                 const pricingStart = Date.now();
-                const pricingResp = await retryWithBackoff(async () => {
-                  const r = await fetchWithTimeout(`${this.baseUrl}/property/pricing`, {
-                    method: 'POST',
-                    headers: { 'X-API-Key': this.apiKey, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ subject: details })
-                  }, 30000);
-                  if (!r.ok) throw new Error(`Pricing ${r.status}`);
-                  return r.json();
-                });
+                const pricingCacheKey = details.id || comp.id || details.street_address || comp.street_address;
+                let pricingResp = await getCachedHelloDataProperty(pricingCacheKey, 'property/pricing');
+                if (pricingResp === undefined) {
+                  pricingResp = await retryWithBackoff(async () => {
+                    const r = await fetchWithTimeout(`${this.baseUrl}/property/pricing`, {
+                      method: 'POST',
+                      headers: { 'X-API-Key': this.apiKey, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ subject: details })
+                    }, 30000);
+                    if (!r.ok) throw new Error(`Pricing ${r.status}`);
+                    return r.json();
+                  });
+                  void cacheHelloDataProperty(pricingCacheKey, 'property/pricing', pricingResp);
+                }
                 apiCallTracker.logCall('HelloData', 'property/pricing', true, Date.now() - pricingStart);
 
                 const allItems = Array.isArray(pricingResp) ? pricingResp : [];

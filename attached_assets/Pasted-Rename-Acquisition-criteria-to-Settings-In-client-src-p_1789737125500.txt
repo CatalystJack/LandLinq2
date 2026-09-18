@@ -1,0 +1,11 @@
+Rename "Acquisition criteria" to "Settings"
+
+In client/src/pages/developer-criteria-settings.tsx (~line 486), change:
+
+title={form.profileType === "general_sales" ? "Company settings" : "Acquisition criteria"}
+
+to:
+
+title={form.profileType === "general_sales" ? "Company settings" : "Settings"}
+
+Only that string changes — leave the "Company settings" branch and everything else on the page as-is.

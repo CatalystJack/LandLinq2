@@ -160,7 +160,6 @@ export default function DeveloperAnalytics() {
       <div className="mx-auto max-w-[1680px] px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
           title="Analytics Dashboard"
-          description="Your company’s deal flow, markets, brokers, and outreach performance"
           actions={
             <>
               <Dialog open={showFilters} onOpenChange={setShowFilters}>

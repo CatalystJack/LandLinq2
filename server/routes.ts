@@ -13274,6 +13274,51 @@ RULES:
     }
   });
 
+  const underwritingNumericFields = [
+    "dua", "hardCostPu", "assumedLandCostPu", "assumedLandCostPuCoastal",
+    "softCostPct", "otherIncomePum", "fixedOpExPu", "insurancePuNc",
+    "insurancePuCoastal", "vacancyPct", "ltlPct", "concessionPct",
+    "badDebtPct", "mgmtFeePct",
+  ] as const;
+  const underwritingPercentFields = new Set([
+    "softCostPct", "vacancyPct", "ltlPct", "concessionPct", "badDebtPct", "mgmtFeePct",
+  ]);
+
+  function parseProductTypeUnderwriting(raw: any) {
+    const parsed: Record<string, any> = {};
+    for (const field of underwritingNumericFields) {
+      const value = raw?.[field];
+      if (value === undefined || value === null || value === "") {
+        parsed[field] = null;
+        continue;
+      }
+      const numberValue = Number(value);
+      const max = underwritingPercentFields.has(field) ? 1 : Number.POSITIVE_INFINITY;
+      if (!Number.isFinite(numberValue) || numberValue < 0 || numberValue > max) {
+        throw new Error(`${field} must be a non-negative number${max === 1 ? " between 0 and 1" : ""}`);
+      }
+      parsed[field] = String(numberValue);
+    }
+
+    if (raw?.unitMix === undefined || raw?.unitMix === null || raw?.unitMix === "") {
+      parsed.unitMix = null;
+    } else {
+      if (!Array.isArray(raw.unitMix)) throw new Error("unitMix must be an array");
+      parsed.unitMix = raw.unitMix.map((row: any, index: number) => {
+        const pct = Number(row?.pct);
+        const avgSF = Number(row?.avgSF);
+        const monthlyRent = Number(row?.monthlyRent);
+        if (!Number.isFinite(pct) || pct < 0 || pct > 1 ||
+            !Number.isFinite(avgSF) || avgSF <= 0 ||
+            !Number.isFinite(monthlyRent) || monthlyRent < 0) {
+          throw new Error(`unitMix row ${index + 1} is invalid`);
+        }
+        return { pct, avgSF, monthlyRent };
+      });
+    }
+    return parsed;
+  }
+
   function parseAdminProductTypes(body: any, legacy: Record<string, any>) {
     if ((body.profileType ?? legacy.profileType) === "general_sales") return [];
     const rawProductTypes = body.productTypes;
@@ -13284,6 +13329,7 @@ RULES:
         maxAcres: legacy.maxAcres ?? null,
         minRentPsf: legacy.minRentPsf ?? null,
         minRentPerUnit: legacy.minRentPerUnit ?? null,
+        ...parseProductTypeUnderwriting(legacy),
         isActive: true,
       }];
     }
@@ -13320,6 +13366,7 @@ RULES:
         maxAcres: maxAcres === null ? null : String(maxAcres),
         minRentPsf: minRentPsf === null ? null : String(minRentPsf),
         minRentPerUnit: minRentPerUnit === null ? null : String(minRentPerUnit),
+        ...parseProductTypeUnderwriting(raw),
         isActive,
       };
     });
@@ -13456,6 +13503,12 @@ RULES:
         }
         return saved;
       });
+      try {
+        const { recomputeDealsForDeveloperProfile } = await import("./services/yocUnderwritingService");
+        await recomputeDealsForDeveloperProfile(req.params.profileId);
+      } catch (yocError) {
+        console.error("[admin investment companies PATCH] YOC recompute failed:", yocError);
+      }
       return res.json({ profile });
     } catch (error: any) {
       console.error("[admin investment companies PATCH] Error:", error);
@@ -14040,6 +14093,13 @@ RULES:
         }).returning();
         return { deal, send, classificationResult };
       });
+      try {
+        const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
+        const recomputed = await recomputeDealYoc(result.deal.id, req.params.profileId);
+        if (recomputed) result.deal = recomputed;
+      } catch (yocError) {
+        console.error("[admin investment company deal POST] YOC recompute failed:", yocError);
+      }
       return res.status(201).json({
         deal: result.deal, send: result.send, classification: result.classificationResult.classification,
         matchedProductTypes: result.classificationResult.matchedProductTypes,
@@ -14235,6 +14295,7 @@ RULES:
           maxAcres: maxAcres === null ? null : String(maxAcres),
           minRentPsf: minRentPsf === null ? null : String(minRentPsf),
           minRentPerUnit: minRentPerUnit === null ? null : String(minRentPerUnit),
+          ...parseProductTypeUnderwriting(raw),
           isActive,
         };
       });
@@ -14328,6 +14389,12 @@ RULES:
         };
       });
       if (!updated) return res.status(404).json({ error: 'Investment Company profile not found' });
+      try {
+        const { recomputeDealsForDeveloperProfile } = await import("./services/yocUnderwritingService");
+        await recomputeDealsForDeveloperProfile(developerProfileId);
+      } catch (yocError) {
+        console.error("[developer-profile/me PATCH] YOC recompute failed:", yocError);
+      }
       return res.json({ profile: updated });
     } catch (error: any) {
       console.error('[developer-profile/me PATCH] Error:', error);
@@ -16822,6 +16889,13 @@ RULES:
                   matchedAt: new Date(),
                 },
               });
+            }
+
+            try {
+              const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
+              deal = await recomputeDealYoc(deal.id, developerProfileId) || deal;
+            } catch (yocError) {
+              console.error(`[developer import] YOC recompute failed for ${deal.id}:`, yocError);
             }
 
             if (wasInserted) inserted++;
@@ -20662,6 +20736,12 @@ RULES:
           status: 'sent',
           matchedAt: new Date(),
         }).onConflictDoNothing();
+        try {
+          const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
+          await recomputeDealYoc(newDeal.id, developerProfileId);
+        } catch (yocError) {
+          console.error(`[quick deal] YOC recompute failed for ${newDeal.id}:`, yocError);
+        }
       }
       
       // PERFORMANCE OPTIMIZATION: Return deal IMMEDIATELY, run classification in background

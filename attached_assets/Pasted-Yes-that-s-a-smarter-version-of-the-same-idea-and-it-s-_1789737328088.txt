@@ -1,0 +1,47 @@
+Yes — that's a smarter version of the same idea, and it's a small change since the warehouse-lookup function already exists and does exactly this: it's a free DB read, not an API call. checkCompWarehouse in server/hellodataService.ts (~line 520) checks the shared 3-month geo-radius cache before ever hitting the live API — that's the exact "free if already in the warehouse" check you're describing. Right now it's only called from inside searchQualifyingComparables itself, so a developer-triggered rerun needs to call it directly, on its own, without going anywhere near the paid path if it misses.
+
+This replaces the developer-role branch from the last prompt:
+
+PROMPT — Check the comp warehouse first; only fall back to the deal's own stored data if there's no cached hit (still zero cost either way)
+
+In server/routes.ts, inside POST /api/deals/:id/rerun-analysis, for the isDeveloperRole branch, check the shared comp warehouse before falling back to the deal's own stored fields:
+
+import { checkCompWarehouse } from './hellodataService'; // add to the existing import if not already present
+
+if (isDeveloperRole) {
+  console.log(`💡 [RERUN-ANALYSIS] Developer-triggered rerun — checking comp warehouse before any live HelloData call`);
+
+  let warehouseHit: any = null;
+  if (deal.latitude && deal.longitude) {
+    const lat = parseFloat(String(deal.latitude));
+    const lng = parseFloat(String(deal.longitude));
+    const productType = deal.productTypes?.[0] || deal.dealType || undefined;
+
+    // Try the deal's specific product type first, then fall back to a
+    // product-type-agnostic warehouse entry for the same location.
+    warehouseHit = await checkCompWarehouse(lat, lng, 3, productType);
+    if (!warehouseHit && productType) {
+      warehouseHit = await checkCompWarehouse(lat, lng, 3, undefined);
+    }
+  }
+
+  if (warehouseHit) {
+    console.log(`📦 [RERUN-ANALYSIS] Warehouse hit — using cached comps, zero cost`);
+    preloadedHelloData = warehouseHit;
+  } else {
+    console.log(`📭 [RERUN-ANALYSIS] No warehouse hit — reusing this deal's own stored comp data instead of a live call`);
+    preloadedHelloData = {
+      success: !!deal.comparablesJson,
+      qualifyingCount: deal.comparableCount || 0,
+      topRentPSF: Number(deal.topRentPSF) || 0,
+      avgRentPSF: Number(deal.avgRentPSF) || 0,
+      topRentPerUnit: Number(deal.topRentPerUnit) || 0,
+      avgRentPerUnit: Number(deal.avgRentPerUnit) || 0,
+      summary: deal.comparableNotes || '',
+      aiExplanatoryNotes: deal.aiExplanatoryNotes || '',
+      comparables: deal.comparablesJson || []
+    };
+  }
+} else {
+  // existing "ALWAYS call HelloData first" try/catch block, unchanged
+}

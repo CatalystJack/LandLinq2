@@ -1442,11 +1442,6 @@ export default function AnalystDashboard() {
 
   // Debounced mutation function to prevent rapid successive calls
   const debouncedMutationRefs = useRef<{ [key: string]: NodeJS.Timeout }>({});
-  // Tracks which deal IDs have already had Auto YOC computed this session (avoids duplicate mutations)
-  const autoYocProcessedRef = useRef<Set<string>>(new Set());
-  const [yocRefreshKey, setYocRefreshKey] = useState(0);
-  const [yocRefreshing, setYocRefreshing] = useState(false);
-
   // ─── Underwriting Presets (validated from actual analyst Excel models) ───
   // softCostPct: 15% for all types
   // otherIncomePUM: $198/unit/month conventional        (v22 — confirmed $197-$199 across 10 models: #161, #119,
@@ -2361,30 +2356,6 @@ export default function AnalystDashboard() {
           ...assignment
         });
 
-        // Auto-calculate Automated YOC using HelloData comparable rents + underwriting presets
-        // Runs even when no asking price — falls back to assumed land cost $/unit by product type
-        const landCost = parseFloat(currentDeal?.askingPrice || '0');
-        const sizeAcres = parseFloat(currentDeal?.sizeAcres || '0');
-        const dealUnitCount = parseInt(currentDeal?.unitCount?.toString() || currentDeal?.estimatedUnits?.toString() || '0') || 0;
-        if (sizeAcres > 0 || dealUnitCount > 0) {
-          const comparablesJson = currentDeal?.comparablesJson || [];
-          const autoYoc = calculateYOCForProductTypes(
-            variables.productTypes || [],
-            landCost,
-            sizeAcres,
-            Array.isArray(comparablesJson) ? comparablesJson : [],
-            currentDeal?.targetProductTypes || [],
-            dealUnitCount > 0 ? dealUnitCount : undefined,
-            currentDeal?.state || undefined,
-            currentDeal?.city || undefined
-          );
-          if (autoYoc) {
-            console.log('📊 [AUTO-YOC] Calculated:', autoYoc, 'for deal:', variables.dealId);
-            cellUpdateMutation.mutate({ dealId: variables.dealId, automatedYoc: autoYoc });
-          }
-        } else {
-          console.log('📊 [AUTO-YOC] Skipped — missing acreage for deal:', variables.dealId);
-        }
       }
 
       // Clear optimistic update for this field since we have real data
@@ -2524,80 +2495,6 @@ export default function AnalystDashboard() {
       });
     },
   });
-
-  // ─── Batch Auto YOC on deals load ─────────────────────────────────────────
-  // Computes and saves AutoYOC for every deal with enough data (product type + acreage).
-  // Falls back to MSA-level targetProductTypes when the analyst hasn't picked a specific
-  // building type. Force-recalculates all deals each session so formula updates are
-  // applied automatically. The processedRef prevents duplicate runs per session.
-  useEffect(() => {
-    if (!deals || deals.length === 0) return;
-
-    const pending = (deals as any[]).filter(deal => {
-      if (autoYocProcessedRef.current.has(`${deal.id}:${PRESET_VERSION}`)) return false;
-      // Auto YOC always recalculates regardless of step or underwriting state —
-      // it's a formula-driven reference number, not the analyst's manual underwrite.
-      const resolved = resolveProductTypeKeys(
-        deal.productTypes || [],
-        deal.targetProductTypes || []
-      );
-      const hasSizeAcres = parseFloat(deal.sizeAcres || '0') > 0;
-      const dealUnitCount = parseInt(deal.unitCount?.toString() || deal.estimatedUnits?.toString() || '0') || 0;
-      const singleType = resolved.length === 1;
-      const canCalculate = resolved.length > 0 && (hasSizeAcres || (dealUnitCount > 0 && singleType));
-      // Also include deals with stale/negative stored automatedYoc so we can clear them
-      const hasStaleNegative = typeof deal.automatedYoc === 'string' && deal.automatedYoc.includes('-');
-      return canCalculate || hasStaleNegative;
-    });
-
-    if (pending.length === 0) {
-      if (yocRefreshing) setYocRefreshing(false);
-      return;
-    }
-
-    // Stagger mutations 600ms apart to avoid rate-limit collisions with manual edits.
-    // Skip saving if the computed value matches what's already stored — most refreshes
-    // produce identical numbers and don't need a round-trip.
-    pending.forEach((deal: any, idx: number) => {
-      autoYocProcessedRef.current.add(`${deal.id}:${PRESET_VERSION}`);
-      setTimeout(() => {
-        try {
-          const landCost = parseFloat(deal.askingPrice || '0');
-          const sizeAcres = parseFloat(deal.sizeAcres || '0');
-          const comparablesJson = Array.isArray(deal.comparablesJson) ? deal.comparablesJson : [];
-          const dealUnitCount = parseInt(deal.unitCount?.toString() || deal.estimatedUnits?.toString() || '0') || 0;
-          const batchFallbackPsf = parseFloat(deal.avgRentPsf || deal.topRentPsf || '0') || null;
-          const yoc = calculateYOCForProductTypes(
-            deal.productTypes || [],
-            landCost,
-            sizeAcres,
-            comparablesJson,
-            deal.targetProductTypes || [],
-            dealUnitCount > 0 ? dealUnitCount : undefined,
-            deal.state || undefined,
-            deal.city || undefined,
-            batchFallbackPsf
-          );
-          // Save new value when changed; clear stale values (including old negatives) when formula returns null
-          if (yoc !== null && yoc !== deal.automatedYoc) {
-            cellUpdateMutation.mutate(
-              { dealId: deal.id, automatedYoc: yoc },
-              { onError: () => { /* silent — batch saves are best-effort */ } }
-            );
-          } else if (yoc === null && deal.automatedYoc) {
-            // Formula returned null — wipe stale stored value so cell shows "—" instead of bad data
-            cellUpdateMutation.mutate(
-              { dealId: deal.id, automatedYoc: '' },
-              { onError: () => { /* silent */ } }
-            );
-          }
-        } catch {
-          // Calculation errors are non-fatal — skip silently
-        }
-      }, idx * 600);
-    });
-  }, [deals, yocRefreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  // ─────────────────────────────────────────────────────────────────────────────
 
   // Full deal update mutation for complete row saves (resets editing state)
   const updateDealMutation = useMutation({
@@ -7896,18 +7793,20 @@ export default function AnalystDashboard() {
                                       )}
                                     </Button>
                                   )}
-                                  <Button
-                                    onClick={() => handleRerunAnalysis(deal.id)}
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={rerunningDealId !== null}
-                                    className="h-8 w-8 p-0 bg-white border border-blue-500 text-blue-500 opacity-50 transition-opacity hover:bg-blue-50 hover:border-blue-600 hover:text-blue-600 group-hover:opacity-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title={rerunningDealId === deal.id ? 'Processing…' : 'Re-run analysis'}
-                                    aria-label={rerunningDealId === deal.id ? 'Processing…' : 'Re-run analysis'}
-                                    data-testid={`button-rerun-analysis-${deal.id}`}
-                                  >
-                                    <RefreshCw size={16} className={rerunningDealId === deal.id ? 'animate-spin' : ''} />
-                                  </Button>
+                                  {!isDeveloperUser && (
+                                    <Button
+                                      onClick={() => handleRerunAnalysis(deal.id)}
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={rerunningDealId !== null}
+                                      className="h-8 w-8 p-0 bg-white border border-blue-500 text-blue-500 opacity-50 transition-opacity hover:bg-blue-50 hover:border-blue-600 hover:text-blue-600 group-hover:opacity-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      title={rerunningDealId === deal.id ? 'Processing…' : 'Re-run analysis'}
+                                      aria-label={rerunningDealId === deal.id ? 'Processing…' : 'Re-run analysis'}
+                                      data-testid={`button-rerun-analysis-${deal.id}`}
+                                    >
+                                      <RefreshCw size={16} className={rerunningDealId === deal.id ? 'animate-spin' : ''} />
+                                    </Button>
+                                  )}
                                   <Button
                                     onClick={() => handleDeleteDeal(deal.id, deal.address || 'Unknown Address')}
                                     disabled={deleteDealMutation.isPending}

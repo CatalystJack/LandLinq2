@@ -12,6 +12,7 @@ import {
   integer,
   date,
   bigint,
+  uuid,
   unique,
   uniqueIndex,
   serial,
@@ -77,6 +78,23 @@ export const developerProductTypes = pgTable("developer_product_types", {
   maxAcres: decimal("max_acres"),
   minRentPsf: decimal("min_rent_psf"),
   minRentPerUnit: decimal("min_rent_per_unit"),
+  // Optional developer-specific underwriting overrides. A null value means
+  // "use the national YOC preset for this field."
+  dua: decimal("dua"),
+  hardCostPu: decimal("hard_cost_pu"),
+  assumedLandCostPu: decimal("assumed_land_cost_pu"),
+  assumedLandCostPuCoastal: decimal("assumed_land_cost_pu_coastal"),
+  softCostPct: decimal("soft_cost_pct"),
+  otherIncomePum: decimal("other_income_pum"),
+  fixedOpExPu: decimal("fixed_opex_pu"),
+  insurancePuNc: decimal("insurance_pu_nc"),
+  insurancePuCoastal: decimal("insurance_pu_coastal"),
+  vacancyPct: decimal("vacancy_pct").default("0.05"),
+  ltlPct: decimal("ltl_pct").default("0.01"),
+  concessionPct: decimal("concession_pct").default("0.01"),
+  badDebtPct: decimal("bad_debt_pct").default("0"),
+  mgmtFeePct: decimal("mgmt_fee_pct").default("0.0275"),
+  unitMix: jsonb("unit_mix"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -668,6 +686,48 @@ export const deals = pgTable("deals", {
   index("idx_deals_status").on(table.status),
   index("idx_deals_broker_id").on(table.brokerId)
 ]);
+
+// Immutable archive of every unmodified HelloData response received by the app.
+// This is intentionally separate from curated comparable/cache data.
+export const helloDataRawResponses = pgTable("hello_data_raw_responses", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  endpoint: varchar("endpoint").notNull(),
+  requestParams: jsonb("request_params").notNull(),
+  rawResponse: jsonb("raw_response").notNull(),
+  dealId: varchar("deal_id").references(() => deals.id),
+  fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+}, (table) => [
+  index("hello_data_raw_responses_deal_idx").on(table.dealId),
+  index("hello_data_raw_responses_fetched_idx").on(table.fetchedAt),
+]);
+
+export const insertHelloDataRawResponseSchema = createInsertSchema(helloDataRawResponses).omit({
+  id: true,
+  fetchedAt: true,
+});
+export type HelloDataRawResponse = typeof helloDataRawResponses.$inferSelect;
+export type InsertHelloDataRawResponse = z.infer<typeof insertHelloDataRawResponseSchema>;
+
+export const helloDataPropertyCache = pgTable("hello_data_property_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  propertyKey: varchar("property_key").notNull(),
+  endpoint: varchar("endpoint").notNull(),
+  responseJson: jsonb("response_json").notNull(),
+  fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+}, (table) => [
+  index("hello_data_property_cache_lookup_idx").on(
+    table.propertyKey,
+    table.endpoint,
+    table.expiresAt,
+  ),
+]);
+
+export const insertHelloDataPropertyCacheSchema = createInsertSchema(helloDataPropertyCache).omit({
+  id: true,
+});
+export type HelloDataPropertyCache = typeof helloDataPropertyCache.$inferSelect;
+export type InsertHelloDataPropertyCache = z.infer<typeof insertHelloDataPropertyCacheSchema>;
 
 // Enhanced communication tracking for automated broker follow-up system
 export const communications = pgTable("communications", {

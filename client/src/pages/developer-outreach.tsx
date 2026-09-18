@@ -499,7 +499,6 @@ export default function DeveloperOutreach() {
       <main className="mx-auto max-w-[1680px] px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
           title="Campaigns"
-          description="Build drip campaigns for your approved contact audience."
           actions={
             <Button variant="outline" size="sm" onClick={openNewCampaignChoice} disabled={!sender?.outlookConnected}>
               <Plus className="mr-2 h-4 w-4" />New Campaign
