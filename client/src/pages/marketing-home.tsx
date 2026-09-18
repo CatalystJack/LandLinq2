@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import {
+  Bot,
   ChevronDown,
   Download,
   List,
@@ -8,6 +9,7 @@ import {
   Menu,
   Plus,
   Search,
+  Send,
   Table2,
   X,
 } from "lucide-react";
@@ -72,6 +74,83 @@ function OutreachAnalyticsMockup() {
       <div className="ll-periods"><span>Today</span><span>7 Days</span><b>30 Days</b><span>YTD</span></div>
       <div className="ll-metric-grid"><div><i>➤</i><small>EMAILS SENT</small><b className="ll-metric-number">1,284</b><em>7 failed · 98.9% delivered</em></div><div><i>⌁</i><small>CONTACTS REACHED</small><b className="ll-metric-number">642</b><em>418 unique opens · 65.1%</em></div><div><i>ϟ</i><small>AVG STEPS / CONTACT</small><b>2.4</b><em>Across 11 active campaigns</em></div><div><i>♧</i><small>IN DRIP SEQUENCES</small><b>178</b><em>26 due today · 11 due now</em></div></div>
       <div className="ll-analytics-lower"><div className="ll-volume"><b>Daily Send Volume <small>Last 7 days · 324 sent</small></b><span className="ll-volume-summary">Peak volume: Tuesday <strong>67 sends</strong></span><div className="ll-volume-bars"><i style={{height:"48%"}}/><i style={{height:"72%"}}/><i style={{height:"91%"}}/><i style={{height:"63%"}}/><i style={{height:"84%"}}/><i style={{height:"56%"}}/><i style={{height:"38%"}}/></div><div className="ll-volume-days"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></div><div className="ll-drip"><b>◷ Drip Enrollment Status</b><span>◷ Pending <strong>42</strong></span><span>⌁ In Progress <strong className="is-blue">96</strong></span><span>✓ Completed <strong className="is-green">824</strong></span><span>⊗ Failed <strong className="is-red">7</strong></span><hr/><span>Due today <strong>26</strong></span><span>Due now <strong>11</strong></span></div></div>
+    </div>
+  );
+}
+
+function AIAssistantMockup() {
+  const [question, setQuestion] = useState("");
+  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
+  const [isThinking, setIsThinking] = useState(false);
+
+  const featuredQuestion = "Which North Carolina deals have projected YOC above 8% and the strongest rent comps, and what should I review next?";
+  const featuredAnswer = "Bull City Landing in Durham leads at 9.0% projected YOC and a $2.41 top rent PSF. Providence Grove follows at 8.6% and $2.34. Bull City is zoning-verified, so I’d prioritize it for IC review and model the 280-unit plan next.";
+
+  useEffect(() => {
+    let answerTimer: number | undefined;
+    const playFeaturedAnswer = () => {
+      setMessages([{ role: "user", text: featuredQuestion }]);
+      setIsThinking(true);
+      answerTimer = window.setTimeout(() => {
+        setMessages([
+          { role: "user", text: featuredQuestion },
+          { role: "assistant", text: featuredAnswer },
+        ]);
+        setIsThinking(false);
+      }, 1700);
+    };
+
+    const startTimer = window.setTimeout(playFeaturedAnswer, 700);
+    const cycleTimer = window.setInterval(playFeaturedAnswer, 8200);
+    return () => {
+      window.clearTimeout(startTimer);
+      if (answerTimer) window.clearTimeout(answerTimer);
+      window.clearInterval(cycleTimer);
+    };
+  }, []);
+
+  const submitQuestion = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedQuestion = question.trim();
+    if (!trimmedQuestion) return;
+    setMessages((current) => [
+      ...current,
+      { role: "user", text: trimmedQuestion },
+      { role: "assistant", text: "I can help you find that across your deal pipeline." },
+    ]);
+    setQuestion("");
+  };
+
+  return (
+    <div className="ll-ai-assistant" aria-label="Truss AI assistant preview">
+      <div className="ll-ai-assistant-head">
+        <div className="ll-ai-assistant-title">
+          <Bot />
+          <span><b>Truss</b><small>Your multifamily development copilot</small></span>
+        </div>
+        <span className="ll-ai-assistant-close" aria-hidden="true"><X /></span>
+      </div>
+      <div className="ll-ai-assistant-messages" aria-live="polite">
+        {messages.map((message, index) => (
+          <div className={`ll-ai-message ${message.role === "user" ? "is-user" : "is-assistant"}`} key={`${message.role}-${index}`}>
+            {message.text}
+          </div>
+        ))}
+        {isThinking && (
+          <div className="ll-ai-thinking" aria-label="Truss is reviewing the deal pipeline">
+            <span /><span /><span />
+          </div>
+        )}
+      </div>
+      <form className="ll-ai-assistant-input" onSubmit={submitQuestion}>
+        <input
+          aria-label="Ask Truss a question"
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder="Ask a question..."
+        />
+        <button type="submit" aria-label="Send question"><Send /></button>
+      </form>
     </div>
   );
 }
@@ -282,7 +361,7 @@ export default function MarketingHome() {
                    <h3>Make the next conversation useful.</h3>
                    <p>See history, active campaigns, notes, and related deals together before your team reaches out.</p>
                  </div>
-                 <div className="ll-step-surface ll-surface-navy"><PipelineMockup /></div>
+                  <div className="ll-step-surface ll-surface-paper"><PipelineMockup /></div>
                </article>
                <article className="ll-journey-step ll-step-analytics">
                  <div className="ll-step-copy">
@@ -292,6 +371,14 @@ export default function MarketingHome() {
                  </div>
                  <div className="ll-step-surface ll-surface-paper"><OutreachAnalyticsMockup /></div>
                </article>
+                <article className="ll-journey-step ll-step-chat">
+                  <div className="ll-step-copy">
+                    <span className="ll-eyebrow">AI ASSISTANT</span>
+                    <h3>Ask the workspace what matters next.</h3>
+                    <p>Use Truss to ask questions about your deals and get a direct answer without leaving the Investment Company workspace.</p>
+                  </div>
+                  <div className="ll-step-surface ll-surface-navy"><AIAssistantMockup /></div>
+                </article>
              </div>
            </div>
          </section>

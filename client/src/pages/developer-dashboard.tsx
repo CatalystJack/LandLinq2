@@ -184,6 +184,7 @@ export default function DeveloperDashboard() {
   const [programFilter, setProgramFilter] = useState("all");
   const [showColumns, setShowColumns] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [rerunningDealId, setRerunningDealId] = useState<string | null>(null);
 
   const dealsQuery = useQuery<{ deals: DeveloperDeal[] }>({
     queryKey: ["/api/developer-profile/me/deals"],
@@ -216,6 +217,50 @@ export default function DeveloperDashboard() {
     },
     onError: (error: Error) => {
       toast({ title: "Could not update deal", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const rerunAnalysisMutation = useMutation({
+    mutationFn: async (dealId: string) => {
+      setRerunningDealId(dealId);
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 300000);
+
+      try {
+        const response = await fetch(`/api/deals/${encodeURIComponent(dealId)}/rerun-analysis`, {
+          method: "POST",
+          credentials: "include",
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ message: "Failed to re-run analysis" }));
+          throw new Error(error.message || error.error || "Failed to re-run analysis");
+        }
+        return response.json();
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw new Error("The refresh timed out. The analysis may still be processing in the background.");
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    },
+    onSuccess: (data) => {
+      setRerunningDealId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/deals"] });
+      toast({
+        title: "Deal data refreshed",
+        description: `Latest analysis complete${data?.classification ? `: ${String(data.classification).toUpperCase()}` : "."}`,
+      });
+    },
+    onError: (error: Error) => {
+      setRerunningDealId(null);
+      toast({
+        title: "Could not refresh deal data",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -594,6 +639,19 @@ export default function DeveloperDashboard() {
                       )}
                       <TableCell className="py-2.5"><DealStatus row={row} /></TableCell>
                       <TableCell className="py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={rerunningDealId !== null}
+                            onClick={() => rerunAnalysisMutation.mutate(row.deal.id)}
+                            className="h-7 whitespace-nowrap px-2.5 text-[11px]"
+                            title={rerunningDealId === row.deal.id ? "Refreshing latest data…" : "Refresh latest deal data"}
+                            aria-label={rerunningDealId === row.deal.id ? "Refreshing latest data" : "Refresh latest deal data"}
+                          >
+                            <RefreshCw className={`mr-1.5 h-3 w-3 ${rerunningDealId === row.deal.id ? "animate-spin" : ""}`} />
+                            {rerunningDealId === row.deal.id ? "Refreshing…" : "Refresh data"}
+                          </Button>
                         <Button
                           size="sm"
                           variant={row.greenFlaggedByDeveloper ? "outline" : "default"}
@@ -604,6 +662,7 @@ export default function DeveloperDashboard() {
                         >
                           {row.greenFlaggedByDeveloper ? "Pursuing" : "Mark as Pursuing"}
                         </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

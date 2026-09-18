@@ -40,7 +40,7 @@ type ContactAvatarPerson = {
   role: string;
 };
 
-const AVATAR_COLORS = ["#4A90E2", "#6B7FD7", "#3B9C8A", "#B7794B", "#8B6FB3"];
+const AVATAR_COLORS = ["#498EDE", "#081729"];
 
 function getInitials(label: string) {
   const initials = label
@@ -149,8 +149,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const profile = (user as any)?.developerProfile;
-  const primaryColor = profile?.primaryColor || "#0A2B4A";
-  const secondaryColor = profile?.secondaryColor || "#4A90E2";
+  const primaryColor = "#081729";
+  const secondaryColor = "#498EDE";
   const contactsQueryKey = adminMode ? "/api/crm/contacts" : "/api/developer-profile/me/contacts";
   const contactsEndpoint = adminMode
     ? "/api/crm/contacts?page=1&limit=9999"

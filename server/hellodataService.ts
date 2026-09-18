@@ -594,6 +594,7 @@ export async function checkCompWarehouse(
   longitude: number,
   radiusMiles: number,
   productType?: string,
+  minimumFetchedAt?: Date | null,
 ): Promise<any | null> {
   if (![latitude, longitude, radiusMiles].every(Number.isFinite) || radiusMiles <= 0) {
     return null;
@@ -616,6 +617,7 @@ export async function checkCompWarehouse(
           OR (product_type IS NULL AND ${normalizedProductType}::text IS NULL)
         )
         AND search_radius_miles >= ${radiusMiles}
+        AND (${minimumFetchedAt ? sql`fetched_at > ${minimumFetchedAt}` : sql`TRUE`})
       ORDER BY fetched_at DESC
     `);
 
@@ -646,7 +648,7 @@ export async function checkCompWarehouse(
       // excludes entries written by the removed searchComparables workflow.
       if (!payload || payload.cacheKind !== COMP_WAREHOUSE_CACHE_KIND) continue;
       console.log(
-        `📦 [HELLODATA-WAREHOUSE] HIT ${COMP_WAREHOUSE_CACHE_KIND}: cached center ${centerDistance.toFixed(2)} miles away, radius ${cachedRadius} miles`,
+        `📦 [HELLODATA-WAREHOUSE] HIT ${COMP_WAREHOUSE_CACHE_KIND}: cached center ${centerDistance.toFixed(2)} miles away, radius ${cachedRadius} miles${minimumFetchedAt ? `, newer than ${minimumFetchedAt.toISOString()}` : ''}`,
       );
       await recordCompWarehouseLookup('hit');
       return payload.result;
@@ -1289,6 +1291,8 @@ export class HelloDataService {
     productType?: string;  // Jan 12, 2026: Product type for custom filter criteria
     radiusMiles?: number;
     sourceDeveloperProfileId?: string;
+    forceFresh?: boolean;
+    minimumWarehouseFetchedAt?: Date | null;
   }): Promise<{
     success: boolean;
     qualifyingCount: number;
@@ -1450,13 +1454,18 @@ export class HelloDataService {
       console.log(`   ZIP: ${geocoded.zipCode || 'N/A'}`);
       console.log(`   Source: ${options?.latitude ? 'caller-provided' : 'Geocodio (trusted)'}`);
 
-      const warehouseResult = await checkCompWarehouse(
-        geocoded.lat!,
-        geocoded.lng!,
-        searchRadius,
-        options?.productType,
-      );
-      if (warehouseResult) return warehouseResult;
+      if (!options?.forceFresh) {
+        const warehouseResult = await checkCompWarehouse(
+          geocoded.lat!,
+          geocoded.lng!,
+          searchRadius,
+          options?.productType,
+          options?.minimumWarehouseFetchedAt,
+        );
+        if (warehouseResult) return warehouseResult;
+      } else {
+        console.log(`🔄 [HELLODATA-WAREHOUSE] Fresh search requested; bypassing comparable warehouse`);
+      }
 
       console.log(`🌐 [HELLODATA-WAREHOUSE] MISS searchQualifyingComparables; calling live HelloData API`);
       
