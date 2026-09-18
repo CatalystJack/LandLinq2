@@ -1,0 +1,31 @@
+Build a one-page PDF "Deal Memo" export for deals. This supersedes any earlier description you may have seen of this feature — build it exactly as specified here.
+
+LAYOUT (single Letter-size page, no scroll/overflow):
+1. Header (dark gradient background using the investment company's own primaryColor as the base, primaryColor→a slightly lighter shade of itself for the gradient):
+   - Top row: company logo (developerProfile.logoUrl) + company name, or if logoUrl is null, a two-letter initials monogram in a soft translucent square instead — never fall back to LandLinq's own logo. Small "Investment Summary" label next to it. No "Sample Data" or "Confidential" pills — keep this row clean.
+   - Gold/accent kicker label above the title (e.g. "MULTIFAMILY ACQUISITION OPPORTUNITY" — derive this from the deal's product type category).
+   - Property name as the H1, in "Newsreader" (this is the same serif font already used on LandLinq's own website — see client/index.html's Google Fonts link and tailwind.config.ts's `serif: ["Newsreader", "serif"]`). Self-host it: use the @fontsource/newsreader npm package and embed the woff2 files as base64 @font-face rules directly in the generated HTML (don't rely on fetching Google Fonts at render/export time — self-hosting means the export never depends on that network call succeeding).
+   - Thin gold divider rule under the title.
+   - Address line formatted as a normal postal address (street, city, state zip all together, comma-separated), then county and MSA as secondary descriptors after a small diamond separator — do NOT break the street/city/state/zip apart with separators, that reads wrong.
+   - Right-aligned meta: "Prepared for [Company Name]" (or similar) and the date. No deal ID.
+2. Hero stat row: NOT a flat divided strip — six individual bordered cards with rounded corners and a colored top accent border (company's primaryColor for the first 3 facts, secondaryColor/accent for the two return-metric cards), each card showing a label, a bold value, and a small caption. Stats: Product Type, Units/Density, Total Dev. Cost, Auto Yield-on-Cost, Auto IRR (5-Yr Hold), Feasibility Read (as a pill badge).
+3. Two-column body:
+   - Left: Property & Program (key-value table), Unit Mix (table), Development Cost Summary (table with a bold total row), Capital Stack (table).
+   - Right: Year-1 Pro Forma (table down to NOI), Return Assumptions & Auto IRR (small chip row showing rent/other-income/expense growth, hold period, exit cap rate, then a bordered IRR callout box showing the 5-year Auto IRR figure large, with Year-5 NOI / reversion value / equity multiple as smaller supporting text), Market Snapshot (key-value table).
+   - Numbered section tags (01-07) with a small circled number in Newsreader, gold outline.
+4. Full-width Investment Thesis section (numbered 08) below the two columns: a single auto-generated paragraph — build this from a template, NOT an AI call, filling in the deal's real computed values (product type, city/state, Auto-YOC, Auto-IRR if available, exit cap rate if available). If automatedIrr or the exit cap rate is null for that product type, drop the IRR clause and only state the YOC — never show a blank or invented number. Do not add a Next Steps section — that varies too much per deal to template reliably; leave it out entirely rather than showing generic placeholder text.
+5. Footer: just a small "Powered by LandLinq" wordmark (small LandLinq icon + text), right-aligned. No sources/disclaimer line, no page numbers — keep it minimal.
+
+DATA SOURCING:
+- Pull deal/underwriting figures from the existing calculateYOCBreakdown (server/services/yocUnderwritingService.ts) — reuse it unchanged, don't recompute the math separately.
+- Pull branding from the deal's developerProfile: logoUrl, primaryColor, secondaryColor.
+- Every investment company gets the exact same layout/sections — only logo and the two colors change per company. Don't let deal-specific customization change which sections appear (other than the Investment Thesis's IRR clause dropping out when there's no exit cap rate).
+
+RENDERING:
+- Add a "Export Deal Memo (PDF)" button on the deal detail view.
+- Server endpoint (e.g. GET /api/deals/:id/memo-pdf) renders the HTML template (with real values substituted) to a single-page, Letter-size PDF using Playwright — playwright-core is already a dependency; launch headless Chromium and print at 8.5in x 11in with printBackground true, zero margins (the page's own padding handles margins). Do not use pdfkit for this — its low-level drawing API can't reproduce this CSS layout; that's fine for the simpler flyer in partnerDeveloperAutoSend.ts, not for this.
+- Return as a downloadable PDF (Content-Type application/pdf, Content-Disposition attachment).
+
+I'll paste the actual HTML/CSS template file for you to adapt so you don't have to guess at exact spacing/sizing — treat the :root color variables and the logo <img>/mono fallback as the only things that get swapped per developer profile.
+
+Non-regression: don't change the underlying YOC/IRR calculation, don't change the existing pdfkit-based auto-send flyer.
