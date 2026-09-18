@@ -4,8 +4,10 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
   Loader2,
   Mail,
+  Pencil,
   Plus,
   Save,
   Settings2,
@@ -117,6 +119,14 @@ type EffectiveSender = {
   name: string;
   email: string;
   source: "company_outlook" | "platform_fallback";
+};
+
+type DeveloperQuickLink = {
+  id: string;
+  label: string;
+  url: string;
+  sortOrder: number;
+  isActive: boolean;
 };
 
 async function jsonRequest(url: string, options?: RequestInit) {
@@ -287,6 +297,9 @@ export default function DeveloperCriteriaSettings() {
   const [testRecipientEmail, setTestRecipientEmail] = useState("");
   const [overridesOpen, setOverridesOpen] = useState(true);
   const [teamOpen, setTeamOpen] = useState(true);
+  const [quickLinkLabel, setQuickLinkLabel] = useState("");
+  const [quickLinkUrl, setQuickLinkUrl] = useState("");
+  const [editingQuickLinkId, setEditingQuickLinkId] = useState<string | null>(null);
 
   const profileQuery = useQuery<{ profile: Profile }>({
     queryKey: ["/api/developer-profile/me"],
@@ -306,6 +319,10 @@ export default function DeveloperCriteriaSettings() {
   const senderListQuery = useQuery<{ senders: NotificationSender[] }>({
     queryKey: ["/api/developer-profile/me/outreach/senders"],
     queryFn: () => jsonRequest("/api/developer-profile/me/outreach/senders"),
+  });
+  const quickLinksQuery = useQuery<{ links: DeveloperQuickLink[] }>({
+    queryKey: ["/api/developer/quick-links"],
+    queryFn: () => jsonRequest("/api/developer/quick-links"),
   });
   const notificationSenderMutation = useMutation({
     mutationFn: (senderId: string) =>
@@ -425,6 +442,45 @@ export default function DeveloperCriteriaSettings() {
     },
     onError: (error: Error) => toast({
       title: "Could not send test email",
+      description: error.message,
+      variant: "destructive",
+    }),
+  });
+
+  const quickLinkMutation = useMutation({
+    mutationFn: (payload: { id?: string; label: string; url: string }) =>
+      jsonRequest(payload.id ? `/api/developer/quick-links/${payload.id}` : "/api/developer/quick-links", {
+        method: payload.id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: payload.label, url: payload.url }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/developer/quick-links"] });
+      setQuickLinkLabel("");
+      setQuickLinkUrl("");
+      setEditingQuickLinkId(null);
+      toast({ title: "Quick link saved" });
+    },
+    onError: (error: Error) => toast({
+      title: "Could not save quick link",
+      description: error.message,
+      variant: "destructive",
+    }),
+  });
+
+  const deleteQuickLinkMutation = useMutation({
+    mutationFn: (id: string) => jsonRequest(`/api/developer/quick-links/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/developer/quick-links"] });
+      if (editingQuickLinkId) {
+        setQuickLinkLabel("");
+        setQuickLinkUrl("");
+        setEditingQuickLinkId(null);
+      }
+      toast({ title: "Quick link deleted" });
+    },
+    onError: (error: Error) => toast({
+      title: "Could not delete quick link",
       description: error.message,
       variant: "destructive",
     }),
@@ -895,6 +951,137 @@ export default function DeveloperCriteriaSettings() {
               <p className="text-xs text-slate-500 md:col-span-3">Overrides only rescue rent failures. County/state and acreage criteria still apply.</p>
             </CardContent>}
           </Card>}
+
+          <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>
+                  <ExternalLink className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle>Quick Links</CardTitle>
+                  <CardDescription>Save the software and resources your team uses most.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5 border-t border-slate-100 pt-5">
+              {quickLinksQuery.isLoading ? (
+                <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+              ) : (quickLinksQuery.data?.links || []).length > 0 ? (
+                <div className="space-y-2">
+                  {quickLinksQuery.data?.links.map((link) => (
+                    <div key={link.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-slate-900">{link.label}</p>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 flex items-center gap-1 truncate text-xs text-slate-500 hover:underline"
+                        >
+                          <span className="truncate">{link.url}</span>
+                          <ExternalLink className="h-3 w-3 shrink-0" />
+                        </a>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditingQuickLinkId(link.id);
+                            setQuickLinkLabel(link.label);
+                            setQuickLinkUrl(link.url);
+                          }}
+                          aria-label={`Edit ${link.label}`}
+                        >
+                          <Pencil className="h-4 w-4 text-slate-500" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteQuickLinkMutation.mutate(link.id)}
+                          disabled={deleteQuickLinkMutation.isPending}
+                          aria-label={`Delete ${link.label}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-slate-400" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-lg bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">No quick links saved yet.</p>
+              )}
+
+              <div className="border-t border-slate-100 pt-5">
+                <p className="mb-3 text-sm font-semibold text-slate-800">
+                  {editingQuickLinkId ? "Edit link" : "Add Link"}
+                </p>
+                <div className="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.4fr)_auto] md:items-end">
+                  <div>
+                    <Label htmlFor="quick-link-label">Label</Label>
+                    <Input
+                      id="quick-link-label"
+                      value={quickLinkLabel}
+                      onChange={(event) => setQuickLinkLabel(event.target.value)}
+                      placeholder="e.g. CoStar"
+                      className="mt-2 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="quick-link-url">URL</Label>
+                    <Input
+                      id="quick-link-url"
+                      type="url"
+                      value={quickLinkUrl}
+                      onChange={(event) => setQuickLinkUrl(event.target.value)}
+                      placeholder="https://example.com"
+                      className="mt-2 bg-white"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const label = quickLinkLabel.trim();
+                        const url = quickLinkUrl.trim();
+                        if (!label || !url) {
+                          toast({ title: "Label and URL are required", variant: "destructive" });
+                          return;
+                        }
+                        quickLinkMutation.mutate({
+                          id: editingQuickLinkId || undefined,
+                          label,
+                          url,
+                        });
+                      }}
+                      disabled={quickLinkMutation.isPending}
+                      style={{ backgroundColor: primaryColor }}
+                      className="text-white"
+                    >
+                      {quickLinkMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      Save
+                    </Button>
+                    {editingQuickLinkId && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingQuickLinkId(null);
+                          setQuickLinkLabel("");
+                          setQuickLinkUrl("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader className="cursor-pointer" onClick={() => setTeamOpen((open) => !open)}>

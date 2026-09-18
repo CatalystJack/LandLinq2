@@ -54,6 +54,22 @@ function platformRoleForEmail(email: string | null | undefined, fallbackRole: st
   return fallbackRole;
 }
 
+async function getOAuthRedirectPath(user: any) {
+  if (isPlatformAdminEmail(user?.email)) return "/dashboard";
+  if (String(user?.role || "").toUpperCase() !== "DEVELOPER") return "/launchpad";
+
+  if (user?.developerProfileId) {
+    const [profile] = await db
+      .select({ profileType: developerProfiles.profileType })
+      .from(developerProfiles)
+      .where(eq(developerProfiles.id, user.developerProfileId))
+      .limit(1);
+    if (profile?.profileType === "general_sales") return "/developer/crm";
+  }
+
+  return "/developer/home";
+}
+
 function enforcePlatformRolePolicy<T extends SelectUser | null | undefined>(user: T): T {
   if (!user) return user;
   const email = String(user.email || "").toLowerCase();
@@ -426,11 +442,11 @@ export function setupAuth(app: Express) {
 
   app.get('/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/auth?mode=login' }),
-    (req, res) => {
+    async (req, res) => {
       // Successful authentication
-      console.log('✅ [GOOGLE AUTH] Successful login, redirecting to launchpad');
-      const email = String((req.user as any)?.email || '').toLowerCase();
-      res.redirect(isPlatformAdminEmail(email) ? '/dashboard' : '/launchpad');
+      const redirectPath = await getOAuthRedirectPath(req.user);
+      console.log(`✅ [GOOGLE AUTH] Successful login, redirecting to ${redirectPath}`);
+      res.redirect(redirectPath);
     }
   );
 
@@ -441,11 +457,11 @@ export function setupAuth(app: Express) {
 
   app.get('/auth/microsoft/callback',
     passport.authenticate('microsoft', { failureRedirect: '/auth?mode=login' }),
-    (req, res) => {
+    async (req, res) => {
       // Successful authentication
-      console.log('✅ [MICROSOFT AUTH] Successful login, redirecting to launchpad');
-      const email = String((req.user as any)?.email || '').toLowerCase();
-      res.redirect(isPlatformAdminEmail(email) ? '/dashboard' : '/launchpad');
+      const redirectPath = await getOAuthRedirectPath(req.user);
+      console.log(`✅ [MICROSOFT AUTH] Successful login, redirecting to ${redirectPath}`);
+      res.redirect(redirectPath);
     }
   );
 

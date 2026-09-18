@@ -88,6 +88,7 @@ const DeveloperOutreach = lazy(() => import("@/pages/developer-outreach"));
 const DeveloperAnalytics = lazy(() => import("@/pages/developer-analytics"));
 const DeveloperUserManagement = lazy(() => import("@/pages/developer-user-management"));
 const DeveloperCriteriaSettings = lazy(() => import("@/pages/developer-criteria-settings"));
+const DeveloperHome = lazy(() => import("@/pages/developer-home"));
 const DeveloperLogin = lazy(() => import("@/pages/developer-login"));
 const DeveloperDashboardPage = lazy(() => import("@/pages/developer-dashboard"));
 
@@ -251,6 +252,7 @@ function Router() {
               as their main deal workspace. Supporting developer routes below remain
               available without changing their existing behavior. */}
           <Route path="/dashboard" component={AnalystDashboard} />
+          <Route path="/developer/home" component={DeveloperHome} />
           <Route path="/developer/dashboard" component={AnalystDashboard} />
           <Route path="/developer/crm" component={DeveloperCrm} />
           <Route path="/developer/outreach" component={DeveloperOutreach} />

@@ -325,6 +325,18 @@ setTimeout(() => {
           ADD COLUMN IF NOT EXISTS bad_debt_pct numeric DEFAULT 0,
           ADD COLUMN IF NOT EXISTS mgmt_fee_pct numeric DEFAULT 0.0275,
           ADD COLUMN IF NOT EXISTS unit_mix jsonb;
+        CREATE TABLE IF NOT EXISTS developer_quick_links (
+          id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+          developer_profile_id varchar NOT NULL REFERENCES developer_profiles(id) ON DELETE CASCADE,
+          label varchar NOT NULL,
+          url varchar NOT NULL,
+          sort_order integer NOT NULL DEFAULT 0,
+          is_active boolean NOT NULL DEFAULT true,
+          created_at timestamp DEFAULT now(),
+          updated_at timestamp DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS developer_quick_links_profile_idx
+          ON developer_quick_links (developer_profile_id);
         CREATE TABLE IF NOT EXISTS hello_data_raw_responses (
           id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
           endpoint varchar NOT NULL,

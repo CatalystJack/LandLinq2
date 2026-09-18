@@ -4,6 +4,7 @@ import { preloadRoute } from "@/lib/route-preload";
 import {
   BarChart3,
   CircleDot,
+  Home,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -12,12 +13,14 @@ import {
   Send,
   Settings,
   Users,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import DeveloperAssistantChat from "@/components/developer-assistant-chat";
 
 const realEstateTabs = [
+  { label: "Home", href: "/developer/home" },
   { label: "Deal Dashboard", href: "/developer/dashboard" },
   { label: "CRM", href: "/developer/crm" },
   { label: "Outreach", href: "/developer/outreach" },
@@ -26,6 +29,7 @@ const realEstateTabs = [
 ];
 
 const iconForTab = (label: string) => {
+  if (label === "Home") return Home;
   if (label === "Deal Dashboard") return LayoutDashboard;
   if (label === "CRM") return Users;
   if (label === "Outreach") return Send;

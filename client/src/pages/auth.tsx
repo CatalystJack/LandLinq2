@@ -33,7 +33,7 @@ export default function AuthPage() {
   ).toUpperCase();
   const authenticatedDeveloperHome = (user as any)?.developerProfile?.profileType === "general_sales"
     ? "/developer/crm"
-    : "/dashboard";
+    : "/developer/home";
   const redirectUrl = isPlatformAdminEmail(authenticatedEmail)
     ? "/dashboard"
     : authenticatedRole === "DEVELOPER"
@@ -85,7 +85,7 @@ export default function AuthPage() {
       const isPlatformAdmin = isPlatformAdminEmail(authenticatedUser?.email);
       const developerHome = authenticatedUser?.developerProfile?.profileType === "general_sales"
         ? "/developer/crm"
-        : "/developer/dashboard";
+        : "/developer/home";
       const redirectPath = forcedResetToken
         ? `/reset-password?token=${encodeURIComponent(forcedResetToken)}`
         : isPlatformAdmin

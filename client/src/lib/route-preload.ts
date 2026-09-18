@@ -19,6 +19,7 @@ const routeLoaders: Record<string, RouteLoader> = {
   "/admin/master-pipeline": () => import("@/pages/master-pipeline"),
   "/admin/investment-companies": () => import("@/pages/admin-investment-companies"),
   "/developer/dashboard": () => import("@/pages/developer-dashboard"),
+  "/developer/home": () => import("@/pages/developer-home"),
   "/developer/crm": () => import("@/pages/developer-crm"),
   "/developer/outreach": () => import("@/pages/developer-outreach"),
   "/developer/pipeline": () => import("@/pages/developer-pipeline"),

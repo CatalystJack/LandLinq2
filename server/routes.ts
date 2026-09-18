@@ -23,6 +23,7 @@ import {
   users,
   brokers,
   developerProfiles,
+  developerQuickLinks,
   partnerDevelopers,
   partnerDeveloperSends,
   communications,
@@ -2853,6 +2854,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const DEVELOPER_ALLOWED_PAGE_PATHS = new Set([
     '/',
     '/dashboard',
+    '/developer/home',
     '/developer/dashboard',
     '/developer/crm',
     '/developer/pipeline',
@@ -2890,7 +2892,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
 
     const developerProfileId = user?.developerProfileId;
-    if (!developerProfileId) return '/developer/dashboard';
+     if (!developerProfileId) return '/developer/home';
 
     try {
       const [profile] = await db
@@ -2900,10 +2902,10 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         .limit(1);
       return profile?.profileType === 'general_sales'
         ? '/developer/crm'
-        : '/developer/dashboard';
+        : '/developer/home';
     } catch (error) {
       console.error('[DEVELOPER ROUTE] Could not resolve profile type for redirect:', error);
-      return '/developer/dashboard';
+      return '/developer/home';
     }
   };
   app.use(async (req: any, res: any, next: any) => {
@@ -13991,6 +13993,125 @@ RULES:
     }
     return true;
   }
+
+  app.get("/api/developer/quick-links", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const links = await db
+        .select()
+        .from(developerQuickLinks)
+        .where(and(
+          eq(developerQuickLinks.developerProfileId, developerProfileId),
+          eq(developerQuickLinks.isActive, true),
+        ))
+        .orderBy(asc(developerQuickLinks.sortOrder), asc(developerQuickLinks.createdAt));
+
+      return res.json({ links });
+    } catch (error) {
+      console.error("[developer quick links] List error:", error);
+      return res.status(500).json({ error: "Failed to load quick links" });
+    }
+  });
+
+  app.post("/api/developer/quick-links", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const label = String(req.body?.label || "").trim();
+      const url = String(req.body?.url || "").trim();
+      if (!label || !url) {
+        return res.status(400).json({ error: "Label and URL are required" });
+      }
+      try {
+        const parsedUrl = new URL(url);
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) throw new Error("Unsupported protocol");
+      } catch {
+        return res.status(400).json({ error: "Enter a valid http or https URL" });
+      }
+
+      const [link] = await db.insert(developerQuickLinks).values({
+        developerProfileId,
+        label,
+        url,
+      }).returning();
+
+      return res.status(201).json({ link });
+    } catch (error) {
+      console.error("[developer quick links] Create error:", error);
+      return res.status(500).json({ error: "Failed to create quick link" });
+    }
+  });
+
+  app.patch("/api/developer/quick-links/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const label = req.body?.label === undefined ? undefined : String(req.body.label).trim();
+      const url = req.body?.url === undefined ? undefined : String(req.body.url).trim();
+      if (label === "" || url === "") {
+        return res.status(400).json({ error: "Label and URL cannot be empty" });
+      }
+      if (url !== undefined) {
+        try {
+          const parsedUrl = new URL(url);
+          if (!["http:", "https:"].includes(parsedUrl.protocol)) throw new Error("Unsupported protocol");
+        } catch {
+          return res.status(400).json({ error: "Enter a valid http or https URL" });
+        }
+      }
+      if (label === undefined && url === undefined) {
+        return res.status(400).json({ error: "Label or URL is required" });
+      }
+
+      const [link] = await db
+        .update(developerQuickLinks)
+        .set({
+          ...(label !== undefined ? { label } : {}),
+          ...(url !== undefined ? { url } : {}),
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(developerQuickLinks.id, req.params.id),
+          eq(developerQuickLinks.developerProfileId, developerProfileId),
+        ))
+        .returning();
+
+      if (!link) return res.status(404).json({ error: "Quick link not found" });
+      return res.json({ link });
+    } catch (error) {
+      console.error("[developer quick links] Update error:", error);
+      return res.status(500).json({ error: "Failed to update quick link" });
+    }
+  });
+
+  app.delete("/api/developer/quick-links/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const [deleted] = await db
+        .delete(developerQuickLinks)
+        .where(and(
+          eq(developerQuickLinks.id, req.params.id),
+          eq(developerQuickLinks.developerProfileId, developerProfileId),
+        ))
+        .returning({ id: developerQuickLinks.id });
+
+      if (!deleted) return res.status(404).json({ error: "Quick link not found" });
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("[developer quick links] Delete error:", error);
+      return res.status(500).json({ error: "Failed to delete quick link" });
+    }
+  });
 
   function adminRequestError(status: number, message: string) {
     const error: any = new Error(message);

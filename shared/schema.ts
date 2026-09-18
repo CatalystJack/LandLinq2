@@ -68,6 +68,29 @@ export const developerProfiles = pgTable("developer_profiles", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const developerQuickLinks = pgTable("developer_quick_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id")
+    .references(() => developerProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  label: varchar("label").notNull(),
+  url: varchar("url").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("developer_quick_links_profile_idx").on(table.developerProfileId),
+]);
+
+export const insertDeveloperQuickLinkSchema = createInsertSchema(developerQuickLinks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type DeveloperQuickLink = typeof developerQuickLinks.$inferSelect;
+export type InsertDeveloperQuickLink = z.infer<typeof insertDeveloperQuickLinkSchema>;
+
 export const developerProductTypes = pgTable("developer_product_types", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   developerProfileId: varchar("developer_profile_id")
