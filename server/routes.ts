@@ -13295,6 +13295,36 @@ RULES:
     }
   });
 
+  app.get("/api/admin/investment-companies/:profileId/crm-tags", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const developerProfileId = String(req.params.profileId || "").trim();
+      if (!developerProfileId) return res.status(400).json({ error: "Investment Company profile ID is required" });
+
+      const result = await db.execute(sql`
+        SELECT DISTINCT tag
+        FROM brokers AS owned_broker
+        CROSS JOIN LATERAL unnest(owned_broker.crm_tags) AS tag
+        WHERE owned_broker.owner_developer_profile_id = ${developerProfileId}
+          AND owned_broker.crm_tags IS NOT NULL
+          AND tag IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM users AS demo_owner
+            WHERE demo_owner.id = owned_broker.user_id
+              AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+          )
+        ORDER BY tag
+      `);
+
+      return res.json((result.rows as Array<{ tag: unknown }>)
+        .map((row) => String(row.tag || "").trim())
+        .filter(Boolean));
+    } catch (error: any) {
+      console.error("[admin investment company CRM tags GET] Error:", error);
+      return res.status(500).json({ error: "Failed to load CRM tags" });
+    }
+  });
+
   app.post("/api/admin/investment-companies/logo", isAuthenticated, requirePlatformAdmin, investmentCompanyLogoUpload.single("logo"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "Choose a logo image to upload" });
@@ -30944,7 +30974,8 @@ RULES:
       res.set('Expires', '0');
       const result = await db.execute(sql`
         SELECT 
-          id, name, email, role, 
+          id, name, email, role,
+          developer_profile_id as "developerProfileId",
           outlook_connected as "outlookConnected",
           microsoft_user_id as "microsoftUserId",
           microsoft_token_expiry as "microsoftTokenExpiry",

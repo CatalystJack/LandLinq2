@@ -88,7 +88,6 @@ export default function DeveloperHome() {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
             {greeting}, {firstName}
           </h1>
-          <p className="mt-2 text-slate-500">Your company workspace at a glance.</p>
         </div>
 
         <section className="mb-8" aria-labelledby="market-rates-heading">

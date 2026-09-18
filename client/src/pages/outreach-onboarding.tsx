@@ -76,6 +76,7 @@ interface OutreachSender {
   name: string;
   email: string;
   role: string;
+  developerProfileId?: string | null;
   outlookConnected: boolean;
   tokenExpired?: boolean;
   tokenExpiringSoon?: boolean;
@@ -1022,6 +1023,8 @@ export default function OutreachOnboarding() {
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
   const [editingSender, setEditingSender] = useState<OutreachSender | null>(null);
+  const [addingNewTagIndex, setAddingNewTagIndex] = useState<number | null>(null);
+  const [newTagDraft, setNewTagDraft] = useState("");
   const [newSenderData, setNewSenderData] = useState({ name: "", email: "", role: "partner" });
   const [showAddSender, setShowAddSender] = useState(false);
   const [campaignSteps, setCampaignSteps] = useState<CampaignStep[]>([]);
@@ -1749,8 +1752,11 @@ export default function OutreachOnboarding() {
     queryKey: ["/api/users"],
   });
 
+  const editingDeveloperProfileId = editingSender?.developerProfileId || null;
   const { data: crmTags = [] } = useQuery<string[]>({
-    queryKey: ["/api/crm/tags"],
+    queryKey: editingDeveloperProfileId
+      ? ["/api/admin/investment-companies", editingDeveloperProfileId, "crm-tags"]
+      : ["/api/crm/tags"],
   });
   const safeSenders = Array.isArray(senders) ? senders : [];
   const teamMembers = (Array.isArray(usersData?.users) ? usersData.users : []).filter(u => 
@@ -1890,6 +1896,11 @@ export default function OutreachOnboarding() {
     } else {
       setCampaignSteps([]);
     }
+  }, [editingSender?.id]);
+
+  useEffect(() => {
+    setAddingNewTagIndex(null);
+    setNewTagDraft("");
   }, [editingSender?.id]);
 
 
@@ -2924,6 +2935,11 @@ export default function OutreachOnboarding() {
                         <Select
                           value={tag}
                           onValueChange={(val) => {
+                              if (val === "__add_new_crm_tag__") {
+                                setAddingNewTagIndex(index);
+                                setNewTagDraft("");
+                                return;
+                              }
                             const tags = [...parseHubspotTags(editingSender)];
                             tags[index] = val;
                             setEditingSender({ ...editingSender, hubspotTriggerTags: tags });
@@ -2939,8 +2955,49 @@ export default function OutreachOnboarding() {
                             {crmTags.map(t => (
                               <SelectItem key={t} value={t}>{t}</SelectItem>
                             ))}
+                            <SelectItem value="__add_new_crm_tag__">Add a new tag…</SelectItem>
                           </SelectContent>
                         </Select>
+                        {addingNewTagIndex === index && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <Input
+                              value={newTagDraft}
+                              onChange={(event) => setNewTagDraft(event.target.value)}
+                              placeholder="New CRM tag"
+                              aria-label="New CRM tag"
+                              className="h-9 flex-1"
+                              autoFocus
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  const nextTag = newTagDraft.trim();
+                                  if (!nextTag) return;
+                                  const tags = [...parseHubspotTags(editingSender)];
+                                  tags[index] = nextTag;
+                                  setEditingSender({ ...editingSender, hubspotTriggerTags: tags });
+                                  setAddingNewTagIndex(null);
+                                  setNewTagDraft("");
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => {
+                                const nextTag = newTagDraft.trim();
+                                if (!nextTag) return;
+                                const tags = [...parseHubspotTags(editingSender)];
+                                tags[index] = nextTag;
+                                setEditingSender({ ...editingSender, hubspotTriggerTags: tags });
+                                setAddingNewTagIndex(null);
+                                setNewTagDraft("");
+                              }}
+                              disabled={!newTagDraft.trim()}
+                            >
+                              Add
+                            </Button>
+                          </div>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"

@@ -1,0 +1,14 @@
+
+1. Add a new admin-only endpoint GET /api/admin/investment-companies/:profileId/crm-tags in server/routes.ts, protected by requirePlatformAdmin (match the pattern used by the other /api/admin/investment-companies/:profileId/* endpoints already in that file), running that same query parameterized by the :profileId route param instead of "me".
+
+2. In outreach-onboarding.tsx, when editingSender.developerProfileId is set, call this new endpoint instead of /api/crm/tags for the CRM Tag Triggers dropdown's options (keep /api/crm/tags as the source when developerProfileId is null/undefined, i.e. for Catalyst's own internal senders — that global list is correct for those).
+
+3. In that same dropdown (the Select around line 2924-2943), also add the ability to type a brand-new tag rather than only picking from the existing scoped list — for example, an "Add a new tag…" SelectItem that reveals a small text input + confirm button, or a combobox-style component if one is already used elsewhere in this file (check for an existing pattern like a command/combobox component before introducing a new dependency). A newly-typed tag doesn't need to be saved anywhere separately — it just becomes the value stored in hubspotTriggerTags for that trigger, the same as picking an existing one from the list.
+
+Non-regression: don't change /api/crm/tags itself, don't change developer-outreach.tsx's existing (already-correct) /api/developer-profile/me/crm-tags usage, and don't change how Catalyst's own internal senders (developerProfileId null) see their tag list.
+
+FIX 2 — Remove the subtitle on the new Investment Company home page
+
+In client/src/pages/developer-home.tsx line 91, remove this line entirely:
+<p className="mt-2 text-slate-500">Your company workspace at a glance.</p>
+Leave the greeting heading ("Good morning, {firstName}") and the company name eyebrow above it exactly as they are — just delete that one subtitle paragraph and any now-unnecessary spacing it leaves behind (check the mb-8 wrapper div doesn't end up with an odd gap; a quick visual check after removing is enough).
