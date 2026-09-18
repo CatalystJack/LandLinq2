@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import {
-  Bot,
   ChevronDown,
   Download,
   List,
   Map,
   Menu,
+  Pause,
   Plus,
+  Play,
   Search,
   Send,
   Table2,
@@ -78,6 +79,62 @@ function OutreachAnalyticsMockup() {
   );
 }
 
+function AutoYocMockup() {
+  const groups = [
+    ["Development Costs", ["Dua", "Hard cost / unit", "Assumed land cost / unit", "Soft costs"]],
+    ["Operating Income & Expenses", ["Other income / unit / month", "Fixed operating expenses", "Insurance / unit", "Management fee"]],
+    ["Rental Loss Assumptions", ["Vacancy", "Loss-to-lease", "Concessions", "Bad debt"]],
+    ["IRR & Exit Assumptions", ["Annual rent growth", "Annual expense growth", "Hold period (years)", "Exit capitalization rate"]],
+    ["Unit Mix", ["1 Bedroom · 60%", "2 Bedroom · 40%", "Average square feet", "Monthly rent"]],
+  ];
+  const [activeGroup, setActiveGroup] = useState(0);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setActiveGroup((current) => (current + 1) % groups.length), 3000);
+    return () => window.clearInterval(interval);
+  }, [groups.length]);
+
+  const currentGroup = groups[activeGroup];
+  return (
+    <div className="ll-app-frame ll-yoc-preview">
+      <div className="ll-yoc-head"><div><b>Auto YOC</b><small>UNDERWRITING ASSUMPTIONS</small></div><span><strong>8.8%</strong><small>PROJECTED YIELD ON COST</small></span></div>
+      <div className="ll-yoc-toolbar"><span>Product type</span><b>3-story surface park</b><button type="button">Save settings</button></div>
+      <div className="ll-yoc-body">
+        <aside><small>UNDERWRITING ASSUMPTIONS</small>{groups.map(([title], index) => <button type="button" key={title} className={activeGroup === index ? "is-active" : ""} onClick={() => setActiveGroup(index)}><span>{index + 1}</span>{title}</button>)}</aside>
+        <main><div className="ll-yoc-section-head"><div><small>EDITING ASSUMPTIONS</small><h3>{currentGroup[0]}</h3></div><span>National default <b>↗</b></span></div><div className="ll-yoc-fields">{currentGroup[1].map((field, index) => <label key={field}><span>{field}</span><b>{index === 0 ? "30" : index === 1 ? "$164,000" : index === 2 ? "5.5%" : "Use default"}{field.toLowerCase().includes("cost") || field.toLowerCase().includes("rent") ? "" : ""}</b></label>)}</div><div className="ll-yoc-footer"><span>Blank fields use the national underwriting default.</span><button type="button">Reset to defaults</button></div></main>
+      </div>
+    </div>
+  );
+}
+
+function DripCampaignBuilderMockup() {
+  const [activeStep, setActiveStep] = useState(1);
+  const steps = [
+    ["1", "Audience", "184 eligible contacts"],
+    ["2", "Sequence", "3 email steps"],
+    ["3", "Review & launch", "Ready to send"],
+  ];
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setActiveStep((current) => (current + 1) % steps.length), 2800);
+    return () => window.clearInterval(interval);
+  }, [steps.length]);
+
+  return (
+    <div className="ll-app-frame ll-drip-builder">
+      <div className="ll-drip-head"><div><small>CAMPAIGNS / NEW CAMPAIGN</small><b>Build a drip campaign</b></div><span>Draft <i>●</i></span></div>
+      <div className="ll-drip-body">
+        <aside>{steps.map(([number, title, detail], index) => <button type="button" key={title} className={activeStep === index ? "is-active" : ""} onClick={() => setActiveStep(index)}><b>{number}</b><span>{title}<small>{detail}</small></span></button>)}</aside>
+        <main>
+          {activeStep === 0 && <><small className="ll-drip-kicker">TARGET AUDIENCE</small><h3>Choose who should receive this sequence.</h3><div className="ll-drip-audience"><b>Interested Broker</b><span>CRM tag</span><strong>184 contacts eligible</strong></div><div className="ll-drip-audience"><b>Charlotte MSA</b><span>Saved geography</span><strong>96 contacts eligible</strong></div></>}
+          {activeStep === 1 && <><small className="ll-drip-kicker">SEQUENCE EDITOR</small><h3>Charlotte Broker Nurture</h3><label>Subject line<input value="A quick introduction to your Charlotte pipeline" readOnly /></label><div className="ll-drip-email-steps"><div><b>STEP 1</b><span>Send immediately</span><strong>Introduction and deal criteria</strong></div><div><b>STEP 2</b><span>Wait 3 days</span><strong>Share current acquisition focus</strong></div><div><b>STEP 3</b><span>Wait 7 days</span><strong>Ask about upcoming opportunities</strong></div></div></>}
+          {activeStep === 2 && <><small className="ll-drip-kicker">REVIEW & LAUNCH</small><h3>Everything is ready to send.</h3><div className="ll-drip-review"><span>Sender</span><b>Morgan Hayes · connected Outlook</b><span>Audience</span><b>184 contacts with “Interested Broker”</b><span>Sequence</span><b>3 steps · 10 days · automatic follow-up</b></div><button type="button" className="ll-drip-launch">Launch campaign</button></>}
+        </main>
+      </div>
+    </div>
+  );
+}
+
 function AIAssistantMockup() {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
@@ -125,7 +182,6 @@ function AIAssistantMockup() {
     <div className="ll-ai-assistant" aria-label="Truss AI assistant preview">
       <div className="ll-ai-assistant-head">
         <div className="ll-ai-assistant-title">
-          <Bot />
           <span><b>Truss</b><small>Your multifamily development copilot</small></span>
         </div>
         <span className="ll-ai-assistant-close" aria-hidden="true"><X /></span>
@@ -196,6 +252,197 @@ function DashboardMockup({ compact = false }: { compact?: boolean }) {
            <table className="ll-analyst-table"><thead><tr>{columns.map((column) => <th key={column}>{column}{column !== "ID" && <small>↕</small>}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell, index) => <td key={`${row[0]}-${index}`} className={`ll-cell-${index}`}>{index === 1 ? <b className={`ll-status ll-status-dot ${cell === "Qualified" ? "is-green" : "is-yellow"}`} aria-label={cell} title={cell}><span className="sr-only">{cell}</span></b> : index === 7 ? <b className="ll-type">{cell}</b> : index === 8 ? <b className="ll-notes">{cell}</b> : cell.includes("|") ? cell.split("|").map((line, i) => <span key={line} className={i === 0 ? "ll-address" : "ll-subaddress"}>{line}</span>) : cell}</td>)}</tr>)}</tbody></table>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PipelineWorkspaceMockup() {
+  const stages = [
+    { name: "New", count: "14", cards: [["Glenwood Commons", "Raleigh, NC", "9.0%", "High"], ["Eastgate Residences", "Raleigh, NC", "7.1%", "Medium"]] },
+    { name: "Qualified", count: "8", cards: [["Bull City Landing", "Durham, NC", "9.0%", "IC review"], ["Providence Grove", "Charlotte, NC", "8.6%", "Strong fit"]] },
+    { name: "Due Diligence", count: "5", cards: [["South End Exchange", "Charlotte, NC", "9.1%", "Survey due"]] },
+    { name: "Closing", count: "2", cards: [["Veterans Crossing", "Murfreesboro, TN", "8.8%", "LOI sent"]] },
+  ];
+
+  return (
+    <div className="ll-demo-page ll-pipeline-page">
+      <div className="ll-demo-page-head">
+        <div><small>SALES WORKSPACE</small><h3>Pipeline</h3><p>Track opportunities from first contact through close.</p></div>
+        <button type="button">+ NEW OPPORTUNITY</button>
+      </div>
+      <div className="ll-pipeline-summary"><span><b>29</b> active opportunities</span><span><b>$43.8M</b> weighted pipeline</span><span><b>68%</b> in motion this month</span></div>
+      <div className="ll-pipeline-board">
+        {stages.map((stage) => (
+          <div className="ll-pipeline-column" key={stage.name}>
+            <div className="ll-pipeline-column-head"><b>{stage.name}</b><span>{stage.count}</span></div>
+            {stage.cards.map(([title, location, yoc, note]) => (
+              <div className="ll-pipeline-opportunity" key={title}>
+                <strong>{title}</strong><small>{location}</small><div><b>{yoc} YOC</b><em>{note}</em></div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OutreachWorkspaceMockup() {
+  const campaigns = [
+    ["Charlotte Broker Nurture", "184 contacts", "72%", "Due today"],
+    ["Q3 Relationship Follow-up", "96 contacts", "48%", "12 queued"],
+    ["Multifamily Deal Flow", "63 contacts", "31%", "Healthy"],
+  ];
+
+  return (
+    <div className="ll-demo-page ll-outreach-page">
+      <div className="ll-demo-page-head">
+        <div><small>RELATIONSHIP WORKSPACE</small><h3>Outreach</h3><p>Keep follow-up moving without losing the deal context.</p></div>
+        <button type="button">+ NEW CAMPAIGN</button>
+      </div>
+      <div className="ll-demo-tabs"><b>Campaigns</b><span>Sequences</span><span>Senders</span><span>Templates</span></div>
+      <div className="ll-outreach-list">
+        <div className="ll-outreach-list-head"><span>CAMPAIGN</span><span>AUDIENCE</span><span>PROGRESS</span><span>NEXT ACTION</span><span>STATUS</span></div>
+        {campaigns.map(([name, audience, progress, next], index) => (
+          <div className="ll-outreach-row" key={name}>
+            <strong>{name}<small>{index === 0 ? "Broker relationships" : index === 1 ? "Warm pipeline contacts" : "New deal alerts"}</small></strong>
+            <span>{audience}</span>
+            <span className="ll-outreach-progress"><i style={{ width: progress }} /><b>{progress}</b></span>
+            <span>{next}</span>
+            <em>ACTIVE</em>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DataHubMockup() {
+  const sources = [
+    ["HelloData", "Market comparables", "1,284 comps", "Synced 8 min ago", "LIVE"],
+    ["HUD", "Affordable housing data", "12,406 records", "Synced today", "LIVE"],
+    ["Census + FRED", "Market and economic signals", "48 indicators", "Synced today", "LIVE"],
+  ];
+
+  return (
+    <div className="ll-demo-page ll-datahub-page">
+      <div className="ll-demo-page-head">
+        <div><small>PROPRIETARY INTELLIGENCE</small><h3>Data Hub</h3><p>Bring market, property, and deal signals into one decision layer.</p></div>
+        <button type="button">REFRESH SOURCES</button>
+      </div>
+      <div className="ll-datahub-metrics"><div><small>ACTIVE SOURCES</small><b>8</b></div><div><small>LAST SYNC</small><b>8 min</b></div><div><small>RECORDS INDEXED</small><b>1.8M</b></div><div><small>HEALTH</small><b className="is-good">99.8%</b></div></div>
+      <div className="ll-datahub-sources">
+        {sources.map(([name, description, records, sync, status]) => (
+          <div className="ll-datahub-source" key={name}><span className="ll-datahub-source-icon">◈</span><div><strong>{name}</strong><small>{description}</small></div><span><b>{records}</b><small>{sync}</small></span><em>{status}</em></div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ICMemoMockup() {
+  return (
+    <div className="ll-demo-page ll-memo-page">
+      <div className="ll-memo-toolbar"><span><b>IC MEMO</b> / Bull City Landing</span><span><em>READY FOR REVIEW</em><button type="button">EXPORT PDF</button><button type="button">SHARE WITH IC</button></span></div>
+      <div className="ll-memo-document">
+        <div className="ll-memo-document-head"><div><small>INVESTMENT COMMITTEE MEMORANDUM</small><h3>Bull City Landing</h3><p>3120 Hillsborough Road · Durham, NC 27705</p></div><strong>9.0%<small>PROJECTED YOC</small></strong></div>
+        <div className="ll-memo-key-metrics"><div><small>RECOMMENDATION</small><b>ADVANCE</b></div><div><small>EST. UNITS</small><b>280</b></div><div><small>TOP RENT / UNIT</small><b>$1,980</b></div><div><small>TOP RENT PSF</small><b>$2.41</b></div></div>
+        <div className="ll-memo-columns"><section><small>EXECUTIVE SUMMARY</small><p>Strong student-oriented infill opportunity with verified zoning, university demand, and a rent-supported path to committee review.</p><small>INVESTMENT THESIS</small><p>High-growth Durham location, clean title reported, and comparable rent support create a credible basis for a 280-unit concept plan.</p></section><aside><small>KEY RISKS</small><ul><li>Confirm unit mix and site plan</li><li>Validate traffic and access assumptions</li><li>Refresh debt and exit assumptions</li></ul><small>NEXT STEP</small><b>Schedule IC review</b></aside></div>
+      </div>
+    </div>
+  );
+}
+
+function SecureWorkspaceMockup() {
+  const controls = [
+    ["Deal criteria", "Private to Investment Company", "LOCKED"],
+    ["Contacts & relationships", "Visible to your team only", "LOCKED"],
+    ["Outreach activity", "Scoped to your workspace", "PROTECTED"],
+  ];
+
+  return (
+    <div className="ll-security-visual" aria-label="Private Investment Company workspace preview">
+      <div className="ll-security-visual-head">
+        <div><span className="ll-security-lock">⌑</span><b>LANDLINQ / WORKSPACE CONTROL</b></div>
+        <span className="ll-security-live"><i /> PRIVATE BY DEFAULT</span>
+      </div>
+      <div className="ll-security-visual-body">
+        <div className="ll-security-workspace-card">
+          <small>YOUR ORGANIZATION</small>
+          <div><span className="ll-security-org-mark">◈</span><div><b>Investment Company</b><span>Acquisitions workspace</span></div><strong>ACTIVE</strong></div>
+        </div>
+        <div className="ll-security-control-list">
+          {controls.map(([title, detail, status]) => <div key={title}><span className="ll-security-check">✓</span><div><b>{title}</b><small>{detail}</small></div><em>{status}</em></div>)}
+        </div>
+        <div className="ll-security-visual-foot"><span>Workspace boundary</span><b>Only your team can view and act on this data</b><i>↗</i></div>
+      </div>
+    </div>
+  );
+}
+
+function SharedWorkspaceMockup() {
+  return (
+    <div className="ll-shared-workspace-visual" aria-label="Shared LandLinq workspace product preview">
+      <div className="ll-shared-workspace-topbar">
+        <div><span className="ll-shared-workspace-mark">◈</span><b>INVESTMENT COMPANY</b><small>LANDLINQ WORKSPACE</small></div>
+        <span className="ll-shared-workspace-user">MH <i /></span>
+      </div>
+      <div className="ll-shared-workspace-content">
+        <aside>
+          <small>WORKSPACE</small>
+          <b className="is-active">◫ Deal Dashboard</b>
+          <span>▦ Pipeline</span>
+          <span>♧ Contacts</span>
+          <span>⌁ Outreach</span>
+          <span>◈ Data Hub</span>
+          <div className="ll-shared-workspace-aside-note"><small>TEAM ACTIVITY</small><b>18 deals reviewed</b><span>this week</span></div>
+        </aside>
+        <main>
+          <div className="ll-shared-workspace-heading"><div><small>DEAL DASHBOARD</small><h3>Good decisions, in one view.</h3></div><button type="button">+ ADD DEAL</button></div>
+          <div className="ll-shared-workspace-metrics"><div><small>ACTIVE DEALS</small><b>29</b><span>+6 this month</span></div><div><small>QUALIFIED</small><b>8</b><span>Ready for review</span></div><div><small>PROJECTED YOC</small><b>8.6%</b><span>Portfolio average</span></div></div>
+          <div className="ll-shared-workspace-table"><div><span>OPPORTUNITY</span><span>OWNER</span><span>STATUS</span><span>YOC</span></div><div><b>Bull City Landing<small>Durham, NC · 280 units</small></b><span>MH</span><em>Qualified</em><strong>9.0%</strong></div><div><b>Providence Grove<small>Charlotte, NC · 216 units</small></b><span>BF</span><em>Review</em><strong>8.6%</strong></div><div><b>Glenwood Commons<small>Raleigh, NC · 184 units</small></b><span>MH</span><em>New</em><strong>7.8%</strong></div></div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function InvestmentCompanyDemo() {
+  const [activeScreen, setActiveScreen] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const screens = [
+    { label: "Deal Dashboard", detail: "Screen every opportunity", render: <DashboardMockup compact /> },
+    { label: "Pipeline", detail: "Move the right deals forward", render: <PipelineWorkspaceMockup /> },
+    { label: "CRM", detail: "Keep relationships in view", render: <ContactDirectoryMockup /> },
+    { label: "Outreach", detail: "Keep follow-up moving", render: <OutreachWorkspaceMockup /> },
+    { label: "Analytics", detail: "See performance clearly", render: <OutreachAnalyticsMockup /> },
+    { label: "Data Hub", detail: "Connect market signals", render: <DataHubMockup /> },
+    { label: "IC Memo", detail: "Turn analysis into a decision", render: <ICMemoMockup /> },
+    { label: "Truss", detail: "Ask the workspace anything", render: <AIAssistantMockup /> },
+  ];
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = window.setInterval(() => {
+      setActiveScreen((current) => (current + 1) % screens.length);
+    }, 4600);
+    return () => window.clearInterval(interval);
+  }, [isPlaying, screens.length]);
+
+  const current = screens[activeScreen];
+  return (
+    <div className="ll-company-demo" aria-label="Interactive Investment Company software demo">
+      <div className="ll-company-demo-chrome">
+        <div className="ll-company-demo-brand"><span>◈</span><b>INVESTMENT COMPANY</b><small>LANDLINQ WORKSPACE</small></div>
+        <div className="ll-company-demo-status"><i /> LIVE PRODUCT TOUR <button type="button" onClick={() => setIsPlaying((playing) => !playing)} aria-label={isPlaying ? "Pause product tour" : "Play product tour"}>{isPlaying ? <Pause /> : <Play />}</button></div>
+      </div>
+      <div className="ll-company-demo-nav" role="tablist" aria-label="Investment Company product pages">
+        {screens.map((screen, index) => <button type="button" role="tab" aria-selected={activeScreen === index} className={activeScreen === index ? "is-active" : ""} key={screen.label} onClick={() => { setActiveScreen(index); setIsPlaying(false); }}>{screen.label}</button>)}
+      </div>
+      <div className="ll-company-demo-stage" aria-live="polite">
+        <div className="ll-company-demo-screen" key={current.label}>{current.render}</div>
+      </div>
+      <div className="ll-company-demo-footer"><span><b>{current.label}</b> · {current.detail}</span><span>{isPlaying ? "Auto tour" : "Tour paused"} · {activeScreen + 1} / {screens.length}</span></div>
     </div>
   );
 }
@@ -329,6 +576,30 @@ export default function MarketingHome() {
 
         <HeroStats />
 
+         <section className="ll-security-section px-4 py-20 sm:px-8 sm:py-28 lg:px-10 lg:py-36" aria-labelledby="security-title">
+           <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[0.78fr_1.22fr] lg:gap-20">
+             <div className="ll-editorial-copy">
+               <span className="ll-eyebrow ll-eyebrow-light">PRIVATE BY DEFAULT</span>
+               <h2 id="security-title">A secure way to scale your strategy.</h2>
+               <p>Your deal criteria, contacts, analysis, and outreach stay inside your organization’s workspace. LandLinq gives every teammate the context they need without creating another shared data layer.</p>
+               <div className="ll-editorial-points"><span><b>01</b><strong>One private workspace</strong><small>Your team works from the same source of truth.</small></span><span><b>02</b><strong>Clear tenant boundaries</strong><small>Deal activity and relationship data stay scoped to your organization.</small></span></div>
+             </div>
+             <div className="ll-editorial-visual"><SecureWorkspaceMockup /></div>
+           </div>
+         </section>
+
+         <section className="ll-shared-workspace-section px-4 py-20 sm:px-8 sm:py-28 lg:px-10 lg:py-36" aria-labelledby="shared-workspace-title">
+           <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.18fr_0.82fr] lg:gap-20">
+             <div className="ll-editorial-visual lg:order-first"><SharedWorkspaceMockup /></div>
+             <div className="ll-editorial-copy">
+               <span className="ll-eyebrow">ONE SHARED WORKSPACE</span>
+               <h2 id="shared-workspace-title">One place for your deals and data. For everyone.</h2>
+               <p>Give acquisitions, underwriting, and relationship teams the same view of what is happening. Every decision starts with the deal context already in reach.</p>
+               <div className="ll-editorial-link"><span>Explore the Investment Company workspace</span><b>↗</b></div>
+             </div>
+           </div>
+         </section>
+
          <section className="ll-journey px-4 py-20 sm:px-8 sm:py-28 lg:px-10 lg:py-36" aria-labelledby="platform-journey-title">
            <div className="mx-auto max-w-7xl">
              <div className="ll-journey-intro">
@@ -347,6 +618,14 @@ export default function MarketingHome() {
                  </div>
                  <div className="ll-step-surface ll-surface-paper"><DashboardMockup compact /></div>
                </article>
+                <article className="ll-journey-step">
+                  <div className="ll-step-copy">
+                    <span className="ll-eyebrow">AUTO YOC</span>
+                    <h3>Underwrite a deal with your assumptions.</h3>
+                    <p>Set product-specific costs, operating assumptions, unit mix, and exit inputs so every opportunity is measured against the way your team invests.</p>
+                  </div>
+                  <div className="ll-step-surface ll-surface-paper"><AutoYocMockup /></div>
+                </article>
                <article className="ll-journey-step ll-step-outreach">
                  <div className="ll-step-copy">
                    <span className="ll-eyebrow">CRM</span>
@@ -363,6 +642,14 @@ export default function MarketingHome() {
                  </div>
                   <div className="ll-step-surface ll-surface-paper"><PipelineMockup /></div>
                </article>
+                <article className="ll-journey-step">
+                  <div className="ll-step-copy">
+                    <span className="ll-eyebrow">DRIP CAMPAIGNS</span>
+                    <h3>Build follow-up once. Keep it moving.</h3>
+                    <p>Choose an audience, write a multi-step sequence, and launch automatic follow-up from your connected Outlook account.</p>
+                  </div>
+                  <div className="ll-step-surface ll-surface-paper"><DripCampaignBuilderMockup /></div>
+                </article>
                <article className="ll-journey-step ll-step-analytics">
                  <div className="ll-step-copy">
                    <span className="ll-eyebrow">OUTREACH ANALYTICS</span>
@@ -371,13 +658,21 @@ export default function MarketingHome() {
                  </div>
                  <div className="ll-step-surface ll-surface-paper"><OutreachAnalyticsMockup /></div>
                </article>
+                <article className="ll-journey-step">
+                  <div className="ll-step-copy">
+                    <span className="ll-eyebrow">IC MEMO</span>
+                    <h3>Turn analysis into a decision.</h3>
+                    <p>Assemble a committee-ready memo with the recommendation, investment thesis, key risks, and next step already in context.</p>
+                  </div>
+                  <div className="ll-step-surface ll-surface-paper"><ICMemoMockup /></div>
+                </article>
                 <article className="ll-journey-step ll-step-chat">
                   <div className="ll-step-copy">
                     <span className="ll-eyebrow">AI ASSISTANT</span>
                     <h3>Ask the workspace what matters next.</h3>
                     <p>Use Truss to ask questions about your deals and get a direct answer without leaving the Investment Company workspace.</p>
                   </div>
-                  <div className="ll-step-surface ll-surface-navy"><AIAssistantMockup /></div>
+                  <div className="ll-step-surface ll-surface-paper"><AIAssistantMockup /></div>
                 </article>
              </div>
            </div>
