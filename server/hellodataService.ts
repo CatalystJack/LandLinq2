@@ -12,6 +12,24 @@ import { and, desc, eq, gt, sql } from 'drizzle-orm';
 
 const HELLODATA_PROPERTY_CACHE_TTL_MS = 21 * 24 * 60 * 60 * 1000;
 
+async function archiveRawHelloDataResponse(
+  endpoint: string,
+  requestParams: unknown,
+  rawResponse: unknown,
+  dealId?: string | null,
+): Promise<void> {
+  try {
+    await db.insert(helloDataRawResponses).values({
+      endpoint,
+      requestParams: requestParams ?? {},
+      rawResponse: rawResponse === null ? sql`'null'::jsonb` : rawResponse,
+      dealId: dealId || null,
+    });
+  } catch (error) {
+    console.warn(`[HELLODATA ARCHIVE] Failed to archive ${endpoint} response; continuing:`, error);
+  }
+}
+
 function normalizeHelloDataPropertyKey(value: unknown): string {
   return String(value ?? '').trim().toLowerCase();
 }
@@ -805,7 +823,9 @@ export class HelloDataService {
           throw new Error(`Property search failed: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
-        return await response.json();
+        const rawResponse = await response.json();
+        void archiveRawHelloDataResponse('property/search', { q: address }, rawResponse);
+        return rawResponse;
       });
       
       // Log successful API call
@@ -918,7 +938,9 @@ export class HelloDataService {
             throw new Error(`Property details fetch failed: ${response.status}`);
           }
 
-          return await response.json();
+          const rawResponse = await response.json();
+          void archiveRawHelloDataResponse('property/:id', { propertyId }, rawResponse);
+          return rawResponse;
         });
         void cacheHelloDataProperty(propertyCacheKey, 'property/:id', data);
       }
@@ -1064,7 +1086,13 @@ export class HelloDataService {
           throw new Error(`Comparables search failed: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
-        return await response.json();
+        const rawResponse = await response.json();
+        void archiveRawHelloDataResponse(
+          'property/comparables',
+          { queryParams: Object.fromEntries(params.entries()), body: requestBody },
+          rawResponse,
+        );
+        return rawResponse;
       });
       
       const responseTime = Date.now() - startTime;
@@ -1204,7 +1232,13 @@ export class HelloDataService {
           throw new Error(`Comparables search failed: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
-        return await response.json();
+        const rawResponse = await response.json();
+        void archiveRawHelloDataResponse(
+          'property/comparables',
+          { queryParams: Object.fromEntries(params.entries()), body: requestBody },
+          rawResponse,
+        );
+        return rawResponse;
       });
       
       const responseTime = Date.now() - startTime;
@@ -1740,7 +1774,13 @@ export class HelloDataService {
                       if (!response.ok) {
                         throw new Error(`Pricing fetch failed: ${response.status}`);
                       }
-                      return await response.json();
+                      const rawResponse = await response.json();
+                      void archiveRawHelloDataResponse(
+                        'property/pricing',
+                        { body: { subject: details } },
+                        rawResponse,
+                      );
+                      return rawResponse;
                     });
                     void cacheHelloDataProperty(pricingCacheKey, 'property/pricing', pricingResponse);
                   }
@@ -1982,7 +2022,13 @@ export class HelloDataService {
                 throw new Error(`Pricing fetch failed: ${response.status}`);
               }
 
-              return await response.json();
+              const rawResponse = await response.json();
+              void archiveRawHelloDataResponse(
+                'property/pricing',
+                { body: { subject: propertyDetails } },
+                rawResponse,
+              );
+              return rawResponse;
             });
             void cacheHelloDataProperty(pricingCacheKey, 'property/pricing', pricingResponse);
           }
@@ -2935,7 +2981,13 @@ export class HelloDataService {
                       body: JSON.stringify({ subject: details })
                     }, 30000);
                     if (!r.ok) throw new Error(`Pricing ${r.status}`);
-                    return r.json();
+                    const rawResponse = await r.json();
+                    void archiveRawHelloDataResponse(
+                      'property/pricing',
+                      { body: { subject: details } },
+                      rawResponse,
+                    );
+                    return rawResponse;
                   });
                   void cacheHelloDataProperty(pricingCacheKey, 'property/pricing', pricingResp);
                 }

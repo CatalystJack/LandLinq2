@@ -8935,12 +8935,15 @@ Provide your analysis in this exact JSON format:
       // Strict analyst email validation - must end with approved domains
       const normalizedEmail = user?.email?.toLowerCase();
       const isAnalyst = isPlatformAdminEmail(normalizedEmail);
+      const isDeveloperRole = String(user?.role || '').toUpperCase() === 'DEVELOPER';
       
-      if (!isAnalyst) {
-        console.warn(`⚠️ [RERUN-ANALYSIS] ❌ ACCESS DENIED for user: ${user?.email} (not an approved analyst)`);
+      if (!isAnalyst && !isDeveloperRole) {
+        console.warn(`⚠️ [RERUN-ANALYSIS] ❌ ACCESS DENIED for user: ${user?.email} (not an approved analyst or Developer account)`);
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
       }
-      console.log(`✅ [RERUN-ANALYSIS] Access granted - ${normalizedEmail} is an approved analyst`);
+      console.log(isDeveloperRole
+        ? `✅ [RERUN-ANALYSIS] Access granted - Developer account will reuse stored comparable data`
+        : `✅ [RERUN-ANALYSIS] Access granted - ${normalizedEmail} is an approved analyst`);
 
       // Check if another re-run is in progress
       if (rerunAnalysisLock) {
@@ -8960,6 +8963,15 @@ Provide your analysis in this exact JSON format:
       if (!deal) {
         console.error(`❌ [RERUN-ANALYSIS] Deal ${id} not found in database`);
         return res.status(404).json({ message: "Deal not found" });
+      }
+      if (isDeveloperRole) {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
+        if (!visibleDealIds.has(id)) {
+          return res.status(404).json({ message: "Deal not found" });
+        }
       }
 
       console.log(`📊 [RERUN-ANALYSIS] CURRENT DEAL STATE BEFORE RE-ANALYSIS:`);
@@ -8991,48 +9003,63 @@ Provide your analysis in this exact JSON format:
       
       let preloadedHelloData: any = null;
       
-      try {
-        console.log(`\n📍 [RERUN-ANALYSIS] Calling HelloData for: ${fullAddress}`);
-        
-        // Internal analyst reruns are not tied to one Investment Company.
-        const helloDataOptions: { latitude?: number; longitude?: number; radiusMiles: number } = {
-          radiusMiles: 3,
-        };
-        if (deal.latitude && deal.longitude) {
-          helloDataOptions.latitude = parseFloat(String(deal.latitude));
-          helloDataOptions.longitude = parseFloat(String(deal.longitude));
-        }
-        
-        if (helloDataOptions) {
-          console.log(`📍 [RERUN-ANALYSIS] Using coordinates for HelloData: ${helloDataOptions.latitude}, ${helloDataOptions.longitude}`);
-        }
-        
-        const result = await hellodataService.searchQualifyingComparables(fullAddress, helloDataOptions);
+      if (isDeveloperRole) {
+        console.log(`💡 [RERUN-ANALYSIS] Developer-triggered rerun — reusing existing comp data, skipping live HelloData call`);
         preloadedHelloData = {
-          success: result.success,
-          qualifyingCount: result.qualifyingCount || 0,
-          topRentPSF: result.topRentPSF || 0,
-          avgRentPSF: result.avgRentPSF || 0,
-          topRentPerUnit: result.topRentPerUnit || 0,
-          avgRentPerUnit: result.avgRentPerUnit || 0,
-          summary: result.summary || '',
-          aiExplanatoryNotes: result.aiExplanatoryNotes || '', // Preserve concise classification note through re-run
-          totalComparables: result.totalComparables || 0,
-          candidateCount: result.candidateCount || 0,
-          candidatesWithPricing: result.candidatesWithPricing || 0,
-          comparables: result.comparables || []
+          success: !!deal.comparablesJson,
+          qualifyingCount: deal.comparableCount || 0,
+          topRentPSF: Number(deal.topRentPSF) || 0,
+          avgRentPSF: Number(deal.avgRentPSF) || 0,
+          topRentPerUnit: Number(deal.topRentPerUnit) || 0,
+          avgRentPerUnit: Number(deal.avgRentPerUnit) || 0,
+          summary: deal.comparableNotes || '',
+          aiExplanatoryNotes: deal.aiExplanatoryNotes || '',
+          comparables: deal.comparablesJson || [],
         };
-        console.log(`✅ [RERUN-ANALYSIS] HelloData returned ${preloadedHelloData.qualifyingCount} qualifying comparables (${preloadedHelloData.comparables.length} total)`);
-        console.log(`   Top Rent PSF: $${preloadedHelloData.topRentPSF?.toFixed(2) || '0.00'}`);
-        console.log(`   Avg Rent PSF: $${preloadedHelloData.avgRentPSF?.toFixed(2) || '0.00'}`);
-      } catch (hdError) {
-        console.error(`❌ [RERUN-ANALYSIS] HelloData call failed:`, hdError);
-        preloadedHelloData = {
-          success: false,
-          qualifyingCount: 0,
-          summary: `HelloData API error: ${hdError instanceof Error ? hdError.message : 'Unknown error'}`,
-          aiExplanatoryNotes: `HelloData API unavailable during re-run. Comparable data could not be fetched — re-run analysis to retry.`
-        };
+      } else {
+        try {
+          console.log(`\n📍 [RERUN-ANALYSIS] Calling HelloData for: ${fullAddress}`);
+
+          // Internal analyst reruns are not tied to one Investment Company.
+          const helloDataOptions: { latitude?: number; longitude?: number; radiusMiles: number } = {
+            radiusMiles: 3,
+          };
+          if (deal.latitude && deal.longitude) {
+            helloDataOptions.latitude = parseFloat(String(deal.latitude));
+            helloDataOptions.longitude = parseFloat(String(deal.longitude));
+          }
+
+          if (helloDataOptions) {
+            console.log(`📍 [RERUN-ANALYSIS] Using coordinates for HelloData: ${helloDataOptions.latitude}, ${helloDataOptions.longitude}`);
+          }
+
+          const result = await hellodataService.searchQualifyingComparables(fullAddress, helloDataOptions);
+          preloadedHelloData = {
+            success: result.success,
+            qualifyingCount: result.qualifyingCount || 0,
+            topRentPSF: result.topRentPSF || 0,
+            avgRentPSF: result.avgRentPSF || 0,
+            topRentPerUnit: result.topRentPerUnit || 0,
+            avgRentPerUnit: result.avgRentPerUnit || 0,
+            summary: result.summary || '',
+            aiExplanatoryNotes: result.aiExplanatoryNotes || '', // Preserve concise classification note through re-run
+            totalComparables: result.totalComparables || 0,
+            candidateCount: result.candidateCount || 0,
+            candidatesWithPricing: result.candidatesWithPricing || 0,
+            comparables: result.comparables || []
+          };
+          console.log(`✅ [RERUN-ANALYSIS] HelloData returned ${preloadedHelloData.qualifyingCount} qualifying comparables (${preloadedHelloData.comparables.length} total)`);
+          console.log(`   Top Rent PSF: $${preloadedHelloData.topRentPSF?.toFixed(2) || '0.00'}`);
+          console.log(`   Avg Rent PSF: $${preloadedHelloData.avgRentPSF?.toFixed(2) || '0.00'}`);
+        } catch (hdError) {
+          console.error(`❌ [RERUN-ANALYSIS] HelloData call failed:`, hdError);
+          preloadedHelloData = {
+            success: false,
+            qualifyingCount: 0,
+            summary: `HelloData API error: ${hdError instanceof Error ? hdError.message : 'Unknown error'}`,
+            aiExplanatoryNotes: `HelloData API unavailable during re-run. Comparable data could not be fetched — re-run analysis to retry.`
+          };
+        }
       }
       
       // STEP 2: Run classification with preloaded HelloData (avoids duplicate API calls)
