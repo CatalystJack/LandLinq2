@@ -4870,6 +4870,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // DELETE /api/crm/contacts/bulk — remove multiple contacts (must be before /:id)
   app.delete("/api/crm/contacts/bulk", isAuthenticated, async (req, res) => {
     try {
+      const user = req.user as any;
+      const userEmail = user?.email || "";
+      if (!isPlatformAdminEmail(userEmail) && !isSuperAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Access denied. Admin privileges are required to delete CRM contacts." });
+      }
+
       const { ids } = req.body;
       if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "ids array required" });
 
@@ -4935,6 +4941,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // DELETE /api/crm/contacts/:id — remove a single contact from the CRM
   app.delete("/api/crm/contacts/:id", isAuthenticated, async (req, res) => {
     try {
+      const user = req.user as any;
+      const userEmail = user?.email || "";
+      if (!isPlatformAdminEmail(userEmail) && !isSuperAdminEmail(userEmail)) {
+        return res.status(403).json({ message: "Access denied. Admin privileges are required to delete CRM contacts." });
+      }
+
       const { id } = req.params;
       const pg = safePgArray([id]);
       await db.transaction(async (tx) => {
@@ -12342,7 +12354,7 @@ RULES:
     }
   });
 
-  app.get("/api/partner-developers", isAuthenticated, async (req, res) => {
+  app.get("/api/partner-developers", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const records = await storage.getAllPartnerDevelopers();
       return res.json({ success: true, developers: records });
@@ -12352,7 +12364,7 @@ RULES:
     }
   });
 
-  app.put("/api/partner-developers/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/partner-developers/:id", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { partnerDevelopers } = await import('@shared/schema');
       const { eq } = await import('drizzle-orm');
@@ -12387,7 +12399,7 @@ RULES:
     }
   });
 
-  app.delete("/api/partner-developers/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/partner-developers/:id", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { partnerDevelopers } = await import('@shared/schema');
       const { eq } = await import('drizzle-orm');
@@ -12400,7 +12412,7 @@ RULES:
   });
 
   // GET /api/partner-developers/:id/sends — list of deals auto-sent to a developer
-  app.get("/api/partner-developers/:id/sends", isAuthenticated, async (req, res) => {
+  app.get("/api/partner-developers/:id/sends", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { partnerDeveloperSends } = await import('@shared/schema');
       const { eq, desc } = await import('drizzle-orm');
@@ -17131,7 +17143,7 @@ RULES:
   // ── Outbox endpoints ────────────────────────────────────────────────────────
 
   // POST /api/partner-developers/outbox/backfill — queue all existing classified deals
-  app.post("/api/partner-developers/outbox/backfill", isAuthenticated, async (req, res) => {
+  app.post("/api/partner-developers/outbox/backfill", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { developerProductTypes, developerProfiles, partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
       const { eq, and, isNotNull } = await import('drizzle-orm');
@@ -17222,7 +17234,7 @@ RULES:
   });
 
   // GET /api/partner-developers/outbox — all pending (unset) match records
-  app.get("/api/partner-developers/outbox", isAuthenticated, async (req, res) => {
+  app.get("/api/partner-developers/outbox", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { partnerDeveloperSends, partnerDevelopers, deals } = await import('@shared/schema');
       const { eq, desc } = await import('drizzle-orm');
@@ -17308,7 +17320,7 @@ RULES:
   });
 
   // PATCH /api/partner-developers/outbox/:id — update zoning/summary overrides
-  app.patch("/api/partner-developers/outbox/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/partner-developers/outbox/:id", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { partnerDeveloperSends } = await import('@shared/schema');
       const { eq } = await import('drizzle-orm');
@@ -17331,7 +17343,7 @@ RULES:
   });
 
   // POST /api/partner-developers/outbox/:id/send — manually send and mark as sent
-  app.post("/api/partner-developers/outbox/:id/send", isAuthenticated, async (req, res) => {
+  app.post("/api/partner-developers/outbox/:id/send", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { partnerDeveloperSends, partnerDevelopers, deals } = await import('@shared/schema');
       const { eq } = await import('drizzle-orm');
@@ -17374,7 +17386,7 @@ RULES:
   });
 
   // DELETE /api/partner-developers/outbox/:id — dismiss a pending record
-  app.delete("/api/partner-developers/outbox/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/partner-developers/outbox/:id", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { partnerDeveloperSends } = await import('@shared/schema');
       const { eq } = await import('drizzle-orm');
@@ -17387,7 +17399,7 @@ RULES:
   });
 
   // PATCH /api/partner-developers/:id/auto-send — toggle autoSendEnabled
-  app.patch("/api/partner-developers/:id/auto-send", isAuthenticated, async (req, res) => {
+  app.patch("/api/partner-developers/:id/auto-send", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { partnerDevelopers } = await import('@shared/schema');
       const { eq } = await import('drizzle-orm');
@@ -17406,7 +17418,7 @@ RULES:
   });
 
   // Deal routing: match all active partner developers against deals in system
-  app.get("/api/partner-developers/routing", isAuthenticated, async (req, res) => {
+  app.get("/api/partner-developers/routing", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const developers = await storage.getActivePartnerDevelopers();
 

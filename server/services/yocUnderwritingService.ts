@@ -542,11 +542,11 @@ export async function calculateYOCBreakdown(
     const defaultInsurance = isCoastal ? preset.insurancePU_coastal : preset.insurancePU_nc;
     const insurancePU = getOverride(overrides, deal.id, `${typeKey}.insurancePU`, defaultInsurance);
     const otherIncomePUM = getOverride(overrides, deal.id, `${typeKey}.otherIncomePUM`, preset.otherIncomePUM);
-    const vacancyPct = preset.vacancyPct;
-    const ltlPct = preset.ltlPct;
-    const concessionPct = preset.concessionPct;
-    const badDebtPct = preset.badDebtPct;
-    const mgmtFeePct = preset.mgmtFeePct;
+    const vacancyPct = getOverride(overrides, deal.id, `${typeKey}.vacancyPct`, preset.vacancyPct);
+    const ltlPct = getOverride(overrides, deal.id, `${typeKey}.ltlPct`, preset.ltlPct);
+    const concessionPct = getOverride(overrides, deal.id, `${typeKey}.concessionPct`, preset.concessionPct);
+    const badDebtPct = getOverride(overrides, deal.id, `${typeKey}.badDebtPct`, preset.badDebtPct);
+    const mgmtFeePct = getOverride(overrides, deal.id, `${typeKey}.mgmtFeePct`, preset.mgmtFeePct);
     const landCostPU = isCoastal ? preset.assumedLandCostPU_coastal : preset.assumedLandCostPU;
     const overrideLandCost = getOverride(overrides, deal.id, "landCost", landCost);
     const effectiveHasActualLandCost = overrideLandCost > 0;
