@@ -2,8 +2,13 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import {
   ChevronDown,
+  Download,
+  List,
+  Map,
   Menu,
+  Plus,
   Search,
+  Table2,
   X,
 } from "lucide-react";
 import Footer from "@/components/footer";
@@ -73,6 +78,13 @@ function OutreachAnalyticsMockup() {
 
 function DashboardMockup({ compact = false }: { compact?: boolean }) {
   const [activeFilter, setActiveFilter] = useState("STATUS");
+  useEffect(() => {
+    const filters = ["STATUS", "PRIORITY", "TYPE", "NEXT"];
+    const interval = window.setInterval(() => {
+      setActiveFilter((current) => filters[(filters.indexOf(current) + 1) % filters.length]);
+    }, 3200);
+    return () => window.clearInterval(interval);
+  }, []);
   const columns = ["ID", "Status", "Priority", "Property Address", "Name", "YOC", "Deal", "Type", "Analyst Notes", "Summary", "Dev Notes", "Broker Notes", "Top Rent/Unit", "Top Rent PSF", "OCC T."];
   const rows = [
     ["#84", "Review", "High", "1824 Glenwood Avenue|Raleigh, NC 27608", "Glenwood Commons", "7.8%", "Land", "Affordable", "Site plan received", "Strong infill opportunity", "Review density", "Seller expects Q4 close", "$1,845", "$2.18", "YES"],
@@ -91,14 +103,14 @@ function DashboardMockup({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`ll-window ll-analyst-real relative overflow-hidden rounded-[1.1rem] border border-white/15 bg-[#f7f9fa] text-[#182b3e] shadow-2xl ${compact ? "min-h-[280px]" : "min-h-[430px]"}`}>
       <div className="ll-analyst-head">
-        <div><h3>Your Dashboard</h3><p>Review, analyze, and manage incoming land deals with AI-powered insights</p></div>
-        <div className="ll-analyst-actions"><button type="button">＋ &nbsp; ADD NEW DEAL</button><button type="button">⇩ &nbsp; EXPORT CSV</button></div>
+        <div><h3>Analyst Dashboard</h3><p>Review, analyze, and manage incoming land deals with AI-powered insights</p></div>
+        <div className="ll-analyst-actions"><button type="button"><Plus /> Add New Deal</button><button type="button"><Download /> Export CSV</button></div>
       </div>
       <div className="ll-analyst-workspace">
         <div className="ll-analyst-toolbar">
           <label className="ll-analyst-search"><Search /><input aria-label="Search deals" placeholder="Search deals, brokers, locations..." /></label>
-          <div className="ll-analyst-views"><button type="button" className="is-selected">▣ Table</button><button type="button">▤ Pipeline</button><button type="button">⌖ Map</button></div>
-          <button type="button" className="ll-analyst-columns">☷ &nbsp; COLUMNS <b>29/40</b></button>
+          <div className="ll-analyst-views"><button type="button" className="is-selected"><Table2 /> Table</button><button type="button"><List /> Pipeline</button><button type="button"><Map /> Map</button></div>
+          <button type="button" className="ll-analyst-columns">Columns <b>29/40</b></button>
           {["STATUS", "PRIORITY", "TYPE", "NEXT"].map((filter) => <button type="button" key={filter} onClick={() => setActiveFilter(filter)} className={`ll-analyst-filter ${activeFilter === filter ? "is-active" : ""}`}>{filter}⌄</button>)}
         </div>
         <div className="ll-analyst-table-scroll">
@@ -237,6 +249,61 @@ export default function MarketingHome() {
         </section>
 
         <HeroStats />
+
+         <section className="ll-journey px-4 py-20 sm:px-8 sm:py-28 lg:px-10 lg:py-36" aria-labelledby="platform-journey-title">
+           <div className="mx-auto max-w-7xl">
+             <div className="ll-journey-intro">
+               <div>
+                 <span className="ll-eyebrow">THE INVESTMENT COMPANY WORKSPACE</span>
+                 <h2 id="platform-journey-title" className="mt-4 max-w-3xl text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">One system from first look to next move.</h2>
+               </div>
+               <p className="max-w-sm text-sm leading-7 text-[#647887] sm:text-base">The same workspace keeps deal review, relationships, outreach, and performance connected for your team.</p>
+             </div>
+             <div className="ll-journey-route">
+               <div className="ll-route-line" aria-hidden="true"><i /></div>
+               <article className="ll-journey-step">
+                 <div className="ll-step-copy">
+                   <div className="ll-step-marker">01</div>
+                   <span className="ll-eyebrow">DEAL DASHBOARD</span>
+                   <h3>See every opportunity clearly.</h3>
+                   <p>Screen incoming land deals, compare the signals that matter, and move the strongest opportunities forward.</p>
+                   <div className="ll-step-meta"><span>AI screening</span><span>Table · Pipeline · Map</span></div>
+                 </div>
+                 <div className="ll-step-surface ll-surface-paper"><DashboardMockup compact /></div>
+               </article>
+               <article className="ll-journey-step ll-step-outreach">
+                 <div className="ll-step-copy">
+                   <div className="ll-step-marker">02</div>
+                   <span className="ll-eyebrow">CRM</span>
+                   <h3>Keep the relationship in view.</h3>
+                   <p>Give every broker, owner, and partner a clear record with the context your team needs before the next conversation.</p>
+                   <div className="ll-step-meta"><span>Shared contacts</span><span>Ownership</span></div>
+                 </div>
+                 <div className="ll-step-surface ll-surface-paper"><OutreachMockup /></div>
+               </article>
+               <article className="ll-journey-step">
+                 <div className="ll-step-copy">
+                   <div className="ll-step-marker">03</div>
+                   <span className="ll-eyebrow">CONTACT DETAIL</span>
+                   <h3>Make the next conversation useful.</h3>
+                   <p>See history, active campaigns, notes, and related deals together before your team reaches out.</p>
+                   <div className="ll-step-meta"><span>Activity history</span><span>Campaign context</span></div>
+                 </div>
+                 <div className="ll-step-surface ll-surface-navy"><PipelineMockup /></div>
+               </article>
+               <article className="ll-journey-step ll-step-analytics">
+                 <div className="ll-step-copy">
+                   <div className="ll-step-marker">04</div>
+                   <span className="ll-eyebrow">OUTREACH ANALYTICS</span>
+                   <h3>Know what is moving.</h3>
+                   <p>Track send activity, sender health, drip sequences, and the follow-up work that keeps the pipeline active.</p>
+                   <div className="ll-step-meta"><span>Send health</span><span>Drip status</span></div>
+                 </div>
+                 <div className="ll-step-surface ll-surface-paper"><OutreachAnalyticsMockup /></div>
+               </article>
+             </div>
+           </div>
+         </section>
 
          <section id="company" data-reveal className="ll-scroll-reveal bg-background px-4 py-16 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-3xl"><div className="mb-10 sm:mb-14"><h2 className="text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">Know what you're getting.</h2></div><div className="divide-y divide-border border-y border-border">{faqs.map(([question, answer], i) => <div key={question}><button type="button" onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i} className="flex w-full items-center justify-between gap-4 py-5 text-left text-base font-semibold sm:gap-5 sm:py-6 sm:text-lg"><span>{question}</span><ChevronDown className={`h-5 w-5 shrink-0 text-primary transition-transform duration-300 ${openFaq === i ? "rotate-180" : ""}`} /></button><div className={`grid transition-[grid-template-rows,opacity] duration-300 ${openFaq === i ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}><div className="overflow-hidden"><p className="max-w-2xl pb-6 leading-7 text-muted-foreground">{answer}</p></div></div></div>)}</div></div></section>
 

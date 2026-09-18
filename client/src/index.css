@@ -2593,6 +2593,12 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   letter-spacing: .05em;
   transition: transform .2s ease, background-color .2s ease;
 }
+.ll-analyst-actions button svg,
+.ll-analyst-views button svg {
+  width: .65rem;
+  height: .65rem;
+  flex: 0 0 auto;
+}
 .ll-analyst-actions button:hover { transform: translateY(-1px); background: #347fc8; }
 .ll-analyst-workspace {
   min-height: 20rem;
@@ -2636,6 +2642,9 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 .ll-analyst-search input::placeholder { color: #9aa6af; }
 .ll-analyst-views, .ll-analyst-columns { display: flex; align-items: center; }
 .ll-analyst-views button, .ll-analyst-columns, .ll-analyst-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: .22rem;
   height: 1.65rem;
   border: 1px solid #d7e0e5;
   border-radius: .2rem;
