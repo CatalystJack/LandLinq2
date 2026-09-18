@@ -16,6 +16,11 @@ import {
 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import Footer from "@/components/footer";
+import YocAssumptionsPanel, {
+  getNationalYocDefaults,
+  YOC_ASSUMPTION_KEYS,
+  type YocAssumptionsValue,
+} from "@/components/yoc-assumptions-panel";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -23,7 +28,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -75,27 +79,6 @@ type ProductType = {
   unitMix: Array<{ pct: number; avgSF: number; monthlyRent: number }> | null;
   isActive: boolean;
 };
-
-const YOC_ASSUMPTION_FIELDS: Array<{
-  key: Exclude<keyof ProductType, "id" | "name" | "minAcres" | "maxAcres" | "minRentPsf" | "minRentPerUnit" | "unitMix" | "isActive">;
-  label: string;
-  step?: string;
-}> = [
-  { key: "dua", label: "Density (units/acre)" },
-  { key: "hardCostPu", label: "Hard cost / unit" },
-  { key: "assumedLandCostPu", label: "Land / unit (inland)" },
-  { key: "assumedLandCostPuCoastal", label: "Land / unit (coastal)" },
-  { key: "softCostPct", label: "Soft costs (decimal)", step: "0.01" },
-  { key: "otherIncomePum", label: "Other income / unit / month" },
-  { key: "fixedOpExPu", label: "Fixed OpEx / unit / year" },
-  { key: "insurancePuNc", label: "Insurance / unit (NC)" },
-  { key: "insurancePuCoastal", label: "Insurance / unit (coastal)" },
-  { key: "vacancyPct", label: "Vacancy (decimal)", step: "0.01" },
-  { key: "ltlPct", label: "Loss-to-lease (decimal)", step: "0.01" },
-  { key: "concessionPct", label: "Concessions (decimal)", step: "0.01" },
-  { key: "badDebtPct", label: "Bad debt (decimal)", step: "0.01" },
-  { key: "mgmtFeePct", label: "Management fee (decimal)", step: "0.01" },
-];
 
 type TeamMember = {
   id: string;
@@ -300,6 +283,7 @@ export default function DeveloperCriteriaSettings() {
   const [quickLinkLabel, setQuickLinkLabel] = useState("");
   const [quickLinkUrl, setQuickLinkUrl] = useState("");
   const [editingQuickLinkId, setEditingQuickLinkId] = useState<string | null>(null);
+  const [assumptionsOpenIndex, setAssumptionsOpenIndex] = useState<number | null>(null);
 
   const profileQuery = useQuery<{ profile: Profile }>({
     queryKey: ["/api/developer-profile/me"],
@@ -382,6 +366,7 @@ export default function DeveloperCriteriaSettings() {
         countyMarketLabels: profile.countyMarketLabels || {},
         compSearchRadiusMiles: profile.compSearchRadiusMiles || "3",
       });
+      setAssumptionsOpenIndex(null);
     }
   }, [profileQuery.data]);
 
@@ -534,7 +519,10 @@ export default function DeveloperCriteriaSettings() {
         maxAcres: productType.maxAcres || null,
         minRentPsf: productType.minRentPsf || null,
         minRentPerUnit: productType.minRentPerUnit || null,
-        ...Object.fromEntries(YOC_ASSUMPTION_FIELDS.map(({ key }) => [key, productType[key] || null])),
+        ...Object.fromEntries(YOC_ASSUMPTION_KEYS.map((key) => [
+          key,
+          productType[key] === "" || productType[key] === undefined ? null : productType[key],
+        ])),
         unitMix: productType.unitMix || null,
       })),
       countyMarketLabels: form.countyMarketLabels,
@@ -883,44 +871,33 @@ export default function DeveloperCriteriaSettings() {
                           </Button>
                         </div>
                         <div className="mt-4 border-t border-slate-100 pt-4">
-                          <div className="mb-3">
-                            <h4 className="font-semibold text-slate-800">Auto-YOC assumptions</h4>
-                            <p className="text-xs text-slate-500">
-                              Leave a field blank to use LandLinq’s national underwriting preset. Percentages use decimals, for example 0.05 for 5%.
-                            </p>
-                          </div>
-                          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            {YOC_ASSUMPTION_FIELDS.map(({ key, label }) => (
-                              <NumberField
-                                key={key}
-                                label={label}
-                                value={String(productType[key] || "")}
-                                onChange={(value) => updateProductType(index, { [key]: value } as Partial<ProductType>)}
-                              />
-                            ))}
-                          </div>
-                          <div className="mt-4 max-w-2xl">
-                            <Label>Unit mix JSON (optional)</Label>
-                            <Textarea
-                              value={productType.unitMix ? JSON.stringify(productType.unitMix) : ""}
-                              onChange={(event) => {
-                                const raw = event.target.value.trim();
-                                if (!raw) {
-                                  updateProductType(index, { unitMix: null });
-                                  return;
-                                }
-                                try {
-                                  const parsed = JSON.parse(raw);
-                                  if (Array.isArray(parsed)) updateProductType(index, { unitMix: parsed });
-                                } catch {
-                                  // Keep the last valid value while the user edits.
-                                }
-                              }}
-                              placeholder='[{"pct":0.6,"avgSF":800,"monthlyRent":1600}]'
-                              className="mt-2 min-h-20 bg-white font-mono text-xs"
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAssumptionsOpenIndex((current) => current === index ? null : index)}
+                          >
+                            <Settings2 className="mr-2 h-4 w-4" />
+                            {assumptionsOpenIndex === index ? "Hide underwriting assumptions" : "Underwriting assumptions"}
+                            {assumptionsOpenIndex === index
+                              ? <ChevronUp className="ml-2 h-4 w-4" />
+                              : <ChevronDown className="ml-2 h-4 w-4" />}
+                          </Button>
+                          {assumptionsOpenIndex === index && (
+                            <YocAssumptionsPanel
+                              productType={{ id: productType.id, name: productType.name }}
+                              nationalDefaults={getNationalYocDefaults(productType.name)}
+                              value={productType}
+                              onChange={(assumptions: YocAssumptionsValue) => updateProductType(index, assumptions)}
+                              otherProductTypes={form.productTypes
+                                .filter((_, productIndex) => productIndex !== index)
+                                .map((otherProductType) => ({
+                                  id: otherProductType.id,
+                                  name: otherProductType.name,
+                                  value: otherProductType,
+                                }))}
                             />
-                            <p className="mt-1 text-xs text-slate-500">Each row needs pct, avgSF, and monthlyRent.</p>
-                          </div>
+                          )}
                         </div>
                       </div>
                     ))}

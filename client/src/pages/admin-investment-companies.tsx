@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Navigation from "@/components/navigation";
+import YocAssumptionsPanel, {
+  createEmptyYocAssumptions,
+  getNationalYocDefaults,
+  YOC_ASSUMPTION_KEYS,
+  type YocAssumptionsValue,
+} from "@/components/yoc-assumptions-panel";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -12,11 +18,11 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertCircle, Building2, CheckCircle2, Edit3, KeyRound, Loader2, LockKeyhole, Mail, MapPin, Plus, RotateCcw, Search, Target, Trash2, Upload, Users, X } from "lucide-react";
+import { AlertCircle, Building2, CheckCircle2, ChevronDown, ChevronUp, Edit3, KeyRound, Loader2, LockKeyhole, Mail, MapPin, Plus, RotateCcw, Search, Settings2, Target, Trash2, Upload, Users, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
 
-type ProductType = {
+type ProductType = YocAssumptionsValue & {
   id?: string;
   name: string;
   minAcres: string;
@@ -118,7 +124,7 @@ const blankForm: CompanyForm = {
   ozOverridesRentMinimum: false,
   targetStates: [],
   targetCounties: [],
-  productTypes: [{ name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
+  productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
   countyMarketLabels: {},
   isActive: true,
 };
@@ -195,6 +201,70 @@ function NumberField({ label, value, onChange, placeholder, required }: { label:
 
 function ToggleRow({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return <div className="flex items-center justify-between gap-4 rounded-lg border p-3"><div><p className="font-medium text-slate-900">{label}</p><p className="text-xs text-slate-500">{description}</p></div><Switch checked={checked} onCheckedChange={onChange} /></div>;
+}
+
+function ProductTypeEditorRow({
+  productType,
+  index,
+  rentMetric,
+  allProductTypes,
+  assumptionsOpen,
+  onToggleAssumptions,
+  onChange,
+  onRemove,
+}: {
+  productType: ProductType;
+  index: number;
+  rentMetric: "psf" | "per_unit";
+  allProductTypes: ProductType[];
+  assumptionsOpen: boolean;
+  onToggleAssumptions: () => void;
+  onChange: (patch: Partial<ProductType>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_auto] lg:items-end">
+        <div>
+          <Label>Product type <span className="text-red-500">*</span></Label>
+          <Input className="mt-1 bg-white" value={productType.name} onChange={(event) => onChange({ name: event.target.value })} placeholder="e.g. 3-Story Garden" />
+        </div>
+        <NumberField label="Min acres" value={productType.minAcres} onChange={(value) => onChange({ minAcres: value })} required />
+        <NumberField label="Max acres" value={productType.maxAcres || ""} onChange={(value) => onChange({ maxAcres: value })} placeholder="No maximum" />
+        <NumberField
+          label={rentMetric === "psf" ? "Min rent $/SF" : "Min rent $/Unit"}
+          value={rentMetric === "psf" ? productType.minRentPsf || "" : productType.minRentPerUnit || ""}
+          onChange={(value) => onChange(rentMetric === "psf" ? { minRentPsf: value } : { minRentPerUnit: value })}
+          required
+        />
+        <Button type="button" size="icon" variant="ghost" onClick={onRemove} aria-label={`Remove ${productType.name || "product type"}`}>
+          <Trash2 className="h-4 w-4 text-slate-400" />
+        </Button>
+      </div>
+      <div className="mt-4 border-t border-slate-200 pt-4">
+        <Button type="button" variant="outline" size="sm" onClick={onToggleAssumptions}>
+          <Settings2 className="mr-2 h-4 w-4" />
+          {assumptionsOpen ? "Hide underwriting assumptions" : "Underwriting assumptions"}
+          {assumptionsOpen ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
+        </Button>
+        {assumptionsOpen && (
+          <YocAssumptionsPanel
+            productType={{ id: productType.id, name: productType.name }}
+            nationalDefaults={getNationalYocDefaults(productType.name)}
+            value={productType}
+            onChange={(assumptions: YocAssumptionsValue) => onChange(assumptions)}
+            otherProductTypes={allProductTypes
+              .filter((_, productIndex) => productIndex !== index)
+              .map((otherProductType) => ({
+                id: otherProductType.id,
+                name: otherProductType.name,
+                value: otherProductType,
+              }))}
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 function ManualEntryDialog({ company, open, onOpenChange }: { company: InvestmentCompany | null; open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -281,6 +351,7 @@ export default function AdminInvestmentCompanies() {
   const [inviteRows, setInviteRows] = useState<InviteRow[]>([]);
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
   const [entryCompany, setEntryCompany] = useState<InvestmentCompany | null>(null);
+  const [assumptionsOpenIndex, setAssumptionsOpenIndex] = useState<number | null>(null);
 
   const companiesQuery = useQuery<{ profiles: InvestmentCompany[] }>({
     queryKey: ["/api/admin/investment-companies"],
@@ -310,6 +381,7 @@ export default function AdminInvestmentCompanies() {
       targetStates: editing.targetStates || [],
       targetCounties: editing.targetCounties || [],
       productTypes: (editing.productTypes?.length ? editing.productTypes : [{
+        ...createEmptyYocAssumptions(),
         name: "General",
         minAcres: editing.minAcres || "",
         maxAcres: editing.maxAcres || "",
@@ -317,11 +389,17 @@ export default function AdminInvestmentCompanies() {
         minRentPerUnit: editing.minRentPerUnit || "",
         isActive: true,
       }]).map((productType) => ({
+        ...createEmptyYocAssumptions(),
         ...productType,
         minAcres: productType.minAcres || "",
         maxAcres: productType.maxAcres || "",
         minRentPsf: productType.minRentPsf || "",
         minRentPerUnit: productType.minRentPerUnit || "",
+        ...Object.fromEntries(YOC_ASSUMPTION_KEYS.map((key) => [
+          key,
+          productType[key] === undefined ? null : productType[key],
+        ])),
+        unitMix: productType.unitMix || null,
         isActive: productType.isActive !== false,
       })),
       countyMarketLabels: editing.countyMarketLabels || {},
@@ -331,9 +409,10 @@ export default function AdminInvestmentCompanies() {
       knownEmailDomains: [],
       targetStates: [],
       targetCounties: [],
-      productTypes: [{ name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
+      productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
       countyMarketLabels: {},
     });
+    setAssumptionsOpenIndex(null);
   }, [editing, formOpen]);
 
   const saveMutation = useMutation({
@@ -371,6 +450,11 @@ export default function AdminInvestmentCompanies() {
             maxAcres: productType.maxAcres || null,
             minRentPsf: productType.minRentPsf || null,
             minRentPerUnit: productType.minRentPerUnit || null,
+            ...Object.fromEntries(YOC_ASSUMPTION_KEYS.map((key) => [
+              key,
+              productType[key] === "" || productType[key] === undefined ? null : productType[key],
+            ])),
+            unitMix: productType.unitMix || null,
           })),
         }),
       });
@@ -462,7 +546,7 @@ export default function AdminInvestmentCompanies() {
   const updateProductType = (index: number, patch: Partial<ProductType>) =>
     update("productTypes", form.productTypes.map((productType, productIndex) => productIndex === index ? { ...productType, ...patch } : productType));
   const addProductType = () =>
-    update("productTypes", [...form.productTypes, { name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }]);
+    update("productTypes", [...form.productTypes, { ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }]);
   const openCreate = () => { setEditing(null); setFormOpen(true); };
   const openEdit = (profile: InvestmentCompany) => { setEditing(profile); setFormOpen(true); };
   const openInvite = (profile: InvestmentCompany) => {
@@ -510,7 +594,31 @@ export default function AdminInvestmentCompanies() {
          <section><h3 className="mb-3 font-semibold">Profile type</h3><div className="grid gap-3 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => !editing && update("profileType", "real_estate")} className={`h-auto justify-start rounded-lg border p-4 text-left transition ${form.profileType === "real_estate" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"} ${editing ? "cursor-default opacity-80" : "hover:border-slate-300"}`}><p className="font-semibold text-slate-900">Real Estate Investment Company</p><p className="mt-1 text-sm text-slate-500">Deal Dashboard, acquisition criteria, CRM, Outreach, and Analytics.</p></Button><Button type="button" variant="outline" onClick={() => !editing && update("profileType", "general_sales")} className={`h-auto justify-start rounded-lg border p-4 text-left transition ${form.profileType === "general_sales" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"} ${editing ? "cursor-default opacity-80" : "hover:border-slate-300"}`}><p className="font-semibold text-slate-900">General Sales</p><p className="mt-1 text-sm text-slate-500">CRM, Outreach, Analytics, and team access without deal criteria.</p></Button></div>{editing && <p className="mt-2 text-xs text-slate-500">Profile type is set when the profile is created.</p>}</section>
          <section><h3 className="mb-3 font-semibold">Company and branding</h3><div className="grid gap-4 sm:grid-cols-2"><div><Label>Company name</Label><Input value={form.companyName} onChange={(e) => { update("companyName", e.target.value); if (!editing) update("slug", e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")); }} /></div><div><Label>Login slug</Label><Input value={form.slug} onChange={(e) => update("slug", e.target.value.toLowerCase())} placeholder="company-name" /></div><div><Label>Primary color</Label><div className="flex gap-2"><Input type="color" value={form.primaryColor} onChange={(e) => update("primaryColor", e.target.value)} className="w-14 p-1" /><Input value={form.primaryColor} onChange={(e) => update("primaryColor", e.target.value)} /></div></div><div><Label>Secondary color</Label><div className="flex gap-2"><Input type="color" value={form.secondaryColor} onChange={(e) => update("secondaryColor", e.target.value)} className="w-14 p-1" /><Input value={form.secondaryColor} onChange={(e) => update("secondaryColor", e.target.value)} /></div></div><div className="sm:col-span-2"><Label>Company logo</Label><div className="mt-1 flex items-center gap-3 rounded-lg border p-3">{form.logoUrl ? <img src={form.logoUrl} alt="Logo preview" className="h-14 w-20 object-contain" /> : <Building2 className="h-10 w-10 text-slate-300" />}<label className="cursor-pointer"><Input type="file" accept=".png,.jpg,.jpeg,.webp" className="hidden" onChange={(e) => e.target.files?.[0] && logoMutation.mutate(e.target.files[0])} /><span className="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium"><Upload className="mr-2 h-4 w-4" />{logoMutation.isPending ? "Uploading…" : "Upload logo"}</span></label>{form.logoUrl && <Button variant="ghost" size="sm" onClick={() => update("logoUrl", "")}>Remove</Button>}</div><p className="mt-1 text-xs text-slate-500">PNG, JPG, or WebP. Maximum 5 MB.</p></div></div></section>
           {form.profileType === "real_estate" && <><section><h3 className="mb-3 font-semibold">Acquisition criteria</h3><div className="max-w-sm"><Label>Primary rent metric</Label><Select value={form.rentMetric} onValueChange={(value: "psf" | "per_unit") => update("rentMetric", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="psf">Rent per square foot</SelectItem><SelectItem value="per_unit">Rent per unit</SelectItem></SelectContent></Select></div></section>
-          <section><div className="mb-3 flex items-center justify-between gap-3"><div><h3 className="font-semibold">Product types</h3><p className="text-sm text-slate-500">Define acreage and {form.rentMetric === "psf" ? "$/SF" : "$/Unit"} thresholds for each active product type.</p></div><Button type="button" variant="outline" size="sm" onClick={addProductType}><Plus className="mr-1 h-4 w-4" />Add product type</Button></div>{form.productTypes.length === 0 ? <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Add at least one active product type before saving.</div> : <div className="space-y-3">{form.productTypes.map((productType, index) => <div key={productType.id || index} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_auto] lg:items-end"><div><Label>Product type <span className="text-red-500">*</span></Label><Input className="mt-1 bg-white" value={productType.name} onChange={(event) => updateProductType(index, { name: event.target.value })} placeholder="e.g. 3-Story Garden" /></div><NumberField label="Min acres" value={productType.minAcres} onChange={(value) => updateProductType(index, { minAcres: value })} required /><NumberField label="Max acres" value={productType.maxAcres || ""} onChange={(value) => updateProductType(index, { maxAcres: value })} placeholder="No maximum" /><NumberField label={form.rentMetric === "psf" ? "Min rent $/SF" : "Min rent $/Unit"} value={form.rentMetric === "psf" ? productType.minRentPsf || "" : productType.minRentPerUnit || ""} onChange={(value) => updateProductType(index, form.rentMetric === "psf" ? { minRentPsf: value } : { minRentPerUnit: value })} required /><Button type="button" size="icon" variant="ghost" onClick={() => update("productTypes", form.productTypes.filter((_, productIndex) => productIndex !== index))} aria-label={`Remove ${productType.name || "product type"}`}><Trash2 className="h-4 w-4 text-slate-400" /></Button></div></div>)}</div>}</section>
+           <section>
+             <div className="mb-3 flex items-center justify-between gap-3">
+               <div><h3 className="font-semibold">Product types</h3><p className="text-sm text-slate-500">Define acreage and {form.rentMetric === "psf" ? "$/SF" : "$/Unit"} thresholds for each active product type.</p></div>
+               <Button type="button" variant="outline" size="sm" onClick={addProductType}><Plus className="mr-1 h-4 w-4" />Add product type</Button>
+             </div>
+             {form.productTypes.length === 0 ? (
+               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Add at least one active product type before saving.</div>
+             ) : (
+               <div className="space-y-3">
+                 {form.productTypes.map((productType, index) => (
+                   <ProductTypeEditorRow
+                     key={productType.id || index}
+                     productType={productType}
+                     index={index}
+                     rentMetric={form.rentMetric}
+                     allProductTypes={form.productTypes}
+                     assumptionsOpen={assumptionsOpenIndex === index}
+                     onToggleAssumptions={() => setAssumptionsOpenIndex((current) => current === index ? null : index)}
+                     onChange={(patch) => updateProductType(index, patch)}
+                     onRemove={() => update("productTypes", form.productTypes.filter((_, productIndex) => productIndex !== index))}
+                   />
+                 ))}
+               </div>
+             )}
+           </section>
          <section><h3 className="mb-3 font-semibold">Affordable housing overrides</h3><div className="grid gap-3 sm:grid-cols-3"><ToggleRow label="QCT override" description="QCT status may override the rent minimum." checked={form.qctOverridesRentMinimum} onChange={(value) => update("qctOverridesRentMinimum", value)} /><ToggleRow label="DDA override" description="DDA status may override the rent minimum." checked={form.ddaOverridesRentMinimum} onChange={(value) => update("ddaOverridesRentMinimum", value)} /><ToggleRow label="OZ override" description="Opportunity Zone status may override rent." checked={form.ozOverridesRentMinimum} onChange={(value) => update("ozOverridesRentMinimum", value)} /></div></section>
          <section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><TagsField label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} placeholder="NC, SC, GA" /><CountyMarketEditor values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
          {form.profileType === "general_sales" && <section className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900"><p className="font-semibold">General Sales profile</p><p className="mt-1">This profile has no Deal Dashboard, acquisition criteria, geographic targeting, product types, or affordable housing overrides. Team members will use CRM, Outreach, Analytics, and Settings.</p></section>}
