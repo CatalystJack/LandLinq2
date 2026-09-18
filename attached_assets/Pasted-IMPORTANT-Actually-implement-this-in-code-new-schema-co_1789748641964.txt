@@ -1,0 +1,21 @@
+IMPORTANT: Actually implement this in code — new schema columns, a real migration, and a real calculation function. Do not write this up as documentation instead of building it.
+
+Add automated IRR calculation alongside the existing Auto-YOC underwriting engine.
+
+SCHEMA (shared/schema.ts):
+Add fields needed to project a hold-period return, following the same per-developer/per-product-type override pattern already used for YOC (developerProductTypes table, PRODUCT_TYPE_YOC_PRESETS in server/services/yocUnderwritingService.ts):
+- rentGrowthPct
+- otherIncomeGrowthPct
+- expenseGrowthPct
+- holdPeriodYears
+- exitCapRatePct
+Each should support the same preset-with-override resolution already used for vacancyPct/ltlPct/concessionPct/badDebtPct/mgmtFeePct (see the getOverride(overrides, dealId, field, fallback) helper in yocUnderwritingService.ts) — do not build a second, different override system.
+
+CALCULATION (server/services/yocUnderwritingService.ts):
+- Add a calculateAutomatedIrr function that projects NOI forward over holdPeriodYears using rentGrowthPct/otherIncomeGrowthPct/expenseGrowthPct, computes a terminal sale value using exitCapRatePct on the final year's NOI, and solves for IRR via a bisection NPV solver against the deal's total development cost as the initial outflow and annual NOI + terminal sale as inflows.
+- Store the result on the deal (e.g. automatedIrr) and surface it wherever Auto-YOC is currently shown (deal detail, analyst dashboard).
+- calculateYOCBreakdown currently returns only {types, compsUsed, state, city, isCoastal, rentStateMult, landStateMult} — extend it (or add a sibling function) to also return the IRR breakdown, following the existing return shape/style.
+
+Wire this the same way Auto-YOC is wired today: computed automatically, overridable per-deal, recomputed via the same recompute path as recomputeDealYoc.
+
+When done, paste the actual diff of shared/schema.ts (including the migration) and the new solver function in yocUnderwritingService.ts.
