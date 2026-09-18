@@ -8990,7 +8990,7 @@ Provide your analysis in this exact JSON format:
       console.log(`📊 [RERUN-ANALYSIS] FORCE HELLODATA: User-triggered rerun always calls HelloData`);
       
       const { UnifiedDealPipeline } = await import('./unifiedDealPipeline');
-      const { hellodataService } = await import('./hellodataService');
+      const { hellodataService, checkCompWarehouse } = await import('./hellodataService');
       
       // STEP 1: ALWAYS call HelloData first, regardless of classification rules
       // Build full address for HelloData search
@@ -9004,18 +9004,36 @@ Provide your analysis in this exact JSON format:
       let preloadedHelloData: any = null;
       
       if (isDeveloperRole) {
-        console.log(`💡 [RERUN-ANALYSIS] Developer-triggered rerun — reusing existing comp data, skipping live HelloData call`);
-        preloadedHelloData = {
-          success: !!deal.comparablesJson,
-          qualifyingCount: deal.comparableCount || 0,
-          topRentPSF: Number(deal.topRentPSF) || 0,
-          avgRentPSF: Number(deal.avgRentPSF) || 0,
-          topRentPerUnit: Number(deal.topRentPerUnit) || 0,
-          avgRentPerUnit: Number(deal.avgRentPerUnit) || 0,
-          summary: deal.comparableNotes || '',
-          aiExplanatoryNotes: deal.aiExplanatoryNotes || '',
-          comparables: deal.comparablesJson || [],
-        };
+        console.log(`💡 [RERUN-ANALYSIS] Developer-triggered rerun — checking comp warehouse before reusing stored data`);
+
+        let warehouseHit: any = null;
+        if (deal.latitude && deal.longitude) {
+          const lat = parseFloat(String(deal.latitude));
+          const lng = parseFloat(String(deal.longitude));
+          const productType = deal.productTypes?.[0] || deal.dealType || undefined;
+
+          warehouseHit = await checkCompWarehouse(lat, lng, 3, productType);
+          if (!warehouseHit && productType) {
+            warehouseHit = await checkCompWarehouse(lat, lng, 3, undefined);
+          }
+        }
+
+        if (warehouseHit) {
+          console.log(`📦 [RERUN-ANALYSIS] Warehouse hit — using cached comps, zero cost`);
+          preloadedHelloData = warehouseHit;
+        } else {
+          preloadedHelloData = {
+            success: !!deal.comparablesJson,
+            qualifyingCount: deal.comparableCount || 0,
+            topRentPSF: Number(deal.topRentPSF) || 0,
+            avgRentPSF: Number(deal.avgRentPSF) || 0,
+            topRentPerUnit: Number(deal.topRentPerUnit) || 0,
+            avgRentPerUnit: Number(deal.avgRentPerUnit) || 0,
+            summary: deal.comparableNotes || '',
+            aiExplanatoryNotes: deal.aiExplanatoryNotes || '',
+            comparables: deal.comparablesJson || [],
+          };
+        }
       } else {
         try {
           console.log(`\n📍 [RERUN-ANALYSIS] Calling HelloData for: ${fullAddress}`);
