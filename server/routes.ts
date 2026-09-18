@@ -14055,8 +14055,16 @@ RULES:
 
       const label = req.body?.label === undefined ? undefined : String(req.body.label).trim();
       const url = req.body?.url === undefined ? undefined : String(req.body.url).trim();
+      const sortOrder = req.body?.sortOrder === undefined ? undefined : Number(req.body.sortOrder);
+      const isActive = req.body?.isActive === undefined ? undefined : req.body.isActive;
       if (label === "" || url === "") {
         return res.status(400).json({ error: "Label and URL cannot be empty" });
+      }
+      if (sortOrder !== undefined && !Number.isInteger(sortOrder)) {
+        return res.status(400).json({ error: "sortOrder must be an integer" });
+      }
+      if (isActive !== undefined && typeof isActive !== "boolean") {
+        return res.status(400).json({ error: "isActive must be a boolean" });
       }
       if (url !== undefined) {
         try {
@@ -14066,8 +14074,8 @@ RULES:
           return res.status(400).json({ error: "Enter a valid http or https URL" });
         }
       }
-      if (label === undefined && url === undefined) {
-        return res.status(400).json({ error: "Label or URL is required" });
+      if (label === undefined && url === undefined && sortOrder === undefined && isActive === undefined) {
+        return res.status(400).json({ error: "At least one quick-link field is required" });
       }
 
       const [link] = await db
@@ -14075,6 +14083,8 @@ RULES:
         .set({
           ...(label !== undefined ? { label } : {}),
           ...(url !== undefined ? { url } : {}),
+          ...(sortOrder !== undefined ? { sortOrder } : {}),
+          ...(isActive !== undefined ? { isActive } : {}),
           updatedAt: new Date(),
         })
         .where(and(
