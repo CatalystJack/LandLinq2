@@ -1,0 +1,62 @@
+Make Re-Run Analysis work for Investment Company accounts, without ever triggering a paid HelloData call
+
+In server/routes.ts, POST /api/deals/:id/rerun-analysis (~line 8923) currently rejects any request unless isPlatformAdminEmail(normalizedEmail) is true, which is why Investment Company (Developer-role) accounts get a 403 "Analyst privileges required" today.
+
+Step 1 — widen who's allowed, scoped to their own deals only. Right after the existing const isAnalyst = isPlatformAdminEmail(normalizedEmail); line, add:
+
+const isDeveloperRole = String(user?.role || '').toUpperCase() === 'DEVELOPER';
+let isAllowed = isAnalyst;
+
+if (!isAllowed && isDeveloperRole) {
+  const developerProfileId = user?.developerProfileId;
+  if (developerProfileId) {
+    const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
+    isAllowed = visibleDealIds.has(id);
+  }
+}
+
+Change the existing if (!isAnalyst) rejection block to if (!isAllowed), keeping the same 403 response. getDeveloperVisibleDealIds already exists in this file (~line 13755) — reuse it, don't write new lookup logic.
+
+Step 2 — when the requester is a Developer-role user, skip the live HelloData call entirely and never pay for it. Find the block starting // STEP 1: ALWAYS call HelloData first (~line 8983) and branch it:
+
+let preloadedHelloData: any = null;
+
+if (isDeveloperRole) {
+  console.log(`💡 [RERUN-ANALYSIS] Developer-triggered rerun — checking comp warehouse before any live HelloData call`);
+
+  let warehouseHit: any = null;
+  if (deal.latitude && deal.longitude) {
+    const lat = parseFloat(String(deal.latitude));
+    const lng = parseFloat(String(deal.longitude));
+    const productType = deal.productTypes?.[0] || deal.dealType || undefined;
+
+    warehouseHit = await checkCompWarehouse(lat, lng, 3, productType);
+    if (!warehouseHit && productType) {
+      warehouseHit = await checkCompWarehouse(lat, lng, 3, undefined);
+    }
+  }
+
+  if (warehouseHit) {
+    console.log(`📦 [RERUN-ANALYSIS] Warehouse hit — using cached comps, zero cost`);
+    preloadedHelloData = warehouseHit;
+  } else {
+    console.log(`📭 [RERUN-ANALYSIS] No warehouse hit — reusing this deal's own stored comp data instead of a live call`);
+    preloadedHelloData = {
+      success: !!deal.comparablesJson,
+      qualifyingCount: deal.comparableCount || 0,
+      topRentPSF: Number(deal.topRentPSF) || 0,
+      avgRentPSF: Number(deal.avgRentPSF) || 0,
+      topRentPerUnit: Number(deal.topRentPerUnit) || 0,
+      avgRentPerUnit: Number(deal.avgRentPerUnit) || 0,
+      summary: deal.comparableNotes || '',
+      aiExplanatoryNotes: deal.aiExplanatoryNotes || '',
+      comparables: deal.comparablesJson || []
+    };
+  }
+} else {
+  // existing "ALWAYS call HelloData first" try/catch block goes here, completely unchanged
+}
+
+Add checkCompWarehouse to the existing hellodataService import at the top of the block (it's already exported from server/hellodataService.ts, ~line 520).
+
+Everything downstream of this — classification, the MSA re-check, ArcGIS/census demographics, school district, building permits — stays exactly as it is and still runs for both roles. Only the paid HelloData comparable search is conditionally skipped, and only for Developer-role requesters. An internal analyst's rerun behavior is completely unchanged.
