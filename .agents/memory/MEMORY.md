@@ -47,3 +47,4 @@
 - [HUD API response envelopes](hud-api-response-envelopes.md) — HUD list endpoints may return raw arrays while data endpoints may wrap payloads in data; normalize both shapes.
 - [City permit source migration](city-permit-source-migration.md) — Nashville and Raleigh permit portals migrated from Socrata to ArcGIS; Atlanta's published permit item is a historical CSV.
 - [YOC coastal county basis](yoc-coastal-county-basis.md) — NOAA ENOW includes inland watershed rows; retain FL/SC statewide behavior until team confirms SC county-only treatment.
+- [Automated return independence](automated-return-independence.md) — an uncomputable IRR must clear only Auto IRR; preserve a valid Auto-YOC result.

@@ -7,7 +7,14 @@ import {
 } from "@shared/schema";
 import { isAutomaticallyCoastal } from "@shared/coastal-counties";
 
-export const PRESET_VERSION = "v22-other-income";
+export const PRESET_VERSION = "v23-auto-irr";
+export const DEFAULT_IRR_ASSUMPTIONS = {
+  rentGrowthPct: 0.03,
+  otherIncomeGrowthPct: 0.03,
+  expenseGrowthPct: 0.03,
+  holdPeriodYears: 5,
+  exitCapRatePct: 0.055,
+} as const;
 
 export type UnitMixRow = {
   pct: number;
@@ -31,6 +38,11 @@ export type YocPreset = {
   concessionPct: number;
   badDebtPct: number;
   mgmtFeePct: number;
+  rentGrowthPct: number;
+  otherIncomeGrowthPct: number;
+  expenseGrowthPct: number;
+  holdPeriodYears: number;
+  exitCapRatePct: number;
   unitMix: UnitMixRow[];
 };
 
@@ -38,6 +50,7 @@ export type YocPreset = {
 // The values are intentionally the same as the former analyst-dashboard model.
 export const PRODUCT_TYPE_YOC_PRESETS: Record<string, YocPreset> = {
   "3-story-surface-park": {
+    ...DEFAULT_IRR_ASSUMPTIONS,
     label: "3-Story SP",
     dua: 30,
     hardCostPU: 164000,
@@ -59,6 +72,7 @@ export const PRODUCT_TYPE_YOC_PRESETS: Record<string, YocPreset> = {
     ],
   },
   "3-story-attainable": {
+    ...DEFAULT_IRR_ASSUMPTIONS,
     label: "3-Story Att.",
     dua: 30,
     hardCostPU: 137000,
@@ -80,6 +94,7 @@ export const PRODUCT_TYPE_YOC_PRESETS: Record<string, YocPreset> = {
     ],
   },
   "4-story-surface-park": {
+    ...DEFAULT_IRR_ASSUMPTIONS,
     label: "4-Story SP",
     dua: 35,
     hardCostPU: 158000,
@@ -101,6 +116,7 @@ export const PRODUCT_TYPE_YOC_PRESETS: Record<string, YocPreset> = {
     ],
   },
   "aa-3-story-flats": {
+    ...DEFAULT_IRR_ASSUMPTIONS,
     label: "AA 3-Story",
     dua: 30,
     hardCostPU: 167200,
@@ -122,6 +138,7 @@ export const PRODUCT_TYPE_YOC_PRESETS: Record<string, YocPreset> = {
     ],
   },
   "aa-4-story-flats": {
+    ...DEFAULT_IRR_ASSUMPTIONS,
     label: "AA 4-Story",
     dua: 35,
     hardCostPU: 185500,
@@ -143,6 +160,7 @@ export const PRODUCT_TYPE_YOC_PRESETS: Record<string, YocPreset> = {
     ],
   },
   "aa-cottages": {
+    ...DEFAULT_IRR_ASSUMPTIONS,
     label: "AA Cottages",
     dua: 6,
     hardCostPU: 252500,
@@ -164,6 +182,7 @@ export const PRODUCT_TYPE_YOC_PRESETS: Record<string, YocPreset> = {
     ],
   },
   "btr-3-story-th": {
+    ...DEFAULT_IRR_ASSUMPTIONS,
     label: "BTR TH",
     dua: 8,
     hardCostPU: 254000,
@@ -185,6 +204,7 @@ export const PRODUCT_TYPE_YOC_PRESETS: Record<string, YocPreset> = {
     ],
   },
   "btr-sfr-detached": {
+    ...DEFAULT_IRR_ASSUMPTIONS,
     label: "BTR SFR",
     dua: 8,
     hardCostPU: 258000,
@@ -206,6 +226,7 @@ export const PRODUCT_TYPE_YOC_PRESETS: Record<string, YocPreset> = {
     ],
   },
   "btr-th-2-3br": {
+    ...DEFAULT_IRR_ASSUMPTIONS,
     label: "BTR TH 2-3BR",
     dua: 10,
     hardCostPU: 230000,
@@ -307,6 +328,31 @@ export type YocBreakdownType = {
   softCostTotal: number;
   tdc: number;
   yoc: number;
+  irr: AutomatedIrrBreakdown | null;
+};
+
+export type AutomatedIrrYear = {
+  year: number;
+  gpr: number;
+  otherIncome: number;
+  egi: number;
+  operatingExpenses: number;
+  noi: number;
+  terminalSaleValue: number;
+  cashFlow: number;
+};
+
+export type AutomatedIrrBreakdown = {
+  irr: number;
+  rentGrowthPct: number;
+  otherIncomeGrowthPct: number;
+  expenseGrowthPct: number;
+  holdPeriodYears: number;
+  exitCapRatePct: number;
+  initialOutflow: number;
+  terminalSaleValue: number;
+  cashFlows: number[];
+  years: AutomatedIrrYear[];
 };
 
 export type YocBreakdown = {
@@ -389,7 +435,154 @@ export function mergeYocPreset(base: YocPreset, row: any | undefined): YocPreset
     concessionPct: toNumber(row.concessionPct) ?? base.concessionPct,
     badDebtPct: toNumber(row.badDebtPct) ?? base.badDebtPct,
     mgmtFeePct: toNumber(row.mgmtFeePct) ?? base.mgmtFeePct,
+    rentGrowthPct: toNumber(row.rentGrowthPct) ?? base.rentGrowthPct,
+    otherIncomeGrowthPct: toNumber(row.otherIncomeGrowthPct) ?? base.otherIncomeGrowthPct,
+    expenseGrowthPct: toNumber(row.expenseGrowthPct) ?? base.expenseGrowthPct,
+    holdPeriodYears: toNumber(row.holdPeriodYears) ?? base.holdPeriodYears,
+    exitCapRatePct: toNumber(row.exitCapRatePct) ?? base.exitCapRatePct,
     unitMix: normalizeUnitMix(row.unitMix, base.unitMix),
+  };
+}
+
+function npv(rate: number, cashFlows: number[]): number {
+  return cashFlows.reduce(
+    (total, cashFlow, period) => total + cashFlow / Math.pow(1 + rate, period),
+    0,
+  );
+}
+
+export function solveIrrBisection(cashFlows: number[]): number | null {
+  if (
+    cashFlows.length < 2 ||
+    cashFlows.some((cashFlow) => !Number.isFinite(cashFlow)) ||
+    cashFlows[0] >= 0 ||
+    !cashFlows.slice(1).some((cashFlow) => cashFlow > 0)
+  ) {
+    return null;
+  }
+
+  let low = -0.9999;
+  let high = 1;
+  let lowNpv = npv(low, cashFlows);
+  let highNpv = npv(high, cashFlows);
+  while (highNpv > 0 && high < 1_000) {
+    high *= 2;
+    highNpv = npv(high, cashFlows);
+  }
+  if (!Number.isFinite(lowNpv) || !Number.isFinite(highNpv) || lowNpv * highNpv > 0) {
+    return null;
+  }
+
+  for (let iteration = 0; iteration < 200; iteration += 1) {
+    const midpoint = (low + high) / 2;
+    const midpointNpv = npv(midpoint, cashFlows);
+    if (Math.abs(high - low) < 1e-10) {
+      return midpoint;
+    }
+    if (midpointNpv > 0) {
+      low = midpoint;
+      lowNpv = midpointNpv;
+    } else {
+      high = midpoint;
+      highNpv = midpointNpv;
+    }
+  }
+  return (low + high) / 2;
+}
+
+export function calculateAutomatedIrr(input: {
+  tdc: number;
+  gpr: number;
+  otherIncome: number;
+  vacancyPct: number;
+  creditLossPct: number;
+  mgmtFeePct: number;
+  fixedOperatingExpenses: number;
+  rentGrowthPct: number;
+  otherIncomeGrowthPct: number;
+  expenseGrowthPct: number;
+  holdPeriodYears: number;
+  exitCapRatePct: number;
+}): AutomatedIrrBreakdown | null {
+  const holdPeriodYears = Math.max(1, Math.min(30, Math.round(input.holdPeriodYears)));
+  const numericInputs = [
+    input.tdc,
+    input.gpr,
+    input.otherIncome,
+    input.vacancyPct,
+    input.creditLossPct,
+    input.mgmtFeePct,
+    input.fixedOperatingExpenses,
+    input.rentGrowthPct,
+    input.otherIncomeGrowthPct,
+    input.expenseGrowthPct,
+    input.holdPeriodYears,
+    input.exitCapRatePct,
+  ];
+  if (
+    numericInputs.some((value) => !Number.isFinite(value)) ||
+    input.tdc <= 0 ||
+    input.gpr < 0 ||
+    input.otherIncome < 0 ||
+    input.fixedOperatingExpenses < 0 ||
+    input.vacancyPct < 0 ||
+    input.vacancyPct > 1 ||
+    input.creditLossPct < 0 ||
+    input.creditLossPct > 1 ||
+    input.mgmtFeePct < 0 ||
+    input.mgmtFeePct > 1 ||
+    input.rentGrowthPct <= -1 ||
+    input.otherIncomeGrowthPct <= -1 ||
+    input.expenseGrowthPct <= -1 ||
+    input.exitCapRatePct <= 0 ||
+    input.exitCapRatePct > 1
+  ) {
+    return null;
+  }
+
+  const years: AutomatedIrrYear[] = [];
+  for (let year = 1; year <= holdPeriodYears; year += 1) {
+    const rentFactor = Math.pow(1 + input.rentGrowthPct, year - 1);
+    const otherIncomeFactor = Math.pow(1 + input.otherIncomeGrowthPct, year - 1);
+    const expenseFactor = Math.pow(1 + input.expenseGrowthPct, year - 1);
+    const gpr = input.gpr * rentFactor;
+    const otherIncome = input.otherIncome * otherIncomeFactor;
+    const totalGross = gpr + otherIncome;
+    const vacancyLoss = totalGross * input.vacancyPct;
+    const creditLoss = gpr * input.creditLossPct;
+    const egi = totalGross - vacancyLoss - creditLoss;
+    const operatingExpenses = egi * input.mgmtFeePct +
+      input.fixedOperatingExpenses * expenseFactor;
+    const noi = egi - operatingExpenses;
+    const terminalSaleValue = year === holdPeriodYears
+      ? noi / input.exitCapRatePct
+      : 0;
+    years.push({
+      year,
+      gpr,
+      otherIncome,
+      egi,
+      operatingExpenses,
+      noi,
+      terminalSaleValue,
+      cashFlow: noi + terminalSaleValue,
+    });
+  }
+
+  const cashFlows = [-input.tdc, ...years.map((year) => year.cashFlow)];
+  const irr = solveIrrBisection(cashFlows);
+  if (irr === null || !Number.isFinite(irr)) return null;
+  return {
+    irr,
+    rentGrowthPct: input.rentGrowthPct,
+    otherIncomeGrowthPct: input.otherIncomeGrowthPct,
+    expenseGrowthPct: input.expenseGrowthPct,
+    holdPeriodYears,
+    exitCapRatePct: input.exitCapRatePct,
+    initialOutflow: input.tdc,
+    terminalSaleValue: years[years.length - 1].terminalSaleValue,
+    cashFlows,
+    years,
   };
 }
 
@@ -535,6 +728,11 @@ export async function calculateYOCBreakdown(
     const concessionPct = getOverride(overrides, deal.id, `${typeKey}.concessionPct`, preset.concessionPct);
     const badDebtPct = getOverride(overrides, deal.id, `${typeKey}.badDebtPct`, preset.badDebtPct);
     const mgmtFeePct = getOverride(overrides, deal.id, `${typeKey}.mgmtFeePct`, preset.mgmtFeePct);
+    const rentGrowthPct = getOverride(overrides, deal.id, `${typeKey}.rentGrowthPct`, preset.rentGrowthPct);
+    const otherIncomeGrowthPct = getOverride(overrides, deal.id, `${typeKey}.otherIncomeGrowthPct`, preset.otherIncomeGrowthPct);
+    const expenseGrowthPct = getOverride(overrides, deal.id, `${typeKey}.expenseGrowthPct`, preset.expenseGrowthPct);
+    const holdPeriodYears = getOverride(overrides, deal.id, `${typeKey}.holdPeriodYears`, preset.holdPeriodYears);
+    const exitCapRatePct = getOverride(overrides, deal.id, `${typeKey}.exitCapRatePct`, preset.exitCapRatePct);
     const landCostPU = isCoastal ? preset.assumedLandCostPU_coastal : preset.assumedLandCostPU;
     const overrideLandCost = getOverride(overrides, deal.id, "landCost", landCost);
     const effectiveHasActualLandCost = overrideLandCost > 0;
@@ -557,7 +755,20 @@ export async function calculateYOCBreakdown(
     const softCostTotal = hardCostTotal * softCostPct;
     const tdc = effectiveLandCost + hardCostTotal + softCostTotal;
     const yoc = (noi / tdc) * 100;
-
+    const irr = calculateAutomatedIrr({
+      tdc,
+      gpr,
+      otherIncome,
+      vacancyPct,
+      creditLossPct: ltlPct + concessionPct + badDebtPct,
+      mgmtFeePct,
+      fixedOperatingExpenses: fixedOpEx + insurance + reTaxAdj,
+      rentGrowthPct,
+      otherIncomeGrowthPct,
+      expenseGrowthPct,
+      holdPeriodYears,
+      exitCapRatePct,
+    });
     return {
       presetKey: typeKey,
       presetLabel: preset.label,
@@ -599,6 +810,7 @@ export async function calculateYOCBreakdown(
       softCostTotal,
       tdc,
       yoc,
+      irr,
     };
   }).filter((type) => Number.isFinite(type.yoc));
 
@@ -678,6 +890,7 @@ export async function recomputeDealYoc(
   if (!breakdown) {
     const [updated] = await db.update(deals).set({
       automatedYoc: null,
+      automatedIrr: null,
       updatedAt: new Date(),
     }).where(eq(deals.id, dealId)).returning();
     return updated;
@@ -689,8 +902,20 @@ export async function recomputeDealYoc(
   const automatedYoc = breakdown.types.length > 1
     ? `BEST: ${yocLabel}% | ${breakdown.types.map((type) => `${type.presetLabel}: ${hasActualLandCost ? type.yoc.toFixed(1) : `~${type.yoc.toFixed(1)}`}% (${type.rentMode === "preset" ? "preset" : type.rentSource})`).join(" | ")}`
     : `${best.presetLabel}: ${yocLabel}% (${best.rentMode === "preset" ? "preset" : best.rentSource})`;
+  const irrTypes = breakdown.types.filter(
+    (type): type is YocBreakdownType & { irr: AutomatedIrrBreakdown } => type.irr !== null,
+  );
+  const bestIrr = irrTypes.length > 0
+    ? irrTypes.reduce((winner, current) => current.irr.irr > winner.irr.irr ? current : winner)
+    : null;
+  const automatedIrr = !bestIrr
+    ? null
+    : irrTypes.length > 1
+      ? `BEST: ${(bestIrr.irr.irr * 100).toFixed(1)}% | ${irrTypes.map((type) => `${type.presetLabel}: ${(type.irr.irr * 100).toFixed(1)}%`).join(" | ")}`
+      : `${bestIrr.presetLabel}: ${(bestIrr.irr.irr * 100).toFixed(1)}%`;
   const [updated] = await db.update(deals).set({
     automatedYoc,
+    automatedIrr,
     projectedNOI: best.noi.toFixed(2),
     totalProjectCost: best.tdc.toFixed(2),
     projectedGPR: best.gpr.toFixed(2),

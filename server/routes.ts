@@ -6631,6 +6631,7 @@ Provide your analysis in this exact JSON format:
         ozStatus: deal.ozStatus,
         ddaStatus: deal.ddaStatus,
         automatedYoc: deal.automatedYoc,
+        automatedIrr: deal.automatedIrr,
         topRentPSF: deal.topRentPSF,
         avgRentPSF: deal.avgRentPSF,
         comparableCount: deal.comparableCount,
@@ -10334,7 +10335,7 @@ Provide your analysis in this exact JSON format:
         'sewerAvailable', 'hasEntitlements', 'topRentPSF', 'brokerNotes',
         // Missing fields that were being filtered out
         'nextSteps', 'population55Plus5Mile', 'income75Plus55Plus', 'demographicsNotes',
-        'yieldOnCost', 'automatedYoc', 'underwritingState', 'propertyName', 'projectedRentPerSF', 'rejectionReason', 'documentUrls',
+        'yieldOnCost', 'automatedYoc', 'automatedIrr', 'underwritingState', 'propertyName', 'projectedRentPerSF', 'rejectionReason', 'documentUrls',
         'qctStatus', 'analystDocumentUrls',
         // Dec 9, 2025: Pending details workflow fields
         'addressConfidence', 'dealRoomUrl', 'city', 'state', 'zip',
@@ -13441,10 +13442,12 @@ RULES:
     "dua", "hardCostPu", "assumedLandCostPu", "assumedLandCostPuCoastal",
     "softCostPct", "otherIncomePum", "fixedOpExPu", "insurancePuNc",
     "insurancePuCoastal", "vacancyPct", "ltlPct", "concessionPct",
-    "badDebtPct", "mgmtFeePct",
+    "badDebtPct", "mgmtFeePct", "rentGrowthPct", "otherIncomeGrowthPct",
+    "expenseGrowthPct", "holdPeriodYears", "exitCapRatePct",
   ] as const;
   const underwritingPercentFields = new Set([
     "softCostPct", "vacancyPct", "ltlPct", "concessionPct", "badDebtPct", "mgmtFeePct",
+    "rentGrowthPct", "otherIncomeGrowthPct", "expenseGrowthPct", "exitCapRatePct",
   ]);
 
   function parseProductTypeUnderwriting(raw: any) {
@@ -13456,6 +13459,16 @@ RULES:
         continue;
       }
       const numberValue = Number(value);
+      if (field === "holdPeriodYears") {
+        if (!Number.isInteger(numberValue) || numberValue < 1 || numberValue > 30) {
+          throw new Error("holdPeriodYears must be a whole number between 1 and 30");
+        }
+        parsed[field] = numberValue;
+        continue;
+      }
+      if (field === "exitCapRatePct" && numberValue <= 0) {
+        throw new Error("exitCapRatePct must be greater than 0 and no more than 1");
+      }
       const max = underwritingPercentFields.has(field) ? 1 : Number.POSITIVE_INFINITY;
       if (!Number.isFinite(numberValue) || numberValue < 0 || numberValue > max) {
         throw new Error(`${field} must be a non-negative number${max === 1 ? " between 0 and 1" : ""}`);
@@ -17359,6 +17372,7 @@ RULES:
           dealAvgRentPSF: deals.avgRentPSF,
           dealAvgRentPerUnit: deals.avgRentPerUnit,
           dealAutomatedYoc: deals.automatedYoc,
+          dealAutomatedIrr: deals.automatedIrr,
           dealVintage: deals.vintage,
           dealType: deals.dealType,
           dealCounty: deals.county,
@@ -17512,6 +17526,7 @@ RULES:
           askingPrice: deals.askingPrice,
           createdAt: deals.createdAt,
           automatedYoc: deals.automatedYoc,
+          automatedIrr: deals.automatedIrr,
           investmentMemoUrl: deals.investmentMemoUrl,
           topRentPSF: deals.topRentPSF,
           rentsPerUnit: deals.rentsPerUnit,
@@ -17596,6 +17611,7 @@ RULES:
             askingPrice: deal.askingPrice,
             createdAt: deal.createdAt,
             automatedYoc: deal.automatedYoc,
+            automatedIrr: deal.automatedIrr,
             investmentMemoUrl: deal.investmentMemoUrl,
             topRentPSF: deal.topRentPSF,
             rentsPerUnit: deal.rentsPerUnit,

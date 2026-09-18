@@ -234,9 +234,11 @@ export function renderDealMemoHtml(deal: DealMemoInput, branding: DealMemoBrandi
   const costPerUnit = totalProjectCost !== null && unitCount
     ? formatMoney(totalProjectCost / unitCount)
     : "—";
-  const computedIrr = getComputedFiveYearIrr(deal);
+  const computedIrr = formatPercent(deal.automatedIrr) !== "—"
+    ? formatPercent(deal.automatedIrr)
+    : getComputedFiveYearIrr(deal);
   const fifthMetric = computedIrr !== "—"
-    ? { label: "5-Yr Auto-IRR", value: computedIrr }
+    ? { label: deal.automatedIrr ? "Auto-IRR" : "5-Yr Auto-IRR", value: computedIrr }
     : { label: "Exit Cap", value: formatPercent(deal.marketCapRate) };
   const metrics = [
     { label: "Total Development Cost", value: formatMoney(deal.totalProjectCost) },

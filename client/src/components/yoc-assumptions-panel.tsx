@@ -32,7 +32,12 @@ export type YocAssumptionFieldKey =
   | "ltlPct"
   | "concessionPct"
   | "badDebtPct"
-  | "mgmtFeePct";
+  | "mgmtFeePct"
+  | "rentGrowthPct"
+  | "otherIncomeGrowthPct"
+  | "expenseGrowthPct"
+  | "holdPeriodYears"
+  | "exitCapRatePct";
 
 export type YocAssumptionsValue = Record<YocAssumptionFieldKey, string | null> & {
   unitMix: UnitMixRow[] | null;
@@ -63,6 +68,11 @@ export const YOC_ASSUMPTION_KEYS: YocAssumptionFieldKey[] = [
   "concessionPct",
   "badDebtPct",
   "mgmtFeePct",
+  "rentGrowthPct",
+  "otherIncomeGrowthPct",
+  "expenseGrowthPct",
+  "holdPeriodYears",
+  "exitCapRatePct",
 ];
 
 const PERCENT_KEYS = new Set<YocAssumptionFieldKey>([
@@ -72,6 +82,10 @@ const PERCENT_KEYS = new Set<YocAssumptionFieldKey>([
   "concessionPct",
   "badDebtPct",
   "mgmtFeePct",
+  "rentGrowthPct",
+  "otherIncomeGrowthPct",
+  "expenseGrowthPct",
+  "exitCapRatePct",
 ]);
 
 const FIELD_LABELS: Record<YocAssumptionFieldKey, string> = {
@@ -89,6 +103,11 @@ const FIELD_LABELS: Record<YocAssumptionFieldKey, string> = {
   concessionPct: "Concessions",
   badDebtPct: "Bad debt",
   mgmtFeePct: "Management fee",
+  rentGrowthPct: "Annual rent growth",
+  otherIncomeGrowthPct: "Annual other-income growth",
+  expenseGrowthPct: "Annual expense growth",
+  holdPeriodYears: "Hold period (years)",
+  exitCapRatePct: "Exit capitalization rate",
 };
 
 type AssumptionGroup = {
@@ -109,58 +128,79 @@ const ASSUMPTION_GROUPS: AssumptionGroup[] = [
     title: "Rental Loss Assumptions",
     keys: ["vacancyPct", "ltlPct", "concessionPct", "badDebtPct"],
   },
+  {
+    title: "IRR & Exit Assumptions",
+    keys: ["rentGrowthPct", "otherIncomeGrowthPct", "expenseGrowthPct", "holdPeriodYears", "exitCapRatePct"],
+  },
 ];
+
+const IRR_DEFAULTS = {
+  rentGrowthPct: 0.03,
+  otherIncomeGrowthPct: 0.03,
+  expenseGrowthPct: 0.03,
+  holdPeriodYears: 5,
+  exitCapRatePct: 0.055,
+};
 
 const NATIONAL_DEFAULTS: Record<string, YocAssumptionsDefaults> = {
   "3-story-surface-park": {
+    ...IRR_DEFAULTS,
     dua: 30, hardCostPu: 164000, assumedLandCostPu: 25000, assumedLandCostPuCoastal: 35000,
     softCostPct: 0.15, otherIncomePum: 198, fixedOpExPu: 6101, insurancePuNc: 550,
     insurancePuCoastal: 700, vacancyPct: 0.05, ltlPct: 0.01, concessionPct: 0.01, badDebtPct: 0,
     mgmtFeePct: 0.0275, unitMix: [{ pct: 0.6, avgSF: 800, monthlyRent: 1600 }, { pct: 0.4, avgSF: 1050, monthlyRent: 2200 }],
   },
   "3-story-attainable": {
+    ...IRR_DEFAULTS,
     dua: 30, hardCostPu: 137000, assumedLandCostPu: 10000, assumedLandCostPuCoastal: 15000,
     softCostPct: 0.15, otherIncomePum: 198, fixedOpExPu: 6101, insurancePuNc: 550,
     insurancePuCoastal: 700, vacancyPct: 0.05, ltlPct: 0.01, concessionPct: 0.01, badDebtPct: 0,
     mgmtFeePct: 0.0275, unitMix: [{ pct: 0.6, avgSF: 800, monthlyRent: 1400 }, { pct: 0.4, avgSF: 1050, monthlyRent: 1900 }],
   },
   "4-story-surface-park": {
+    ...IRR_DEFAULTS,
     dua: 35, hardCostPu: 158000, assumedLandCostPu: 30000, assumedLandCostPuCoastal: 45000,
     softCostPct: 0.15, otherIncomePum: 198, fixedOpExPu: 6101, insurancePuNc: 600,
     insurancePuCoastal: 800, vacancyPct: 0.05, ltlPct: 0.01, concessionPct: 0.01, badDebtPct: 0,
     mgmtFeePct: 0.0275, unitMix: [{ pct: 0.6, avgSF: 800, monthlyRent: 1650 }, { pct: 0.4, avgSF: 1050, monthlyRent: 2300 }],
   },
   "aa-3-story-flats": {
+    ...IRR_DEFAULTS,
     dua: 30, hardCostPu: 167200, assumedLandCostPu: 30000, assumedLandCostPuCoastal: 40000,
     softCostPct: 0.15, otherIncomePum: 207, fixedOpExPu: 9500, insurancePuNc: 575,
     insurancePuCoastal: 750, vacancyPct: 0.05, ltlPct: 0.01, concessionPct: 0.01, badDebtPct: 0,
     mgmtFeePct: 0.0275, unitMix: [{ pct: 0.6, avgSF: 800, monthlyRent: 1750 }, { pct: 0.4, avgSF: 1100, monthlyRent: 2200 }],
   },
   "aa-4-story-flats": {
+    ...IRR_DEFAULTS,
     dua: 35, hardCostPu: 185500, assumedLandCostPu: 30000, assumedLandCostPuCoastal: 45000,
     softCostPct: 0.15, otherIncomePum: 207, fixedOpExPu: 9500, insurancePuNc: 625,
     insurancePuCoastal: 825, vacancyPct: 0.05, ltlPct: 0.01, concessionPct: 0.01, badDebtPct: 0,
     mgmtFeePct: 0.0275, unitMix: [{ pct: 0.6, avgSF: 800, monthlyRent: 1750 }, { pct: 0.4, avgSF: 1100, monthlyRent: 2200 }],
   },
   "aa-cottages": {
+    ...IRR_DEFAULTS,
     dua: 6, hardCostPu: 252500, assumedLandCostPu: 30000, assumedLandCostPuCoastal: 40000,
     softCostPct: 0.15, otherIncomePum: 235, fixedOpExPu: 9500, insurancePuNc: 750,
     insurancePuCoastal: 900, vacancyPct: 0.05, ltlPct: 0.01, concessionPct: 0.01, badDebtPct: 0,
     mgmtFeePct: 0.0275, unitMix: [{ pct: 0.25, avgSF: 1200, monthlyRent: 2100 }, { pct: 0.75, avgSF: 1400, monthlyRent: 2900 }],
   },
   "btr-3-story-th": {
+    ...IRR_DEFAULTS,
     dua: 8, hardCostPu: 254000, assumedLandCostPu: 50000, assumedLandCostPuCoastal: 55000,
     softCostPct: 0.15, otherIncomePum: 251, fixedOpExPu: 7014, insurancePuNc: 750,
     insurancePuCoastal: 900, vacancyPct: 0.05, ltlPct: 0.01, concessionPct: 0.01, badDebtPct: 0,
     mgmtFeePct: 0.0275, unitMix: [{ pct: 0.65, avgSF: 1659, monthlyRent: 2500 }, { pct: 0.35, avgSF: 1996, monthlyRent: 2700 }],
   },
   "btr-sfr-detached": {
+    ...IRR_DEFAULTS,
     dua: 8, hardCostPu: 258000, assumedLandCostPu: 50000, assumedLandCostPuCoastal: 55000,
     softCostPct: 0.15, otherIncomePum: 247, fixedOpExPu: 7014, insurancePuNc: 800,
     insurancePuCoastal: 950, vacancyPct: 0.05, ltlPct: 0.01, concessionPct: 0.01, badDebtPct: 0,
     mgmtFeePct: 0.0275, unitMix: [{ pct: 0.3, avgSF: 2020, monthlyRent: 2750 }, { pct: 0.7, avgSF: 2600, monthlyRent: 3000 }],
   },
   "btr-th-2-3br": {
+    ...IRR_DEFAULTS,
     dua: 10, hardCostPu: 230000, assumedLandCostPu: 50000, assumedLandCostPuCoastal: 55000,
     softCostPct: 0.15, otherIncomePum: 251, fixedOpExPu: 7014, insurancePuNc: 750,
     insurancePuCoastal: 900, vacancyPct: 0.05, ltlPct: 0.01, concessionPct: 0.01, badDebtPct: 0,
@@ -204,6 +244,11 @@ export function createEmptyYocAssumptions(): YocAssumptionsValue {
     concessionPct: null,
     badDebtPct: null,
     mgmtFeePct: null,
+    rentGrowthPct: null,
+    otherIncomeGrowthPct: null,
+    expenseGrowthPct: null,
+    holdPeriodYears: null,
+    exitCapRatePct: null,
     unitMix: null,
   };
 }

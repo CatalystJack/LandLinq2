@@ -645,6 +645,18 @@ export default function DealDetails() {
                       </p>
                     </div>
                     <div>
+                      <label className="text-sm font-medium text-catalyst-gray-600">Auto-YOC</label>
+                      <p className="text-catalyst-navy font-semibold" data-testid="text-automated-yoc">
+                        {(deal as any).automatedYoc || "Not calculated"}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-catalyst-gray-600">Auto IRR</label>
+                      <p className="text-catalyst-navy font-semibold" data-testid="text-automated-irr">
+                        {(deal as any).automatedIrr || "Not calculated"}
+                      </p>
+                    </div>
+                    <div>
                       <label className="text-sm font-medium text-catalyst-gray-600">Product Type</label>
                       <p className="text-catalyst-navy" data-testid="text-product-types">
                         {formatProductTypes(deal.productTypes)}

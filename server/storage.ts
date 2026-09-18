@@ -1482,6 +1482,9 @@ export class DatabaseStorage implements IStorage {
         marketCapRate: deals.marketCapRate,
         yieldOnCost: deals.yieldOnCost,
         irr: deals.irr,
+        automatedYoc: deals.automatedYoc,
+        automatedIrr: deals.automatedIrr,
+        yocOverrides: deals.yocOverrides,
         developmentTimelineMonths: deals.developmentTimelineMonths,
         unitSize: deals.unitSize,
         estimatedUnits: deals.estimatedUnits,
@@ -1757,6 +1760,25 @@ export class DatabaseStorage implements IStorage {
     // The PATCH handler calls sanitizeStringArray() before passing updates here
     if ('documentUrls' in sanitizedUpdates) {
       console.log(`📎 Storage.updateDeal - documentUrls being saved:`, sanitizedUpdates.documentUrls);
+    }
+    if ('yocOverrides' in sanitizedUpdates && sanitizedUpdates.yocOverrides) {
+      let parsedOverrides: Record<string, unknown>;
+      try {
+        parsedOverrides = typeof sanitizedUpdates.yocOverrides === "string"
+          ? JSON.parse(sanitizedUpdates.yocOverrides)
+          : sanitizedUpdates.yocOverrides;
+      } catch {
+        throw new Error("yocOverrides must be valid JSON");
+      }
+      for (const [key, rawValue] of Object.entries(parsedOverrides || {})) {
+        const value = Number(rawValue);
+        if (key.endsWith(".exitCapRatePct") && (!Number.isFinite(value) || value <= 0 || value > 1)) {
+          throw new Error("Exit cap rate overrides must be greater than 0 and no more than 1");
+        }
+        if (key.endsWith(".holdPeriodYears") && (!Number.isInteger(value) || value < 1 || value > 30)) {
+          throw new Error("Hold period overrides must be a whole number between 1 and 30");
+        }
+      }
     }
 
     const [deal] = await db
@@ -2036,6 +2058,7 @@ export class DatabaseStorage implements IStorage {
         underContract: deals.underContract,
         loiSubmitted: deals.loiSubmitted,
         automatedYoc: deals.automatedYoc,
+        automatedIrr: deals.automatedIrr,
         underwritingState: deals.underwritingState,
         submissionCount: deals.submissionCount,
         lastResubmittedAt: deals.lastResubmittedAt,

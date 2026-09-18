@@ -76,6 +76,11 @@ type ProductType = {
   concessionPct: string | null;
   badDebtPct: string | null;
   mgmtFeePct: string | null;
+  rentGrowthPct: string | null;
+  otherIncomeGrowthPct: string | null;
+  expenseGrowthPct: string | null;
+  holdPeriodYears: string | null;
+  exitCapRatePct: string | null;
   unitMix: Array<{ pct: number; avgSF: number; monthlyRent: number }> | null;
   isActive: boolean;
 };
@@ -360,6 +365,11 @@ export default function DeveloperCriteriaSettings() {
           concessionPct: productType.concessionPct || "",
           badDebtPct: productType.badDebtPct || "",
           mgmtFeePct: productType.mgmtFeePct || "",
+          rentGrowthPct: productType.rentGrowthPct || "",
+          otherIncomeGrowthPct: productType.otherIncomeGrowthPct || "",
+          expenseGrowthPct: productType.expenseGrowthPct || "",
+          holdPeriodYears: productType.holdPeriodYears?.toString() || "",
+          exitCapRatePct: productType.exitCapRatePct || "",
           unitMix: productType.unitMix || null,
           isActive: productType.isActive !== false,
         })),
@@ -556,6 +566,11 @@ export default function DeveloperCriteriaSettings() {
         concessionPct: "",
         badDebtPct: "",
         mgmtFeePct: "",
+        rentGrowthPct: "",
+        otherIncomeGrowthPct: "",
+        expenseGrowthPct: "",
+        holdPeriodYears: "",
+        exitCapRatePct: "",
         unitMix: null,
         isActive: true,
       },

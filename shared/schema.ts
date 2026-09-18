@@ -117,6 +117,11 @@ export const developerProductTypes = pgTable("developer_product_types", {
   concessionPct: decimal("concession_pct").default("0.01"),
   badDebtPct: decimal("bad_debt_pct").default("0"),
   mgmtFeePct: decimal("mgmt_fee_pct").default("0.0275"),
+  rentGrowthPct: decimal("rent_growth_pct"),
+  otherIncomeGrowthPct: decimal("other_income_growth_pct"),
+  expenseGrowthPct: decimal("expense_growth_pct"),
+  holdPeriodYears: integer("hold_period_years"),
+  exitCapRatePct: decimal("exit_cap_rate_pct"),
   unitMix: jsonb("unit_mix"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -507,6 +512,7 @@ export const deals = pgTable("deals", {
   yieldOnCost: text("yield_on_cost"), // Yield on cost — free text notes (e.g. "8.5%" or "8.5% - conservative est.")
   irr: text("irr"), // Internal Rate of Return — manually entered by analyst (e.g. "14.88%")
   automatedYoc: text("automated_yoc"), // Auto-calculated YOC from underwriting model when product types are selected
+  automatedIrr: text("automated_irr"), // Auto-calculated unlevered IRR from the YOC underwriting model
   yocOverrides: text("yoc_overrides"), // JSON: analyst field overrides for the Auto YOC breakdown modal
   brokerPortalApproved: boolean("broker_portal_approved").default(false), // Admin-approved for broker portal display + auto-email
   underwritingState: text("underwriting_state"), // JSON: full phase + shared-assumption state from the underwriter UI

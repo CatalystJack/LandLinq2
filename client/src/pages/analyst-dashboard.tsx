@@ -125,6 +125,7 @@ const ALL_COLUMNS = [
   { key: 'name', label: 'Name', defaultVisible: true },
   { key: 'yieldOnCost', label: 'YOC', defaultVisible: true },
   { key: 'automatedYoc', label: 'Auto YOC', defaultVisible: true },
+  { key: 'automatedIrr', label: 'Auto IRR', defaultVisible: true },
   { key: 'irr', label: 'IRR', defaultVisible: true },
   { key: 'excelModel', label: 'Excel', defaultVisible: true },
   { key: 'reason', label: 'AI Reason', defaultVisible: true },
@@ -1562,6 +1563,13 @@ export default function AnalystDashboard() {
     'STALLINGS', 'PINEVILLE', 'HARRISBURG', 'MIDLAND', 'BELMONT', 'GASTONIA',
   ]);
 
+  const DEFAULT_IRR_ASSUMPTIONS = {
+    rentGrowthPct: 0.03,
+    otherIncomeGrowthPct: 0.03,
+    expenseGrowthPct: 0.03,
+    holdPeriodYears: 5,
+    exitCapRatePct: 0.055,
+  };
   const PRODUCT_TYPE_YOC_PRESETS: Record<string, {
     label: string;
     dua: number;
@@ -1573,11 +1581,17 @@ export default function AnalystDashboard() {
     fixedOpExPU: number;          // EXCLUDES insurance — insurance computed separately by coastal status
     insurancePU_nc: number;    // Non-coastal insurance $/unit/year
     insurancePU_coastal: number; // Coastal insurance $/unit/year
+    rentGrowthPct: number;
+    otherIncomeGrowthPct: number;
+    expenseGrowthPct: number;
+    holdPeriodYears: number;
+    exitCapRatePct: number;
     unitMix: { pct: number; avgSF: number; monthlyRent: number }[];
   }> = {
     // 3-Story Walk-Up (Conventional Garden) — 30 u/a (analyst Q13: avg 30 u/a), 60% 1BR/800SF + 40% 2BR/1,050SF
     // hardCostPU $164k validated: #58 model $54.1M / 330 units = $164k, #180 $53.2M / 324 = $164k
     '3-story-surface-park': {
+      ...DEFAULT_IRR_ASSUMPTIONS,
       label: '3-Story SP',
       dua: 30, hardCostPU: 164000, assumedLandCostPU: 25000, assumedLandCostPU_coastal: 35000,
       softCostPct: 0.15, otherIncomePUM: 198, fixedOpExPU: 6101,
@@ -1586,6 +1600,7 @@ export default function AnalystDashboard() {
     },
     // 3-Story Attainable — 30 u/a (analyst Q13: avg 30 u/a), same unit mix as WU
     '3-story-attainable': {
+      ...DEFAULT_IRR_ASSUMPTIONS,
       label: '3-Story Att.',
       dua: 30, hardCostPU: 137000, assumedLandCostPU: 10000, assumedLandCostPU_coastal: 15000,
       softCostPct: 0.15, otherIncomePUM: 198, fixedOpExPU: 6101,
@@ -1595,6 +1610,7 @@ export default function AnalystDashboard() {
     // 4-Story Surface-Parked (Conventional Mid-Rise) — 35 u/a, same 60/40 split
     // coastal $45K: back-solved from deal #180 Kissimmee FL (5.99% actual YOC)
     '4-story-surface-park': {
+      ...DEFAULT_IRR_ASSUMPTIONS,
       label: '4-Story SP',
       dua: 35, hardCostPU: 158000, assumedLandCostPU: 30000, assumedLandCostPU_coastal: 45000,
       softCostPct: 0.15, otherIncomePUM: 198, fixedOpExPU: 6101,
@@ -1614,6 +1630,7 @@ export default function AnalystDashboard() {
     // otherIncomePUM $207: v21 — confirmed from #247 Verdin Rd ($209) and #45 Orphanage Rd ($207).
     // NOTE: AA types do NOT use HelloData PSF — see comments above presets block.
     'aa-3-story-flats': {
+      ...DEFAULT_IRR_ASSUMPTIONS,
       label: 'AA 3-Story',
       dua: 30, hardCostPU: 167200, assumedLandCostPU: 30000, assumedLandCostPU_coastal: 40000,
       softCostPct: 0.15, otherIncomePUM: 207, fixedOpExPU: 9500,
@@ -1628,6 +1645,7 @@ export default function AnalystDashboard() {
     // otherIncomePUM $207: v21 — confirmed from AA models (see above).
     // NOTE: AA types do NOT use HelloData PSF — see comments above presets block.
     'aa-4-story-flats': {
+      ...DEFAULT_IRR_ASSUMPTIONS,
       label: 'AA 4-Story',
       dua: 35, hardCostPU: 185500, assumedLandCostPU: 30000, assumedLandCostPU_coastal: 45000,
       softCostPct: 0.15, otherIncomePUM: 207, fixedOpExPU: 9500,
@@ -1639,6 +1657,7 @@ export default function AnalystDashboard() {
     // fixedOpExPU $9,500: v21 — AA amenity/activity cost applies equally to cottage product.
     // NOTE: AA types do NOT use HelloData PSF — see comments above presets block.
     'aa-cottages': {
+      ...DEFAULT_IRR_ASSUMPTIONS,
       label: 'AA Cottages',
       dua: 6, hardCostPU: 252500, assumedLandCostPU: 30000, assumedLandCostPU_coastal: 40000,
       softCostPct: 0.15, otherIncomePUM: 235, fixedOpExPU: 9500,
@@ -1651,6 +1670,7 @@ export default function AnalystDashboard() {
     // BTR TH coastal $55K: back-solved from deal #171 N.Myrtle Beach SC (5.56% actual at 154 units)
     // otherIncomePUM $251: v22 — confirmed from BTR TH models (#119 Grandale BTR, #202 BTR, #118 Hopson BTR)
     'btr-3-story-th': {
+      ...DEFAULT_IRR_ASSUMPTIONS,
       label: 'BTR TH',
       dua: 8, hardCostPU: 254000, assumedLandCostPU: 50000, assumedLandCostPU_coastal: 55000,
       softCostPct: 0.15, otherIncomePUM: 251, fixedOpExPU: 7014,
@@ -1661,6 +1681,7 @@ export default function AnalystDashboard() {
     // Unit mix from UW template: 3BR/2.5BA 30%@2,020SF@$2,750/mo, 4BR/3.5BA 70%@2,600SF@$3,000/mo
     // otherIncomePUM $247: v22 — confirmed from SFR model analysis (#172 Sneads Ferry SFR)
     'btr-sfr-detached': {
+      ...DEFAULT_IRR_ASSUMPTIONS,
       label: 'BTR SFR',
       dua: 8, hardCostPU: 258000, assumedLandCostPU: 50000, assumedLandCostPU_coastal: 55000,
       softCostPct: 0.15, otherIncomePUM: 247, fixedOpExPU: 7014,
@@ -1670,6 +1691,7 @@ export default function AnalystDashboard() {
     // BTR TH 2-3BR — 10 u/a (smaller attached TH product)
     // otherIncomePUM $251: v22 — same as BTR TH 3-Story (confirmed from model data)
     'btr-th-2-3br': {
+      ...DEFAULT_IRR_ASSUMPTIONS,
       label: 'BTR TH 2-3BR',
       dua: 10, hardCostPU: 230000, assumedLandCostPU: 50000, assumedLandCostPU_coastal: 55000,
       softCostPct: 0.15, otherIncomePUM: 251, fixedOpExPU: 7014,
@@ -1859,6 +1881,7 @@ export default function AnalystDashboard() {
       yieldOnCost?: string;
       irr?: string;
       automatedYoc?: string;
+      automatedIrr?: string;
       productTypes?: string[];
       hasEntitlements?: boolean;
       sewerAvailable?: boolean;
@@ -2473,6 +2496,28 @@ export default function AnalystDashboard() {
     setYocOverrides(prev => ({ ...prev, [`${dealId}.${field}`]: value }));
   }
 
+  function solveLiveIrr(cashFlows: number[]): number | null {
+    if (cashFlows.length < 2 || cashFlows[0] >= 0 || !cashFlows.slice(1).some(value => value > 0)) return null;
+    const npv = (rate: number) => cashFlows.reduce(
+      (sum, cashFlow, period) => sum + cashFlow / Math.pow(1 + rate, period),
+      0,
+    );
+    let low = -0.9999;
+    let high = 1;
+    let highNpv = npv(high);
+    while (highNpv > 0 && high < 1000) {
+      high *= 2;
+      highNpv = npv(high);
+    }
+    if (!Number.isFinite(highNpv) || npv(low) * highNpv > 0) return null;
+    for (let iteration = 0; iteration < 200 && Math.abs(high - low) >= 1e-10; iteration += 1) {
+      const midpoint = (low + high) / 2;
+      if (npv(midpoint) > 0) low = midpoint;
+      else high = midpoint;
+    }
+    return (low + high) / 2;
+  }
+
   // Compute live YOC from overrides for the open dialog deal (per product type)
   function computeLiveYocForDialog(deal: any, typeKey: string) {
     if (!deal) return null;
@@ -2556,6 +2601,30 @@ export default function AnalystDashboard() {
     const softCostTotal = hardCostTotal * softCostPct;
     const tdc = effectiveLandCost + hardCostTotal + softCostTotal;
     const yoc = tdc > 0 ? (noi / tdc) * 100 : 0;
+    const rentGrowthPct = getYocField(id, `${typeKey}.rentGrowthPct`, preset.rentGrowthPct);
+    const otherIncomeGrowthPct = getYocField(id, `${typeKey}.otherIncomeGrowthPct`, preset.otherIncomeGrowthPct);
+    const expenseGrowthPct = getYocField(id, `${typeKey}.expenseGrowthPct`, preset.expenseGrowthPct);
+    const holdPeriodYears = Math.max(1, Math.min(30, Math.round(
+      getYocField(id, `${typeKey}.holdPeriodYears`, preset.holdPeriodYears),
+    )));
+    const exitCapRatePct = getYocField(id, `${typeKey}.exitCapRatePct`, preset.exitCapRatePct);
+    const fixedOperatingExpenses = fixedOpEx + insurance + reTaxAdj;
+    const irrCashFlows = [-tdc];
+    let terminalSaleValue = 0;
+    for (let year = 1; year <= holdPeriodYears; year += 1) {
+      const projectedGpr = gpr * Math.pow(1 + rentGrowthPct, year - 1);
+      const projectedOtherIncome = otherIncome * Math.pow(1 + otherIncomeGrowthPct, year - 1);
+      const projectedGross = projectedGpr + projectedOtherIncome;
+      const projectedEgi = projectedGross * (1 - VACANCY) - projectedGpr * (LTL + CONCESSION);
+      const projectedExpenses = projectedEgi * MGMT_PCT +
+        fixedOperatingExpenses * Math.pow(1 + expenseGrowthPct, year - 1);
+      const projectedNoi = projectedEgi - projectedExpenses;
+      terminalSaleValue = year === holdPeriodYears && exitCapRatePct > 0
+        ? projectedNoi / exitCapRatePct
+        : 0;
+      irrCashFlows.push(projectedNoi + terminalSaleValue);
+    }
+    const automatedIrr = solveLiveIrr(irrCashFlows);
 
     return {
       totalUnits, hardCostPU, softCostPct, fixedOpExPU, insurancePU, otherIncomePUM,
@@ -2564,7 +2633,9 @@ export default function AnalystDashboard() {
       gpr, otherIncome, totalGross, vacancyLoss, creditLoss, egi,
       mgmtFee, fixedOpEx, insurance, reTaxAdj, totalOpEx, noi,
       effectiveLandCost, landCostPU, landStateMult, hasActualLandCost, overrideLandCost,
-      hardCostTotal, softCostTotal, tdc, yoc,
+      hardCostTotal, softCostTotal, tdc, yoc, automatedIrr,
+      rentGrowthPct, otherIncomeGrowthPct, expenseGrowthPct, holdPeriodYears,
+      exitCapRatePct, terminalSaleValue,
       isCoastal, rentStateMult, isBTR, reTaxAdjPU,
     };
   }
@@ -4801,6 +4872,7 @@ export default function AnalystDashboard() {
     );
     switch (key) {
       case 'automatedYoc': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}>{headerLabel('Auto YOC')}</th>;
+      case 'automatedIrr': return <th key={key} className={`${thBase} min-w-[92px]`} style={{display: vis?'':'none'}}>{headerLabel('Auto IRR')}</th>;
       case 'developerSummary': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}>{headerLabel('Developer Summary')}</th>;
       case 'assigned': return <th key={key} className={`${thBase} min-w-[130px]`} style={{display: vis?'':'none'}}>{sortBtn('Assigned', 'nextAssignee')}</th>;
       case 'name': return <th key={key} className={`${thBase} min-w-[140px]`} style={{display: vis?'':'none'}}>{headerLabel('Name')}</th>;
@@ -4868,6 +4940,13 @@ export default function AnalystDashboard() {
           >
             {d.automatedYoc || <span className="text-gray-300 italic">—</span>}
           </button>
+        </td>
+      );
+      case 'automatedIrr': return (
+        <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700 min-w-[92px]" style={{display: vis?'':'none'}}>
+          {d.automatedIrr
+            ? <span className="font-medium text-violet-700" title={d.automatedIrr}>{d.automatedIrr}</span>
+            : <span className="text-gray-300 italic">—</span>}
         </td>
       );
       case 'developerSummary': return (
@@ -10660,6 +10739,12 @@ export default function AnalystDashboard() {
                             <div className="text-[10px] text-gray-400 mb-0.5 text-right">Stand-alone YOC</div>
                             <div className={`text-[22px] font-black ${yocText}`}>{live.yoc.toFixed(2)}%</div>
                           </div>
+                          <div>
+                            <div className="text-[10px] text-gray-400 mb-0.5 text-right">{live.holdPeriodYears}-Yr Auto IRR</div>
+                            <div className="text-[22px] font-black text-violet-700">
+                              {live.automatedIrr === null ? "—" : `${(live.automatedIrr * 100).toFixed(2)}%`}
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -10771,6 +10856,66 @@ export default function AnalystDashboard() {
                           </div>
                         </div>
 
+                        {/* ── IRR assumptions ── */}
+                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                          <div className="px-4 py-1.5 border-b border-gray-100 bg-gray-50">
+                            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">IRR &amp; Exit Assumptions</span>
+                          </div>
+                          <div className="px-4 py-2 grid grid-cols-2 gap-2">
+                            {([
+                              ["Annual Rent Growth", `${typeKey}.rentGrowthPct`, preset.rentGrowthPct],
+                              ["Other Income Growth", `${typeKey}.otherIncomeGrowthPct`, preset.otherIncomeGrowthPct],
+                              ["Annual Expense Growth", `${typeKey}.expenseGrowthPct`, preset.expenseGrowthPct],
+                              ["Exit Cap Rate", `${typeKey}.exitCapRatePct`, preset.exitCapRatePct],
+                            ] as const).map(([label, field, fallback]) => (
+                              <div key={field}>
+                                <div className="text-[11px] text-gray-500 mb-1">{label}</div>
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="number"
+                                    min={field.endsWith("exitCapRatePct") ? 0.1 : 0}
+                                    max={100}
+                                    step={0.1}
+                                    value={Number((getYocField(id, field, fallback) * 100).toFixed(4))}
+                                    onChange={e => {
+                                      const value = Number(e.target.value);
+                                      if (Number.isFinite(value)) setYocField(id, field, value / 100);
+                                    }}
+                                    className="w-full px-3 py-1.5 border border-gray-200 rounded text-[13px] text-gray-800 bg-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-100"
+                                  />
+                                  <span className="text-[11px] text-gray-400">%</span>
+                                </div>
+                              </div>
+                            ))}
+                            <div>
+                              <div className="text-[11px] text-gray-500 mb-1">Hold Period</div>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={30}
+                                  step={1}
+                                  value={getYocField(id, `${typeKey}.holdPeriodYears`, preset.holdPeriodYears)}
+                                  onChange={e => {
+                                    const value = Number(e.target.value);
+                                    if (Number.isInteger(value) && value >= 1 && value <= 30) {
+                                      setYocField(id, `${typeKey}.holdPeriodYears`, value);
+                                    }
+                                  }}
+                                  className="w-full px-3 py-1.5 border border-gray-200 rounded text-[13px] text-gray-800 bg-white focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-100"
+                                />
+                                <span className="text-[11px] text-gray-400">years</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[11px] text-gray-500 mb-1">Terminal Sale Value</div>
+                              <div className="px-3 py-1.5 text-[13px] font-mono text-gray-800 bg-gray-50 border border-gray-100 rounded">
+                                {fmtK(live.terminalSaleValue)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                         {/* ── Total Dev Cost ── */}
                         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                           <div className="px-4 py-1.5 border-b border-gray-100 bg-gray-50">
@@ -10825,7 +10970,7 @@ export default function AnalystDashboard() {
                     try {
                       await apiRequest('PATCH', `/api/deals/${d.id}`, { yocOverrides: JSON.stringify(yocOverrides) });
                       queryClient.invalidateQueries({ queryKey: ['/api/deals'] });
-                      toast({ title: 'Saved', description: 'YOC inputs saved to this deal.' });
+                      toast({ title: 'Saved', description: 'YOC and IRR inputs saved to this deal.' });
                     } catch (err: any) {
                       toast({ title: 'Save failed', description: err?.message || 'Unknown error', variant: 'destructive' });
                     }
