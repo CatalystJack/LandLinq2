@@ -22698,7 +22698,9 @@ RULES:
   // Update the main deal submission to use enhanced screening
   app.patch("/api/deals", dealSubmissionLimiter, async (req, res) => {
     try {
-      console.log("📥 Enhanced deal submission received:", JSON.stringify(req.body, null, 2));
+      if (process.env.NODE_ENV !== "production") {
+        console.log("📥 Enhanced deal submission received:", JSON.stringify(req.body, null, 2));
+      }
       
       // Validate required fields before processing
       if (!req.body.brokerId || !req.body.address) {
@@ -34226,7 +34228,12 @@ RULES:
           if (d.status === 'OK' && d.rows?.[0]?.elements?.[0]?.status === 'OK') {
             return d.rows[0].elements[0].distance.value / 1609.344; // meters → miles
           }
-        } catch {}
+        } catch (distanceErr) {
+          console.error(
+            `[LIHTC] Google driving distance lookup failed for deal ${dealId} (${lat},${lng} → ${destLat},${destLng}):`,
+            distanceErr,
+          );
+        }
         return null;
       };
 
@@ -34654,7 +34661,11 @@ RULES:
       if (!hasManualAMI && effectiveUnits40AMI) detectedUpdates.lihtcUnits40AMI = effectiveUnits40AMI;
       if (!hasManualAMI && effectiveUnits50AMI) detectedUpdates.lihtcUnits50AMI = effectiveUnits50AMI;
       if (Object.keys(detectedUpdates).length > 0) {
-        try { await storage.updateDeal(dealId, detectedUpdates as any); } catch {}
+        try {
+          await storage.updateDeal(dealId, detectedUpdates as any);
+        } catch (updateErr) {
+          console.error(`[LIHTC-AUTO] Failed to save auto-detected fields for deal ${dealId}:`, updateErr);
+        }
       }
 
       // DHHS Priority County auto-detection (QAP §IV(F)(5)) — used for Olmstead +1 pt
@@ -34672,7 +34683,11 @@ RULES:
           effectiveDHHS = DHHS_PRIORITY_COUNTIES.has(rawCounty);
           if (effectiveDHHS && !manualDHHS) {
             // Save auto-detected value back so it shows in the UI
-            try { await storage.updateDeal(dealId, { lihtcDHHSPriorityCounty: true } as any); } catch {}
+            try {
+              await storage.updateDeal(dealId, { lihtcDHHSPriorityCounty: true } as any);
+            } catch (updateErr) {
+              console.error(`[LIHTC-AUTO] Failed to save DHHS priority county for deal ${dealId}:`, updateErr);
+            }
           }
         }
       }

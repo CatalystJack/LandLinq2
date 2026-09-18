@@ -913,7 +913,13 @@ export default function AnalystDashboard() {
   };
 
   // Fetch deals data with pagination and flagging filters - optimized for fast pagination
-  const { data: dealsData, isLoading, isFetching } = useQuery({
+  const {
+    data: dealsData,
+    isLoading,
+    isFetching,
+    isError,
+    refetch: refetchDeals,
+  } = useQuery({
     queryKey: ['/api/deals', currentPage, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), filterApex.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection],
     queryFn: async ({ signal }) => {
       // Use flagged deals endpoint if only showing flagged deals
@@ -6610,8 +6616,32 @@ export default function AnalystDashboard() {
                       </tr>
                     </thead>
                     <tbody>
+                      {/* Error State */}
+                      {isError && (
+                        <tr>
+                          <td colSpan={ALL_COLUMNS.length + 3} className="p-8 text-center">
+                            <div className="flex flex-col items-center space-y-3">
+                              <AlertCircle className="h-10 w-10 text-red-400" />
+                              <div>
+                                <div className="font-semibold text-lg text-red-700">Couldn't load deals</div>
+                                <div className="text-sm text-gray-500">There was a problem loading the deal list.</div>
+                              </div>
+                              <Button
+                                variant="outline"
+                                onClick={() => refetchDeals()}
+                                disabled={isFetching}
+                                className="border-red-300 text-red-700 hover:bg-red-50"
+                              >
+                                <RefreshCw size={14} className={`mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+                                Try again
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+
                       {/* Loading State - only show when no cached data */}
-                      {isLoading && (
+                      {isLoading && !isError && (
                         <tr>
                           <td colSpan={ALL_COLUMNS.length + 3} className="p-8 text-center text-gray-500">
                             <div className="flex items-center justify-center space-x-2">
@@ -6623,7 +6653,7 @@ export default function AnalystDashboard() {
                       )}
                       
                       {/* Subtle loading indicator for pagination while showing cached data */}
-                      {isFetching && !isLoading && (
+                      {isFetching && !isLoading && !isError && (
                         <tr>
                           <td colSpan={ALL_COLUMNS.length + 3} className="p-0">
                             <div className="w-full h-1 bg-gray-100 overflow-hidden">
@@ -6634,7 +6664,7 @@ export default function AnalystDashboard() {
                       )}
                       
                       {/* Add New Deal Row (when editing) */}
-                      {!isLoading && editingRow === 'new-deal-temp' && (
+                      {!isLoading && !isError && editingRow === 'new-deal-temp' && (
                         <tr className="bg-blue-50 border-b border-blue-200">
                           <td className="px-1 py-1 text-xs border-r border-gray-200 sticky left-0 bg-blue-50 z-10 shadow-lg">
                             <div className="w-4 h-4 bg-blue-400 rounded"></div>
@@ -7069,7 +7099,7 @@ export default function AnalystDashboard() {
                       )}
                       
                       {/* Empty State Row when no deals and not loading */}
-                      {!isLoading && filteredAndSortedDeals.length === 0 && editingRow !== 'new-deal-temp' && (
+                      {!isLoading && !isError && filteredAndSortedDeals.length === 0 && editingRow !== 'new-deal-temp' && (
                         <tr className="border-b">
                           <td colSpan={ALL_COLUMNS.length + 3} className="p-8 text-center text-gray-500">
                             <div className="flex flex-col items-center space-y-4">
@@ -7096,7 +7126,7 @@ export default function AnalystDashboard() {
                       )}
                       
                       {/* Regular Deal Rows */}
-                      {!isLoading && filteredAndSortedDeals.map((deal: DealWithBroker) => (
+                      {!isLoading && !isError && filteredAndSortedDeals.map((deal: DealWithBroker) => (
                         <tr key={deal.id} id={`deal-${deal.id}`} className={`group border-b transition-colors duration-150 [&>td]:py-2 ${selectedDeals.includes(deal.id) ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`}>
                           {/* Row selection — kept outside the paged data so selections persist across pages */}
                           <td className={`w-[36px] min-w-[36px] px-1 py-1 text-center border-r border-gray-200 z-10 shadow-lg ${selectedDeals.includes(deal.id) ? 'bg-blue-50' : 'bg-white'}`} style={{position: 'sticky', left: 0}}>

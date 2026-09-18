@@ -51,11 +51,21 @@ export default function DeveloperHome() {
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? "Good morning" : currentHour < 18 ? "Good afternoon" : "Good evening";
 
-  const { data: marketMetrics, isLoading: metricsLoading, refetch: refetchMetrics } = useQuery<MarketMetrics>({
+  const {
+    data: marketMetrics,
+    isLoading: metricsLoading,
+    isError: metricsError,
+    refetch: refetchMetrics,
+  } = useQuery<MarketMetrics>({
     queryKey: ["/api/market-metrics"],
     refetchInterval: 1000 * 60 * 15,
   });
-  const { data: pipelineStats, isLoading: statsLoading } = useQuery<PipelineStats>({
+  const {
+    data: pipelineStats,
+    isLoading: statsLoading,
+    isError: statsError,
+    refetch: refetchPipelineStats,
+  } = useQuery<PipelineStats>({
     queryKey: ["/api/deals/stats"],
     refetchInterval: 1000 * 60 * 5,
   });
@@ -94,7 +104,7 @@ export default function DeveloperHome() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 id="market-rates-heading" className="text-lg font-semibold text-slate-900">Market Rates</h2>
             <div className="flex items-center gap-2 text-xs text-slate-500">
-              {marketMetrics?.lastUpdated && (
+              {!metricsError && marketMetrics?.lastUpdated && (
                 <span>Updated: {new Date(marketMetrics.lastUpdated).toLocaleString()}</span>
               )}
               <button
@@ -118,6 +128,18 @@ export default function DeveloperHome() {
                   </div>
                 </Card>
               ))
+            ) : metricsError ? (
+              <Card className="col-span-2 border-red-200 bg-red-50 p-5 text-sm text-red-700 shadow-sm sm:col-span-4">
+                <p className="font-medium">Couldn't load market rates.</p>
+                <button
+                  type="button"
+                  onClick={() => refetchMetrics()}
+                  className="mt-2 font-semibold underline hover:no-underline"
+                  disabled={metricsLoading}
+                >
+                  Try again
+                </button>
+              </Card>
             ) : (
               (marketMetrics?.rates || []).map((rate) => (
                 <a
@@ -145,7 +167,7 @@ export default function DeveloperHome() {
               ))
             )}
           </div>
-          {marketMetrics?.note && <p className="mt-2 text-xs text-slate-500">{marketMetrics.note}</p>}
+          {!metricsError && marketMetrics?.note && <p className="mt-2 text-xs text-slate-500">{marketMetrics.note}</p>}
         </section>
 
         <section className="mb-8" aria-labelledby="pipeline-heading">
@@ -160,6 +182,18 @@ export default function DeveloperHome() {
                   </div>
                 </Card>
               ))
+            ) : statsError ? (
+              <Card className="col-span-2 border-red-200 bg-red-50 p-5 text-sm text-red-700 shadow-sm sm:col-span-4">
+                <p className="font-medium">Couldn't load pipeline data.</p>
+                <button
+                  type="button"
+                  onClick={() => refetchPipelineStats()}
+                  className="mt-2 font-semibold underline hover:no-underline"
+                  disabled={statsLoading}
+                >
+                  Try again
+                </button>
+              </Card>
             ) : (
               statCards.map((stat) => (
                 <Card key={stat.label} className="border-slate-200 bg-white p-4 shadow-sm">

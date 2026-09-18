@@ -246,7 +246,12 @@ ${articles.map((a, i) => `[${i + 1}] TITLE: ${a.title}\nURL: ${a.link}\nDATE: ${
         rawText: item.sourceTitle || null,
       });
       saved++;
-    } catch (_e) {}
+    } catch (saveErr) {
+      console.error(
+        `[ZONING] Failed to save agenda item for ${config.displayName} (${item.caseNumber || item.propertyAddress || "unknown item"}):`,
+        saveErr,
+      );
+    }
   }
 
   console.log(`✅ [ZONING] Saved ${saved} agenda items for ${config.displayName}`);
@@ -415,7 +420,12 @@ export async function fetchLoopNetListings(market: MarketKey): Promise<{ saved: 
           aiSignal: deriveListingSignal(listing),
         });
         saved++;
-      } catch (_e) {}
+      } catch (saveErr) {
+        console.error(
+          `[LISTINGS] Failed to save listing for ${config.displayName} (${listing.listingId || listing.id || listing.url || "unknown listing"}):`,
+          saveErr,
+        );
+      }
     }
 
     console.log(`✅ [LISTINGS] Saved ${saved} listings for ${config.displayName}`);

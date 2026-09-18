@@ -1,0 +1,14 @@
+Build a one-page PDF "Deal Memo" export, using the attached HTML/CSS design as the template (institutional layout: navy header with property title, a hero stat strip, a two-column body — Property & Program / Unit Mix / Development Cost / Capital Stack on the left, Year-1 Pro Forma / Return Assumptions & Auto IRR / Market Snapshot / Key Highlights on the right — a deal-stage stepper, and a footer).
+
+1. Add a "Export Deal Memo (PDF)" button on the deal detail view (wherever makes sense alongside other deal actions).
+2. Add a server endpoint (e.g. GET /api/deals/:id/memo-pdf) that:
+   - Loads the deal plus its resolved YOC/IRR breakdown via the existing calculateYOCBreakdown (server/services/yocUnderwritingService.ts) — reuse it unchanged, don't recompute the math separately.
+   - Loads the deal's developerProfile and reads its logoUrl, primaryColor, secondaryColor.
+   - Renders the HTML template with those values substituted as CSS variables (primaryColor → the navy/header color, secondaryColor → the accent/stat color), the developer's logoUrl in the header (falling back to a two-letter initials monogram in a soft translucent square if logoUrl is null — do NOT fall back to LandLinq's own logo), and the deal's real field values in every table/stat.
+   - Converts that HTML to a single-page, Letter-size PDF using Playwright (playwright-core is already a dependency; launch headless Chromium the same way this session's browser is configured, print at 8.5in x 11in with printBackground true) — do not use pdfkit for this one, since pdfkit's low-level drawing API can't reasonably reproduce this CSS layout; pdfkit's existing usage in partnerDeveloperAutoSend.ts is for a much simpler flyer and isn't a good fit here.
+   - Keep a small "Powered by LandLinq" wordmark in the footer on every export regardless of which investment company it's branded for.
+   - Returns the PDF as a download (Content-Type application/pdf, Content-Disposition attachment).
+3. Every investment company gets the exact same layout/sections — only the header logo, primary color, and accent color change per developerProfile. Don't let any deal-specific or developer-specific customization change which sections appear.
+4. I'll share the exact HTML/CSS template file for you to adapt — treat the color values in its :root block as the only things that should be swapped per developer, and treat the two example renders (LandLinq/Catalyst colors vs. a green/copper "Meridian Capital" placeholder) as proof the same markup already reskins cleanly.
+
+Non-regression: don't change the underlying YOC/IRR calculation, don't change the existing pdfkit-based auto-send flyer in partnerDeveloperAutoSend.ts.

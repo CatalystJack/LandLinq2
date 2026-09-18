@@ -113,6 +113,30 @@ interface ProfileAnalytics {
   lastActivityAt: string | null;
 }
 
+const COMPANY_LOGO_TILE_COLORS = [
+  "#E8F1FF",
+  "#EAF7F0",
+  "#FFF1E6",
+  "#F3EDFF",
+  "#E8F7F7",
+  "#FFF6D9",
+  "#FDECF3",
+  "#EDF2F7",
+  "#E9F3EC",
+  "#F1EEFF",
+];
+
+function getCompanyLogoTileColor(profile: Pick<ProfileAnalytics, "companyName" | "id">) {
+  const identity = profile.companyName.trim() || profile.id;
+  let hash = 0;
+
+  for (let index = 0; index < identity.length; index += 1) {
+    hash = (hash * 31 + identity.charCodeAt(index)) >>> 0;
+  }
+
+  return COMPANY_LOGO_TILE_COLORS[hash % COMPANY_LOGO_TILE_COLORS.length];
+}
+
 interface SystemWideAnalytics {
   profiles: ProfileAnalytics[];
   summary: {
@@ -308,7 +332,7 @@ function SystemWideView() {
           </thead>
           <tbody>
             {data.profiles.map((profile) => <tr key={profile.id} className="border-b last:border-0">
-              <td className="px-5 py-4"><div className="flex items-center gap-3">{profile.logoUrl ? <img src={profile.logoUrl} alt="" className="h-9 w-9 rounded border object-contain p-1" /> : <div className="flex h-9 w-9 items-center justify-center rounded bg-slate-100"><Building2 className="h-4 w-4 text-slate-400" /></div>}<div><p className="font-semibold text-slate-900">{profile.companyName}</p><Badge variant={profile.isActive ? "default" : "secondary"} className="mt-1">{profile.isActive ? "Active" : "Inactive"}</Badge></div></div></td>
+               <td className="px-5 py-4"><div className="flex items-center gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200" style={{ backgroundColor: getCompanyLogoTileColor(profile) }}>{profile.logoUrl ? <img src={profile.logoUrl} alt="" className="h-full w-full object-contain p-1" /> : <Building2 className="h-4 w-4 text-slate-400" />}</div><div><p className="font-semibold text-slate-900">{profile.companyName}</p><Badge variant={profile.isActive ? "default" : "secondary"} className="mt-1">{profile.isActive ? "Active" : "Inactive"}</Badge></div></div></td>
               <td className="px-4 py-4 font-semibold">{profile.deals.total}</td><td className="px-4 py-4 text-blue-700">{profile.deals.passed}</td><td className="px-4 py-4 text-amber-700">{profile.deals.review}</td><td className="px-4 py-4 text-green-700">{profile.deals.pursuing}</td><td className="px-4 py-4">{profile.crmContactCount}</td><td className="px-4 py-4">{profile.outreach.sent}</td><td className="px-4 py-4 text-slate-500">{profile.lastActivityAt ? format(new Date(profile.lastActivityAt), "MMM d, yyyy h:mm a") : "No activity"}</td>
             </tr>)}
           </tbody>
