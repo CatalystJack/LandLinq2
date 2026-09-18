@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DeveloperNavigation from "@/components/developer-navigation";
+import Navigation from "@/components/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import Footer from "@/components/footer";
 import AnalyticsDashboard from "@/components/analytics-dashboard";
@@ -60,6 +61,41 @@ async function loadAnalytics(): Promise<AnalyticsData> {
   return response.json();
 }
 
+async function loadPlatformAnalytics(): Promise<AnalyticsData> {
+  const [dealsResponse, profileResponse] = await Promise.all([
+    fetch("/api/analyst/deals", { credentials: "include" }),
+    fetch("/api/admin/analytics/by-profile", { credentials: "include" }),
+  ]);
+  if (!dealsResponse.ok || !profileResponse.ok) {
+    throw new Error("Failed to load platform analytics");
+  }
+
+  const dealsPayload = await dealsResponse.json();
+  const profilePayload = await profileResponse.json();
+  const rawDeals = Array.isArray(dealsPayload) ? dealsPayload : dealsPayload?.deals || [];
+  const deals = rawDeals.map((deal: any) => {
+    const rawStatus = String(deal.status || deal.classification || "").toLowerCase();
+    const status = rawStatus === "pursuing"
+      ? "Pursuing"
+      : rawStatus === "green" || rawStatus === "passed"
+        ? "Passed"
+        : rawStatus === "yellow" || rawStatus === "review"
+          ? "Review"
+          : deal.status || deal.classification || "Review";
+    return { ...deal, status };
+  });
+  const statusCounts = ["Passed", "Review", "Pursuing"].map((stage) => ({
+    stage,
+    count: deals.filter((deal: Deal) => deal.status === stage).length,
+  }));
+
+  return {
+    deals,
+    outreachStats: { sent: Number(profilePayload?.summary?.outreachSent) || 0 },
+    pipelineStageBreakdown: statusCounts,
+  };
+}
+
 const analyticsCardClass = "rounded-2xl border-slate-200 bg-white shadow-sm";
 const statusChartConfig = {
   Passed: { label: "Passed", color: "#ef4444" },
@@ -69,10 +105,13 @@ const statusChartConfig = {
 
 export default function DeveloperAnalytics() {
   const { isAuthenticated, user } = useAuth();
+  const role = String((user as any)?.role || "").toUpperCase();
+  const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
+  const hasAnalyticsAccess = role === "DEVELOPER" || isAdmin;
   const { data, isLoading, isError } = useQuery<AnalyticsData>({
-    queryKey: ["/api/developer-profile/me/analytics"],
-    queryFn: loadAnalytics,
-    enabled: isAuthenticated,
+    queryKey: [isAdmin ? "/api/admin/company-analytics" : "/api/developer-profile/me/analytics"],
+    queryFn: isAdmin ? loadPlatformAnalytics : loadAnalytics,
+    enabled: isAuthenticated && hasAnalyticsAccess,
   });
   const [filters, setFilters] = useState({ status: "all", city: "all", broker: "all", dateRange: "all" });
   const [showFilters, setShowFilters] = useState(false);
@@ -132,8 +171,8 @@ export default function DeveloperAnalytics() {
     };
   }, [filteredDeals]);
 
-  if (!isAuthenticated || String((user as any)?.role || "").toUpperCase() !== "DEVELOPER") {
-    return <div className="flex min-h-screen items-center justify-center bg-warm"><div className="text-center"><Shield className="mx-auto mb-4 h-14 w-14 text-slate-300" /><h1 className="font-serif text-3xl font-normal">Access Restricted</h1><p className="mt-2 text-slate-500">Analytics are only available to Investment Company users.</p></div></div>;
+  if (!isAuthenticated || !hasAnalyticsAccess) {
+    return <div className="flex min-h-screen items-center justify-center bg-warm"><div className="text-center"><Shield className="mx-auto mb-4 h-14 w-14 text-slate-300" /><h1 className="font-serif text-3xl font-normal">Access Restricted</h1><p className="mt-2 text-slate-500">Analytics are only available to Investment Company users and platform administrators.</p></div></div>;
   }
   if (isLoading) return <div className="flex min-h-screen items-center justify-center bg-warm text-slate-500">Loading analytics...</div>;
   if (isError) return <div className="flex min-h-screen items-center justify-center bg-warm text-slate-500">Unable to load analytics right now.</div>;
@@ -156,10 +195,10 @@ export default function DeveloperAnalytics() {
 
   return (
     <div className="min-h-screen bg-warm">
-      <DeveloperNavigation />
+      {isAdmin ? <Navigation /> : <DeveloperNavigation />}
       <div className="mx-auto max-w-[1680px] px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
-          title="Analytics Dashboard"
+          title={isAdmin ? "Company Analytics" : "Analytics Dashboard"}
           actions={
             <>
               <Dialog open={showFilters} onOpenChange={setShowFilters}>

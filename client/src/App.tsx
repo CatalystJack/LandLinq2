@@ -289,6 +289,7 @@ function Router() {
           <Route path="/data-hub" component={DataHub} />
           <Route path="/listing-review" component={ListingReview} />
           <Route path="/analytics" component={AnalyticsPage} />
+          <Route path="/admin/analytics" component={DeveloperAnalytics} />
           <Route path="/api-monitoring" component={ApiMonitoring} />
           <Route path="/messaging" component={MessagingPage} />
           <Route path="/ai-training" component={AITraining} />

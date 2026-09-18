@@ -1667,22 +1667,24 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 .ll-hero-stat {
   display: flex;
   min-height: 10.5rem;
+  align-items: center;
   flex-direction: column;
   justify-content: center;
   padding: 2.25rem clamp(1.25rem, 4vw, 4rem);
+  text-align: center;
 }
 .ll-hero-stat + .ll-hero-stat {
   border-top: 1px solid rgba(16,40,61,.14);
 }
 .ll-hero-stat strong {
   display: inline-block;
-  align-self: flex-start;
+  align-self: center;
   color: #10283d;
   font-size: clamp(2.4rem, 5vw, 4.5rem);
   font-weight: 650;
   letter-spacing: -.065em;
   line-height: .95;
-  transform-origin: left bottom;
+  transform-origin: center bottom;
   will-change: transform;
 }
 .ll-hero-stat strong span {

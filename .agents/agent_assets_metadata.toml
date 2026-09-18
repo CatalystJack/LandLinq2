@@ -217,3 +217,17 @@ mtime_ms = 1789748341473
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/d77376b0-0a5d-4d51-bfce-a09aff0dca64/dce7fafd-a47d-4521-afa8-5bea401e0636"
 storage_version_token = "1789748353814245"
 content_type = "image/png"
+
+[[outputs]]
+id = "eDK4nt0oGWSEYQQEmazO7"
+uri = "file://screenshots/executive-dashboard-restyled.jpg"
+type = "image"
+title = "Restyled Platform Dashboard"
+description = "Authenticated component preview of the updated executive dashboard using representative browser-only API responses; no project data was changed."
+logical_id = "8a8b10d4-279d-441b-9f11-75fca46ec3f1"
+content_hash = "sha256:c4846e10ca486cb7689c68781a376284770caa13b1770baa4bd5d813b6fda00a"
+size = 150435
+mtime_ms = 1789756702116
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/8a8b10d4-279d-441b-9f11-75fca46ec3f1/596d0747-e75f-465f-b71f-a62738417d23"
+storage_version_token = "1789756716312850"
+content_type = "image/jpeg"

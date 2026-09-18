@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter, SheetClose } from "@/components/ui/sheet";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import Footer from "@/components/footer";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -31,7 +33,7 @@ import {
   X
 } from "lucide-react";
 import { format } from "date-fns";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, PieChart as RechartsPieChart, Pie, Cell } from "recharts";
 import { Link } from "wouter";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -158,14 +160,60 @@ const COLORS = {
   navy: '#081729',
 };
 
+const analyticsCardClass = "rounded-2xl border-slate-200 bg-white shadow-sm";
+const classificationChartConfig = {
+  passed: { label: "Passed", color: COLORS.red },
+  review: { label: "Review", color: COLORS.yellow },
+  pursuing: { label: "Pursuing", color: COLORS.green },
+};
+const sourceChartConfig = {
+  sourced: { label: "LandLinq sourced", color: COLORS.navy },
+  bulkImported: { label: "Bulk imported", color: "#498EDE" },
+};
+const trendChartConfig = {
+  green: { label: "Green", color: COLORS.green },
+  yellow: { label: "Yellow", color: COLORS.yellow },
+  red: { label: "Red", color: COLORS.red },
+};
+const dealClassificationChartConfig = {
+  Green: { label: "Green", color: COLORS.green },
+  Yellow: { label: "Yellow", color: COLORS.yellow },
+  Red: { label: "Red", color: COLORS.red },
+  Pending: { label: "Pending", color: "#94a3b8" },
+};
+
+function ChartLegendGrid({
+  items,
+  columns = 3,
+}: {
+  items: Array<{ label: string; color: string; value?: string | number }>;
+  columns?: 2 | 3 | 4;
+}) {
+  const columnClass = columns === 2 ? "sm:grid-cols-2" : columns === 4 ? "sm:grid-cols-4" : "sm:grid-cols-3";
+  return (
+    <div className={`mt-3 grid grid-cols-1 gap-2 ${columnClass}`}>
+      {items.map((item) => (
+        <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+              <span className="truncate text-xs font-medium text-slate-600">{item.label}</span>
+            </div>
+            {item.value !== undefined && <span className="text-sm font-bold text-[#081729]">{item.value}</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function KPICard({ 
   title, 
   value, 
   subtitle, 
   icon: Icon, 
   trend, 
-  trendValue,
-  color = 'blue'
+  trendValue
 }: { 
   title: string; 
   value: string | number; 
@@ -175,31 +223,15 @@ function KPICard({
   trendValue?: string;
   color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple';
 }) {
-  const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-200',
-    green: 'bg-green-50 text-green-600 border-green-200',
-    yellow: 'bg-yellow-50 text-yellow-600 border-yellow-200',
-    red: 'bg-red-50 text-red-600 border-red-200',
-    purple: 'bg-purple-50 text-purple-600 border-purple-200',
-  };
-
-  const iconBgClasses = {
-    blue: 'bg-blue-100',
-    green: 'bg-green-100',
-    yellow: 'bg-yellow-100',
-    red: 'bg-red-100',
-    purple: 'bg-purple-100',
-  };
-
   return (
-    <Card className={`${colorClasses[color]} border-2 hover:shadow-lg transition-shadow`}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
+    <Card className={`${analyticsCardClass} overflow-hidden`}>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
-            <p className="text-3xl font-bold">{value}</p>
+            <p className="text-sm font-medium text-slate-500">{title}</p>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-[#081729]">{value}</p>
             {subtitle && (
-              <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+              <p className="mt-1 text-xs text-slate-400">{subtitle}</p>
             )}
             {trend && trendValue && (
               <div className={`flex items-center mt-2 text-sm ${trend === 'up' ? 'text-green-600' : trend === 'down' ? 'text-red-600' : 'text-gray-500'}`}>
@@ -208,8 +240,8 @@ function KPICard({
               </div>
             )}
           </div>
-          <div className={`p-4 rounded-full ${iconBgClasses[color]}`}>
-            <Icon className="h-8 w-8" />
+          <div className="rounded-xl bg-[#498EDE]/15 p-3 text-[#498EDE]">
+            <Icon className="h-5 w-5" />
           </div>
         </div>
       </CardContent>
@@ -277,7 +309,7 @@ function SystemWideView() {
     return <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">{[1, 2, 3, 4].map((item) => <Skeleton key={item} className="h-32" />)}</div>;
   }
   if (isError || !data) {
-    return <Card><CardContent className="py-16 text-center text-slate-500">Unable to load system-wide Investment Company analytics.</CardContent></Card>;
+    return <Card className={analyticsCardClass}><CardContent className="py-16 text-center text-slate-500">Unable to load system-wide Investment Company analytics.</CardContent></Card>;
   }
 
   const summary = data.summary;
@@ -290,41 +322,48 @@ function SystemWideView() {
     </div>
 
     <div className="grid gap-6 xl:grid-cols-2">
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-blue-600" />Classification by Investment Company</CardTitle></CardHeader>
+      <Card className={analyticsCardClass}>
+        <CardHeader><CardTitle className="flex items-center gap-2 text-[#081729]"><BarChart3 className="h-5 w-5 text-[#498EDE]" />Classification by Investment Company</CardTitle></CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={340}>
-            <BarChart data={data.profiles} layout="vertical" margin={{ left: 20 }}>
+          <ChartContainer config={classificationChartConfig} className="h-[340px] w-full aspect-auto">
+            <RechartsBarChart data={data.profiles} layout="vertical" margin={{ left: 20 }}>
               <XAxis type="number" allowDecimals={false} />
               <YAxis type="category" dataKey="companyName" width={120} fontSize={12} />
-              <Tooltip />
-              <Legend />
+              <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
               <Bar dataKey="deals.passed" name="Passed" fill="#ef4444" stackId="classification" />
               <Bar dataKey="deals.review" name="Review" fill="#eab308" stackId="classification" />
               <Bar dataKey="deals.pursuing" name="Pursuing" fill="#22c55e" stackId="classification" />
-            </BarChart>
-          </ResponsiveContainer>
+            </RechartsBarChart>
+          </ChartContainer>
+          <ChartLegendGrid items={[
+            { label: "Passed", color: COLORS.red },
+            { label: "Review", color: COLORS.yellow },
+            { label: "Pursuing", color: COLORS.green },
+          ]} />
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-purple-600" />Deal Source Mix</CardTitle></CardHeader>
+      <Card className={analyticsCardClass}>
+        <CardHeader><CardTitle className="flex items-center gap-2 text-[#081729]"><Activity className="h-5 w-5 text-[#498EDE]" />Deal Source Mix</CardTitle></CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={340}>
-            <BarChart data={data.profiles} layout="vertical" margin={{ left: 20 }}>
+          <ChartContainer config={sourceChartConfig} className="h-[340px] w-full aspect-auto">
+            <RechartsBarChart data={data.profiles} layout="vertical" margin={{ left: 20 }}>
               <XAxis type="number" allowDecimals={false} />
               <YAxis type="category" dataKey="companyName" width={120} fontSize={12} />
-              <Tooltip />
-              <Legend />
+              <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
               <Bar dataKey="sources.sourced" name="LandLinq sourced" fill="#081729" stackId="source" />
               <Bar dataKey="sources.bulkImported" name="Bulk imported" fill="#4A90E2" stackId="source" />
-            </BarChart>
-          </ResponsiveContainer>
+            </RechartsBarChart>
+          </ChartContainer>
+          <ChartLegendGrid columns={2} items={[
+            { label: "LandLinq sourced", color: COLORS.navy },
+            { label: "Bulk imported", color: "#498EDE" },
+          ]} />
         </CardContent>
       </Card>
     </div>
 
-    <Card>
-      <CardHeader><CardTitle>Company Activity Detail</CardTitle></CardHeader>
+    <Card className={analyticsCardClass}>
+      <CardHeader><CardTitle className="text-[#081729]">Company Activity Detail</CardTitle></CardHeader>
       <CardContent className="table-scroll-container p-0">
         <table className="w-full min-w-[1050px] text-sm">
           <thead className="border-y bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -622,7 +661,7 @@ export default function ExecutiveDashboard() {
           {statsLoading ? (
             <>
               {[1, 2, 3, 4].map(i => (
-                <Card key={i}>
+                <Card key={i} className={analyticsCardClass}>
                   <CardContent className="p-6">
                     <Skeleton className="h-24" />
                   </CardContent>
@@ -666,10 +705,10 @@ export default function ExecutiveDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2">
+          <Card className={`${analyticsCardClass} lg:col-span-2`}>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <BarChart3 size={20} className="text-blue-600" />
+              <CardTitle className="flex items-center gap-2 text-lg text-[#081729]">
+                <BarChart3 size={20} className="text-[#498EDE]" />
                 Deal Flow Trend
               </CardTitle>
             </CardHeader>
@@ -677,25 +716,31 @@ export default function ExecutiveDashboard() {
               {statsLoading ? (
                 <Skeleton className="h-[300px]" />
               ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={trendData}>
+                <>
+                  <ChartContainer config={trendChartConfig} className="h-[300px] w-full aspect-auto">
+                    <RechartsBarChart data={trendData}>
                     <XAxis dataKey="month" fontSize={12} />
                     <YAxis fontSize={12} />
-                    <Tooltip />
-                    <Legend />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
                     <Bar dataKey="green" name="Green" fill={COLORS.green} stackId="stack" />
                     <Bar dataKey="yellow" name="Yellow" fill={COLORS.yellow} stackId="stack" />
                     <Bar dataKey="red" name="Red" fill={COLORS.red} stackId="stack" />
-                  </BarChart>
-                </ResponsiveContainer>
+                    </RechartsBarChart>
+                  </ChartContainer>
+                  <ChartLegendGrid items={[
+                    { label: "Green", color: COLORS.green },
+                    { label: "Yellow", color: COLORS.yellow },
+                    { label: "Red", color: COLORS.red },
+                  ]} />
+                </>
               )}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className={analyticsCardClass}>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Activity size={20} className="text-purple-600" />
+              <CardTitle className="flex items-center gap-2 text-lg text-[#081729]">
+                <Activity size={20} className="text-[#498EDE]" />
                 Deal Classification
               </CardTitle>
             </CardHeader>
@@ -703,8 +748,10 @@ export default function ExecutiveDashboard() {
               {statsLoading ? (
                 <Skeleton className="h-[300px]" />
               ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
+                <>
+                  <ChartContainer config={dealClassificationChartConfig} className="mx-auto h-[260px] w-full max-w-[320px] aspect-auto">
+                    <RechartsPieChart>
+                      <ChartTooltip cursor={false} content={<ChartTooltipContent nameKey="name" hideLabel />} />
                     <Pie
                       data={pieData}
                       cx="50%"
@@ -712,25 +759,32 @@ export default function ExecutiveDashboard() {
                       innerRadius={60}
                       outerRadius={100}
                       dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
+                      paddingAngle={3}
+                      stroke="#ffffff"
+                      strokeWidth={2}
                     >
                       {pieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                    </RechartsPieChart>
+                  </ChartContainer>
+                  <ChartLegendGrid columns={2} items={pieData.map((item) => ({
+                    label: item.name,
+                    color: item.color,
+                    value: item.value,
+                  }))} />
+                </>
               )}
             </CardContent>
           </Card>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card>
+          <Card className={analyticsCardClass}>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <MapPin size={20} className="text-green-600" />
+              <CardTitle className="flex items-center gap-2 text-lg text-[#081729]">
+                <MapPin size={20} className="text-[#498EDE]" />
                 Top Markets
               </CardTitle>
             </CardHeader>
@@ -765,10 +819,10 @@ export default function ExecutiveDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2">
+          <Card className={`${analyticsCardClass} lg:col-span-2`}>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Newspaper size={20} className="text-orange-600" />
+              <CardTitle className="flex items-center gap-2 text-lg text-[#081729]">
+                <Newspaper size={20} className="text-[#498EDE]" />
                 Real Estate News
               </CardTitle>
             </CardHeader>
@@ -799,6 +853,7 @@ export default function ExecutiveDashboard() {
           <p>Data refreshes automatically every minute. Last updated: {format(new Date(), 'h:mm a')}</p>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

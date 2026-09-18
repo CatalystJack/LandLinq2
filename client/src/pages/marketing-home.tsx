@@ -240,13 +240,12 @@ export default function MarketingHome() {
 
          <section id="company" data-reveal className="ll-scroll-reveal bg-background px-4 py-16 sm:px-8 sm:py-32 lg:px-10 lg:py-40"><div className="mx-auto max-w-3xl"><div className="mb-10 sm:mb-14"><h2 className="text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">Know what you're getting.</h2></div><div className="divide-y divide-border border-y border-border">{faqs.map(([question, answer], i) => <div key={question}><button type="button" onClick={() => setOpenFaq(openFaq === i ? null : i)} aria-expanded={openFaq === i} className="flex w-full items-center justify-between gap-4 py-5 text-left text-base font-semibold sm:gap-5 sm:py-6 sm:text-lg"><span>{question}</span><ChevronDown className={`h-5 w-5 shrink-0 text-primary transition-transform duration-300 ${openFaq === i ? "rotate-180" : ""}`} /></button><div className={`grid transition-[grid-template-rows,opacity] duration-300 ${openFaq === i ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}><div className="overflow-hidden"><p className="max-w-2xl pb-6 leading-7 text-muted-foreground">{answer}</p></div></div></div>)}</div></div></section>
 
-         <section id="contact" data-reveal className="ll-scroll-reveal bg-muted/40 px-4 py-16 sm:px-8 sm:py-32 lg:px-10">
-           <div className="mx-auto max-w-7xl rounded-3xl bg-primary p-5 text-primary-foreground sm:p-14 lg:p-20">
-            <div className="grid gap-12 lg:grid-cols-[1fr_0.72fr] lg:items-end">
+          <section id="contact" data-reveal className="ll-scroll-reveal bg-muted/40 px-4 py-12 sm:px-8 sm:py-20 lg:px-10">
+            <div className="mx-auto max-w-7xl rounded-3xl bg-primary p-5 text-primary-foreground sm:p-10 lg:p-12">
+             <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-12">
               <div>
-                <p className="mb-6 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">Make the next decision faster</p>
-                 <h2 className="max-w-3xl text-[clamp(2.65rem,12vw,3.75rem)] font-semibold leading-[0.98] tracking-[-0.06em] sm:text-7xl">See what a supercharged acquisitions team looks like.</h2>
-                 <p className="mt-6 max-w-xl text-base leading-7 text-white/65 sm:mt-7">Tell us a little about what your team is trying to solve. We’ll be in touch.</p>
+                  <h2 className="max-w-2xl text-[clamp(2.25rem,8vw,3.25rem)] font-semibold leading-[1.02] tracking-[-0.05em]">See what a supercharged acquisitions team looks like.</h2>
+                  <p className="mt-5 max-w-xl text-base leading-7 text-white/65">Tell us a little about what your team is trying to solve. We’ll be in touch.</p>
               </div>
                <form onSubmit={async (event) => {
                 event.preventDefault();
@@ -265,14 +264,14 @@ export default function MarketingHome() {
                   setContactStatus("error");
                   setContactError(error instanceof Error ? error.message : "We could not send your message.");
                 }
-                }} className="w-full max-w-[520px] justify-self-end rounded-3xl border border-white/20 p-5 sm:p-8 lg:min-h-[390px] lg:p-9">
+                }} className="w-full max-w-[680px] justify-self-end rounded-3xl border border-white/20 p-5 sm:p-6">
                 {contactStatus === "success" ? <p className="text-lg font-semibold text-white">Thanks — we’ll be in touch.</p> : <>
                    <div className="grid gap-4 sm:grid-cols-2">
                      <input aria-label="Your name" required value={contactForm.name} onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })} placeholder="Your name" className="h-14 rounded-full border border-white/25 bg-transparent px-6 text-base text-white outline-none transition-colors placeholder:text-white/40 focus:border-white/60" />
                      <input aria-label="Your email" type="email" required value={contactForm.email} onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })} placeholder="you@company.com" className="h-14 rounded-full border border-white/25 bg-transparent px-6 text-base text-white outline-none transition-colors placeholder:text-white/40 focus:border-white/60" />
                   </div>
-                   <textarea aria-label="Your message" required rows={6} value={contactForm.message} onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })} placeholder="How can we help?" className="mt-4 min-h-[180px] w-full resize-none rounded-3xl border border-white/25 bg-transparent p-5 text-base leading-7 text-white outline-none transition-colors placeholder:text-white/40 focus:border-white/60" />
-                   <button type="submit" disabled={contactStatus === "sending"} className="mt-5 h-14 rounded-full bg-white px-8 text-base font-semibold text-primary transition-colors hover:bg-white/90 disabled:opacity-60">{contactStatus === "sending" ? "Sending…" : "Send message"}</button>
+                    <textarea aria-label="Your message" required rows={5} value={contactForm.message} onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })} placeholder="How can we help?" className="mt-4 min-h-[150px] w-full resize-none rounded-3xl border border-white/25 bg-transparent p-5 text-base leading-7 text-white outline-none transition-colors placeholder:text-white/40 focus:border-white/60" />
+                    <button type="submit" disabled={contactStatus === "sending"} className="mt-4 h-12 rounded-full bg-white px-7 text-sm font-semibold text-primary transition-colors hover:bg-white/90 disabled:opacity-60">{contactStatus === "sending" ? "Sending…" : "Send message"}</button>
                   {contactStatus === "error" && <p role="alert" className="mt-3 text-sm text-red-200">{contactError}</p>}
                 </>}
               </form>
