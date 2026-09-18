@@ -88,6 +88,7 @@ import {
 } from "lucide-react";
 import type { Deal, Broker, PublicListingData } from "@shared/schema";
 import { formatDealNumber } from "@shared/schema";
+import { isAutomaticallyCoastal } from "@shared/coastal-counties";
 import QuickDealAddition from "@/components/quick-property-evaluation";
 import PropertyDataPanel from "@/components/property-data-panel";
 import ComparablesMap from "@/components/comparables-map";
@@ -759,7 +760,17 @@ export default function AnalystDashboard() {
   const [scrollToDealId, setScrollToDealId] = useState<string | null>(null);
 
   // Address edit dialog state
-  const [editAddressDialog, setEditAddressDialog] = useState<{dealId: string; address: string; city: string; state: string; zip: string; lat: string; lng: string} | null>(null);
+  const [editAddressDialog, setEditAddressDialog] = useState<{
+    dealId: string;
+    address: string;
+    city: string;
+    county: string;
+    state: string;
+    zip: string;
+    lat: string;
+    lng: string;
+    coastalMode: 'auto' | 'coastal' | 'inland';
+  } | null>(null);
 
   // Expanded documents state - tracks which deals have expanded document lists
   const [expandedBrokerDocs, setExpandedBrokerDocs] = useState<Set<string>>(new Set());
@@ -7430,10 +7441,12 @@ export default function AnalystDashboard() {
                                           dealId: deal.id,
                                           address: deal.address || '',
                                           city: deal.city || '',
+                                           county: deal.county || '',
                                           state: deal.state || '',
                                           zip: deal.zip || '',
                                           lat: String((deal as any).manualLatitude || (deal as any).latitude || ''),
                                           lng: String((deal as any).manualLongitude || (deal as any).longitude || ''),
+                                           coastalMode: deal.manualIsCoastal === true ? 'coastal' : deal.manualIsCoastal === false ? 'inland' : 'auto',
                                         });
                                       }}
                                       size="sm"
@@ -9105,6 +9118,28 @@ export default function AnalystDashboard() {
                   </p>
                 )}
               </div>
+
+              <div className="border-t pt-4 space-y-2">
+                <label className="text-sm font-medium">YOC insurance location</label>
+                <Select
+                  value={editAddressDialog.coastalMode}
+                  onValueChange={(value: 'auto' | 'coastal' | 'inland') => setEditAddressDialog({ ...editAddressDialog, coastalMode: value })}
+                >
+                  <SelectTrigger data-testid="select-dialog-coastal-override">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">
+                      Auto-detect (currently: {isAutomaticallyCoastal(editAddressDialog.state, editAddressDialog.county) ? 'Coastal' : 'Inland'})
+                    </SelectItem>
+                    <SelectItem value="coastal">Force Coastal</SelectItem>
+                    <SelectItem value="inland">Force Inland</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Automatic result from {editAddressDialog.county || 'the deal county'}: {isAutomaticallyCoastal(editAddressDialog.state, editAddressDialog.county) ? 'Coastal' : 'Inland'}.
+                </p>
+              </div>
             </div>
           )}
           
@@ -9139,6 +9174,9 @@ export default function AnalystDashboard() {
                   payload.manualLatitude = null;
                   payload.manualLongitude = null;
                 }
+                payload.manualIsCoastal = editAddressDialog.coastalMode === 'auto'
+                  ? null
+                  : editAddressDialog.coastalMode === 'coastal';
                 const dealId = editAddressDialog.dealId;
                 setEditAddressDialog(null);
 

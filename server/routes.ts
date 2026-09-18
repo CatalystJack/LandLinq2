@@ -10267,7 +10267,7 @@ Provide your analysis in this exact JSON format:
         // Dec 15, 2025: Next Assignee and Deal Step dropdown fields
         'nextAssignee', 'dealStep',
         // Dec 16, 2025: Manual coordinate override for geocoding errors
-        'manualLatitude', 'manualLongitude', 'manualCoordsReason',
+        'manualLatitude', 'manualLongitude', 'manualCoordsReason', 'manualIsCoastal',
         // Dec 22, 2025: Priority rating (1-5)
         'priority',
         // Jan 7, 2026: Deal type (land/acquisition)

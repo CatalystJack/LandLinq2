@@ -308,7 +308,8 @@ setTimeout(() => {
           ADD COLUMN IF NOT EXISTS parsed_parcel_id varchar;
         ALTER TABLE deals
           ADD COLUMN IF NOT EXISTS census_data_json jsonb,
-          ADD COLUMN IF NOT EXISTS census_data_fetched_at timestamp;
+          ADD COLUMN IF NOT EXISTS census_data_fetched_at timestamp,
+          ADD COLUMN IF NOT EXISTS manual_is_coastal boolean;
         ALTER TABLE developer_product_types
           ADD COLUMN IF NOT EXISTS dua numeric,
           ADD COLUMN IF NOT EXISTS hard_cost_pu numeric,

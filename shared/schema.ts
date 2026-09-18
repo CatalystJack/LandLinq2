@@ -668,6 +668,7 @@ export const deals = pgTable("deals", {
   // Manual Geocoding Override Fields (for incorrect pins)
   manualLatitude: decimal("manual_latitude", { precision: 10, scale: 7 }), // Admin-corrected latitude (overrides geocoded value)
   manualLongitude: decimal("manual_longitude", { precision: 10, scale: 7 }), // Admin-corrected longitude (overrides geocoded value)
+  manualIsCoastal: boolean("manual_is_coastal"), // Analyst override for YOC coastal/inland insurance pricing; null uses automatic county detection
   manualCoordsSetBy: varchar("manual_coords_set_by").references(() => users.id), // Who manually set the coordinates
   manualCoordsSetAt: timestamp("manual_coords_set_at"), // When coordinates were manually corrected
   manualCoordsReason: text("manual_coords_reason"), // Why coordinates were manually corrected

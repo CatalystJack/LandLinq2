@@ -5,6 +5,7 @@ import {
   developerProductTypes,
   partnerDeveloperSends,
 } from "@shared/schema";
+import { isAutomaticallyCoastal } from "@shared/coastal-counties";
 
 export const PRESET_VERSION = "v22-other-income";
 
@@ -227,17 +228,6 @@ export const PRODUCT_TYPE_YOC_PRESETS: Record<string, YocPreset> = {
   },
 };
 
-const COASTAL_STATES = new Set(["FL", "SC"]);
-const COASTAL_CITIES_NC = new Set([
-  "WILMINGTON", "CAROLINA BEACH", "WRIGHTSVILLE BEACH", "KURE BEACH",
-  "OAK ISLAND", "SOUTHPORT", "HOLDEN BEACH", "OCEAN ISLE BEACH", "SUNSET BEACH",
-  "SURF CITY", "TOPSAIL BEACH", "SNEADS FERRY", "SWANSBORO",
-  "MOREHEAD CITY", "BEAUFORT", "NEW BERN", "JACKSONVILLE",
-]);
-const COASTAL_CITIES_GA = new Set([
-  "SAVANNAH", "BRUNSWICK", "ST. SIMONS ISLAND", "ST SIMONS ISLAND",
-  "TYBEE ISLAND", "JEKYLL ISLAND", "DARIEN", "WOODBINE", "KINGSLAND", "RICHMOND HILL",
-]);
 const RE_TAX_ADJUSTMENT_BY_STATE: Record<string, number> = { TN: 495 };
 const RENT_MULT_BY_STATE: Record<string, number> = {
   NC: 0.82, GA: 0.9, TN: 1, FL: 1, SC: 1, VA: 0.95,
@@ -466,12 +456,10 @@ export async function calculateYOCBreakdown(
   if (typeKeys.length === 0) return null;
 
   const state = String(deal.state || "");
-  const city = String(deal.city || "");
   const stateKey = state.toUpperCase();
+  const city = String(deal.city || "");
   const cityKey = city.toUpperCase().trim();
-  const isCoastal = COASTAL_STATES.has(stateKey) ||
-    (stateKey === "NC" && COASTAL_CITIES_NC.has(cityKey)) ||
-    (stateKey === "GA" && COASTAL_CITIES_GA.has(cityKey));
+  const isCoastal = deal.manualIsCoastal ?? isAutomaticallyCoastal(stateKey, deal.county);
   const reTaxAdjPU = RE_TAX_ADJUSTMENT_BY_STATE[stateKey] ?? 0;
   let rentStateMult = RENT_MULT_BY_STATE[stateKey] ?? RENT_MULT_DEFAULT;
   let landStateMult = LAND_COST_MULT_BY_STATE[stateKey] ?? LAND_COST_MULT_DEFAULT;
