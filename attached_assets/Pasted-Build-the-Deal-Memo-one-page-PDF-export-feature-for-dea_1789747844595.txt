@@ -1,0 +1,26 @@
+Build the "Deal Memo" one-page PDF export feature for deals. This should produce an institutional-grade, single-page (8.5x11in Letter) PDF summarizing a deal, generated server-side and downloadable from the deal detail page (and developer-facing deal view).
+
+RENDERING APPROACH:
+- Use Playwright (already a dependency: playwright-core) with headless Chromium to render an HTML/CSS template to PDF. Do NOT use pdfkit for this — it can't reproduce the layout.
+- page.pdf() with width: '8.5in', height: '11in', printBackground: true, margin: { top: 0, bottom: 0, left: 0, right: 0 }.
+
+FONT:
+- The brand font is Newsreader (Google Fonts serif, already used site-wide via client/index.html and tailwind.config.ts fontFamily.serif).
+- Self-host it for PDF rendering: install @fontsource/newsreader, extract the woff2 files for weights 400/500/600/700, base64-encode them, and embed as @font-face rules directly in the generated HTML (data:font/woff2;base64,...). Do NOT depend on a live fetch to fonts.googleapis.com at export time — it may not be reachable from the server.
+
+LAYOUT (top to bottom):
+1. Header: full property address written normally (street, city, state, zip), with county/MSA shown separately in the address line separated by a diamond character. No "Deal ID" anywhere. No "Prepared by [company]" branding line in the default (LandLinq) template — default template shows "LandLinq" branding only.
+2. A row of 5 hero stat cards (not 6) with a thin colored top border, showing the deal's key metrics (TDC, cost/unit, Year-1 NOI, Auto-YOC, 5-yr Auto-IRR once that exists — see the separate IRR prompt; use YOC and existing metrics for now).
+3. A full-width "Investment Thesis" section — one paragraph, template-generated from data the platform already computes (address, submarket growth stat, Auto-YOC, exit cap, etc.) — NOT an AI-generated free-text field, and no "Next Steps" section (that varies too much per deal to templatize).
+4. Footer: only this single line, nothing else — "Planning-level estimate — not an appraisal, and not investment, legal, or tax advice." No data-source citations, no "Sample Data" or "Confidential" pills anywhere on the page.
+
+WHITE-LABELING (this is required, not optional):
+- When a developer/investment-company user exports a Deal Memo for one of their deals, the template must use THEIR branding: developerProfiles.logoUrl in place of the LandLinq mark, developerProfiles.primaryColor / secondaryColor driving the accent colors (hero card top-border color, header rule color, etc.).
+- In the white-labeled variant: no disclaimer/footer line at all — footer shows only "Powered by LandLinq" in small text. No Sample Data/Confidential pills, same as default.
+- Every investment company should get the exact same layout/format, just swapped colors and logo — do not build separate layouts per company.
+
+ENDPOINT:
+- Add something like GET /api/deals/:id/memo-pdf that renders and streams the PDF, respecting the requesting user's developer profile for white-labeling when applicable (platform admins/analysts viewing internally should get the LandLinq-branded default).
+- Add a "Download Deal Memo" button on the deal detail page.
+
+Confirm when done by pasting the actual diff of new files/routes added — do not just describe it in the commit message.
