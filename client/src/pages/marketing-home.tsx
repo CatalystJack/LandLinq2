@@ -504,7 +504,6 @@ function InvestmentCompanyDemo() {
     { label: "Outreach", detail: "Keep follow-up moving", render: <OutreachWorkspaceMockup /> },
     { label: "Analytics", detail: "See performance clearly", render: <OutreachAnalyticsMockup /> },
     { label: "Data Hub", detail: "Connect market signals", render: <DataHubMockup /> },
-    { label: "IC Memo", detail: "Turn analysis into a decision", render: <ICMemoMockup /> },
     { label: "Truss", detail: "Ask the workspace anything", render: <AIAssistantMockup /> },
   ];
 
@@ -663,30 +662,6 @@ export default function MarketingHome() {
 
         <HeroStats />
 
-         <section className="ll-security-section px-4 py-20 sm:px-8 sm:py-28 lg:px-10 lg:py-36" aria-labelledby="security-title">
-           <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[0.78fr_1.22fr] lg:gap-20">
-             <div className="ll-editorial-copy">
-               <span className="ll-eyebrow ll-eyebrow-light">PRIVATE BY DEFAULT</span>
-               <h2 id="security-title">A secure way to scale your strategy.</h2>
-               <p>Your deal criteria, contacts, analysis, and outreach stay inside your organization’s workspace. LandLinq gives every teammate the context they need without creating another shared data layer.</p>
-               <div className="ll-editorial-points"><span><b>01</b><strong>One private workspace</strong><small>Your team works from the same source of truth.</small></span><span><b>02</b><strong>Clear tenant boundaries</strong><small>Deal activity and relationship data stay scoped to your organization.</small></span></div>
-             </div>
-             <div className="ll-editorial-visual"><SecureWorkspaceMockup /></div>
-           </div>
-         </section>
-
-         <section className="ll-shared-workspace-section px-4 py-20 sm:px-8 sm:py-28 lg:px-10 lg:py-36" aria-labelledby="shared-workspace-title">
-           <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1.18fr_0.82fr] lg:gap-20">
-             <div className="ll-editorial-visual lg:order-first"><SharedWorkspaceMockup /></div>
-             <div className="ll-editorial-copy">
-               <span className="ll-eyebrow">ONE SHARED WORKSPACE</span>
-               <h2 id="shared-workspace-title">One place for your deals and data. For everyone.</h2>
-               <p>Give acquisitions, underwriting, and relationship teams the same view of what is happening. Every decision starts with the deal context already in reach.</p>
-               <div className="ll-editorial-link"><span>Explore the Investment Company workspace</span><b>↗</b></div>
-             </div>
-           </div>
-         </section>
-
          <section className="ll-journey px-4 py-20 sm:px-8 sm:py-28 lg:px-10 lg:py-36" aria-labelledby="platform-journey-title">
            <div className="mx-auto max-w-7xl">
              <div className="ll-journey-intro">
@@ -745,14 +720,6 @@ export default function MarketingHome() {
                  </div>
                  <div className="ll-step-surface ll-surface-paper"><OutreachAnalyticsMockup /></div>
                </article>
-                <article className="ll-journey-step">
-                  <div className="ll-step-copy">
-                    <span className="ll-eyebrow">IC MEMO</span>
-                    <h3>Turn analysis into a decision.</h3>
-                    <p>Assemble a committee-ready memo with the recommendation, investment thesis, key risks, and next step already in context.</p>
-                  </div>
-                  <div className="ll-step-surface ll-surface-paper"><ICMemoMockup /></div>
-                </article>
                 <article className="ll-journey-step ll-step-chat">
                   <div className="ll-step-copy">
                     <span className="ll-eyebrow">AI ASSISTANT</span>
