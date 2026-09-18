@@ -80,28 +80,57 @@ function OutreachAnalyticsMockup() {
 }
 
 function AutoYocMockup() {
-  const groups = [
-    ["Development Costs", ["Dua", "Hard cost / unit", "Assumed land cost / unit", "Soft costs"]],
-    ["Operating Income & Expenses", ["Other income / unit / month", "Fixed operating expenses", "Insurance / unit", "Management fee"]],
-    ["Rental Loss Assumptions", ["Vacancy", "Loss-to-lease", "Concessions", "Bad debt"]],
-    ["IRR & Exit Assumptions", ["Annual rent growth", "Annual expense growth", "Hold period (years)", "Exit capitalization rate"]],
-    ["Unit Mix", ["1 Bedroom · 60%", "2 Bedroom · 40%", "Average square feet", "Monthly rent"]],
+  const stages = ["inputs", "rent", "revenue", "expenses"];
+  const deals = [
+    {
+      name: "3-story surface park",
+      location: "1468 Lake View Lane · Charlotte, NC",
+      yoc: "3.80%",
+      units: "1027",
+      totalCost: "$430,919,919",
+      revenue: "$248,211,348",
+      rent: "$1,563/mo",
+      inputs: [["Units", "1027"], ["Hard Cost / Unit", "$167,200"], ["Soft Costs", "$15"], ["Fixed OpEx / Unit", "$9,500"], ["Insurance / Unit", "$1,572"], ["Other Income / Unit", "$207"]],
+      rentRows: [["Blended Rent", "$1,980 per unit · 0.08 state"], ["Discounted Rent Assumption", "$1,563.33"]],
+      revenueRows: [["GPR", "$19,258,381/yr"], ["Other Income", "+$2,990,074/yr"], ["Gross Income", "$21,888,670/yr"], ["Vacancy (5%)", "−$1,018,434"], ["Credit & Loss (4%)", "−$835,100"], ["EGI", "$20,035,137/yr"]],
+      expenseRows: [["Mgmt (2.75%)", "$551,158/yr"], ["Fixed OpEx", "$9,720,798/yr"], ["Insurance", "$588,299/yr"], ["Total OpEx", "$10,860,255/yr"], ["NOI", "$9,434,912/yr"]],
+    },
+    {
+      name: "BTR",
+      location: "2814 Pine Ridge Road · Raleigh, NC",
+      yoc: "5.37%",
+      units: "274",
+      totalCost: "$508,580,508",
+      revenue: "$102,550,496",
+      rent: "$2,313/mo",
+      inputs: [["Units", "274"], ["Hard Cost / Unit", "$254,000"], ["Soft Costs", "$15"], ["Fixed OpEx / Unit", "$7,014"], ["Insurance / Unit", "$710"], ["Other Income / Unit", "$251"]],
+      rentRows: [["Blended Rent", "$2,176 per unit · 1.40 state"], ["Discounted Rent Assumption", "$2,313"]],
+      revenueRows: [["GPR", "$7,104,481/yr"], ["Other Income", "+$824,465/yr"], ["Gross Income", "$8,428,049/yr"], ["Vacancy (5%)", "−$422,152"], ["Credit & Loss (4%)", "−$351,428"], ["EGI", "$7,598,969/yr"]],
+      expenseRows: [["Mgmt (2.75%)", "$213,873/yr"], ["Fixed OpEx", "$1,929,151/yr"], ["Insurance", "$85,328/yr"], ["Total OpEx", "$2,341,346/yr"], ["NOI", "$5,558,588/yr"]],
+    },
   ];
-  const [activeGroup, setActiveGroup] = useState(0);
+  const [activeStage, setActiveStage] = useState(0);
 
   useEffect(() => {
-    const interval = window.setInterval(() => setActiveGroup((current) => (current + 1) % groups.length), 3000);
+    const interval = window.setInterval(() => setActiveStage((current) => (current + 1) % stages.length), 2200);
     return () => window.clearInterval(interval);
-  }, [groups.length]);
+  }, [stages.length]);
 
-  const currentGroup = groups[activeGroup];
   return (
-    <div className="ll-app-frame ll-yoc-preview">
-      <div className="ll-yoc-head"><div><b>Auto YOC</b><small>UNDERWRITING ASSUMPTIONS</small></div><span><strong>8.8%</strong><small>PROJECTED YIELD ON COST</small></span></div>
-      <div className="ll-yoc-toolbar"><span>Product type</span><b>3-story surface park</b><button type="button">Save settings</button></div>
-      <div className="ll-yoc-body">
-        <aside><small>UNDERWRITING ASSUMPTIONS</small>{groups.map(([title], index) => <button type="button" key={title} className={activeGroup === index ? "is-active" : ""} onClick={() => setActiveGroup(index)}><span>{index + 1}</span>{title}</button>)}</aside>
-        <main><div className="ll-yoc-section-head"><div><small>EDITING ASSUMPTIONS</small><h3>{currentGroup[0]}</h3></div><span>National default <b>↗</b></span></div><div className="ll-yoc-fields">{currentGroup[1].map((field, index) => <label key={field}><span>{field}</span><b>{index === 0 ? "30" : index === 1 ? "$164,000" : index === 2 ? "5.5%" : "Use default"}{field.toLowerCase().includes("cost") || field.toLowerCase().includes("rent") ? "" : ""}</b></label>)}</div><div className="ll-yoc-footer"><span>Blank fields use the national underwriting default.</span><button type="button">Reset to defaults</button></div></main>
+    <div className="ll-app-frame ll-yoc-breakdown">
+      <div className="ll-yoc-breakdown-head"><div><b>YOC Formula Breakdown</b><small>UNDERWRITING OUTPUT</small></div><span>Edit any field → YOC updates automatically</span></div>
+      <div className="ll-yoc-alert">⚠ No rental comps — using project rents</div>
+      <div className="ll-yoc-deals">
+        {deals.map((deal) => (
+          <article className="ll-yoc-deal" key={deal.name}>
+            <div className="ll-yoc-deal-head"><div><b>{deal.name}</b><small>{deal.location}</small></div><strong>{deal.yoc}<small>YIELD ON COST</small></strong></div>
+            <div className="ll-yoc-summary"><span><small>UNITS</small><b>{deal.units}</b></span><span><small>TOTAL COST</small><b>{deal.totalCost}</b></span><span><small>TOTAL REVENUE</small><b>{deal.revenue}</b></span><span><small>TOP RENT</small><b>{deal.rent}</b></span></div>
+            <div className={`ll-yoc-breakdown-section ${activeStage === 0 ? "is-active" : ""}`}><div className="ll-yoc-section-label">INPUTS <span>model assumptions</span></div><div className="ll-yoc-input-grid">{deal.inputs.map(([label, value]) => <div className="ll-yoc-input-row" key={label}><span>{label}</span><b>{value}</b></div>)}</div></div>
+            <div className={`ll-yoc-breakdown-section ${activeStage === 1 ? "is-active" : ""}`}><div className="ll-yoc-section-label">RENT <span>⚠ project rent</span></div>{deal.rentRows.map(([label, value]) => <div className="ll-yoc-value-row" key={label}><span>{label}</span><b>{value}</b></div>)}</div>
+            <div className={`ll-yoc-breakdown-section ${activeStage === 2 ? "is-active" : ""}`}><div className="ll-yoc-section-label">REVENUE &amp; LOSSES</div>{deal.revenueRows.map(([label, value], index) => <div className={`ll-yoc-value-row ${index === 3 || index === 4 ? "is-loss" : index === 5 ? "is-total" : ""}`} key={label}><span>{label}</span><b>{value}</b></div>)}</div>
+            <div className={`ll-yoc-breakdown-section ${activeStage === 3 ? "is-active" : ""}`}><div className="ll-yoc-section-label">OPERATING EXPENSES</div>{deal.expenseRows.map(([label, value], index) => <div className={`ll-yoc-value-row ${index === 3 ? "is-total" : index === 4 ? "is-noi" : ""}`} key={label}><span>{label}</span><b>{value}</b></div>)}</div>
+          </article>
+        ))}
       </div>
     </div>
   );
@@ -343,11 +372,28 @@ function DataHubMockup() {
 function ICMemoMockup() {
   return (
     <div className="ll-demo-page ll-memo-page">
-      <div className="ll-memo-toolbar"><span><b>IC MEMO</b> / Bull City Landing</span><span><em>READY FOR REVIEW</em><button type="button">EXPORT PDF</button><button type="button">SHARE WITH IC</button></span></div>
+      <div className="ll-memo-toolbar"><span><b>IC MEMO</b> / Riverbend Crossing</span><span><em>READY FOR REVIEW</em><button type="button">EXPORT PDF</button><button type="button">SHARE WITH IC</button></span></div>
       <div className="ll-memo-document">
-        <div className="ll-memo-document-head"><div><small>INVESTMENT COMMITTEE MEMORANDUM</small><h3>Bull City Landing</h3><p>3120 Hillsborough Road · Durham, NC 27705</p></div><strong>9.0%<small>PROJECTED YOC</small></strong></div>
-        <div className="ll-memo-key-metrics"><div><small>RECOMMENDATION</small><b>ADVANCE</b></div><div><small>EST. UNITS</small><b>280</b></div><div><small>TOP RENT / UNIT</small><b>$1,980</b></div><div><small>TOP RENT PSF</small><b>$2.41</b></div></div>
-        <div className="ll-memo-columns"><section><small>EXECUTIVE SUMMARY</small><p>Strong student-oriented infill opportunity with verified zoning, university demand, and a rent-supported path to committee review.</p><small>INVESTMENT THESIS</small><p>High-growth Durham location, clean title reported, and comparable rent support create a credible basis for a 280-unit concept plan.</p></section><aside><small>KEY RISKS</small><ul><li>Confirm unit mix and site plan</li><li>Validate traffic and access assumptions</li><li>Refresh debt and exit assumptions</li></ul><small>NEXT STEP</small><b>Schedule IC review</b></aside></div>
+        <div className="ll-memo-cover">
+          <div className="ll-memo-brand"><span>MC</span><b>Meridian Capital Partners</b><i /> <small>INVESTMENT SUMMARY</small></div>
+          <div className="ll-memo-cover-line"><div><small>MULTIFAMILY ACQUISITION OPPORTUNITY</small><h3>Riverbend Crossing</h3><p>4820 Riverbend Church Rd, Concord, NC 28025 <i>◆</i> Cabarrus County <i>◆</i> Charlotte–Concord–Gastonia MSA</p></div><span>Prepared for <b>Investment Committee</b><small>September 16, 2026</small></span></div>
+        </div>
+        <div className="ll-memo-metrics"><div><small>PRODUCT TYPE</small><b>3-Story<br />Garden</b><span>Surface-Parked</span></div><div><small>UNITS / NET<br />DENSITY</small><b>240</b><span>30.0 DU/A</span></div><div><small>TOTAL DEV. COST</small><b>$55.9M</b><span>$232,870 / unit</span></div><div><small>AUTO YIELD-ON-<br />COST</small><b className="is-gold">6.71%</b><span>Year-1 stabilized</span></div><div><small>AUTO IRR (5-YR<br />HOLD)</small><b className="is-gold">14.4%</b><span>5.25% exit cap</span></div><div><small>FEASIBILITY READ</small><b className="is-green">● PURSUING</b></div></div>
+        <div className="ll-memo-grid">
+          <div>
+            <section className="ll-memo-block"><h4><i>01</i> PROPERTY &amp; PROGRAM</h4><dl><div><dt>Gross / Net Acres</dt><dd>10.5 / 8.0</dd></div><div><dt>Zoning</dt><dd>CR (Conditional Rezoning)</dd></div><div><dt>Proposed Units</dt><dd>240</dd></div><div><dt>Buildings / Stories</dt><dd>10 / 3-story</dd></div><div><dt>Parking (surface)</dt><dd>~408 spaces (1.7 / unit)</dd></div><div><dt>Land Basis (assumed)</dt><dd>$25,000 / unit (inland)</dd></div></dl></section>
+            <section className="ll-memo-block"><h4><i>02</i> UNIT MIX</h4><table><thead><tr><th>TYPE</th><th>% MIX</th><th>AVG SF</th><th>ASKING RENT</th></tr></thead><tbody><tr><td>1 Bed / 1 Bath</td><td>60%</td><td>800</td><td>$1,600</td></tr><tr><td>2 Bed / 2 Bath</td><td>40%</td><td>1,050</td><td>$2,200</td></tr><tr className="is-total"><td>Blended</td><td>100%</td><td>905</td><td>$1,853</td></tr></tbody></table></section>
+            <section className="ll-memo-block"><h4><i>03</i> DEVELOPMENT COST SUMMARY</h4><table><thead><tr><th>CATEGORY</th><th>TOTAL</th><th>/ UNIT</th></tr></thead><tbody><tr><td>Land Basis</td><td>$6,000,000</td><td>$25,000</td></tr><tr><td>Hard Cost</td><td>$39,360,000</td><td>$164,000</td></tr><tr><td>Soft Costs (15%)</td><td>$5,904,000</td><td>$24,600</td></tr><tr><td>Financing &amp; Carry</td><td>$2,361,600</td><td>$9,840</td></tr><tr><td>Fees &amp; Contingency</td><td>$2,263,200</td><td>$9,430</td></tr><tr className="is-total"><td>Total Development Cost</td><td>$55,888,800</td><td>$232,870</td></tr></tbody></table></section>
+            <section className="ll-memo-block"><h4><i>04</i> CAPITAL STACK (ILLUSTRATIVE)</h4><table><thead><tr><th>SOURCE</th><th>%</th><th>AMOUNT</th></tr></thead><tbody><tr><td>Senior Construction Loan</td><td>65%</td><td>$36,327,720</td></tr><tr><td>LP / Sponsor Equity</td><td>35%</td><td>$19,561,080</td></tr><tr className="is-total"><td>Total Capitalization</td><td>100%</td><td>$55,888,800</td></tr></tbody></table></section>
+          </div>
+          <div>
+            <section className="ll-memo-block"><h4><i>05</i> YEAR-1 PRO FORMA</h4><dl><div><dt>Gross Potential Rent</dt><dd>$5,299,200</dd></div><div><dt>Other Income</dt><dd>$570,240</dd></div><div><dt>Vacancy (5.0%) / LTL (1.0%) / Concessions (1.0%)</dt><dd className="is-loss">−$370,944</dd></div><div><dt>Effective Gross Income</dt><dd>$5,498,496</dd></div><div><dt>Fixed Operating Expenses</dt><dd>$1,464,240</dd></div><div><dt>Insurance (inland)</dt><dd>$132,000</dd></div><div><dt>Management Fee (2.75%)</dt><dd>$151,208</dd></div><div className="is-total"><dt>Year-1 Net Operating Income</dt><dd>$3,751,047</dd></div></dl></section>
+            <section className="ll-memo-block"><h4><i>06</i> RETURN ASSUMPTIONS &amp; AUTO IRR</h4><div className="ll-memo-assumptions"><span>Rent growth <b>3.00%</b>/yr</span><span>Other income growth <b>3.00%</b>/yr</span><span>Expense growth <b>2.75%</b>/yr</span><span>Hold period <b>5 yrs</b></span><span>Exit cap rate <b>5.25%</b></span></div><div className="ll-memo-irr"><small>5-YEAR AUTO IRR</small><strong>14.4%</strong><span>NOI growth + reversion at exit</span><em>Year-5 NOI: <b>$4.24M</b> · Reversion: <b>$83.3M</b></em></div></section>
+            <section className="ll-memo-block"><h4><i>07</i> MARKET SNAPSHOT</h4><dl><div><dt>Submarket</dt><dd>North Cabarrus / I-85 Corridor</dd></div><div><dt>3-mi population growth (’19–’24)</dt><dd>+14.2%</dd></div><div><dt>Median HH income (submarket)</dt><dd>$84,300</dd></div><div><dt>Comp set avg. asking rent / SF</dt><dd>$2.04</dd></div><div><dt>Competing pipeline (3 mi)</dt><dd>1 project, 180 units</dd></div></dl></section>
+          </div>
+        </div>
+        <section className="ll-memo-thesis"><h4><i>08</i> INVESTMENT THESIS</h4><p>Riverbend Crossing pairs an already-conditionally-approved rezoning with strong in-migration into the North Cabarrus / I-85 corridor, underwriting to a Year-1 Auto-YOC of 6.71% and a 5-year Auto-IRR of 14.4% at a 5.25% exit cap.</p></section>
+        <div className="ll-memo-powered">Powered by <b>LandLinq</b></div>
       </div>
     </div>
   );
