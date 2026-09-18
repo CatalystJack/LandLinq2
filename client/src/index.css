@@ -2521,11 +2521,263 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 .ll-drip strong.is-red { color:#d85b5b; }
 .ll-drip hr { border:0; border-top:1px solid #edf1f3; margin:9px 0 0; }
 
+/* Drip campaign preview: a quiet, floating editor that leaves room for the
+   journey copy to carry the story. */
+.ll-drip-builder {
+  position: relative;
+  min-height: 300px;
+  border-color: #d7e5eb;
+  border-radius: 1rem;
+  background: #eff5f7;
+  box-shadow: none;
+  color: #183047;
+  font-size: 8px;
+}
+.ll-drip-canvas {
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  padding: 1.25rem 1.1rem 1.5rem;
+  background:
+    radial-gradient(circle at 72% 8%, rgba(255,255,255,.96), transparent 34%),
+    linear-gradient(135deg, #f5f9fa 0%, #eaf2f5 100%);
+}
+.ll-drip-canvas::after {
+  position: absolute;
+  right: -4rem;
+  bottom: -5rem;
+  width: 18rem;
+  height: 12rem;
+  border-radius: 50%;
+  background: rgba(190,220,231,.2);
+  content: "";
+  filter: blur(24px);
+  pointer-events: none;
+}
+.ll-drip-window {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 40rem);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid rgba(211,225,232,.95);
+  border-radius: .85rem;
+  background: rgba(250,253,254,.82);
+  box-shadow: 0 1.5rem 2.6rem rgba(44,76,96,.12), 0 .3rem .9rem rgba(72,106,126,.06);
+  transition: transform .35s ease, box-shadow .35s ease;
+}
+.ll-drip-window:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 1.7rem 3rem rgba(44,76,96,.15), 0 .3rem .9rem rgba(72,106,126,.08);
+}
+.ll-drip-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .8rem 1rem .7rem;
+  border-bottom: 1px solid #e3edf1;
+  background: rgba(255,255,255,.72);
+}
+.ll-drip-head div { min-width: 0; }
+.ll-drip-head small {
+  display: block;
+  overflow: hidden;
+  color: #91a1aa;
+  font-size: .44rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ll-drip-head b {
+  display: block;
+  margin-top: .25rem;
+  color: #183047;
+  font-size: .82rem;
+  letter-spacing: -.03em;
+}
+.ll-drip-head > span {
+  flex: none;
+  border: 1px solid #d5e4ea;
+  border-radius: 999px;
+  background: #f8fbfc;
+  padding: .3rem .5rem;
+  color: #7b909d;
+  font-size: .46rem;
+  font-weight: 600;
+}
+.ll-drip-head i { margin-left: .2rem; color: #e0a33d; font-style: normal; }
+.ll-drip-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .35rem;
+  padding: .5rem .7rem;
+  border-bottom: 1px solid #e7eef1;
+  background: rgba(246,250,251,.86);
+}
+.ll-drip-tabs button {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: .4rem;
+  border: 1px solid transparent;
+  border-radius: .45rem;
+  background: transparent;
+  padding: .4rem .45rem;
+  color: #8ba0ab;
+  text-align: left;
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease;
+}
+.ll-drip-tabs button:hover,
+.ll-drip-tabs button.is-active {
+  border-color: #cfe2ea;
+  background: #fff;
+  color: #3286c8;
+}
+.ll-drip-tabs button > b {
+  display: grid;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  place-items: center;
+  border: 1px solid #d5e4ea;
+  border-radius: 50%;
+  background: #f5f9fa;
+  color: #91a5af;
+  font-size: .52rem;
+}
+.ll-drip-tabs button.is-active > b { border-color: #8fc6df; background: #eaf7fb; color: #3286c8; }
+.ll-drip-tabs button > span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: .58rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ll-drip-tabs button small {
+  display: block;
+  margin-top: .13rem;
+  overflow: hidden;
+  color: #a2b0b7;
+  font-size: .44rem;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ll-drip-content {
+  min-height: 8.9rem;
+  padding: .85rem 1rem .95rem;
+  background: rgba(255,255,255,.46);
+}
+.ll-drip-state { animation: ll-drip-state-in .35s ease both; }
+.ll-drip-kicker {
+  display: block;
+  color: #498ede;
+  font-size: .45rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+.ll-drip-state h3 {
+  margin: .35rem 0 .65rem;
+  color: #183047;
+  font-size: .85rem;
+  letter-spacing: -.035em;
+}
+.ll-drip-state label {
+  display: block;
+  color: #8c9da7;
+  font-size: .48rem;
+  font-weight: 600;
+}
+.ll-drip-state input {
+  display: block;
+  width: 100%;
+  margin-top: .3rem;
+  border: 1px solid #dce8ed;
+  border-radius: .35rem;
+  background: rgba(255,255,255,.82);
+  padding: .45rem .55rem;
+  color: #496171;
+  font-size: .58rem;
+  outline: none;
+}
+.ll-drip-audience-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; }
+.ll-drip-audience {
+  min-width: 0;
+  border: 1px solid #dce8ed;
+  border-radius: .4rem;
+  background: rgba(255,255,255,.72);
+  padding: .6rem;
+}
+.ll-drip-audience b,
+.ll-drip-audience span,
+.ll-drip-audience strong { display: block; }
+.ll-drip-audience b { color: #385265; font-size: .62rem; }
+.ll-drip-audience span { margin-top: .15rem; color: #9aaab2; font-size: .48rem; }
+.ll-drip-audience strong { margin-top: .55rem; color: #3286c8; font-size: .52rem; font-weight: 600; }
+.ll-drip-email-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; margin-top: .65rem; }
+.ll-drip-email-steps > div {
+  min-width: 0;
+  border-left: 2px solid #b8ddeb;
+  background: rgba(247,251,252,.82);
+  padding: .45rem .5rem;
+}
+.ll-drip-email-steps b,
+.ll-drip-email-steps span,
+.ll-drip-email-steps strong { display: block; }
+.ll-drip-email-steps b { color: #498ede; font-size: .42rem; letter-spacing: .08em; }
+.ll-drip-email-steps span { margin-top: .2rem; color: #95a5ad; font-size: .46rem; }
+.ll-drip-email-steps strong { margin-top: .35rem; overflow: hidden; color: #506876; font-size: .5rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ll-drip-review {
+  display: grid;
+  grid-template-columns: 5.2rem 1fr;
+  gap: .35rem .6rem;
+  border: 1px solid #dce8ed;
+  border-radius: .4rem;
+  background: rgba(255,255,255,.72);
+  padding: .55rem .65rem;
+}
+.ll-drip-review span { color: #9aaab2; font-size: .48rem; }
+.ll-drip-review b { overflow: hidden; color: #506876; font-size: .52rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ll-drip-launch {
+  margin-top: .65rem;
+  border: 1px solid #498ede;
+  border-radius: 999px;
+  background: #498ede;
+  padding: .45rem .7rem;
+  color: #fff;
+  font-size: .5rem;
+  font-weight: 700;
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+}
+.ll-drip-launch:hover { border-color: #498ede; background: #fff; color: #498ede; }
+.ll-drip-window-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .55rem 1rem;
+  border-top: 1px solid #e4edf0;
+  color: #9aabb3;
+  font-size: .46rem;
+}
+.ll-drip-window-foot i { display: inline-block; width: .35rem; height: .35rem; margin-right: .25rem; border-radius: 50%; background: #4dbb8a; }
+.ll-drip-window-foot b { font-weight: 500; }
+@keyframes ll-drip-state-in {
+  from { opacity: .25; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (max-width: 768px) {
   .ll-contact-directory, .ll-contact-detail, .ll-outreach-analytics { min-width:580px; transform:scale(.82); transform-origin:top left; width:122%; margin-bottom:-42px; }
   .ll-app-frame { font-size:7px; }
   .ll-detail-nav span { display:none; }
   .ll-contact-filters { flex-wrap:nowrap; }
+  .ll-drip-builder, .ll-drip-canvas { min-height: 280px; }
+  .ll-drip-canvas { padding: 1rem .75rem 1.15rem; }
+  .ll-drip-window-foot { padding-inline: .75rem; }
 }
 
 /* LandLinq platform journey

@@ -151,14 +151,55 @@ function DripCampaignBuilderMockup() {
 
   return (
     <div className="ll-app-frame ll-drip-builder">
-      <div className="ll-drip-head"><div><small>CAMPAIGNS / NEW CAMPAIGN</small><b>Build a drip campaign</b></div><span>Draft <i>●</i></span></div>
-      <div className="ll-drip-body">
-        <aside>{steps.map(([number, title, detail], index) => <button type="button" key={title} className={activeStep === index ? "is-active" : ""} onClick={() => setActiveStep(index)}><b>{number}</b><span>{title}<small>{detail}</small></span></button>)}</aside>
-        <main>
-          {activeStep === 0 && <><small className="ll-drip-kicker">TARGET AUDIENCE</small><h3>Choose who should receive this sequence.</h3><div className="ll-drip-audience"><b>Interested Broker</b><span>CRM tag</span><strong>184 contacts eligible</strong></div><div className="ll-drip-audience"><b>Charlotte MSA</b><span>Saved geography</span><strong>96 contacts eligible</strong></div></>}
-          {activeStep === 1 && <><small className="ll-drip-kicker">SEQUENCE EDITOR</small><h3>Charlotte Broker Nurture</h3><label>Subject line<input value="A quick introduction to your Charlotte pipeline" readOnly /></label><div className="ll-drip-email-steps"><div><b>STEP 1</b><span>Send immediately</span><strong>Introduction and deal criteria</strong></div><div><b>STEP 2</b><span>Wait 3 days</span><strong>Share current acquisition focus</strong></div><div><b>STEP 3</b><span>Wait 7 days</span><strong>Ask about upcoming opportunities</strong></div></div></>}
-          {activeStep === 2 && <><small className="ll-drip-kicker">REVIEW & LAUNCH</small><h3>Everything is ready to send.</h3><div className="ll-drip-review"><span>Sender</span><b>Morgan Hayes · connected Outlook</b><span>Audience</span><b>184 contacts with “Interested Broker”</b><span>Sequence</span><b>3 steps · 10 days · automatic follow-up</b></div><button type="button" className="ll-drip-launch">Launch campaign</button></>}
-        </main>
+      <div className="ll-drip-canvas">
+        <div className="ll-drip-window">
+          <div className="ll-drip-head">
+            <div><small>CAMPAIGNS / NEW CAMPAIGN</small><b>Build a drip campaign</b></div>
+            <span>Draft <i>●</i></span>
+          </div>
+          <div className="ll-drip-tabs" role="tablist" aria-label="Campaign setup steps">
+            {steps.map(([number, title, detail], index) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeStep === index}
+                key={title}
+                className={activeStep === index ? "is-active" : ""}
+                onClick={() => setActiveStep(index)}
+              >
+                <b>{number}</b>
+                <span>{title}<small>{detail}</small></span>
+              </button>
+            ))}
+          </div>
+          <div className="ll-drip-content">
+            {activeStep === 0 && <div className="ll-drip-state">
+              <small className="ll-drip-kicker">TARGET AUDIENCE</small>
+              <h3>Choose who should receive this sequence.</h3>
+              <div className="ll-drip-audience-grid">
+                <div className="ll-drip-audience"><b>Interested Broker</b><span>CRM tag</span><strong>184 contacts eligible</strong></div>
+                <div className="ll-drip-audience"><b>Charlotte MSA</b><span>Saved geography</span><strong>96 contacts eligible</strong></div>
+              </div>
+            </div>}
+            {activeStep === 1 && <div className="ll-drip-state">
+              <small className="ll-drip-kicker">SEQUENCE EDITOR</small>
+              <h3>Charlotte Broker Nurture</h3>
+              <label>Subject line<input value="A quick introduction to your Charlotte pipeline" readOnly /></label>
+              <div className="ll-drip-email-steps">
+                <div><b>STEP 1</b><span>Send immediately</span><strong>Introduction and deal criteria</strong></div>
+                <div><b>STEP 2</b><span>Wait 3 days</span><strong>Share current acquisition focus</strong></div>
+                <div><b>STEP 3</b><span>Wait 7 days</span><strong>Ask about upcoming opportunities</strong></div>
+              </div>
+            </div>}
+            {activeStep === 2 && <div className="ll-drip-state">
+              <small className="ll-drip-kicker">REVIEW &amp; LAUNCH</small>
+              <h3>Everything is ready to send.</h3>
+              <div className="ll-drip-review"><span>Sender</span><b>Morgan Hayes · connected Outlook</b><span>Audience</span><b>184 contacts with “Interested Broker”</b><span>Sequence</span><b>3 steps · 10 days · automatic follow-up</b></div>
+              <button type="button" className="ll-drip-launch">Launch campaign</button>
+            </div>}
+          </div>
+          <div className="ll-drip-window-foot"><span><i /> Connected Outlook account</span><b>Autosaved just now</b></div>
+        </div>
       </div>
     </div>
   );
