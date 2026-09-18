@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { BriefcaseBusiness, ExternalLink, Filter, MapPin, RefreshCw, Search } from "lucide-react";
+import { Building2, ExternalLink, Filter, MapPin, RefreshCw, Search } from "lucide-react";
 import Navigation from "@/components/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { PageHeader } from "@/components/ui/page-header";
+import Footer from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,6 +73,30 @@ const initialFilters = {
   classification: "all",
   search: "",
 };
+
+const COMPANY_LOGO_TILE_COLORS = [
+  "#E8F1FF",
+  "#EAF7F0",
+  "#FFF1E6",
+  "#F3EDFF",
+  "#E8F7F7",
+  "#FFF6D9",
+  "#FDECF3",
+  "#EDF2F7",
+  "#E9F3EC",
+  "#F1EEFF",
+];
+
+function getCompanyLogoTileColor(profile: Pick<NonNullable<PipelineRow["profile"]>, "companyName" | "id">) {
+  const identity = profile.companyName.trim() || profile.id;
+  let hash = 0;
+
+  for (let index = 0; index < identity.length; index += 1) {
+    hash = (hash * 31 + identity.charCodeAt(index)) >>> 0;
+  }
+
+  return COMPANY_LOGO_TILE_COLORS[hash % COMPANY_LOGO_TILE_COLORS.length];
+}
 
 function formatMoney(value: string | null) {
   const amount = Number(value);
@@ -150,6 +176,7 @@ export default function MasterPipeline() {
           <h1 className="text-2xl font-bold text-slate-900">Platform administrators only</h1>
           <p className="mt-2 text-slate-500">This view is restricted to authenticated platform administrators.</p>
         </main>
+        <Footer />
       </div>
     );
   }
@@ -158,20 +185,17 @@ export default function MasterPipeline() {
     <div className="min-h-screen bg-warm">
       <Navigation />
       <main className="mx-auto max-w-[1800px] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#4A90E2]">Admin workspace</p>
-            <h1 className="mt-1 flex items-center gap-3 font-serif text-4xl font-bold text-[#0A2B4A]">
-              <BriefcaseBusiness className="h-8 w-8 text-[#4A90E2]" />
-              Master Pipeline
-            </h1>
-            <p className="mt-2 text-slate-600">See how every deal is moving across all Investment Company portals.</p>
-          </div>
-          <Button variant="outline" className="gap-2 self-start md:self-auto" onClick={() => pipelineQuery.refetch()} disabled={pipelineQuery.isFetching}>
-            <RefreshCw className={`h-4 w-4 ${pipelineQuery.isFetching ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
+        <PageHeader
+          eyebrow="Admin workspace"
+          title="Master Pipeline"
+          description="See how every deal is moving across all Investment Company portals."
+          actions={
+            <Button variant="outline" className="gap-2" onClick={() => pipelineQuery.refetch()} disabled={pipelineQuery.isFetching}>
+              <RefreshCw className={`h-4 w-4 ${pipelineQuery.isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          }
+        />
 
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
           {[
@@ -302,10 +326,18 @@ export default function MasterPipeline() {
                         </TableCell>
                         <TableCell className="min-w-[180px]">
                           {row.profile ? (
-                            <>
-                              <div className="font-medium text-slate-800">{row.profile.companyName}</div>
-                              <div className="mt-1 text-xs text-slate-500">{row.profile.isActive ? "Active portal" : "Inactive portal"}</div>
-                            </>
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200"
+                                style={{ backgroundColor: getCompanyLogoTileColor(row.profile) }}
+                              >
+                                <Building2 className="h-4 w-4 text-slate-400" />
+                              </div>
+                              <div>
+                                <div className="font-semibold text-slate-900">{row.profile.companyName}</div>
+                                <div className="mt-1 text-xs text-slate-500">{row.profile.isActive ? "Active portal" : "Inactive portal"}</div>
+                              </div>
+                            </div>
                           ) : <span className="text-sm text-slate-400">Not sent to a profile</span>}
                         </TableCell>
                         <TableCell>
@@ -339,6 +371,7 @@ export default function MasterPipeline() {
           </CardContent>
         </Card>
       </main>
+      <Footer />
     </div>
   );
 }

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Users, Shield, Settings, Edit, Trash2, Mail, Calendar, UserCheck, UserX, Crown, Eye, Building, MapPin, Clock, CheckCircle2, Loader2 } from "lucide-react";
+import { Search, Plus, Users, Shield, Settings, Edit, Trash2, Mail, Calendar, UserCheck, UserX, Crown, Building, MapPin, Clock, CheckCircle2, Loader2 } from "lucide-react";
 import { formatDateEST } from "@/utils/timezone";
 import Footer from "@/components/footer";
 import Navigation from "@/components/navigation";
@@ -359,10 +359,9 @@ export default function UserManagement() {
         />
 
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3" data-testid="user-management-tabs">
+          <TabsList className="grid w-full grid-cols-2" data-testid="user-management-tabs">
             <TabsTrigger value="users">Users ({filteredUsers.length})</TabsTrigger>
-            <TabsTrigger value="roles">Roles & Permissions</TabsTrigger>
-            <TabsTrigger value="security">Security Settings</TabsTrigger>
+            <TabsTrigger value="approvals">Broker Approvals</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="space-y-6">
@@ -718,173 +717,81 @@ export default function UserManagement() {
           </Dialog>
 
 
-          <TabsContent value="roles">
+          <TabsContent value="approvals">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Role Management
+                  <Clock className="h-5 w-5" />
+                  Partner Broker Approvals
+                  {(pendingBrokers?.length ?? 0) > 0 && (
+                    <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold">
+                      {pendingBrokers!.length}
+                    </span>
+                  )}
                 </CardTitle>
-                <p className="text-sm text-muted-foreground">Define and manage user roles</p>
+                <p className="text-sm text-muted-foreground">
+                  Brokers who registered via the Partner Broker Portal and are waiting for access.
+                </p>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  {/* Partner Broker Portal Approvals */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-amber-500" />
-                        <h3 className="font-semibold text-gray-900">Partner Broker Approvals</h3>
-                        {(pendingBrokers?.length ?? 0) > 0 && (
-                          <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold">
-                            {pendingBrokers!.length}
-                          </span>
-                        )}
-                      </div>
-                      <Button onClick={() => refetchPending()} variant="ghost" size="xs" className="text-xs text-gray-400 hover:text-gray-600">
-                        Refresh
-                      </Button>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Brokers who registered via the Partner Broker Portal and are waiting for access.
-                    </p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-end">
+                    <Button onClick={() => refetchPending()} variant="ghost" size="xs" className="text-xs text-gray-400 hover:text-gray-600">
+                      Refresh
+                    </Button>
+                  </div>
 
-                    {pendingLoading ? (
-                      <div className="flex items-center gap-2 py-6 text-gray-400 text-sm">
-                        <Loader2 size={16} className="animate-spin" /> Loading pending approvals…
-                      </div>
-                    ) : !pendingBrokers?.length ? (
-                      <div className="flex items-center gap-3 py-6 px-4 rounded-lg bg-green-50 border border-green-100">
-                        <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-                        <p className="text-sm text-green-700">No pending broker approvals — you're all caught up.</p>
-                      </div>
-                    ) : (
-                      <div className="border rounded-lg divide-y">
-                        {pendingBrokers.map((broker) => (
-                          <div key={broker.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-                            <div className="min-w-0 flex-1">
-                              <div className="font-medium text-sm text-gray-900">
-                                {broker.firstName} {broker.lastName}
-                              </div>
-                              <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                                <span className="text-xs text-gray-500 flex items-center gap-1">
-                                  <Mail size={11} /> {broker.email}
-                                </span>
-                                {broker.brokerage && (
-                                  <span className="text-xs text-gray-500 flex items-center gap-1">
-                                    <Building size={11} /> {broker.brokerage}
-                                  </span>
-                                )}
-                                {broker.phone && (
-                                  <span className="text-xs text-gray-500">{broker.phone}</span>
-                                )}
-                              </div>
-                              <div className="text-[11px] text-gray-400 mt-0.5">
-                                Registered {new Date(broker.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                              </div>
+                  {pendingLoading ? (
+                    <div className="flex items-center gap-2 py-6 text-gray-400 text-sm">
+                      <Loader2 size={16} className="animate-spin" /> Loading pending approvals…
+                    </div>
+                  ) : !pendingBrokers?.length ? (
+                    <div className="flex items-center gap-3 py-6 px-4 rounded-lg bg-green-50 border border-green-100">
+                      <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                      <p className="text-sm text-green-700">No pending broker approvals — you're all caught up.</p>
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg divide-y">
+                      {pendingBrokers.map((broker) => (
+                        <div key={broker.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-sm text-gray-900">
+                              {broker.firstName} {broker.lastName}
                             </div>
-                            <Button
-                              size="sm"
-                              className="ml-4 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
-                              disabled={approveBrokerMutation.isPending}
-                              onClick={() => approveBrokerMutation.mutate(broker.id)}
-                            >
-                              {approveBrokerMutation.isPending ? (
-                                <Loader2 size={13} className="animate-spin mr-1" />
-                              ) : (
-                                <UserCheck size={13} className="mr-1" />
+                            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                              <span className="text-xs text-gray-500 flex items-center gap-1">
+                                <Mail size={11} /> {broker.email}
+                              </span>
+                              {broker.brokerage && (
+                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                  <Building size={11} /> {broker.brokerage}
+                                </span>
                               )}
-                              Approve
-                            </Button>
+                              {broker.phone && (
+                                <span className="text-xs text-gray-500">{broker.phone}</span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-gray-400 mt-0.5">
+                              Registered {new Date(broker.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="border-t pt-4" />
-
-                  {/* Role Definitions */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="border-2 border-red-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Crown className="h-5 w-5 text-red-500" />
-                          <h3 className="font-semibold text-red-700">Super Admin</h3>
+                          <Button
+                            size="sm"
+                            className="ml-4 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                            disabled={approveBrokerMutation.isPending}
+                            onClick={() => approveBrokerMutation.mutate(broker.id)}
+                          >
+                            {approveBrokerMutation.isPending ? (
+                              <Loader2 size={13} className="animate-spin mr-1" />
+                            ) : (
+                              <UserCheck size={13} className="mr-1" />
+                            )}
+                            Approve
+                          </Button>
                         </div>
-                        <p className="text-sm text-gray-600 mb-3">Full system access, including irreversible actions</p>
-                        <ul className="text-sm text-gray-500 space-y-1">
-                          <li>• User management</li>
-                          <li>• System settings</li>
-                          <li>• Security controls</li>
-                          <li>• All analytics</li>
-                        </ul>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-2 border-indigo-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Shield className="h-5 w-5 text-indigo-500" />
-                          <h3 className="font-semibold text-indigo-700">Admin</h3>
-                        </div>
-                        <p className="text-sm text-gray-600 mb-3">Standard platform administrator access</p>
-                        <ul className="text-sm text-gray-500 space-y-1">
-                          <li>• Deal management</li>
-                          <li>• Broker oversight</li>
-                          <li>• Analytics access</li>
-                          <li>• Team collaboration</li>
-                        </ul>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-2 border-gray-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Eye className="h-5 w-5 text-gray-500" />
-                          <h3 className="font-semibold text-gray-700">Broker</h3>
-                        </div>
-                        <p className="text-sm text-gray-600 mb-3">External broker partners</p>
-                        <ul className="text-sm text-gray-500 space-y-1">
-                          <li>• Deal submission</li>
-                          <li>• Track submissions</li>
-                          <li>• View commission</li>
-                          <li>• Limited access</li>
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Security Settings
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">Configure system security and access controls</p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="text-center py-8">
-                    <Shield className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Security Center</h3>
-                    <p className="text-gray-500 mb-4">Advanced security settings and monitoring</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-md mx-auto">
-                      <Card className="p-4">
-                        <h4 className="font-medium text-gray-700">Authentication</h4>
-                        <p className="text-sm text-gray-500">Replit Auth enabled</p>
-                      </Card>
-                      <Card className="p-4">
-                        <h4 className="font-medium text-gray-700">Authorization</h4>
-                        <p className="text-sm text-gray-500">Role-based access</p>
-                      </Card>
+                      ))}
                     </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

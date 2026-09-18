@@ -203,3 +203,17 @@ mtime_ms = 1789500662272
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/c08ea430-fbfb-4f5f-9aeb-7da238d011d1/39fbed2a-2d8b-4cb9-9afb-92656e7fce42"
 storage_version_token = "1789500703169128"
 content_type = "image/png"
+
+[[outputs]]
+id = "TNlUD32GD-KiGxdSjgJuN"
+uri = "file://screenshots/marketing-home-login-hover.png"
+type = "image"
+title = "Marketing homepage Log In hover state"
+description = "Desktop marketing homepage screenshot with the pointer over the nav Log In link, showing the visible hover treatment and sliding arrow."
+logical_id = "d77376b0-0a5d-4d51-bfce-a09aff0dca64"
+content_hash = "sha256:ad32d77d68876cb70208b2e77ca13e436466edec812b02781bcd6be76ef423cb"
+size = 155672
+mtime_ms = 1789748341473
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/d77376b0-0a5d-4d51-bfce-a09aff0dca64/dce7fafd-a47d-4521-afa8-5bea401e0636"
+storage_version_token = "1789748353814245"
+content_type = "image/png"
