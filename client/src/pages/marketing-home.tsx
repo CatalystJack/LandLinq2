@@ -34,15 +34,15 @@ function Button({ children, href = "/contact", dark = false }: { children: React
 }
 
 const contactRows = [
-  ["MC", "Maya Collins", "maya.collins@northline.example", "(704) 555-0182", "Northline Realty", "Known Broker · Multifamily · Charlotte", "Morgan Hayes", "12", "Aug 28, 26"],
-  ["JR", "Julian Reyes", "julian@oakandstone.example", "(919) 555-0147", "Oak & Stone Capital", "Principal · Land Seller · Triangle", "Brian Ford", "8", "Aug 25, 26"],
-  ["SP", "Sophie Patel", "spatel@harborcre.example", "(843) 555-0119", "Harbor Commercial", "CRE Broker · Coastal · BTR", "Morgan Hayes", "15", "Aug 21, 26"],
-  ["DM", "Derek Monroe", "dmonroe@piedmontadvisors.example", "(336) 555-0165", "Piedmont Advisors", "Known Broker · Affordable · Triad", "Brian Ford", "6", "Aug 18, 26"],
-  ["EW", "Elena Walsh", "elena@bluepeakland.example", "(615) 555-0133", "BluePeak Land Co.", "Landowner · Tennessee · Warm Lead", "Morgan Hayes", "4", "Aug 14, 26"],
-  ["TB", "Trevor Brooks", "tbrooks@crescentpartners.example", "(980) 555-0196", "Crescent Partners", "CRE Broker · Active Adult · Charlotte", "Brian Ford", "10", "Aug 09, 26"],
-  ["NK", "Naomi Kim", "naomi@redwoodcommunities.example", "(984) 555-0128", "Redwood Communities", "Developer · Multifamily · Raleigh", "Morgan Hayes", "7", "Aug 03, 26"],
-  ["CW", "Caleb Wright", "caleb@ironwoodre.example", "(864) 555-0174", "Ironwood Real Estate", "Known Broker · Greenville · Student", "Brian Ford", "9", "Jul 29, 26"],
-  ["AH", "Amelia Hart", "amelia@carolinalandgroup.example", "(910) 555-0151", "Carolina Land Group", "Land Broker · Wilmington · Priority", "Morgan Hayes", "11", "Jul 24, 26"],
+  ["AE", "Alex Example", "alex@example.test", "(555) 010-0101", "Example Realty", "Demo Broker · Multifamily · Example Market", "Demo Owner", "12", "Aug 28, 26"],
+  ["TS", "Taylor Sample", "taylor@sample.test", "(555) 010-0102", "Sample Capital", "Demo Seller · Land · Sample Market", "Demo Owner", "8", "Aug 25, 26"],
+  ["CD", "Casey Demo", "casey@demo.test", "(555) 010-0103", "Demo Commercial", "Demo Broker · Coastal · BTR", "Demo Owner", "15", "Aug 21, 26"],
+  ["JT", "Jordan Test", "jordan@test.test", "(555) 010-0104", "Test Properties", "Demo Broker · Affordable · Test Market", "Demo Owner", "6", "Aug 18, 26"],
+  ["RP", "Riley Placeholder", "riley@placeholder.test", "(555) 010-0105", "Placeholder Land Co.", "Demo Owner · Inland · Warm Lead", "Demo Owner", "4", "Aug 14, 26"],
+  ["DM", "Drew Mock", "drew@mock.test", "(555) 010-0106", "Mock Partners", "Demo Broker · Active Adult · Example Market", "Demo Owner", "10", "Aug 09, 26"],
+  ["SD", "Sam Demo", "sam@demo.test", "(555) 010-0107", "Demo Communities", "Demo Developer · Multifamily · Sample Market", "Demo Owner", "7", "Aug 03, 26"],
+  ["ES", "Evan Sample", "evan@sample.test", "(555) 010-0108", "Sample Real Estate", "Demo Broker · Student · Test Market", "Demo Owner", "9", "Jul 29, 26"],
+  ["EX", "Ellis Example", "ellis@example.test", "(555) 010-0109", "Example Land Group", "Demo Broker · Priority · Demo Market", "Demo Owner", "11", "Jul 24, 26"],
 ];
 
 function ContactDirectoryMockup() {
@@ -62,8 +62,8 @@ function ContactDetailMockup() {
   return (
     <div className="ll-app-frame ll-contact-detail">
       <div className="ll-detail-nav"><b><img src="/assets/landlinq-white-logo.png" alt="LandLinq" /></b><span>Deal Dashboard　 <i>CRM</i>　 Outreach Analytics　 Outreach Setup　 Data Hub　 Analytics</span><button>SIGN OUT</button></div>
-      <div className="ll-detail-hero"><small>‹ Back to contacts</small><div className="ll-detail-person"><i>MC</i><b>Maya<br /><small>Senior Vice President</small></b><b>Collins<br /><small>• Northline Realty</small></b><span>✉ Email　　✎ Edit　 <strong>SAVE CHANGES</strong></span></div><div className="ll-detail-meta"><span>PHONE<br /><b>(704) 555-0182</b></span><span>EMAIL<br /><b>maya.collins@northline.example</b></span><span>COMPANY<br /><b>Northline Realty</b></span><span>LAST CONTACTED<br /><b>Aug 29, 2026</b></span></div></div>
-      <div className="ll-detail-body"><aside><small>RECORD</small><b>Contact details</b>{[["NAME", "Maya Collins"], ["EMAIL", "maya.collins@northline.example"], ["PHONE", "(704) 555-0182"], ["ACCOUNT / COMPANY", "Northline Realty"], ["ASSIGNED TO", "Morgan Hayes"], ["CONTACT TYPE", "CRE broker"], ["LEAD SOURCE", "Broker referral"], ["LAST CONTACTED", "Aug 29, 2026"]].map(([a, b]) => <label key={a}>{a}<strong>{b}</strong></label>)}</aside><main><div className="ll-detail-tabs"><b>Overview</b><span>Activity</span><span>Deals</span><span>Notes</span></div><div className="ll-detail-cards"><div><small>CREATED</small><b>Feb 12, 2025</b></div><div><small>TYPE</small><b>Known broker</b></div><div><small>DEALS</small><b>12</b></div><div><small>CAMPAIGNS</small><b>3 active</b></div></div><div className="ll-detail-activity"><div className="ll-detail-event"><i>✉</i><b>Email opened</b><small>Providence Grove follow-up · Aug 29, 2026</small></div><div className="ll-detail-event"><i>＋</i><b>New deal received</b><small>Glenwood Commons · Aug 27, 2026</small></div><div className="ll-detail-event"><i>✓</i><b>Call completed</b><small>Discussed Charlotte pipeline · Aug 22, 2026</small></div></div><div className="ll-detail-section"><small>ORGANIZATION</small><b>Tags</b><span className="ll-detail-tags"><i>Known Broker</i><i>Multifamily</i><i>Charlotte MSA</i><i>Priority</i><i>Warm Relationship</i></span></div><div className="ll-detail-section"><small>OUTREACH</small><b>Campaigns</b><span>Charlotte Broker Nurture　 • Multifamily Deal Flow　 • Q3 Relationship Follow-up</span></div></main></div>
+      <div className="ll-detail-hero"><small>‹ Back to contacts</small><div className="ll-detail-person"><i>AE</i><b>Alex<br /><small>Demo Contact</small></b><b>Example<br /><small>• Example Realty</small></b><span>✉ Email　　✎ Edit　 <strong>SAVE CHANGES</strong></span></div><div className="ll-detail-meta"><span>PHONE<br /><b>(555) 010-0101</b></span><span>EMAIL<br /><b>alex@example.test</b></span><span>COMPANY<br /><b>Example Realty</b></span><span>LAST CONTACTED<br /><b>Aug 29, 2026</b></span></div></div>
+      <div className="ll-detail-body"><aside><small>RECORD</small><b>Contact details</b>{[["NAME", "Alex Example"], ["EMAIL", "alex@example.test"], ["PHONE", "(555) 010-0101"], ["ACCOUNT / COMPANY", "Example Realty"], ["ASSIGNED TO", "Demo Owner"], ["CONTACT TYPE", "Demo broker"], ["LEAD SOURCE", "Demo referral"], ["LAST CONTACTED", "Aug 29, 2026"]].map(([a, b]) => <label key={a}>{a}<strong>{b}</strong></label>)}</aside><main><div className="ll-detail-tabs"><b>Overview</b><span>Activity</span><span>Deals</span><span>Notes</span></div><div className="ll-detail-cards"><div><small>CREATED</small><b>Feb 12, 2025</b></div><div><small>TYPE</small><b>Demo broker</b></div><div><small>DEALS</small><b>12</b></div><div><small>CAMPAIGNS</small><b>3 active</b></div></div><div className="ll-detail-activity"><div className="ll-detail-event"><i>✉</i><b>Email opened</b><small>Example Parcel A follow-up · Aug 29, 2026</small></div><div className="ll-detail-event"><i>＋</i><b>New deal received</b><small>Sample Parcel B · Aug 27, 2026</small></div><div className="ll-detail-event"><i>✓</i><b>Call completed</b><small>Discussed Example Market pipeline · Aug 22, 2026</small></div></div><div className="ll-detail-section"><small>ORGANIZATION</small><b>Tags</b><span className="ll-detail-tags"><i>Demo Broker</i><i>Multifamily</i><i>Example Market</i><i>Priority</i><i>Warm Relationship</i></span></div><div className="ll-detail-section"><small>OUTREACH</small><b>Campaigns</b><span>Example Broker Follow-up　 • Demo Deal Flow　 • Sample Relationship Nurture</span></div></main></div>
     </div>
   );
 }
@@ -84,7 +84,7 @@ function AutoYocMockup() {
   const deals = [
     {
       name: "3-story surface park",
-      location: "1468 Lake View Lane · Charlotte, NC",
+       location: "Example Parcel A · Demo Market",
       yoc: "3.80%",
       units: "1027",
       totalCost: "$430,919,919",
@@ -97,7 +97,7 @@ function AutoYocMockup() {
     },
     {
       name: "BTR",
-      location: "2814 Pine Ridge Road · Raleigh, NC",
+       location: "Sample Parcel B · Test Market",
       yoc: "5.37%",
       units: "274",
       totalCost: "$508,580,508",
@@ -178,13 +178,13 @@ function DripCampaignBuilderMockup() {
               <h3>Choose who should receive this sequence.</h3>
               <div className="ll-drip-audience-grid">
                 <div className="ll-drip-audience"><b>Interested Broker</b><span>CRM tag</span><strong>184 contacts eligible</strong></div>
-                <div className="ll-drip-audience"><b>Charlotte MSA</b><span>Saved geography</span><strong>96 contacts eligible</strong></div>
+                 <div className="ll-drip-audience"><b>Example Market</b><span>Saved geography</span><strong>96 contacts eligible</strong></div>
               </div>
             </div>}
             {activeStep === 1 && <div className="ll-drip-state">
               <small className="ll-drip-kicker">SEQUENCE EDITOR</small>
-              <h3>Charlotte Broker Nurture</h3>
-              <label>Subject line<input value="A quick introduction to your Charlotte pipeline" readOnly /></label>
+               <h3>Example Broker Follow-up</h3>
+               <label>Subject line<input value="A quick introduction to your demo pipeline" readOnly /></label>
               <div className="ll-drip-email-steps">
                 <div><b>STEP 1</b><span>Send immediately</span><strong>Introduction and deal criteria</strong></div>
                 <div><b>STEP 2</b><span>Wait 3 days</span><strong>Share current acquisition focus</strong></div>
@@ -194,7 +194,7 @@ function DripCampaignBuilderMockup() {
             {activeStep === 2 && <div className="ll-drip-state">
               <small className="ll-drip-kicker">REVIEW &amp; LAUNCH</small>
               <h3>Everything is ready to send.</h3>
-              <div className="ll-drip-review"><span>Sender</span><b>Morgan Hayes · connected Outlook</b><span>Audience</span><b>184 contacts with “Interested Broker”</b><span>Sequence</span><b>3 steps · 10 days · automatic follow-up</b></div>
+              <div className="ll-drip-review"><span>Sender</span><b>Demo Owner · connected mailbox</b><span>Audience</span><b>184 contacts with “Interested Broker”</b><span>Sequence</span><b>3 steps · 10 days · automatic follow-up</b></div>
               <button type="button" className="ll-drip-launch">Launch campaign</button>
             </div>}
           </div>
@@ -210,8 +210,8 @@ function AIAssistantMockup() {
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [isThinking, setIsThinking] = useState(false);
 
-  const featuredQuestion = "Which North Carolina deals have projected YOC above 8% and the strongest rent comps, and what should I review next?";
-  const featuredAnswer = "Bull City Landing in Durham leads at 9.0% projected YOC and a $2.41 top rent PSF. Providence Grove follows at 8.6% and $2.34. Bull City is zoning-verified, so I’d prioritize it for IC review and model the 280-unit plan next.";
+  const featuredQuestion = "Which demo-market opportunities have projected YOC above 8% and the strongest rent comps, and what should I review next?";
+  const featuredAnswer = "Example Parcel A in Demo Market leads at 9.0% projected YOC and a $2.41 top rent PSF. Sample Parcel B follows at 8.6% and $2.34. Example Parcel A is review-ready, so I’d prioritize it for committee review and model the 280-unit plan next.";
 
   useEffect(() => {
     let answerTimer: number | undefined;
@@ -292,18 +292,18 @@ function DashboardMockup({ compact = false }: { compact?: boolean }) {
   }, []);
   const columns = ["ID", "Status", "Priority", "Property Address", "Name", "YOC", "Deal", "Type", "Analyst Notes", "Summary", "Dev Notes", "Broker Notes", "Top Rent/Unit", "Top Rent PSF", "OCC T."];
   const rows = [
-    ["#84", "Review", "High", "1824 Glenwood Avenue|Raleigh, NC 27608", "Glenwood Commons", "7.8%", "Land", "Affordable", "Site plan received", "Strong infill opportunity", "Review density", "Seller expects Q4 close", "$1,845", "$2.18", "YES"],
-    ["#83", "Qualified", "High", "6400 Providence Road|Charlotte, NC 28226", "Providence Grove", "8.6%", "Land", "BTR", "Utilities confirmed", "High-growth submarket", "Advance to UW", "Best offers due Friday", "$2,120", "$2.34", "YES"],
-    ["#82", "Review", "Medium", "915 South Main Street|Greenville, SC 29601", "Reedy River Flats", "7.4%", "Land", "Conventional", "Traffic study pending", "Walkable downtown site", "Confirm access", "Broker shared survey", "$1,765", "$2.06", "YES"],
-    ["#81", "Qualified", "High", "3120 Hillsborough Road|Durham, NC 27705", "Bull City Landing", "9.0%", "Land", "Student", "Zoning verified", "Near university demand", "Model 280 units", "Clean title reported", "$1,980", "$2.41", "YES"],
-    ["#80", "Review", "Medium", "4475 New Bern Avenue|Raleigh, NC 27610", "Eastgate Residences", "7.1%", "Land", "Affordable", "QCT status confirmed", "Transit-oriented parcel", "Check tax credits", "Seller flexible on timing", "$1,690", "$1.98", "YES"],
-    ["#79", "Qualified", "Medium", "2280 Wendover Avenue|Greensboro, NC 27407", "Wendover Park", "8.3%", "Land", "Active Adult", "Demographics complete", "Strong 55+ population", "Begin concept plan", "Full package received", "$1,725", "$2.09", "YES"],
-    ["#78", "Review", "Low", "7600 Market Street|Wilmington, NC 28411", "Porters Neck Village", "7.0%", "Land", "BTR", "Wetlands report added", "Coastal growth corridor", "Review wetland area", "Pricing guidance received", "$1,860", "$2.22", "YES"],
-    ["#77", "Qualified", "High", "1350 Veterans Parkway|Murfreesboro, TN 37128", "Veterans Crossing", "8.8%", "Land", "Conventional", "Comp set refreshed", "Rapid household growth", "Schedule IC review", "Seller financing available", "$1,925", "$2.27", "YES"],
-    ["#76", "Review", "Medium", "2900 Western Boulevard|Raleigh, NC 27606", "Western Row", "7.6%", "Land", "Student", "Enrollment data added", "NC State demand driver", "Verify unit mix", "Broker uploaded OM", "$1,995", "$2.38", "YES"],
-    ["#75", "Qualified", "High", "5210 South Boulevard|Charlotte, NC 28217", "South End Exchange", "9.1%", "Land", "Conventional", "Transit access verified", "Prime infill location", "Prepare LOI terms", "Seller prefers certainty", "$2,180", "$2.46", "YES"],
-    ["#74", "Review", "Medium", "3801 Battleground Avenue|Greensboro, NC 27410", "Battleground Oaks", "7.9%", "Land", "Affordable", "AMI rents modeled", "Established retail node", "Confirm bond volume", "Phase I available", "$1,640", "$1.94", "YES"],
-    ["#73", "Qualified", "Low", "2045 Highway 70 East|New Bern, NC 28560", "Neuse River Landing", "8.1%", "Land", "Active Adult", "Flood maps reviewed", "Low basis opportunity", "Order market study", "Flexible closing window", "$1,575", "$1.87", "YES"],
+    ["#84", "Review", "High", "Example Parcel A|Demo Market", "Example Parcel A", "7.8%", "Land", "Affordable", "Demo site plan received", "Strong sample opportunity", "Review density", "Demo timing noted", "$1,845", "$2.18", "YES"],
+    ["#83", "Qualified", "High", "Sample Parcel B|Test Market", "Sample Parcel B", "8.6%", "Land", "BTR", "Demo utilities confirmed", "Strong sample market", "Advance to review", "Demo offer due Friday", "$2,120", "$2.34", "YES"],
+    ["#82", "Review", "Medium", "Demo Parcel C|Example Market", "Demo Parcel C", "7.4%", "Land", "Conventional", "Sample study pending", "Walkable demo setting", "Confirm access", "Demo survey shared", "$1,765", "$2.06", "YES"],
+    ["#81", "Qualified", "High", "Test Parcel D|Placeholder Market", "Test Parcel D", "9.0%", "Land", "Student", "Demo zoning verified", "Strong sample demand", "Model 280 units", "Demo title reported", "$1,980", "$2.41", "YES"],
+    ["#80", "Review", "Medium", "Placeholder Parcel E|Mock Market", "Placeholder Parcel E", "7.1%", "Land", "Affordable", "Sample status confirmed", "Transit-ready demo parcel", "Check assumptions", "Demo timing flexible", "$1,690", "$1.98", "YES"],
+    ["#79", "Qualified", "Medium", "Example Parcel F|Demo Market", "Example Parcel F", "8.3%", "Land", "Active Adult", "Demo demographics complete", "Strong sample audience", "Begin concept plan", "Sample package received", "$1,725", "$2.09", "YES"],
+    ["#78", "Review", "Low", "Sample Parcel G|Test Market", "Sample Parcel G", "7.0%", "Land", "BTR", "Demo report added", "Coastal demo corridor", "Review sample area", "Demo pricing received", "$1,860", "$2.22", "YES"],
+    ["#77", "Qualified", "High", "Demo Parcel H|Example Market", "Demo Parcel H", "8.8%", "Land", "Conventional", "Sample comp set refreshed", "Rapid demo growth", "Schedule review", "Demo financing available", "$1,925", "$2.27", "YES"],
+    ["#76", "Review", "Medium", "Test Parcel I|Placeholder Market", "Test Parcel I", "7.6%", "Land", "Student", "Demo enrollment data added", "Sample demand driver", "Verify unit mix", "Demo package uploaded", "$1,995", "$2.38", "YES"],
+    ["#75", "Qualified", "High", "Placeholder Parcel J|Mock Market", "Placeholder Parcel J", "9.1%", "Land", "Conventional", "Demo access verified", "Prime sample location", "Prepare demo terms", "Sample seller prefers certainty", "$2,180", "$2.46", "YES"],
+    ["#74", "Review", "Medium", "Example Parcel K|Demo Market", "Example Parcel K", "7.9%", "Land", "Affordable", "Sample rents modeled", "Established demo node", "Confirm assumptions", "Demo report available", "$1,640", "$1.94", "YES"],
+    ["#73", "Qualified", "Low", "Sample Parcel L|Test Market", "Sample Parcel L", "8.1%", "Land", "Active Adult", "Demo maps reviewed", "Low sample basis", "Order demo study", "Flexible demo window", "$1,575", "$1.87", "YES"],
   ];
   return (
     <div className={`ll-window ll-analyst-real relative overflow-hidden rounded-[1.1rem] border border-white/15 bg-[#f7f9fa] text-[#182b3e] shadow-2xl ${compact ? "min-h-[280px]" : "min-h-[430px]"}`}>
@@ -328,10 +328,10 @@ function DashboardMockup({ compact = false }: { compact?: boolean }) {
 
 function PipelineWorkspaceMockup() {
   const stages = [
-    { name: "New", count: "14", cards: [["Glenwood Commons", "Raleigh, NC", "9.0%", "High"], ["Eastgate Residences", "Raleigh, NC", "7.1%", "Medium"]] },
-    { name: "Qualified", count: "8", cards: [["Bull City Landing", "Durham, NC", "9.0%", "IC review"], ["Providence Grove", "Charlotte, NC", "8.6%", "Strong fit"]] },
-    { name: "Due Diligence", count: "5", cards: [["South End Exchange", "Charlotte, NC", "9.1%", "Survey due"]] },
-    { name: "Closing", count: "2", cards: [["Veterans Crossing", "Murfreesboro, TN", "8.8%", "LOI sent"]] },
+    { name: "New", count: "14", cards: [["Example Parcel A", "Demo Market", "9.0%", "High"], ["Sample Parcel B", "Test Market", "7.1%", "Medium"]] },
+    { name: "Qualified", count: "8", cards: [["Demo Parcel C", "Example Market", "9.0%", "Review"], ["Test Parcel D", "Placeholder Market", "8.6%", "Strong fit"]] },
+    { name: "Due Diligence", count: "5", cards: [["Placeholder Parcel E", "Mock Market", "9.1%", "Survey due"]] },
+    { name: "Closing", count: "2", cards: [["Example Parcel F", "Demo Market", "8.8%", "Terms sent"]] },
   ];
 
   return (
@@ -686,7 +686,7 @@ export default function MarketingHome() {
                     <h3>Underwrite a deal with your assumptions.</h3>
                     <p>Set product-specific costs, operating assumptions, unit mix, and exit inputs so every opportunity is measured against the way your team invests.</p>
                   </div>
-                  <div className="ll-step-surface ll-surface-paper"><AutoYocMockup /></div>
+                  <div className="ll-step-surface ll-surface-paper ll-yoc-step-surface"><AutoYocMockup /></div>
                 </article>
                <article className="ll-journey-step ll-step-outreach">
                  <div className="ll-step-copy">
