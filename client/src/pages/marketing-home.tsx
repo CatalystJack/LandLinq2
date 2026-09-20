@@ -359,7 +359,7 @@ function PipelineWorkspaceMockup() {
 
 function OutreachWorkspaceMockup() {
   const campaigns = [
-    ["Charlotte Broker Nurture", "184 contacts", "72%", "Due today"],
+    ["Example Broker Follow-up", "184 contacts", "72%", "Due today"],
     ["Q3 Relationship Follow-up", "96 contacts", "48%", "12 queued"],
     ["Multifamily Deal Flow", "63 contacts", "31%", "Healthy"],
   ];
@@ -413,11 +413,11 @@ function DataHubMockup() {
 function ICMemoMockup() {
   return (
     <div className="ll-demo-page ll-memo-page">
-      <div className="ll-memo-toolbar"><span><b>IC MEMO</b> / Riverbend Crossing</span><span><em>READY FOR REVIEW</em><button type="button">EXPORT PDF</button><button type="button">SHARE WITH IC</button></span></div>
+      <div className="ll-memo-toolbar"><span><b>IC MEMO</b> / Example Parcel A</span><span><em>READY FOR REVIEW</em><button type="button">EXPORT PDF</button><button type="button">SHARE WITH IC</button></span></div>
       <div className="ll-memo-document">
         <div className="ll-memo-cover">
-          <div className="ll-memo-brand"><span>MC</span><b>Meridian Capital Partners</b><i /> <small>INVESTMENT SUMMARY</small></div>
-          <div className="ll-memo-cover-line"><div><small>MULTIFAMILY ACQUISITION OPPORTUNITY</small><h3>Riverbend Crossing</h3><p>4820 Riverbend Church Rd, Concord, NC 28025 <i>◆</i> Cabarrus County <i>◆</i> Charlotte–Concord–Gastonia MSA</p></div><span>Prepared for <b>Investment Committee</b><small>September 16, 2026</small></span></div>
+          <div className="ll-memo-brand"><span>EG</span><b>Example Capital Group</b><i /> <small>INVESTMENT SUMMARY</small></div>
+          <div className="ll-memo-cover-line"><div><small>MULTIFAMILY ACQUISITION OPPORTUNITY</small><h3>Example Parcel A</h3><p>Demo Parcel · Example Market <i>◆</i> Sample County <i>◆</i> Example MSA</p></div><span>Prepared for <b>Investment Committee</b><small>September 16, 2026</small></span></div>
         </div>
         <div className="ll-memo-metrics"><div><small>PRODUCT TYPE</small><b>3-Story<br />Garden</b><span>Surface-Parked</span></div><div><small>UNITS / NET<br />DENSITY</small><b>240</b><span>30.0 DU/A</span></div><div><small>TOTAL DEV. COST</small><b>$55.9M</b><span>$232,870 / unit</span></div><div><small>AUTO YIELD-ON-<br />COST</small><b className="is-gold">6.71%</b><span>Year-1 stabilized</span></div><div><small>AUTO IRR (5-YR<br />HOLD)</small><b className="is-gold">14.4%</b><span>5.25% exit cap</span></div><div><small>FEASIBILITY READ</small><b className="is-green">● PURSUING</b></div></div>
         <div className="ll-memo-grid">
@@ -430,10 +430,10 @@ function ICMemoMockup() {
           <div>
             <section className="ll-memo-block"><h4><i>05</i> YEAR-1 PRO FORMA</h4><dl><div><dt>Gross Potential Rent</dt><dd>$5,299,200</dd></div><div><dt>Other Income</dt><dd>$570,240</dd></div><div><dt>Vacancy (5.0%) / LTL (1.0%) / Concessions (1.0%)</dt><dd className="is-loss">−$370,944</dd></div><div><dt>Effective Gross Income</dt><dd>$5,498,496</dd></div><div><dt>Fixed Operating Expenses</dt><dd>$1,464,240</dd></div><div><dt>Insurance (inland)</dt><dd>$132,000</dd></div><div><dt>Management Fee (2.75%)</dt><dd>$151,208</dd></div><div className="is-total"><dt>Year-1 Net Operating Income</dt><dd>$3,751,047</dd></div></dl></section>
             <section className="ll-memo-block"><h4><i>06</i> RETURN ASSUMPTIONS &amp; AUTO IRR</h4><div className="ll-memo-assumptions"><span>Rent growth <b>3.00%</b>/yr</span><span>Other income growth <b>3.00%</b>/yr</span><span>Expense growth <b>2.75%</b>/yr</span><span>Hold period <b>5 yrs</b></span><span>Exit cap rate <b>5.25%</b></span></div><div className="ll-memo-irr"><small>5-YEAR AUTO IRR</small><strong>14.4%</strong><span>NOI growth + reversion at exit</span><em>Year-5 NOI: <b>$4.24M</b> · Reversion: <b>$83.3M</b></em></div></section>
-            <section className="ll-memo-block"><h4><i>07</i> MARKET SNAPSHOT</h4><dl><div><dt>Submarket</dt><dd>North Cabarrus / I-85 Corridor</dd></div><div><dt>3-mi population growth (’19–’24)</dt><dd>+14.2%</dd></div><div><dt>Median HH income (submarket)</dt><dd>$84,300</dd></div><div><dt>Comp set avg. asking rent / SF</dt><dd>$2.04</dd></div><div><dt>Competing pipeline (3 mi)</dt><dd>1 project, 180 units</dd></div></dl></section>
+            <section className="ll-memo-block"><h4><i>07</i> MARKET SNAPSHOT</h4><dl><div><dt>Submarket</dt><dd>Example Market / Demo Corridor</dd></div><div><dt>3-mi population growth (’19–’24)</dt><dd>+14.2%</dd></div><div><dt>Median HH income (submarket)</dt><dd>$84,300</dd></div><div><dt>Comp set avg. asking rent / SF</dt><dd>$2.04</dd></div><div><dt>Competing pipeline (3 mi)</dt><dd>1 project, 180 units</dd></div></dl></section>
           </div>
         </div>
-        <section className="ll-memo-thesis"><h4><i>08</i> INVESTMENT THESIS</h4><p>Riverbend Crossing pairs an already-conditionally-approved rezoning with strong in-migration into the North Cabarrus / I-85 corridor, underwriting to a Year-1 Auto-YOC of 6.71% and a 5-year Auto-IRR of 14.4% at a 5.25% exit cap.</p></section>
+        <section className="ll-memo-thesis"><h4><i>08</i> INVESTMENT THESIS</h4><p>Example Parcel A pairs an illustrative rezoning scenario with strong demo-market demand, underwriting to a Year-1 Auto-YOC of 6.71% and a 5-year Auto-IRR of 14.4% at a 5.25% exit cap.</p></section>
         <div className="ll-memo-powered">Powered by <b>LandLinq</b></div>
       </div>
     </div>
@@ -487,7 +487,7 @@ function SharedWorkspaceMockup() {
         <main>
           <div className="ll-shared-workspace-heading"><div><small>DEAL DASHBOARD</small><h3>Good decisions, in one view.</h3></div><button type="button">+ ADD DEAL</button></div>
           <div className="ll-shared-workspace-metrics"><div><small>ACTIVE DEALS</small><b>29</b><span>+6 this month</span></div><div><small>QUALIFIED</small><b>8</b><span>Ready for review</span></div><div><small>PROJECTED YOC</small><b>8.6%</b><span>Portfolio average</span></div></div>
-          <div className="ll-shared-workspace-table"><div><span>OPPORTUNITY</span><span>OWNER</span><span>STATUS</span><span>YOC</span></div><div><b>Bull City Landing<small>Durham, NC · 280 units</small></b><span>MH</span><em>Qualified</em><strong>9.0%</strong></div><div><b>Providence Grove<small>Charlotte, NC · 216 units</small></b><span>BF</span><em>Review</em><strong>8.6%</strong></div><div><b>Glenwood Commons<small>Raleigh, NC · 184 units</small></b><span>MH</span><em>New</em><strong>7.8%</strong></div></div>
+          <div className="ll-shared-workspace-table"><div><span>OPPORTUNITY</span><span>OWNER</span><span>STATUS</span><span>YOC</span></div><div><b>Example Parcel A<small>Demo Market · 280 units</small></b><span>DO</span><em>Qualified</em><strong>9.0%</strong></div><div><b>Sample Parcel B<small>Test Market · 216 units</small></b><span>DO</span><em>Review</em><strong>8.6%</strong></div><div><b>Demo Parcel C<small>Example Market · 184 units</small></b><span>DO</span><em>New</em><strong>7.8%</strong></div></div>
         </main>
       </div>
     </div>

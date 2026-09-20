@@ -3787,6 +3787,10 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 }
 .ll-step-copy { max-width: 24rem; padding-top: clamp(1rem, 4vw, 4rem); }
 .ll-step-surface { padding: 1.2rem; }
+.ll-yoc-step-surface {
+  width: 86%;
+  justify-self: end;
+}
 
 @media (max-width: 900px) {
   .ll-security-section .grid,
@@ -3794,6 +3798,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   .ll-shared-workspace-section .ll-editorial-visual { order: 2; }
   .ll-shared-workspace-section .ll-editorial-copy { order: 1; }
   .ll-step-copy { padding-top: 0; }
+  .ll-yoc-step-surface { width: 100%; }
 }
 @media (max-width: 560px) {
   .ll-editorial-copy h2 { font-size: 2.35rem; }
