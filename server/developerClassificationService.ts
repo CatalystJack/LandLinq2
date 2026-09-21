@@ -52,52 +52,40 @@ export function classifyDealForProfile(
   const dealAcreage = numericValue(deal?.sizeAcres);
   if (profile.assetClass === "industrial") {
     const industrialCriteria = normalizeIndustrialCriteria(profile.industrialCriteria);
-    const hasLocation = Boolean(String(deal?.state ?? "").trim() || String(deal?.county ?? "").trim());
-
-    if (!hasLocation && industrialCriteria.yellowMissingLocation) {
-      return {
-        classification: "yellow",
-        matchedProductTypes: ["Yellow: location needs verification"],
-      };
-    }
-
-    if (!countyMatch && industrialCriteria.redOutsideTargetMarket) {
+    if (!countyMatch) {
       return {
         classification: "red",
-        matchedProductTypes: ["Red: outside target market"],
+        matchedProductTypes: ["Passed: outside configured target market"],
       };
     }
 
-    if (dealAcreage !== null &&
-        dealAcreage < industrialCriteria.minSingleLoadAcres &&
-        industrialCriteria.redBelowMinimumAcreage) {
+    if (dealAcreage === null) {
       return {
         classification: "red",
-        matchedProductTypes: [`Red: below ${industrialCriteria.minSingleLoadAcres} acre minimum`],
+        matchedProductTypes: ["Passed: acreage not verified"],
       };
     }
 
-    const matchedProductTypes = [];
-    if (dealAcreage === null && industrialCriteria.yellowMissingAcreage) {
-      matchedProductTypes.push("Yellow: acreage needs verification");
-    } else if (dealAcreage !== null) {
-      if (dealAcreage >= industrialCriteria.minSingleLoadAcres) {
-        matchedProductTypes.push("Single-load candidate");
-      }
-      if (dealAcreage >= industrialCriteria.minCrossDockAcres) {
-        matchedProductTypes.push("Cross-dock candidate");
-      }
-    }
-    if (industrialCriteria.yellowSiteEvidenceUnavailable) {
-      matchedProductTypes.push("Yellow: industrial site diligence required");
+    if (dealAcreage < industrialCriteria.minSingleLoadAcres) {
+      return {
+        classification: "red",
+        matchedProductTypes: [`Passed: below ${industrialCriteria.minSingleLoadAcres} acre minimum`],
+      };
     }
 
-    // Current evidence supports market and acreage triage only. Geometry,
-    // slope, wetlands, access, utilities, entitlement, and labor catchments
-    // remain yellow/manual review until reliable site-level sources are connected.
+    const matchedProductTypes = [
+      "Review: target market and acreage minimum met",
+      ...(dealAcreage >= industrialCriteria.minSingleLoadAcres ? ["Single-load candidate"] : []),
+      ...(dealAcreage >= industrialCriteria.minCrossDockAcres ? ["Cross-dock candidate"] : []),
+      "Review: industrial site diligence required",
+    ];
+
+    // Market and acreage are the only current gates for yellow/review.
+    // Geometry, slope, wetlands, access, utilities, entitlement, and labor
+    // catchments remain review notes rather than additional classification gates.
     return {
       classification: "yellow",
-      matchedProductTypes: matchedProductTypes.length ? matchedProductTypes : ["Yellow: industrial site review"],
+      matchedProductTypes,
     };
   }
   const dealRent = profile.rentMetric === "psf"

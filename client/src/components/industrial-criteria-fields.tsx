@@ -1,6 +1,5 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
   type IndustrialCriteria,
@@ -60,46 +59,25 @@ export default function IndustrialCriteriaFields({ value, onChange, compact = fa
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-          <h4 className="font-semibold text-red-950">Automatic red screens available now</h4>
+          <h4 className="font-semibold text-red-950">Passed outcome (red)</h4>
           <p className="mt-1 text-xs leading-5 text-red-900">
-            These are the only hard failures the current data model can support without making an engineering or entitlement assumption.
+            Industrial sites remain passed unless both review conditions below are met.
           </p>
-          <div className="mt-3 space-y-2">
-            {[
-              ["redOutsideTargetMarket", "Outside the configured target state or county"],
-              ["redBelowMinimumAcreage", "Below the minimum acreage for any configured industrial format"],
-            ].map(([key, label]) => (
-              <label key={key} className="flex items-start gap-3 rounded-lg border border-red-200 bg-white p-3">
-                <Switch
-                  checked={Boolean(criteria[key as keyof IndustrialCriteria])}
-                  onCheckedChange={(checked) => update(key as keyof IndustrialCriteria, checked)}
-                />
-                <span className="text-sm leading-5 text-red-950">{label}</span>
-              </label>
-            ))}
-          </div>
+          <ul className="mt-3 space-y-2 text-sm leading-5 text-red-950">
+            <li>• Outside the configured target state or county</li>
+            <li>• Acreage is missing or below the minimum industrial acreage</li>
+          </ul>
         </div>
 
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <h4 className="font-semibold text-amber-950">Automatic yellow screens available now</h4>
+          <h4 className="font-semibold text-amber-950">Review outcome (yellow)</h4>
           <p className="mt-1 text-xs leading-5 text-amber-900">
-            Yellow means the opportunity may fit, but the current record is incomplete or requires manual site review.
+            Yellow/review is reserved for sites that meet both minimum industrial screening conditions.
           </p>
-          <div className="mt-3 space-y-2">
-            {[
-              ["yellowMissingLocation", "Address, state, or county is missing or unresolved"],
-              ["yellowMissingAcreage", "Acreage is missing or cannot be verified"],
-              ["yellowSiteEvidenceUnavailable", "Parcel, building-fit, environmental, access, labor, entitlement, or utility evidence is not automated yet"],
-            ].map(([key, label]) => (
-              <label key={key} className="flex items-start gap-3 rounded-lg border border-amber-200 bg-white p-3">
-                <Switch
-                  checked={Boolean(criteria[key as keyof IndustrialCriteria])}
-                  onCheckedChange={(checked) => update(key as keyof IndustrialCriteria, checked)}
-                />
-                <span className="text-sm leading-5 text-amber-950">{label}</span>
-              </label>
-            ))}
-          </div>
+          <ul className="mt-3 space-y-2 text-sm leading-5 text-amber-950">
+            <li>• Site is in a configured target state or county</li>
+            <li>• Acreage meets the single-load minimum</li>
+          </ul>
         </div>
       </div>
 

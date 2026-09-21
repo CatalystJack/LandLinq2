@@ -148,7 +148,7 @@ function DealStatus({ row, industrial }: { row: DeveloperDeal; industrial: boole
   if (industrial && row.classification === "red") {
     return (
       <div className="flex flex-wrap items-center gap-1.5">
-        <Badge className="border-red-200 bg-red-100 text-red-800 hover:bg-red-100">Red</Badge>
+        <Badge className="border-red-200 bg-red-100 text-red-800 hover:bg-red-100">Passed</Badge>
         {(row.matchedProductTypes || []).map((reason) => (
           <Badge key={reason} variant="outline" className="border-red-200 bg-white text-red-700">
             {reason}
@@ -160,7 +160,7 @@ function DealStatus({ row, industrial }: { row: DeveloperDeal; industrial: boole
   if (industrial) {
     return (
       <div className="flex flex-wrap items-center gap-1.5">
-        <Badge className="border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-100">Yellow</Badge>
+        <Badge className="border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-100">Review</Badge>
         {(row.matchedProductTypes || []).map((reason) => (
           <Badge key={reason} variant="outline" className="border-amber-200 bg-white text-amber-700">
             {reason}
@@ -460,7 +460,7 @@ export default function DeveloperDashboard() {
           row.deal.zoning,
           row.deal.hasEntitlements == null ? "Unknown" : row.deal.hasEntitlements ? "Yes" : "No",
           row.deal.sewerAvailable == null ? "Unknown" : row.deal.sewerAvailable ? "Yes" : "No",
-          row.greenFlaggedByDeveloper ? "Pursuing" : row.classification === "red" ? "Red" : "Yellow",
+          row.greenFlaggedByDeveloper ? "Pursuing" : row.classification === "red" ? "Passed" : "Review",
           (row.matchedProductTypes || []).join(", "),
         ]
       : [
@@ -536,8 +536,8 @@ export default function DeveloperDashboard() {
           {(isIndustrial
             ? [
                 { label: "All sites", value: counts.total, icon: Building2, tone: "text-slate-700 bg-slate-100" },
-                { label: "Red", value: counts.red, icon: CheckCircle2, tone: "text-red-700 bg-red-100" },
-                { label: "Yellow", value: counts.yellow, icon: Search, tone: "text-amber-700 bg-amber-100" },
+                { label: "Passed", value: counts.red, icon: CheckCircle2, tone: "text-red-700 bg-red-100" },
+                { label: "Review", value: counts.yellow, icon: Search, tone: "text-amber-700 bg-amber-100" },
                 { label: "Pursuing", value: counts.pursuing, icon: Star, tone: "text-emerald-700 bg-emerald-100" },
               ]
             : [
@@ -550,7 +550,12 @@ export default function DeveloperDashboard() {
             <button
               key={label}
               type="button"
-              onClick={() => setStatusFilter(statusFilter === label.toLowerCase() ? "all" : label.toLowerCase())}
+              onClick={() => {
+                const nextFilter = isIndustrial
+                  ? label === "Passed" ? "red" : label === "Review" ? "yellow" : label.toLowerCase()
+                  : label.toLowerCase();
+                setStatusFilter(statusFilter === nextFilter ? "all" : nextFilter);
+              }}
               className={`flex items-center justify-between rounded-md border bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-[#4A90E2] ${
                 statusFilter === label.toLowerCase() ? "border-[#4A90E2] ring-1 ring-[#4A90E2]/20" : "border-slate-200"
               }`}
@@ -601,8 +606,8 @@ export default function DeveloperDashboard() {
                      <SelectItem value="all">{isIndustrial ? "All screens" : "All status"}</SelectItem>
                      {isIndustrial ? (
                        <>
-                         <SelectItem value="red">Red</SelectItem>
-                         <SelectItem value="yellow">Yellow</SelectItem>
+                         <SelectItem value="red">Passed</SelectItem>
+                         <SelectItem value="yellow">Review</SelectItem>
                        </>
                      ) : (
                        <>
