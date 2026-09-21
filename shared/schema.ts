@@ -37,6 +37,8 @@ export const developerProfiles = pgTable("developer_profiles", {
   companyName: varchar("company_name").notNull(),
   slug: varchar("slug").notNull().unique(),
   profileType: varchar("profile_type").notNull().default("real_estate"),
+  assetClass: varchar("asset_class").notNull().default("multifamily"),
+  industrialCriteria: jsonb("industrial_criteria").default('{}'),
   logoUrl: varchar("logo_url"),
   primaryColor: varchar("primary_color").default("#0A2B4A"),
   secondaryColor: varchar("secondary_color").default("#4A90E2"),

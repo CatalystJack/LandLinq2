@@ -326,6 +326,9 @@ setTimeout(() => {
           ADD COLUMN IF NOT EXISTS bad_debt_pct numeric DEFAULT 0,
           ADD COLUMN IF NOT EXISTS mgmt_fee_pct numeric DEFAULT 0.0275,
           ADD COLUMN IF NOT EXISTS unit_mix jsonb;
+        ALTER TABLE developer_profiles
+          ADD COLUMN IF NOT EXISTS asset_class varchar NOT NULL DEFAULT 'multifamily',
+          ADD COLUMN IF NOT EXISTS industrial_criteria jsonb NOT NULL DEFAULT '{}';
         CREATE TABLE IF NOT EXISTS developer_quick_links (
           id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
           developer_profile_id varchar NOT NULL REFERENCES developer_profiles(id) ON DELETE CASCADE,

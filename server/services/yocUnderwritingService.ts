@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import {
   deals,
+  developerProfiles,
   developerProductTypes,
   partnerDeveloperSends,
 } from "@shared/schema";
@@ -886,6 +887,17 @@ export async function recomputeDealYoc(
   const [deal] = await db.select().from(deals).where(eq(deals.id, dealId)).limit(1);
   if (!deal) return undefined;
   const profileId = developerProfileId || (await getDeveloperProfileIdsForDeal(dealId))[0];
+  if (profileId) {
+    const [profile] = await db.select({ assetClass: developerProfiles.assetClass })
+      .from(developerProfiles)
+      .where(eq(developerProfiles.id, profileId))
+      .limit(1);
+    if (profile?.assetClass === "industrial") {
+      // Industrial profiles are criteria-screening only until their
+      // underwriting methodology is explicitly configured.
+      return deal;
+    }
+  }
   const breakdown = await calculateYOCBreakdown(deal, profileId);
   if (!breakdown) {
     const [updated] = await db.update(deals).set({
@@ -931,6 +943,11 @@ export async function recomputeDealYoc(
 }
 
 export async function recomputeDealsForDeveloperProfile(developerProfileId: string): Promise<number> {
+  const [profile] = await db.select({ assetClass: developerProfiles.assetClass })
+    .from(developerProfiles)
+    .where(eq(developerProfiles.id, developerProfileId))
+    .limit(1);
+  if (profile?.assetClass === "industrial") return 0;
   const rows = await db.select({ dealId: partnerDeveloperSends.dealId })
     .from(partnerDeveloperSends)
     .where(eq(partnerDeveloperSends.developerProfileId, developerProfileId));

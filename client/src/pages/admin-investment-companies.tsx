@@ -21,6 +21,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertCircle, Building2, CheckCircle2, ChevronDown, ChevronUp, Edit3, KeyRound, Loader2, LockKeyhole, Mail, MapPin, Plus, RotateCcw, Search, Settings2, Target, Trash2, Upload, Users, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
+import IndustrialCriteriaFields from "@/components/industrial-criteria-fields";
+import {
+  DEFAULT_INDUSTRIAL_CRITERIA,
+  type DeveloperAssetClass,
+  type IndustrialCriteria,
+} from "@shared/industrial-criteria";
 
 type ProductType = YocAssumptionsValue & {
   id?: string;
@@ -37,6 +43,8 @@ interface InvestmentCompany {
   companyName: string;
   slug: string;
   profileType: "real_estate" | "general_sales";
+  assetClass: DeveloperAssetClass;
+  industrialCriteria: IndustrialCriteria;
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
@@ -62,6 +70,8 @@ interface CompanyForm {
   companyName: string;
   slug: string;
   profileType: "real_estate" | "general_sales";
+  assetClass: DeveloperAssetClass;
+  industrialCriteria: IndustrialCriteria;
   logoUrl: string;
   primaryColor: string;
   secondaryColor: string;
@@ -109,6 +119,8 @@ const blankForm: CompanyForm = {
   companyName: "",
   slug: "",
   profileType: "real_estate",
+  assetClass: "multifamily",
+  industrialCriteria: DEFAULT_INDUSTRIAL_CRITERIA,
   logoUrl: "",
   primaryColor: "#0A2B4A",
   secondaryColor: "#4A90E2",
@@ -365,6 +377,8 @@ export default function AdminInvestmentCompanies() {
       companyName: editing.companyName,
       slug: editing.slug,
       profileType: editing.profileType || "real_estate",
+      assetClass: editing.assetClass || "multifamily",
+      industrialCriteria: editing.industrialCriteria || DEFAULT_INDUSTRIAL_CRITERIA,
       logoUrl: editing.logoUrl || "",
       primaryColor: editing.primaryColor || "#0A2B4A",
       secondaryColor: editing.secondaryColor || "#4A90E2",
@@ -418,9 +432,10 @@ export default function AdminInvestmentCompanies() {
   const saveMutation = useMutation({
     mutationFn: () => {
       const isGeneralSales = form.profileType === "general_sales";
+      const isIndustrial = form.assetClass === "industrial";
       const activeProductTypes = form.productTypes.filter((productType) => productType.isActive);
       const firstActive = activeProductTypes[0];
-      if (!isGeneralSales) {
+      if (!isGeneralSales && !isIndustrial) {
         if (!firstActive) throw new Error("At least one active product type is required");
         for (let index = 0; index < form.productTypes.length; index++) {
           const productType = form.productTypes[index];
@@ -437,14 +452,16 @@ export default function AdminInvestmentCompanies() {
         body: JSON.stringify({
           ...form,
           profileType: form.profileType,
+          assetClass: form.assetClass,
+          industrialCriteria: form.industrialCriteria,
           logoUrl: form.logoUrl || null,
-          minAcres: isGeneralSales ? "0" : firstActive?.minAcres,
-          maxAcres: isGeneralSales ? null : firstActive?.maxAcres || null,
-          minRentPsf: isGeneralSales ? null : firstActive?.minRentPsf || null,
-          minRentPerUnit: isGeneralSales ? null : firstActive?.minRentPerUnit || null,
+          minAcres: isGeneralSales || isIndustrial ? "0" : firstActive?.minAcres,
+          maxAcres: isGeneralSales || isIndustrial ? null : firstActive?.maxAcres || null,
+          minRentPsf: isGeneralSales || isIndustrial ? null : firstActive?.minRentPsf || null,
+          minRentPerUnit: isGeneralSales || isIndustrial ? null : firstActive?.minRentPerUnit || null,
           targetStates: isGeneralSales ? [] : form.targetStates,
           targetCounties: isGeneralSales ? [] : form.targetCounties,
-          productTypes: isGeneralSales ? [] : form.productTypes.map(({ id: _id, ...productType }) => ({
+          productTypes: isGeneralSales || isIndustrial ? [] : form.productTypes.map(({ id: _id, ...productType }) => ({
             ...productType,
             name: productType.name.trim(),
             maxAcres: productType.maxAcres || null,
@@ -593,7 +610,8 @@ export default function AdminInvestmentCompanies() {
        <div className="space-y-7 py-2">
          <section><h3 className="mb-3 font-semibold">Profile type</h3><div className="grid gap-3 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => !editing && update("profileType", "real_estate")} className={`h-auto justify-start rounded-lg border p-4 text-left transition ${form.profileType === "real_estate" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"} ${editing ? "cursor-default opacity-80" : "hover:border-slate-300"}`}><p className="font-semibold text-slate-900">Real Estate Investment Company</p><p className="mt-1 text-sm text-slate-500">Deal Dashboard, acquisition criteria, CRM, Outreach, and Analytics.</p></Button><Button type="button" variant="outline" onClick={() => !editing && update("profileType", "general_sales")} className={`h-auto justify-start rounded-lg border p-4 text-left transition ${form.profileType === "general_sales" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"} ${editing ? "cursor-default opacity-80" : "hover:border-slate-300"}`}><p className="font-semibold text-slate-900">General Sales</p><p className="mt-1 text-sm text-slate-500">CRM, Outreach, Analytics, and team access without deal criteria.</p></Button></div>{editing && <p className="mt-2 text-xs text-slate-500">Profile type is set when the profile is created.</p>}</section>
          <section><h3 className="mb-3 font-semibold">Company and branding</h3><div className="grid gap-4 sm:grid-cols-2"><div><Label>Company name</Label><Input value={form.companyName} onChange={(e) => { update("companyName", e.target.value); if (!editing) update("slug", e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")); }} /></div><div><Label>Login slug</Label><Input value={form.slug} onChange={(e) => update("slug", e.target.value.toLowerCase())} placeholder="company-name" /></div><div><Label>Primary color</Label><div className="flex gap-2"><Input type="color" value={form.primaryColor} onChange={(e) => update("primaryColor", e.target.value)} className="w-14 p-1" /><Input value={form.primaryColor} onChange={(e) => update("primaryColor", e.target.value)} /></div></div><div><Label>Secondary color</Label><div className="flex gap-2"><Input type="color" value={form.secondaryColor} onChange={(e) => update("secondaryColor", e.target.value)} className="w-14 p-1" /><Input value={form.secondaryColor} onChange={(e) => update("secondaryColor", e.target.value)} /></div></div><div className="sm:col-span-2"><Label>Company logo</Label><div className="mt-1 flex items-center gap-3 rounded-lg border p-3">{form.logoUrl ? <img src={form.logoUrl} alt="Logo preview" className="h-14 w-20 object-contain" /> : <Building2 className="h-10 w-10 text-slate-300" />}<label className="cursor-pointer"><Input type="file" accept=".png,.jpg,.jpeg,.webp" className="hidden" onChange={(e) => e.target.files?.[0] && logoMutation.mutate(e.target.files[0])} /><span className="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium"><Upload className="mr-2 h-4 w-4" />{logoMutation.isPending ? "Uploading…" : "Upload logo"}</span></label>{form.logoUrl && <Button variant="ghost" size="sm" onClick={() => update("logoUrl", "")}>Remove</Button>}</div><p className="mt-1 text-xs text-slate-500">PNG, JPG, or WebP. Maximum 5 MB.</p></div></div></section>
-          {form.profileType === "real_estate" && <><section><h3 className="mb-3 font-semibold">Acquisition criteria</h3><div className="max-w-sm"><Label>Primary rent metric</Label><Select value={form.rentMetric} onValueChange={(value: "psf" | "per_unit") => update("rentMetric", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="psf">Rent per square foot</SelectItem><SelectItem value="per_unit">Rent per unit</SelectItem></SelectContent></Select></div></section>
+         {form.profileType === "real_estate" && <section><h3 className="mb-3 font-semibold">Asset class</h3><div className="grid gap-3 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => update("assetClass", "multifamily")} className={`h-auto justify-start rounded-lg border p-4 text-left ${form.assetClass === "multifamily" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"}`}><div><p className="font-semibold text-slate-900">Multifamily</p><p className="mt-1 text-sm text-slate-500">Rent, product type, and automated YOC criteria.</p></div></Button><Button type="button" variant="outline" onClick={() => update("assetClass", "industrial")} className={`h-auto justify-start rounded-lg border p-4 text-left ${form.assetClass === "industrial" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"}`}><div><p className="font-semibold text-slate-900">Industrial</p><p className="mt-1 text-sm text-slate-500">Site-screening criteria only. No automated YOC.</p></div></Button></div></section>}
+         {form.profileType === "real_estate" && form.assetClass === "multifamily" && <><section><h3 className="mb-3 font-semibold">Acquisition criteria</h3><div className="max-w-sm"><Label>Primary rent metric</Label><Select value={form.rentMetric} onValueChange={(value: "psf" | "per_unit") => update("rentMetric", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="psf">Rent per square foot</SelectItem><SelectItem value="per_unit">Rent per unit</SelectItem></SelectContent></Select></div></section>
            <section>
              <div className="mb-3 flex items-center justify-between gap-3">
                <div><h3 className="font-semibold">Product types</h3><p className="text-sm text-slate-500">Define acreage and {form.rentMetric === "psf" ? "$/SF" : "$/Unit"} thresholds for each active product type.</p></div>
@@ -621,6 +639,7 @@ export default function AdminInvestmentCompanies() {
            </section>
          <section><h3 className="mb-3 font-semibold">Affordable housing overrides</h3><div className="grid gap-3 sm:grid-cols-3"><ToggleRow label="QCT override" description="QCT status may override the rent minimum." checked={form.qctOverridesRentMinimum} onChange={(value) => update("qctOverridesRentMinimum", value)} /><ToggleRow label="DDA override" description="DDA status may override the rent minimum." checked={form.ddaOverridesRentMinimum} onChange={(value) => update("ddaOverridesRentMinimum", value)} /><ToggleRow label="OZ override" description="Opportunity Zone status may override rent." checked={form.ozOverridesRentMinimum} onChange={(value) => update("ozOverridesRentMinimum", value)} /></div></section>
          <section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><TagsField label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} placeholder="NC, SC, GA" /><CountyMarketEditor values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
+         {form.profileType === "real_estate" && form.assetClass === "industrial" && <><section className="rounded-lg border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Industrial site-screening criteria</h3><p className="mt-1 text-sm text-amber-900">These values drive the initial site search and manual review queue. Automated multifamily YOC and rent underwriting are intentionally disabled for this company.</p><div className="mt-5"><IndustrialCriteriaFields value={form.industrialCriteria} onChange={(value) => update("industrialCriteria", value)} compact /></div></section><section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><TagsField label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} placeholder="NC, SC, GA" /><CountyMarketEditor values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
          {form.profileType === "general_sales" && <section className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900"><p className="font-semibold">General Sales profile</p><p className="mt-1">This profile has no Deal Dashboard, acquisition criteria, geographic targeting, product types, or affordable housing overrides. Team members will use CRM, Outreach, Analytics, and Settings.</p></section>}
         <section className="grid gap-3 sm:grid-cols-2"><ToggleRow label="Internal company" description="Marks this as a LandLinq/Catalyst internal profile." checked={form.isInternal} onChange={(value) => update("isInternal", value)} /><ToggleRow label="Profile active" description="Allows assigned users to enter the company portal." checked={form.isActive} onChange={(value) => update("isActive", value)} /></section>
        </div><DialogFooter><Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button><Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || logoMutation.isPending}>{saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? "Save changes" : "Create Development Partner"}</Button></DialogFooter>

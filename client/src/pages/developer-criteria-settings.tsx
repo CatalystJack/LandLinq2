@@ -37,10 +37,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import IndustrialCriteriaFields from "@/components/industrial-criteria-fields";
+import {
+  DEFAULT_INDUSTRIAL_CRITERIA,
+  type DeveloperAssetClass,
+  type IndustrialCriteria,
+} from "@shared/industrial-criteria";
 
 type Profile = {
   companyName: string;
   profileType: "real_estate" | "general_sales";
+  assetClass: DeveloperAssetClass;
+  industrialCriteria: IndustrialCriteria;
   primaryColor: string | null;
   secondaryColor: string | null;
   outreachTestModeEnabled: boolean;
@@ -343,6 +351,8 @@ export default function DeveloperCriteriaSettings() {
       const profile = profileQuery.data.profile;
       setForm({
         ...profile,
+        assetClass: profile.assetClass || "multifamily",
+        industrialCriteria: profile.industrialCriteria || DEFAULT_INDUSTRIAL_CRITERIA,
         targetStates: profile.targetStates || [],
         targetCounties: profile.targetCounties || [],
         productTypes: (profile.productTypes || []).map((productType) => ({
@@ -488,6 +498,17 @@ export default function DeveloperCriteriaSettings() {
     if (!form) return;
     if (form.profileType === "general_sales") {
       saveMutation.mutate({ profileType: "general_sales" });
+      return;
+    }
+    if (form.assetClass === "industrial") {
+      saveMutation.mutate({
+        assetClass: "industrial",
+        industrialCriteria: form.industrialCriteria,
+        targetStates: form.targetStates,
+        targetCounties: form.targetCounties,
+        countyMarketLabels: form.countyMarketLabels,
+        productTypes: [],
+      });
       return;
     }
     if (!form.productTypes.length || !form.productTypes.some((productType) => productType.isActive)) {
@@ -782,7 +803,7 @@ export default function DeveloperCriteriaSettings() {
 
           </div>
 
-          {form.profileType === "real_estate" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+          {form.profileType === "real_estate" && form.assetClass === "multifamily" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <div className="flex items-start gap-3">
                 <div className="rounded-xl p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}><Settings2 className="h-5 w-5" /></div>
@@ -922,7 +943,31 @@ export default function DeveloperCriteriaSettings() {
             </CardContent>
           </Card>}
 
-          {form.profileType === "real_estate" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+          {form.profileType === "real_estate" && form.assetClass === "industrial" && <Card className="rounded-2xl border-amber-200 bg-amber-50 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-amber-950">Industrial site-screening criteria</CardTitle>
+              <CardDescription className="text-amber-900">
+                Configure the site requirements used to find and review industrial opportunities. Automated multifamily rent and YOC underwriting is not available for industrial profiles.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 border-t border-amber-200 pt-5">
+              <IndustrialCriteriaFields
+                value={form.industrialCriteria}
+                onChange={(value) => update("industrialCriteria", value)}
+              />
+              <div className="grid gap-5 border-t border-amber-200 pt-5 md:grid-cols-2">
+                <TagEditor label="Target states" values={form.targetStates} onChange={(value) => update("targetStates", value)} placeholder="e.g. North Carolina" />
+                <CountyMarketEditor
+                  values={form.targetCounties}
+                  labels={form.countyMarketLabels}
+                  onCountiesChange={(value) => update("targetCounties", value)}
+                  onLabelsChange={(value) => update("countyMarketLabels", value)}
+                />
+              </div>
+            </CardContent>
+          </Card>}
+
+          {form.profileType === "real_estate" && form.assetClass === "multifamily" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader className="cursor-pointer" onClick={() => setOverridesOpen((open) => !open)}>
               <div className="flex items-center justify-between">
                 <div><CardTitle>Rent minimum overrides</CardTitle><CardDescription>Allow qualifying public programs to bypass rent minimums.</CardDescription></div>

@@ -1,4 +1,5 @@
 import type { DeveloperProductType, DeveloperProfile } from "@shared/schema";
+import { normalizeIndustrialCriteria } from "@shared/industrial-criteria";
 
 export type DealClassification = "passed" | "review";
 export interface DeveloperClassificationResult {
@@ -49,6 +50,26 @@ export function classifyDealForProfile(
   }
   const countyMatch = isDealInProfileMarket(deal, profile);
   const dealAcreage = numericValue(deal?.sizeAcres);
+  if (profile.assetClass === "industrial") {
+    if (!countyMatch) {
+      return { classification: "passed", matchedProductTypes: [] };
+    }
+    const industrialCriteria = normalizeIndustrialCriteria(profile.industrialCriteria);
+    const matchedProductTypes = dealAcreage === null
+      ? ["Industrial site review"]
+      : [
+          ...(dealAcreage >= industrialCriteria.minSingleLoadAcres ? ["Single-load candidate"] : []),
+          ...(dealAcreage >= industrialCriteria.minCrossDockAcres ? ["Cross-dock candidate"] : []),
+        ];
+
+    // Geometry, slope, wetlands, access, utilities, entitlement, and
+    // labor catchments require site-screening evidence and remain manual
+    // review inputs until those sources are connected.
+    return {
+      classification: "review",
+      matchedProductTypes: matchedProductTypes.length ? matchedProductTypes : ["Industrial site review"],
+    };
+  }
   const dealRent = profile.rentMetric === "psf"
     ? numericValue(deal?.topRentPSF)
     : numericValue(deal?.avgRentPerUnit);
