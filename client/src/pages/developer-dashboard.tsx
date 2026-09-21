@@ -51,6 +51,14 @@ type DealRecord = {
   topRentPSF: string | null;
   avgRentPerUnit: string | null;
   askingPrice: string | null;
+  parcelId?: string | null;
+  zoning?: string | null;
+  hasEntitlements?: boolean | null;
+  sewerAvailable?: boolean | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
+  wetlandNotes?: string | null;
+  addressConfidence?: string | null;
   productTypes: string[] | null;
   qctStatus?: string | null;
   ozStatus?: string | null;
@@ -75,7 +83,7 @@ type DealRecord = {
 
 type DeveloperDeal = {
   id: string;
-  classification: "passed" | "review" | null;
+  classification: "passed" | "review" | "red" | "yellow" | null;
   matchedProductTypes: string[] | null;
   matchedAt: string | null;
   sentAt: string | null;
@@ -128,13 +136,37 @@ function dealPrograms(deal: DealRecord): string[] {
   return programs;
 }
 
-function DealStatus({ row }: { row: DeveloperDeal }) {
+function DealStatus({ row, industrial }: { row: DeveloperDeal; industrial: boolean }) {
   if (row.greenFlaggedByDeveloper) {
     return (
       <Badge className="border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
         <Star className="mr-1 h-3 w-3 fill-current" />
         Pursuing
       </Badge>
+    );
+  }
+  if (industrial && row.classification === "red") {
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge className="border-red-200 bg-red-100 text-red-800 hover:bg-red-100">Red</Badge>
+        {(row.matchedProductTypes || []).map((reason) => (
+          <Badge key={reason} variant="outline" className="border-red-200 bg-white text-red-700">
+            {reason}
+          </Badge>
+        ))}
+      </div>
+    );
+  }
+  if (industrial) {
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge className="border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-100">Yellow</Badge>
+        {(row.matchedProductTypes || []).map((reason) => (
+          <Badge key={reason} variant="outline" className="border-amber-200 bg-white text-amber-700">
+            {reason}
+          </Badge>
+        ))}
+      </div>
     );
   }
   if (row.classification === "review") {
@@ -159,6 +191,7 @@ export default function DeveloperDashboard() {
   const queryClient = useQueryClient();
   const profile = (user as any)?.developerProfile;
   const isGeneralSales = profile?.profileType === "general_sales";
+  const isIndustrial = profile?.assetClass === "industrial";
   const primaryColor = profile?.primaryColor || "#0A2B4A";
   const secondaryColor = profile?.secondaryColor || "#4A90E2";
 
@@ -379,8 +412,12 @@ export default function DeveloperDashboard() {
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "pursuing" && row.greenFlaggedByDeveloper) ||
-        (statusFilter === "review" && row.classification === "review" && !row.greenFlaggedByDeveloper) ||
-        (statusFilter === "passed" && row.classification !== "review" && !row.greenFlaggedByDeveloper);
+        (isIndustrial
+          ? ((statusFilter === "red" && row.classification === "red") ||
+             (statusFilter === "yellow" && row.classification !== "red")) &&
+            !row.greenFlaggedByDeveloper
+          : (statusFilter === "review" && row.classification === "review" && !row.greenFlaggedByDeveloper) ||
+            (statusFilter === "passed" && row.classification !== "review" && !row.greenFlaggedByDeveloper));
       const productTypes = [...(row.matchedProductTypes || []), ...(row.deal.productTypes || [])];
       const matchesProductType = productTypeFilter === "all" || productTypes.includes(productTypeFilter);
       const programs = dealPrograms(row.deal);
@@ -390,33 +427,55 @@ export default function DeveloperDashboard() {
         || programs.includes(programFilter);
       return matchesSearch && matchesStatus && matchesProductType && matchesProgram;
     });
-  }, [rows, search, statusFilter, productTypeFilter, programFilter]);
+  }, [rows, search, statusFilter, productTypeFilter, programFilter, isIndustrial]);
 
-  const counts = useMemo(() => ({
+  const counts = useMemo(() => isIndustrial ? ({
+    total: rows.length,
+    red: rows.filter((row) => row.classification === "red" && !row.greenFlaggedByDeveloper).length,
+    yellow: rows.filter((row) => row.classification !== "red" && !row.greenFlaggedByDeveloper).length,
+    pursuing: rows.filter((row) => row.greenFlaggedByDeveloper).length,
+  }) : ({
     total: rows.length,
     review: rows.filter((row) => row.classification === "review" && !row.greenFlaggedByDeveloper).length,
     passed: rows.filter((row) => row.classification !== "review" && !row.greenFlaggedByDeveloper).length,
     pursuing: rows.filter((row) => row.greenFlaggedByDeveloper).length,
-  }), [rows]);
+  }), [rows, isIndustrial]);
 
   const canImport = Boolean(file && mapping.address && mapping.acreage && rowCount > 0 && !parsing);
 
   const exportDeals = () => {
     const escapeCsv = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-    const header = ["Property", "City", "County", "State", "Acreage", "Rent", "Status", "Product Type", "HUD FMR (2BR)", "HUD 4-Person Income Limit", "Programs"];
-    const body = filteredRows.map((row) => [
-      row.deal.address,
-      row.deal.city,
-      row.deal.county,
-      row.deal.state,
-      row.deal.sizeAcres,
-      rentText(row.deal),
-      row.greenFlaggedByDeveloper ? "Pursuing" : row.classification === "review" ? "Review" : "Passed",
-      (row.matchedProductTypes || row.deal.productTypes || []).join(", "),
-      row.deal.hudData?.fmrTwoBedroom ?? "",
-      row.deal.hudData?.lowIncomeLimitFourPerson ?? "",
-      dealPrograms(row.deal).join(", "),
-    ]);
+    const header = isIndustrial
+      ? ["Property", "City", "County", "State", "Acreage", "Asking Price", "Parcel ID", "Zoning", "Entitlements", "Sewer", "Screen", "Screen Reasons"]
+      : ["Property", "City", "County", "State", "Acreage", "Rent", "Status", "Product Type", "HUD FMR (2BR)", "HUD 4-Person Income Limit", "Programs"];
+    const body = filteredRows.map((row) => isIndustrial
+      ? [
+          row.deal.address,
+          row.deal.city,
+          row.deal.county,
+          row.deal.state,
+          row.deal.sizeAcres,
+          row.deal.askingPrice,
+          row.deal.parcelId,
+          row.deal.zoning,
+          row.deal.hasEntitlements == null ? "Unknown" : row.deal.hasEntitlements ? "Yes" : "No",
+          row.deal.sewerAvailable == null ? "Unknown" : row.deal.sewerAvailable ? "Yes" : "No",
+          row.greenFlaggedByDeveloper ? "Pursuing" : row.classification === "red" ? "Red" : "Yellow",
+          (row.matchedProductTypes || []).join(", "),
+        ]
+      : [
+          row.deal.address,
+          row.deal.city,
+          row.deal.county,
+          row.deal.state,
+          row.deal.sizeAcres,
+          rentText(row.deal),
+          row.greenFlaggedByDeveloper ? "Pursuing" : row.classification === "review" ? "Review" : "Passed",
+          (row.matchedProductTypes || row.deal.productTypes || []).join(", "),
+          row.deal.hudData?.fmrTwoBedroom ?? "",
+          row.deal.hudData?.lowIncomeLimitFourPerson ?? "",
+          dealPrograms(row.deal).join(", "),
+        ]);
     const csv = [header, ...body].map((line) => line.map(escapeCsv).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
     const anchor = document.createElement("a");
@@ -474,12 +533,20 @@ export default function DeveloperDashboard() {
         />
 
         <div className="section-gap-sm grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "All deals", value: counts.total, icon: Building2, tone: "text-slate-700 bg-slate-100", filter: "all" },
-            { label: "Review", value: counts.review, icon: Search, tone: "text-amber-700 bg-amber-100", filter: "review" },
-            { label: "Passed", value: counts.passed, icon: CheckCircle2, tone: "text-blue-700 bg-blue-100", filter: "passed" },
-            { label: "Pursuing", value: counts.pursuing, icon: Star, tone: "text-emerald-700 bg-emerald-100", filter: "pursuing" },
-          ].map(({ label, value, icon: Icon, tone }) => (
+          {(isIndustrial
+            ? [
+                { label: "All sites", value: counts.total, icon: Building2, tone: "text-slate-700 bg-slate-100" },
+                { label: "Red", value: counts.red, icon: CheckCircle2, tone: "text-red-700 bg-red-100" },
+                { label: "Yellow", value: counts.yellow, icon: Search, tone: "text-amber-700 bg-amber-100" },
+                { label: "Pursuing", value: counts.pursuing, icon: Star, tone: "text-emerald-700 bg-emerald-100" },
+              ]
+            : [
+                { label: "All deals", value: counts.total, icon: Building2, tone: "text-slate-700 bg-slate-100" },
+                { label: "Review", value: counts.review, icon: Search, tone: "text-amber-700 bg-amber-100" },
+                { label: "Passed", value: counts.passed, icon: CheckCircle2, tone: "text-blue-700 bg-blue-100" },
+                { label: "Pursuing", value: counts.pursuing, icon: Star, tone: "text-emerald-700 bg-emerald-100" },
+              ]
+          ).map(({ label, value, icon: Icon, tone }) => (
             <button
               key={label}
               type="button"
@@ -530,12 +597,21 @@ export default function DeveloperDashboard() {
                 ))}
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="h-8 w-[108px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All status</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="passed">Passed</SelectItem>
-                    <SelectItem value="pursuing">Pursuing</SelectItem>
-                  </SelectContent>
+                   <SelectContent>
+                     <SelectItem value="all">{isIndustrial ? "All screens" : "All status"}</SelectItem>
+                     {isIndustrial ? (
+                       <>
+                         <SelectItem value="red">Red</SelectItem>
+                         <SelectItem value="yellow">Yellow</SelectItem>
+                       </>
+                     ) : (
+                       <>
+                         <SelectItem value="review">Review</SelectItem>
+                         <SelectItem value="passed">Passed</SelectItem>
+                       </>
+                     )}
+                     <SelectItem value="pursuing">Pursuing</SelectItem>
+                   </SelectContent>
                 </Select>
                 <Select value={productTypeFilter} onValueChange={setProductTypeFilter}>
                   <SelectTrigger className="h-8 w-[124px] text-xs"><SelectValue placeholder="Product type" /></SelectTrigger>
@@ -544,7 +620,7 @@ export default function DeveloperDashboard() {
                     {productTypeOptions.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={programFilter} onValueChange={setProgramFilter}>
+                 {!isIndustrial && <Select value={programFilter} onValueChange={setProgramFilter}>
                   <SelectTrigger className="h-8 w-[126px] text-xs"><SelectValue placeholder="Programs" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All programs</SelectItem>
@@ -553,7 +629,7 @@ export default function DeveloperDashboard() {
                     <SelectItem value="OZ">Opportunity Zone</SelectItem>
                     <SelectItem value="none">No designation</SelectItem>
                   </SelectContent>
-                </Select>
+                 </Select>}
                 <Button type="button" size="sm" variant="outline" className="h-8 px-2.5 text-xs" onClick={() => setShowColumns((open) => !open)}>
                   <Columns3 className="mr-1 h-3 w-3" />
                   Columns
@@ -563,7 +639,9 @@ export default function DeveloperDashboard() {
             {showColumns && (
               <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-2 text-xs text-slate-500">
                 <Columns3 className="h-3.5 w-3.5" />
-                Showing HUD FMR, HUD income limit, and program columns
+                 {isIndustrial
+                   ? "Showing parcel, zoning, entitlement, and utility columns"
+                   : "Showing HUD FMR, HUD income limit, and program columns"}
               </div>
             )}
           </div>
@@ -603,10 +681,22 @@ export default function DeveloperDashboard() {
                     <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Property</TableHead>
                     <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Market</TableHead>
                     <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Acreage</TableHead>
-                    <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Rent</TableHead>
-                     {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">HUD FMR</TableHead>}
-                     {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">HUD Income Limit</TableHead>}
-                     {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Programs</TableHead>}
+                    {isIndustrial ? (
+                      <>
+                        <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Asking Price</TableHead>
+                        <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Parcel ID</TableHead>
+                        <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Zoning</TableHead>
+                        <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Entitlements</TableHead>
+                        <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Sewer</TableHead>
+                      </>
+                    ) : (
+                      <>
+                        <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Rent</TableHead>
+                        {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">HUD FMR</TableHead>}
+                        {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">HUD Income Limit</TableHead>}
+                        {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Programs</TableHead>}
+                      </>
+                    )}
                     <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Status</TableHead>
                     <TableHead className="h-9 whitespace-nowrap text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">Action</TableHead>
                   </TableRow>
@@ -625,19 +715,31 @@ export default function DeveloperDashboard() {
                         </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.sizeAcres ? `${Number(row.deal.sizeAcres).toLocaleString()} ac` : "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap py-2.5 text-xs">{rentText(row.deal)}</TableCell>
-                      {showColumns && <TableCell className="whitespace-nowrap py-2.5 text-xs">{monthlyMoney(row.deal.hudData?.fmrTwoBedroom)}</TableCell>}
-                      {showColumns && <TableCell className="whitespace-nowrap py-2.5 text-xs">{monthlyMoney(row.deal.hudData?.lowIncomeLimitFourPerson)}</TableCell>}
-                      {showColumns && (
-                        <TableCell className="py-2.5">
-                          <div className="flex flex-wrap gap-1">
-                            {dealPrograms(row.deal).length
-                              ? dealPrograms(row.deal).map((program) => <Badge key={program} variant="outline" className="text-[10px]">{program}</Badge>)
-                              : <span className="text-xs text-slate-400">—</span>}
-                          </div>
-                        </TableCell>
+                      {isIndustrial ? (
+                        <>
+                          <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.askingPrice ? money(row.deal.askingPrice) : "—"}</TableCell>
+                          <TableCell className="max-w-36 truncate py-2.5 text-xs" title={row.deal.parcelId || undefined}>{row.deal.parcelId || "—"}</TableCell>
+                          <TableCell className="max-w-32 truncate py-2.5 text-xs" title={row.deal.zoning || undefined}>{row.deal.zoning || "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.hasEntitlements == null ? "Unknown" : row.deal.hasEntitlements ? "Yes" : "No"}</TableCell>
+                          <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.sewerAvailable == null ? "Unknown" : row.deal.sewerAvailable ? "Yes" : "No"}</TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="whitespace-nowrap py-2.5 text-xs">{rentText(row.deal)}</TableCell>
+                          {showColumns && <TableCell className="whitespace-nowrap py-2.5 text-xs">{monthlyMoney(row.deal.hudData?.fmrTwoBedroom)}</TableCell>}
+                          {showColumns && <TableCell className="whitespace-nowrap py-2.5 text-xs">{monthlyMoney(row.deal.hudData?.lowIncomeLimitFourPerson)}</TableCell>}
+                          {showColumns && (
+                            <TableCell className="py-2.5">
+                              <div className="flex flex-wrap gap-1">
+                                {dealPrograms(row.deal).length
+                                  ? dealPrograms(row.deal).map((program) => <Badge key={program} variant="outline" className="text-[10px]">{program}</Badge>)
+                                  : <span className="text-xs text-slate-400">—</span>}
+                              </div>
+                            </TableCell>
+                          )}
+                        </>
                       )}
-                      <TableCell className="py-2.5"><DealStatus row={row} /></TableCell>
+                      <TableCell className="py-2.5"><DealStatus row={row} industrial={isIndustrial} /></TableCell>
                       <TableCell className="py-2.5 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Button

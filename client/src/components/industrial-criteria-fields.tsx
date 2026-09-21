@@ -21,17 +21,6 @@ const numberFields: Array<{
 }> = [
   { key: "minSingleLoadAcres", label: "Single-load minimum parcel", suffix: "acres" },
   { key: "minCrossDockAcres", label: "Cross-dock minimum parcel", suffix: "acres" },
-  { key: "singleLoadWidthFt", label: "Single-load footprint width", suffix: "feet" },
-  { key: "singleLoadLengthFt", label: "Single-load footprint length", suffix: "feet" },
-  { key: "crossDockWidthFt", label: "Cross-dock footprint width", suffix: "feet" },
-  { key: "crossDockLengthFt", label: "Cross-dock footprint length", suffix: "feet" },
-  { key: "maxSlopePct", label: "Maximum footprint slope", suffix: "%" },
-  { key: "maxStreamCrossings", label: "Maximum stream crossings", suffix: "crossings", integer: true },
-  { key: "maxInterstateMiles", label: "Maximum routed distance to interstate", suffix: "miles" },
-  { key: "minPopulation30Min", label: "Minimum population within 30 minutes", suffix: "people", integer: true },
-  { key: "minPopulation45Min", label: "Minimum population within 45 minutes", suffix: "people", integer: true },
-  { key: "maxUnemploymentPct", label: "Maximum unemployment rate", suffix: "%" },
-  { key: "minTechnicalColleges30Min", label: "Technical/community colleges within 30 minutes", suffix: "schools", integer: true },
 ];
 
 export default function IndustrialCriteriaFields({ value, onChange, compact = false }: Props) {
@@ -69,21 +58,58 @@ export default function IndustrialCriteriaFields({ value, onChange, compact = fa
         ))}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {[
-          ["allowIndustrialZoning", "Accept industrial zoning as green"],
-          ["allowIndustrialComprehensivePlan", "Accept industrial comprehensive-plan designation as green"],
-          ["allowAdjacentIndustrialYellow", "Flag adjacent industrial zoning/plan areas as yellow"],
-          ["requireUtilityReview", "Require utility and power confirmation before approval"],
-        ].map(([key, label]) => (
-          <label key={key} className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3">
-            <Switch
-              checked={Boolean(criteria[key as keyof IndustrialCriteria])}
-              onCheckedChange={(checked) => update(key as keyof IndustrialCriteria, checked)}
-            />
-            <span className="text-sm leading-5 text-slate-700">{label}</span>
-          </label>
-        ))}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <h4 className="font-semibold text-red-950">Automatic red screens available now</h4>
+          <p className="mt-1 text-xs leading-5 text-red-900">
+            These are the only hard failures the current data model can support without making an engineering or entitlement assumption.
+          </p>
+          <div className="mt-3 space-y-2">
+            {[
+              ["redOutsideTargetMarket", "Outside the configured target state or county"],
+              ["redBelowMinimumAcreage", "Below the minimum acreage for any configured industrial format"],
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-start gap-3 rounded-lg border border-red-200 bg-white p-3">
+                <Switch
+                  checked={Boolean(criteria[key as keyof IndustrialCriteria])}
+                  onCheckedChange={(checked) => update(key as keyof IndustrialCriteria, checked)}
+                />
+                <span className="text-sm leading-5 text-red-950">{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <h4 className="font-semibold text-amber-950">Automatic yellow screens available now</h4>
+          <p className="mt-1 text-xs leading-5 text-amber-900">
+            Yellow means the opportunity may fit, but the current record is incomplete or requires manual site review.
+          </p>
+          <div className="mt-3 space-y-2">
+            {[
+              ["yellowMissingLocation", "Address, state, or county is missing or unresolved"],
+              ["yellowMissingAcreage", "Acreage is missing or cannot be verified"],
+              ["yellowSiteEvidenceUnavailable", "Parcel, building-fit, environmental, access, labor, entitlement, or utility evidence is not automated yet"],
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-start gap-3 rounded-lg border border-amber-200 bg-white p-3">
+                <Switch
+                  checked={Boolean(criteria[key as keyof IndustrialCriteria])}
+                  onCheckedChange={(checked) => update(key as keyof IndustrialCriteria, checked)}
+                />
+                <span className="text-sm leading-5 text-amber-950">{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-600">
+        <p className="font-semibold text-slate-800">Not used for automatic industrial scoring yet</p>
+        <p className="mt-1">
+          Building-envelope fit, slope, streams, wetlands, interstate drive time, 30/45-minute population, unemployment,
+          technical colleges, zoning/entitlement, and utility capacity remain manual-review items until reliable site-level
+          evidence is connected.
+        </p>
       </div>
 
       <div>

@@ -14307,7 +14307,7 @@ RULES:
   // rather than the administrator's own account.
   app.get("/api/admin/investment-companies/:profileId/entry-options", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
     try {
-      const { developerProductTypes } = await import("@shared/schema");
+      const { developerProductTypes, developerProfiles } = await import("@shared/schema");
       const [profile] = await db.select().from(developerProfiles).where(and(
         eq(developerProfiles.id, req.params.profileId),
         eq(developerProfiles.isActive, true),
@@ -14365,14 +14365,19 @@ RULES:
       const county = String(body.county || "").trim();
       const productTypeId = String(body.productTypeId || "").trim();
       const sizeAcres = Number(body.sizeAcres);
-      const rent = Number(body.rent);
+      const rent = body.rent === undefined || body.rent === null || body.rent === "" ? null : Number(body.rent);
       const askingPrice = body.askingPrice === undefined || body.askingPrice === null || body.askingPrice === ""
         ? null : Number(body.askingPrice);
-      if (!address || !city || !state || !county || !productTypeId) {
-        return res.status(400).json({ error: "Address, city, state, county, and product type are required" });
+      const [profileForValidation] = await db.select({
+        profileType: developerProfiles.profileType,
+        assetClass: developerProfiles.assetClass,
+      }).from(developerProfiles).where(eq(developerProfiles.id, req.params.profileId)).limit(1);
+      const isIndustrial = profileForValidation?.assetClass === "industrial";
+      if (!address || !city || !state || !county || (!isIndustrial && !productTypeId)) {
+        return res.status(400).json({ error: isIndustrial ? "Address, city, state, county, and acreage are required" : "Address, city, state, county, and product type are required" });
       }
       if (!Number.isFinite(sizeAcres) || sizeAcres < 0) return res.status(400).json({ error: "Size in acres must be a valid non-negative number" });
-      if (!Number.isFinite(rent) || rent < 0) return res.status(400).json({ error: "Rent must be a valid non-negative number" });
+      if (!isIndustrial && (rent === null || !Number.isFinite(rent) || rent < 0)) return res.status(400).json({ error: "Rent must be a valid non-negative number" });
       if (askingPrice !== null && (!Number.isFinite(askingPrice) || askingPrice < 0)) {
         return res.status(400).json({ error: "Asking price must be a valid non-negative number" });
       }
@@ -14393,14 +14398,17 @@ RULES:
           eq(developerProductTypes.isActive, true),
         ));
         const selectedProductType = productTypes.find((productType) => productType.id === productTypeId);
-        if (!selectedProductType) throw adminRequestError(400, "Selected product type is not active for this Investment Company");
+        const industrial = profile.assetClass === "industrial";
+        if (!industrial && !selectedProductType) throw adminRequestError(400, "Selected product type is not active for this Investment Company");
         const dealValues: any = {
           address, city, state, county, sizeAcres: String(sizeAcres), askingPrice: askingPrice === null ? null : String(askingPrice),
-          productTypes: [selectedProductType.name], submissionMethod: "admin_manual_entry", source: "admin_manual_entry",
+          productTypes: [industrial ? "Industrial site" : selectedProductType.name], submissionMethod: "admin_manual_entry", source: "admin_manual_entry",
           status: "pending_review", isQct: body.qctDesignation === true, isDda: body.ddaDesignation === true, isOz: body.opportunityZone === true,
         };
-        if (profile.rentMetric === "per_unit") dealValues.avgRentPerUnit = String(rent);
-        else dealValues.topRentPSF = String(rent);
+        if (!industrial) {
+          if (profile.rentMetric === "per_unit") dealValues.avgRentPerUnit = String(rent);
+          else dealValues.topRentPSF = String(rent);
+        }
         const [deal] = await tx.insert(deals).values(dealValues).returning();
         const classificationResult = classifyDealForProfile(deal, profile, productTypes);
         const [send] = await tx.insert(partnerDeveloperSends).values({
