@@ -52,6 +52,7 @@ type Profile = {
   primaryColor: string | null;
   secondaryColor: string | null;
   outreachTestModeEnabled: boolean;
+  emailUnsubscribeEnabled: boolean;
   targetStates: string[];
   targetCounties: string[];
   rentMetric: "psf" | "per_unit";
@@ -385,6 +386,7 @@ export default function DeveloperCriteriaSettings() {
         })),
         countyMarketLabels: profile.countyMarketLabels || {},
         compSearchRadiusMiles: profile.compSearchRadiusMiles || "3",
+         emailUnsubscribeEnabled: Boolean(profile.emailUnsubscribeEnabled),
       });
       setAssumptionsOpenIndex(null);
     }
@@ -428,6 +430,33 @@ export default function DeveloperCriteriaSettings() {
     },
     onError: (error: Error) => toast({
       title: "Could not update outreach mode",
+      description: error.message,
+      variant: "destructive",
+    }),
+  });
+
+  const emailUnsubscribeMutation = useMutation({
+    mutationFn: (enabled: boolean) => jsonRequest("/api/developer-profile/me/outreach/unsubscribe", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    }),
+    onSuccess: (data: { emailUnsubscribeEnabled: boolean }) => {
+      queryClient.setQueryData(["/api/developer-profile/me"], (current: any) => current
+        ? { ...current, profile: { ...current.profile, emailUnsubscribeEnabled: data.emailUnsubscribeEnabled } }
+        : current);
+      setForm((current) => current
+        ? { ...current, emailUnsubscribeEnabled: data.emailUnsubscribeEnabled }
+        : current);
+      toast({
+        title: data.emailUnsubscribeEnabled ? "Unsubscribe links enabled" : "Unsubscribe links disabled",
+        description: data.emailUnsubscribeEnabled
+          ? "Organization emails will include a one-click unsubscribe link."
+          : "Organization emails will no longer include the automatic unsubscribe link.",
+      });
+    },
+    onError: (error: Error) => toast({
+      title: "Could not update unsubscribe setting",
       description: error.message,
       variant: "destructive",
     }),
@@ -765,6 +794,22 @@ export default function DeveloperCriteriaSettings() {
                   onCheckedChange={(checked) => outreachTestModeMutation.mutate(checked)}
                   disabled={outreachTestModeMutation.isPending}
                   aria-label="Toggle outreach Test mode"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 p-4">
+                <div>
+                  <p className="font-medium text-slate-900">One-click unsubscribe link</p>
+                  <p className="max-w-2xl text-sm text-slate-500">
+                    Add an unsubscribe link to every email sent from this company’s connected Outlook senders.
+                    Clicking it immediately marks the contact inactive and stops future outreach.
+                  </p>
+                </div>
+                <Switch
+                  checked={Boolean(form.emailUnsubscribeEnabled)}
+                  onCheckedChange={(checked) => emailUnsubscribeMutation.mutate(checked)}
+                  disabled={emailUnsubscribeMutation.isPending}
+                  aria-label="Toggle one-click unsubscribe links"
                 />
               </div>
 

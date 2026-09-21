@@ -20,6 +20,7 @@ export interface EmailNotification {
   fromEmail?: string; // Optional override for the sender address
   fromName?: string;  // Optional override for the sender display name
   transactional?: boolean; // Suppress marketing-only additions such as unsubscribe links
+  brokerId?: string | null; // Recipient broker used for one-click organization unsubscribe links
 }
 
 export interface SMSParams {

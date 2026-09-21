@@ -1,5 +1,6 @@
 import { db } from './db';
 import { sql } from 'drizzle-orm';
+import { appendUnsubscribeFooter, resolveScopedBrokerId } from './emailUnsubscribe';
 
 const GRAPH_SEND_URL = 'https://graph.microsoft.com/v1.0/me/sendMail';
 const TOKEN_URL = (tenantId: string) =>
@@ -333,6 +334,7 @@ export async function sendEmailViaMicrosoft(
  */
 export async function sendDripEmailViaMicrosoft(enrollment: {
   id: string;
+  broker_id?: string | null;
   contact_email: string;
   sender_id: string;
   developer_profile_id?: string | null;
@@ -372,10 +374,32 @@ export async function sendDripEmailViaMicrosoft(enrollment: {
     }
   }
 
+  let htmlBody = opts.htmlBody;
+  if (enrollment.developer_profile_id) {
+    const profileResult = await db.execute(sql`
+      SELECT email_unsubscribe_enabled
+      FROM developer_profiles
+      WHERE id = ${enrollment.developer_profile_id} AND is_active = true
+      LIMIT 1
+    `);
+    const unsubscribeEnabled = (profileResult.rows?.[0] as any)?.email_unsubscribe_enabled === true;
+    if (unsubscribeEnabled) {
+      const brokerId = await resolveScopedBrokerId(
+        enrollment.broker_id,
+        enrollment.contact_email,
+        enrollment.developer_profile_id,
+      );
+      if (!brokerId) {
+        throw new Error(`Cannot send organization email without a scoped broker for ${enrollment.contact_email}`);
+      }
+      htmlBody = appendUnsubscribeFooter(htmlBody, brokerId);
+    }
+  }
+
   await sendEmailViaMicrosoft(accessToken, {
     to: enrollment.contact_email,
     subject: opts.subject,
-    htmlBody: opts.htmlBody,
+    htmlBody,
     ...(opts.attachments && opts.attachments.length > 0 && { attachments: opts.attachments }),
   });
 }

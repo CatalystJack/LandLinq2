@@ -313,6 +313,11 @@ import {
 } from "./emailService";
 import { sendSMS, landLinqSMSTemplates } from "./smsService";
 import { TemplateService, renderBrandedEmail } from "./templateService";
+import {
+  EMAIL_UNSUBSCRIBED_TAG,
+  unsubscribeConfirmationHtml,
+  verifyUnsubscribeToken,
+} from "./emailUnsubscribe";
 import { marketIntelligence } from "./marketIntelligence";
 import { dealScoringService, SCORING_WEIGHTS } from "./dealScoringService";
 import { dealInsightsEngine } from "./dealInsightsEngine";
@@ -3912,7 +3917,51 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
   });
 
-  // Broker opt-out endpoint (for email unsubscribe links)
+  // One-click organization unsubscribe endpoint. The signed token identifies
+  // the broker without exposing the email address or requiring a form.
+  app.get("/api/email/unsubscribe/:token", async (req, res) => {
+    try {
+      const brokerId = verifyUnsubscribeToken(String(req.params.token || ""));
+      if (!brokerId) {
+        return res.status(400).type("html").send("<h1>Invalid unsubscribe link</h1><p>This link is not valid or has been altered.</p>");
+      }
+
+      const result = await db.execute(sql`
+        UPDATE brokers
+        SET is_active = false,
+            sms_opt_in = false,
+            sms_opt_out_date = NOW(),
+            crm_tags = ARRAY(
+              SELECT DISTINCT unnest(
+                COALESCE(crm_tags, ARRAY[]::text[])
+                || ARRAY[${EMAIL_UNSUBSCRIBED_TAG}]::text[]
+              )
+            ),
+            updated_at = NOW()
+        WHERE id = ${brokerId}
+        RETURNING id
+      `);
+      if ((result.rows || []).length === 0) {
+        return res.status(404).type("html").send("<h1>Contact not found</h1><p>This unsubscribe link is no longer active.</p>");
+      }
+
+      await db.execute(sql`
+        UPDATE drip_campaign_enrollments
+        SET status = 'cancelled',
+            paused_reason = 'Unsubscribed by recipient',
+            updated_at = NOW()
+        WHERE broker_id = ${brokerId}
+          AND status IN ('pending', 'in_progress')
+      `);
+
+      return res.type("html").send(unsubscribeConfirmationHtml());
+    } catch (error) {
+      console.error("[EMAIL-UNSUBSCRIBE] Failed to process one-click unsubscribe:", error);
+      return res.status(500).type("html").send("<h1>Unable to unsubscribe</h1><p>Please try again later.</p>");
+    }
+  });
+
+  // Broker opt-out endpoint (for email unsubscribe forms and SMS opt-outs)
   app.post("/api/brokers/opt-out", async (req, res) => {
     try {
       const { email, phone, brokerId } = req.body;
@@ -3933,10 +3982,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       }
       
       // Mark broker as inactive and record SMS opt-out
-      await storage.updateBroker(broker.id, { 
+      const existingTags = Array.isArray(broker.crmTags) ? broker.crmTags : [];
+      await storage.updateBroker(broker.id, {
         isActive: false,
         smsOptIn: false,
-        smsOptOutDate: new Date()
+        smsOptOutDate: new Date(),
+        crmTags: Array.from(new Set([...existingTags, EMAIL_UNSUBSCRIBED_TAG])),
       });
       
       console.log(`🚫 Broker ${broker.firstName} ${broker.lastName} opted out via ${email ? 'email' : phone ? 'SMS' : 'direct'}`);
@@ -14767,6 +14818,32 @@ RULES:
     } catch (error: any) {
       console.error("[developer-profile/me/outreach/test-mode PATCH] Error:", error);
       return res.status(500).json({ error: "Failed to update outreach sending mode" });
+    }
+  });
+
+  app.patch("/api/developer-profile/me/outreach/unsubscribe", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const enabled = req.body?.enabled;
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ error: "enabled must be boolean" });
+      }
+
+      const result = await db.execute(sql`
+        UPDATE developer_profiles
+        SET email_unsubscribe_enabled = ${enabled}, updated_at = NOW()
+        WHERE id = ${developerProfileId} AND is_active = true
+        RETURNING email_unsubscribe_enabled
+      `);
+      const saved = result.rows?.[0] as any;
+      if (!saved) return res.status(404).json({ error: "Investment Company profile not found" });
+      return res.json({ emailUnsubscribeEnabled: saved.email_unsubscribe_enabled === true });
+    } catch (error: any) {
+      console.error("[developer-profile/me/outreach/unsubscribe PATCH] Error:", error);
+      return res.status(500).json({ error: "Failed to update unsubscribe setting" });
     }
   });
 

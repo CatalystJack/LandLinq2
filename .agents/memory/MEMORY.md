@@ -50,3 +50,4 @@
 - [Automated return independence](automated-return-independence.md) — an uncomputable IRR must clear only Auto IRR; preserve a valid Auto-YOC result.
 - [Industrial site scoring data boundaries](industrial-site-scoring-data-boundaries.md) — acreage, point slope, tract population, and generic zoning proxies cannot establish geometry, drive-time, utilities, or entitlement.
 - [Industrial asset-class onboarding](industrial-asset-class-onboarding.md) — industrial profiles store screening criteria separately and never use automatic multifamily YOC assumptions.
+- [Organization unsubscribe policy](organization-unsubscribe-policy.md) — one-click unsubscribe applies to developer-owned recipient mail; platform account and internal transactional mail remain excluded.

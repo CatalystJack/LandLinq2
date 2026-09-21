@@ -366,6 +366,7 @@ export class EventDispatchService {
            : null;
          const notification = {
            to: payload.brokerEmail,
+            brokerId: payload.brokerId || null,
            subject,
            html: htmlContent,
            type: 'broker_invitation',

@@ -13,6 +13,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { getAppOnlyGraphToken, refreshMicrosoftToken, sendEmailViaMicrosoft } from './microsoftAuth';
+import { appendUnsubscribeFooter, resolveScopedBrokerId } from './emailUnsubscribe';
 import { sql } from 'drizzle-orm';
 import nodemailer from 'nodemailer';
 
@@ -365,7 +366,27 @@ export async function sendNotificationEmailViaOutlookSender(
       ? rawHtml
       : renderBrandedEmail({ title: subject, bodyHtml: rawHtml });
     const logoBuffer = await getEmailLogoBuffer();
-    const htmlBody = stripLegacyCatalystBranding(logoBuffer ? inlineEmailLogo(brandedHtml) : brandedHtml);
+    let htmlBody = stripLegacyCatalystBranding(logoBuffer ? inlineEmailLogo(brandedHtml) : brandedHtml);
+    if (sender.developerProfileId) {
+      const profileResult = await db.execute(sql`
+        SELECT email_unsubscribe_enabled
+        FROM developer_profiles
+        WHERE id = ${sender.developerProfileId} AND is_active = true
+        LIMIT 1
+      `);
+      const unsubscribeEnabled = (profileResult.rows?.[0] as any)?.email_unsubscribe_enabled === true;
+      if (unsubscribeEnabled) {
+        const brokerId = await resolveScopedBrokerId(
+          notification.brokerId,
+          notification.to,
+          sender.developerProfileId,
+        );
+        if (!brokerId) {
+          throw new Error(`Cannot send organization notification without a scoped broker for ${notification.to}`);
+        }
+        htmlBody = appendUnsubscribeFooter(htmlBody, brokerId);
+      }
+    }
     const attachments = [
       ...(notification.attachments || []).map((attachment) => ({
         filename: attachment.filename,

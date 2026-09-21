@@ -7,6 +7,7 @@ import * as cron from 'node-cron';
 import { outreachService } from '../services/outreachService';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
+import { markBrokerEmailUnavailable } from '../emailUnsubscribe';
 
 function formatDeveloperTargetMarket(states: unknown, counties: unknown): string {
   const values = [...(Array.isArray(states) ? states : []), ...(Array.isArray(counties) ? counties : [])]
@@ -437,7 +438,7 @@ export async function processDripEnrollments(): Promise<void> {
     const dueEnrollmentsResult = await db.execute(sql`
       WITH due AS (
         SELECT 
-          e.id, e.contact_email, e.contact_first_name, e.contact_last_name,
+          e.id, e.broker_id, e.contact_email, e.contact_first_name, e.contact_last_name,
           e.hubspot_contact_id, e.template_id, e.sender_id,
           e.current_step_index, e.total_steps_sent,
           e.next_send_at,
@@ -715,58 +716,16 @@ export async function processDripEnrollments(): Promise<void> {
                     updated_at = NOW()
                 WHERE id = ${enrollment.id} AND sender_id = ${enrollment.sender_id}
               `);
-              console.warn(`   ⚠️ [DRIP] Cancelled bounced enrollment ${enrollment.id} for sender ${enrollment.sender_id}`);
+              const brokerId = await markBrokerEmailUnavailable({
+                brokerId: enrollment.broker_id,
+                email: enrollment.contact_email,
+                developerProfileId: enrollment.developer_profile_id,
+              });
+              console.warn(
+                `   ⚠️ [DRIP] Cancelled bounced enrollment ${enrollment.id}; ` +
+                `${brokerId ? `marked broker ${brokerId} inactive and tagged` : 'no scoped broker record found'}`
+              );
               continue;
-            }
-            if (isMailboxBounceError(msError.message || '')) {
-              // Hard bounce — this address no longer exists. Delete the broker entirely.
-              console.warn(`   🗑️ [DRIP] Hard bounce detected for ${enrollment.contact_email} — permanently deleting from system. Error: ${msError.message}`);
-              try {
-                const brokerLookup = await db.execute(sql`SELECT id, first_name, last_name FROM brokers WHERE email = ${enrollment.contact_email} LIMIT 1`);
-                const brokerRow = (brokerLookup.rows as any[])[0];
-                if (brokerRow) {
-                  const bId = brokerRow.id;
-                  await db.transaction(async (tx) => {
-                    await tx.execute(sql`UPDATE brokers SET referred_by = NULL WHERE referred_by = ${bId}`);
-                    await tx.execute(sql`UPDATE deals SET broker_id = NULL WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM commission_splits WHERE broker_id = ${bId} OR primary_broker_id = ${bId} OR referrer_broker_id = ${bId}`);
-                    await tx.execute(sql`UPDATE broker_points SET referral_id = NULL WHERE referral_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM referral_activities WHERE referrer_broker_id = ${bId} OR referred_broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM referral_metrics WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM referral_links WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM broker_partnerships WHERE broker_a_id = ${bId} OR broker_b_id = ${bId} OR broker_id = ${bId} OR partner_broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM preferred_partners WHERE broker_id = ${bId} OR partner_broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM partnership_invitations WHERE inviter_broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM broker_achievements WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM broker_points WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM broker_rewards WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM commission_earnings WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM platform_shares WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM deal_tags WHERE tagger_broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM viral_signups WHERE tagger_broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM valuations WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM valuation_shares WHERE shared_by_broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM outreach_sender_assignments WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM drip_campaign_enrollments WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM outreach_messages WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM communications WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM projects WHERE broker_id = ${bId}`);
-                    await tx.execute(sql`DELETE FROM brokers WHERE id = ${bId}`);
-                  });
-                  console.log(`   ✅ [DRIP] Bounced broker deleted: ${enrollment.contact_email} (${brokerRow.first_name || ''} ${brokerRow.last_name || ''}) id=${bId}`);
-                } else {
-                  // No broker record — just cancel all enrollments for this email
-                  await db.execute(sql`
-                    UPDATE drip_campaign_enrollments
-                    SET status = 'cancelled', paused_reason = 'Hard bounce — mailbox does not exist', updated_at = NOW()
-                    WHERE contact_email = ${enrollment.contact_email}
-                  `);
-                  console.log(`   ⚠️ [DRIP] Hard bounce for ${enrollment.contact_email} — no broker record found, enrollment cancelled`);
-                }
-              } catch (deleteErr: any) {
-                console.error(`   ❌ [DRIP] Failed to delete bounced contact ${enrollment.contact_email}:`, deleteErr.message);
-              }
-              continue; // Skip the normal emailSent/failed accounting — this contact is gone
             }
             console.error(`   ❌ [DRIP] [${enrollment.sender_name}] Microsoft send failed for ${enrollment.contact_email}: ${msError.message}`);
           }
@@ -1422,8 +1381,8 @@ export function getCrmPollStatus() {
 
 /**
  * Poll each connected Outlook sender's inbox for bounce-back emails and
- * hard-delete the corresponding broker from the CRM (same cascade as the
- * drip worker's immediate-bounce handler).
+ * preserve the corresponding CRM contact while marking it inactive and
+ * cancelling future outreach.
  */
 export async function processOutlookBouncedEmails(): Promise<void> {
   try {
@@ -1481,52 +1440,27 @@ export async function processOutlookBouncedEmails(): Promise<void> {
                 AND LOWER(contact_email) = LOWER(${email})
                 AND status IN ('pending', 'in_progress')
             `);
-            console.log(`   ⚠️ [BOUNCE-POLL] Cancelled bounced enrollments for ${email} under sender ${sender.id}`);
+            const brokerResult = await db.execute(sql`
+              SELECT b.id
+              FROM brokers b
+              INNER JOIN outreach_senders os ON os.developer_profile_id = b.owner_developer_profile_id
+              WHERE os.id = ${sender.id}
+                AND LOWER(b.email) = LOWER(${email})
+              ORDER BY b.id
+              LIMIT 1
+            `);
+            const brokerId = await markBrokerEmailUnavailable({
+              brokerId: (brokerResult.rows?.[0] as any)?.id || null,
+              email,
+              developerProfileId: sender.developer_profile_id,
+            });
+            console.log(
+              `   ⚠️ [BOUNCE-POLL] Cancelled bounced enrollments for ${email} under sender ${sender.id}; ` +
+              `${brokerId ? `marked broker ${brokerId} inactive and tagged` : 'no scoped broker record found'}`
+            );
             continue;
-            const lookup = await db.execute(sql`SELECT id, first_name, last_name FROM brokers WHERE email = ${email} LIMIT 1`);
-            const brokerRow = (lookup.rows as any[])[0];
-
-            if (brokerRow) {
-              const bId = brokerRow.id;
-              await db.transaction(async (tx) => {
-                await tx.execute(sql`UPDATE brokers SET referred_by = NULL WHERE referred_by = ${bId}`);
-                await tx.execute(sql`UPDATE deals SET broker_id = NULL WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM commission_splits WHERE broker_id = ${bId} OR primary_broker_id = ${bId} OR referrer_broker_id = ${bId}`);
-                await tx.execute(sql`UPDATE broker_points SET referral_id = NULL WHERE referral_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM referral_activities WHERE referrer_broker_id = ${bId} OR referred_broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM referral_metrics WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM referral_links WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM broker_partnerships WHERE broker_a_id = ${bId} OR broker_b_id = ${bId} OR broker_id = ${bId} OR partner_broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM preferred_partners WHERE broker_id = ${bId} OR partner_broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM partnership_invitations WHERE inviter_broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM broker_achievements WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM broker_points WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM broker_rewards WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM commission_earnings WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM platform_shares WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM deal_tags WHERE tagger_broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM viral_signups WHERE tagger_broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM valuations WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM valuation_shares WHERE shared_by_broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM outreach_sender_assignments WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM drip_campaign_enrollments WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM outreach_messages WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM communications WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM projects WHERE broker_id = ${bId}`);
-                await tx.execute(sql`DELETE FROM brokers WHERE id = ${bId}`);
-              });
-              console.log(`   🗑️ [BOUNCE-POLL] Deleted bounced broker: ${email} (${brokerRow.first_name || ''} ${brokerRow.last_name || ''}) id=${bId}`);
-            } else {
-              // No broker record — cancel enrollments only
-              await db.execute(sql`
-                UPDATE drip_campaign_enrollments
-                SET status = 'cancelled', paused_reason = 'Hard bounce — mailbox does not exist', updated_at = NOW()
-                WHERE contact_email = ${email}
-              `);
-              console.log(`   ⚠️ [BOUNCE-POLL] No broker for ${email} — enrollments cancelled`);
-            }
-          } catch (deleteErr: any) {
-            console.error(`   ❌ [BOUNCE-POLL] Failed to delete ${email}:`, deleteErr.message);
+          } catch (bounceErr: any) {
+            console.error(`   ❌ [BOUNCE-POLL] Failed to process ${email}:`, bounceErr.message);
           }
         }
       } catch (senderErr: any) {
