@@ -10,7 +10,7 @@ import { useScrollToTop } from "@/hooks/useScrollToTop";
 import ErrorBoundary from "@/components/error-boundary";
 import { Loader2 } from "lucide-react";
 import { ClassificationProgress } from "@/components/ClassificationProgress";
-import { isPlatformAdminEmail } from "@shared/admin-auth";
+import { isAnalyticsAuthorized, isPlatformAdminEmail } from "@shared/admin-auth";
 
 // ============================================
 // CODE SPLITTING OPTIMIZATION - Jan 5, 2026
@@ -481,7 +481,8 @@ function Router() {
       <Route path="/analytics" component={() => {
         if (isAuthenticated && user) {
           const userEmail = (user as any)?.claims?.email || (user as any)?.email || '';
-          if (userEmail.endsWith('@catalystcp.com')) {
+          const persistedRole = (user as any)?.role || (user as any)?.claims?.role || userRole;
+          if (isAnalyticsAuthorized(userEmail, persistedRole)) {
             return <AnalyticsPage />;
           } else {
             window.location.href = '/dashboard';

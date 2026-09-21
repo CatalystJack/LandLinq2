@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { useAuth } from "@/hooks/useAuth";
-import { isPlatformAdminEmail } from "@shared/admin-auth";
+import { isAnalyticsAuthorized, isPlatformAdminEmail } from "@shared/admin-auth";
 import { Cell, Pie, PieChart as RechartsPieChart } from "recharts";
 import { 
   BarChart3, 
@@ -114,17 +114,13 @@ export default function AnalyticsPage() {
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  // Check if user is analyst - supports @catalystcp.com emails AND Jack's Ultimate Power
+  // Analytics is available to platform-domain users and persisted internal
+  // analyst/admin roles. Developer tenants use their scoped analytics page.
   // FIX (Dec 15, 2025): Support both OIDC auth (user.claims.email) and traditional auth (user.email)
   const userEmail = (user as any)?.claims?.email || (user as any)?.email || '';
-  const userRole = (user as any)?.role || '';
+  const userRole = (user as any)?.role || (user as any)?.claims?.role || '';
   const isPlatformAdmin = isPlatformAdminEmail(userEmail);
-  
-  // Check for analyst access: email domain OR role-based (including Jack's Ultimate Power)
-  const isAnalyst = userEmail.includes('@catalystcp.com') || 
-                   userRole === 'analyst' || 
-                   userRole === 'admin' ||
-                   userRole === 'super_admin';
+  const isAnalyst = isAnalyticsAuthorized(userEmail, userRole);
 
   // Don't render anything if not an analyst (routing will handle redirects)
   if (!isAuthenticated || !isAnalyst) {

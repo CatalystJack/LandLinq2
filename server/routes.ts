@@ -50,6 +50,7 @@ import {
 } from "@shared/schema";
 import { or, like, ilike, eq, ne, desc, asc, gte, lte, gt, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
 import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
+import { isAnalyticsAuthorized } from "@shared/admin-auth";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
@@ -11416,7 +11417,10 @@ RULES:
   app.get("/api/analytics", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
+      const isAnalyst = isAnalyticsAuthorized(
+        user?.claims?.email || user?.email,
+        user?.role || user?.claims?.role,
+      );
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -11507,7 +11511,10 @@ RULES:
   app.get("/api/analytics/email-intake-performance", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+      if (!isAnalyticsAuthorized(
+        user?.claims?.email || user?.email,
+        user?.role || user?.claims?.role,
+      )) {
         return res.status(403).json({ message: "Platform administrator access required." });
       }
 
@@ -11621,7 +11628,10 @@ RULES:
   app.get("/api/analytics/dashboard", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
+      const isAnalyst = isAnalyticsAuthorized(
+        user?.claims?.email || user?.email,
+        user?.role || user?.claims?.role,
+      );
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
@@ -20080,7 +20090,10 @@ RULES:
       
       // Check if user is a Catalyst analyst
       const user = req.user as any;
-      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
+      const isAnalyst = isAnalyticsAuthorized(
+        user?.claims?.email || user?.email,
+        user?.role || user?.claims?.role,
+      );
       const isDeveloper = String(user?.role || '').toUpperCase() === 'DEVELOPER';
       
       if (!isAnalyst && !isDeveloper) {
