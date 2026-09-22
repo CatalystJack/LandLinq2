@@ -8,7 +8,7 @@ const { Pool } = pg;
 
 const workbookPath = process.argv[2]
   ? path.resolve(process.argv[2])
-  : path.resolve("attached_assets/NC_Active_Brokers_Tagged_Sep2026_1790102977895.xlsx");
+  : path.resolve("attached_assets/NC_Active_Brokers_Tagged_Sep2026_(1)_1790108883653.xlsx");
 
 type ImportRow = {
   firstName: string;
@@ -23,7 +23,7 @@ type ImportRow = {
   specialty: string | null;
   confidence: string | null;
   sourceLicenseNumber: string;
-  stateRegion: "NC";
+  stateRegion: string;
   marketsCovered: string | null;
 };
 
@@ -72,7 +72,37 @@ function splitName(name: string | null, first: string | null, last: string | nul
   };
 }
 
-function rowsFromSheet(sheet: XLSX.WorkSheet, sector: "commercial" | "residential"): ImportRow[] {
+function inferStateRegion(filePath: string, workbook: XLSX.WorkBook): string {
+  const filenameState = path.basename(filePath).match(/(?:^|_)(NC|TN)(?:_|\.|$)/i)?.[1];
+  if (filenameState) return filenameState.toUpperCase();
+  for (const sheetName of workbook.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheetName], {
+      defval: null,
+      raw: false,
+    });
+    const state = clean(rows[0]?.State) ?? clean(rows[0]?.["Mailing State"]);
+    if (state) return state.toUpperCase();
+  }
+  throw new Error(`Could not infer state region from workbook: ${filePath}`);
+}
+
+function resolveSector(row: Record<string, unknown>, fallback: "commercial" | "residential"): "commercial" | "residential" {
+  const rawSector = clean(row.Sector)?.toLowerCase();
+  if (rawSector === "commercial" || rawSector === "residential") return rawSector;
+  if (rawSector === "needs review") {
+    const productType = clean(row["Product Type"])?.toLowerCase() ?? "";
+    if (/(residential|timeshare|apartment)/.test(productType)) return "residential";
+    return "commercial";
+  }
+  return fallback;
+}
+
+function rowsFromSheet(
+  sheet: XLSX.WorkSheet | undefined,
+  stateRegion: string,
+  fallbackSector: "commercial" | "residential",
+): ImportRow[] {
+  if (!sheet) return [];
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
   const imported: ImportRow[] = [];
   for (const row of rows) {
@@ -80,8 +110,10 @@ function rowsFromSheet(sheet: XLSX.WorkSheet, sector: "commercial" | "residentia
     if (!sourceLicenseNumber) continue;
     const name = clean(row.Name);
     const { firstName, lastName } = splitName(name, clean(row["First Name"]), clean(row["Last Name"]));
-    const firm = clean(row.Firm);
+    const firm = clean(row.Firm) ?? clean(row["Firm Holding License"]) ?? clean(row["Firm (linked)"]);
     const county = clean(row.County)?.toLowerCase() ?? null;
+    const rowState = clean(row.State) ?? clean(row["Mailing State"]) ?? stateRegion;
+    const specialty = clean(row.Specialty) ?? clean(row["Product Type"]);
     imported.push({
       firstName,
       lastName,
@@ -91,11 +123,11 @@ function rowsFromSheet(sheet: XLSX.WorkSheet, sector: "commercial" | "residentia
       company: firm,
       licenseNumber: sourceLicenseNumber,
       county,
-      sector,
-      specialty: clean(row.Specialty),
+      sector: resolveSector(row, fallbackSector),
+      specialty,
       confidence: clean(row.Confidence)?.toLowerCase() ?? null,
       sourceLicenseNumber,
-      stateRegion: "NC",
+      stateRegion: rowState.toUpperCase(),
       marketsCovered: county,
     });
   }
@@ -143,6 +175,11 @@ function dedupeRows(rows: ImportRow[]): ImportRow[] {
         .flatMap((value) => String(value).split(",").map((item) => item.trim()))
         .filter(Boolean),
     );
+    const states = new Set(
+      [existing.stateRegion, row.stateRegion]
+        .flatMap((value) => String(value).split(",").map((item) => item.trim().toUpperCase()))
+        .filter(Boolean),
+    );
     byEmail.set(row.email, {
       ...existing,
       sector: existing.sector === "commercial" || row.sector === "commercial"
@@ -154,6 +191,7 @@ function dedupeRows(rows: ImportRow[]): ImportRow[] {
       company: existing.company ?? row.company,
       phone: existing.phone ?? row.phone,
       county: existing.county ?? row.county,
+      stateRegion: [...states].join(", "),
       marketsCovered: counties.size ? [...counties].join(", ") : existing.marketsCovered,
     });
   }
@@ -169,10 +207,12 @@ async function main(): Promise<void> {
   }
 
   const workbook = XLSX.readFile(workbookPath, { cellDates: false, dense: true });
+  const stateRegion = inferStateRegion(workbookPath, workbook);
   const rows = dedupeRows([
-    ...rowsFromSheet(workbook.Sheets.Commercial, "commercial"),
-    ...rowsFromSheet(workbook.Sheets.Residential, "residential"),
-    ...rowsFromSheet(workbook.Sheets["Firm Licenses"], "commercial"),
+    ...rowsFromSheet(workbook.Sheets.Commercial, stateRegion, "commercial"),
+    ...rowsFromSheet(workbook.Sheets.Residential, stateRegion, "residential"),
+    ...rowsFromSheet(workbook.Sheets["Needs Review"], stateRegion, "commercial"),
+    ...rowsFromSheet(workbook.Sheets["Firm Licenses"], stateRegion, "commercial"),
   ]);
   if (rows.length === 0) throw new Error("No broker rows found in workbook");
 
@@ -262,6 +302,7 @@ async function main(): Promise<void> {
       FROM broker_workbook_import AS i
       WHERE b.owner_developer_profile_id IS NULL
         AND b.source_license_number = i.source_license_number
+        AND UPPER(COALESCE(b.state_region, '')) = UPPER(i.state_region)
     `);
 
     const updateByEmail = await client.query(`
@@ -277,16 +318,30 @@ async function main(): Promise<void> {
           contact_sector = i.contact_sector,
           contact_specialty = i.contact_specialty,
           contact_confidence = i.contact_confidence,
-          source_license_number = i.source_license_number,
-          state_region = i.state_region,
-          markets_covered = COALESCE(i.markets_covered, b.markets_covered),
+          source_license_number = COALESCE(b.source_license_number, i.source_license_number),
+          state_region = CASE
+            WHEN b.state_region IS NULL OR b.state_region = '' THEN i.state_region
+            WHEN UPPER(i.state_region) = ANY(string_to_array(UPPER(b.state_region), ', ')) THEN b.state_region
+            ELSE b.state_region || ', ' || i.state_region
+          END,
+          markets_covered = CASE
+            WHEN b.markets_covered IS NULL OR b.markets_covered = '' THEN i.markets_covered
+            WHEN i.markets_covered IS NULL OR i.markets_covered = '' THEN b.markets_covered
+            ELSE b.markets_covered || ', ' || i.markets_covered
+          END,
           updated_at = NOW()
       FROM broker_workbook_import AS i
       WHERE b.owner_developer_profile_id IS NULL
-        AND b.source_license_number IS NULL
         AND b.email IS NOT NULL
         AND i.email IS NOT NULL
         AND LOWER(b.email) = LOWER(i.email)
+        AND NOT EXISTS (
+          SELECT 1
+          FROM brokers AS same_license
+          WHERE same_license.owner_developer_profile_id IS NULL
+            AND same_license.source_license_number = i.source_license_number
+            AND UPPER(COALESCE(same_license.state_region, '')) = UPPER(i.state_region)
+        )
     `);
 
     const insertResult = await client.query(`
@@ -305,6 +360,7 @@ async function main(): Promise<void> {
         SELECT 1 FROM brokers AS b
         WHERE b.owner_developer_profile_id IS NULL
           AND b.source_license_number = i.source_license_number
+          AND UPPER(COALESCE(b.state_region, '')) = UPPER(i.state_region)
       )
       AND NOT EXISTS (
         SELECT 1 FROM brokers AS b
@@ -319,6 +375,8 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({
       workbook: workbookPath,
       workbookRows: rows.length,
+      updatedByLicense: updateByLicense.rowCount ?? 0,
+      updatedByEmail: updateByEmail.rowCount ?? 0,
       updated: (updateByLicense.rowCount ?? 0) + (updateByEmail.rowCount ?? 0),
       inserted: insertResult.rowCount ?? 0,
     }));

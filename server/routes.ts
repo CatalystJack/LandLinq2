@@ -4489,7 +4489,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       if (stateFilter && !msaFilter && !countyFilter) {
         // Simple state filter — match directly on state_region column OR deals in that state
         filtered = filtered.filter(b =>
-          (b.stateRegion || '').toUpperCase() === stateFilter ||
+          (b.stateRegion || '').toUpperCase().split(',').map((state: string) => state.trim()).includes(stateFilter) ||
           (brokerIdsFromDeals ? brokerIdsFromDeals.has(b.id) : false)
         );
       } else if (geoCountySet && geoCountySet.size > 0) {
