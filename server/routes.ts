@@ -4388,7 +4388,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       if (developerProfileId && !await requireActiveDeveloperProfile(developerProfileId, res)) return;
       const contactVisibility = developerProfileId
         ? await getDeveloperContactVisibility(developerProfileId)
-        : { sectors: [], counties: [] };
+        : { sectors: [], counties: [], sourceTags: [] };
 
       // For geo filters: build set of county names that match the requested state/MSA
       let geoCountySet: Set<string> | null = null;
@@ -13528,6 +13528,14 @@ RULES:
     } else if (!partial) {
       payload.crmContactCounties = [];
     }
+    if (body.crmContactSourceTags !== undefined) {
+      if (!Array.isArray(body.crmContactSourceTags) || body.crmContactSourceTags.some((value: unknown) => typeof value !== "string")) {
+        throw new Error("CRM contact source tags must be an array of strings");
+      }
+      payload.crmContactSourceTags = Array.from(new Set(body.crmContactSourceTags.map((value: string) => value.trim().toLowerCase()).filter(Boolean)));
+    } else if (!partial) {
+      payload.crmContactSourceTags = [];
+    }
     if ((!partial || body.maxAcres !== undefined || body.minAcres !== undefined) &&
       payload.maxAcres !== null && payload.maxAcres !== undefined &&
       Number(payload.maxAcres) < Number(payload.minAcres ?? body.minAcres)) {
@@ -13581,6 +13589,24 @@ RULES:
     } catch (error: any) {
       console.error("[admin investment companies GET] Error:", error);
       return res.status(500).json({ error: "Failed to load Investment Company profiles" });
+    }
+  });
+
+  app.get("/api/crm/source-tags", isAuthenticated, async (_req: any, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT LOWER(BTRIM(tag)) AS tag
+        FROM brokers
+        CROSS JOIN LATERAL unnest(COALESCE(source_tags, ARRAY[]::text[])) AS tag
+        WHERE BTRIM(tag) <> ''
+        ORDER BY tag
+      `);
+      return res.json((result.rows as Array<{ tag: unknown }>)
+        .map((row) => String(row.tag || "").trim())
+        .filter(Boolean));
+    } catch (error: any) {
+      console.error("[crm source tags] Error:", error);
+      return res.status(500).json({ error: "Failed to load source tags" });
     }
   });
 
@@ -14200,10 +14226,11 @@ RULES:
     return new Set(rows.map((row) => row.dealId));
   }
 
-  async function getDeveloperContactVisibility(developerProfileId: string): Promise<{ sectors: string[]; counties: string[] }> {
+  async function getDeveloperContactVisibility(developerProfileId: string): Promise<{ sectors: string[]; counties: string[]; sourceTags: string[] }> {
     const [profile] = await db.select({
       sectors: developerProfiles.crmContactSectors,
       counties: developerProfiles.crmContactCounties,
+      sourceTags: developerProfiles.crmContactSourceTags,
     }).from(developerProfiles).where(and(
       eq(developerProfiles.id, developerProfileId),
       eq(developerProfiles.isActive, true),
@@ -14215,22 +14242,29 @@ RULES:
       counties: Array.isArray(profile?.counties)
         ? profile.counties.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
         : [],
+      sourceTags: Array.isArray(profile?.sourceTags)
+        ? profile.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
+        : [],
     };
   }
 
   function isSharedBrokerVisible(
-    broker: { ownerDeveloperProfileId?: string | null; contactSector?: string | null; contactCounty?: string | null; userId?: string | null },
+    broker: { ownerDeveloperProfileId?: string | null; contactSector?: string | null; contactCounty?: string | null; sourceTags?: string[] | null; userId?: string | null },
     developerProfileId: string,
-    visibility: { sectors: string[]; counties: string[] },
+    visibility: { sectors: string[]; counties: string[]; sourceTags: string[] },
   ): boolean {
     if (broker.ownerDeveloperProfileId === developerProfileId) return true;
     if (broker.ownerDeveloperProfileId !== null && broker.ownerDeveloperProfileId !== undefined) return false;
     if (broker.userId === '20974d7b-e103-4fc7-b42f-7a13d41041fb') return false;
     const sector = String(broker.contactSector || '').trim().toLowerCase();
     const county = String(broker.contactCounty || '').trim().toLowerCase();
+    const brokerSourceTags = Array.isArray(broker.sourceTags)
+      ? broker.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
+      : [];
     return (
       (visibility.sectors.length === 0 || visibility.sectors.includes(sector)) &&
-      (visibility.counties.length === 0 || visibility.counties.includes(county))
+      (visibility.counties.length === 0 || visibility.counties.includes(county)) &&
+      (visibility.sourceTags.length === 0 || visibility.sourceTags.some((tag) => brokerSourceTags.includes(tag)))
     );
   }
 
@@ -14240,6 +14274,7 @@ RULES:
       ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
       contactSector: brokers.contactSector,
       contactCounty: brokers.contactCounty,
+      sourceTags: brokers.sourceTags,
       userId: brokers.userId,
     }).from(brokers).where(and(eq(brokers.id, brokerId), isNonDemoBroker())).limit(1);
     return !!broker && isSharedBrokerVisible(broker, developerProfileId, visibility);
@@ -14907,6 +14942,12 @@ RULES:
           throw new Error('CRM contact counties must be an array of strings');
         }
         updates.crmContactCounties = Array.from(new Set(body.crmContactCounties.map((value: string) => value.trim().toLowerCase()).filter(Boolean)));
+      }
+      if (body.crmContactSourceTags !== undefined) {
+        if (!Array.isArray(body.crmContactSourceTags) || body.crmContactSourceTags.some((value: unknown) => typeof value !== 'string')) {
+          throw new Error('CRM contact source tags must be an array of strings');
+        }
+        updates.crmContactSourceTags = Array.from(new Set(body.crmContactSourceTags.map((value: string) => value.trim().toLowerCase()).filter(Boolean)));
       }
 
       for (const field of ['qctOverridesRentMinimum', 'ddaOverridesRentMinimum', 'ozOverridesRentMinimum']) {

@@ -50,6 +50,7 @@ export const developerProfiles = pgTable("developer_profiles", {
   // shared contacts; non-empty filters are applied together.
   crmContactSectors: text("crm_contact_sectors").array().default(sql`ARRAY[]::text[]`).notNull(),
   crmContactCounties: text("crm_contact_counties").array().default(sql`ARRAY[]::text[]`).notNull(),
+  crmContactSourceTags: text("crm_contact_source_tags").array().default(sql`ARRAY[]::text[]`).notNull(),
 
   // Rent criteria — primary drives classification, secondary is reference only
   rentMetric: varchar("rent_metric").notNull(), // 'psf' | 'per_unit'

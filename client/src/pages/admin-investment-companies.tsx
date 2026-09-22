@@ -62,6 +62,7 @@ interface InvestmentCompany {
   targetCounties: string[];
   crmContactSectors: string[];
   crmContactCounties: string[];
+  crmContactSourceTags: string[];
   productTypes: ProductType[];
   countyMarketLabels: Record<string, string>;
   isActive: boolean;
@@ -164,6 +165,7 @@ const blankForm: CompanyForm = {
   targetCounties: [],
   crmContactSectors: [],
   crmContactCounties: [],
+  crmContactSourceTags: [],
   productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
   countyMarketLabels: {},
   isActive: true,
@@ -410,6 +412,11 @@ export default function AdminInvestmentCompanies() {
     queryFn: () => requestJson("/api/admin/investment-companies"),
     enabled: isPlatformAdmin,
   });
+  const sourceTagsQuery = useQuery<string[]>({
+    queryKey: ["/api/crm/source-tags"],
+    queryFn: () => requestJson("/api/crm/source-tags"),
+    enabled: isPlatformAdmin,
+  });
 
   useEffect(() => {
     if (!formOpen) return;
@@ -436,6 +443,7 @@ export default function AdminInvestmentCompanies() {
       targetCounties: editing.targetCounties || [],
       crmContactSectors: editing.crmContactSectors || [],
       crmContactCounties: editing.crmContactCounties || [],
+      crmContactSourceTags: editing.crmContactSourceTags || [],
       productTypes: (editing.productTypes?.length ? editing.productTypes : [{
         ...createEmptyYocAssumptions(),
         name: "General",
@@ -467,6 +475,7 @@ export default function AdminInvestmentCompanies() {
       targetCounties: [],
       crmContactSectors: [],
       crmContactCounties: [],
+      crmContactSourceTags: [],
       productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
       countyMarketLabels: {},
     });
@@ -700,6 +709,23 @@ export default function AdminInvestmentCompanies() {
                onChange={(values) => update("crmContactCounties", values.map((value) => value.toLowerCase()))}
                placeholder="Mecklenburg, Wake"
              />
+              <div className="sm:col-span-2">
+                <Label htmlFor="admin-crm-contact-source-tags">Source tags</Label>
+                <select
+                  id="admin-crm-contact-source-tags"
+                  multiple
+                  size={Math.min(Math.max(sourceTagsQuery.data?.length || 0, 3), 8)}
+                  value={form.crmContactSourceTags}
+                  onChange={(event) => update(
+                    "crmContactSourceTags",
+                    Array.from(event.target.selectedOptions).map((option) => option.value.toLowerCase()),
+                  )}
+                  className="mt-2 min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                >
+                  {(sourceTagsQuery.data || []).map((tag) => <option key={tag} value={tag.toLowerCase()}>{tag}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">Optional. Select one or more imported source tags; contacts matching any selected tag will be visible in this company CRM.</p>
+              </div>
            </div>
          </section>
          {form.profileType === "general_sales" && <section className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900"><p className="font-semibold">General Sales profile</p><p className="mt-1">This profile has no Deal Dashboard, acquisition criteria, geographic targeting, product types, or affordable housing overrides. Team members will use CRM, Outreach, Analytics, and Settings.</p></section>}

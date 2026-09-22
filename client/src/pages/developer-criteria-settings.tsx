@@ -64,6 +64,7 @@ type Profile = {
   ozOverridesRentMinimum: boolean;
   crmContactSectors: string[];
   crmContactCounties: string[];
+  crmContactSourceTags: string[];
 };
 
 type ProductType = {
@@ -305,6 +306,10 @@ export default function DeveloperCriteriaSettings() {
     queryKey: ["/api/developer-profile/me"],
     queryFn: () => jsonRequest("/api/developer-profile/me"),
   });
+  const sourceTagsQuery = useQuery<string[]>({
+    queryKey: ["/api/crm/source-tags"],
+    queryFn: () => jsonRequest("/api/crm/source-tags"),
+  });
   const teamQuery = useQuery<{ team: TeamMember[] }>({
     queryKey: ["/api/developer-profile/me/team"],
     queryFn: () => jsonRequest("/api/developer-profile/me/team"),
@@ -389,6 +394,7 @@ export default function DeveloperCriteriaSettings() {
         countyMarketLabels: profile.countyMarketLabels || {},
         crmContactSectors: profile.crmContactSectors || [],
         crmContactCounties: profile.crmContactCounties || [],
+        crmContactSourceTags: profile.crmContactSourceTags || [],
         compSearchRadiusMiles: profile.compSearchRadiusMiles || "3",
          emailUnsubscribeEnabled: Boolean(profile.emailUnsubscribeEnabled),
       });
@@ -534,6 +540,7 @@ export default function DeveloperCriteriaSettings() {
         profileType: "general_sales",
         crmContactSectors: form.crmContactSectors,
         crmContactCounties: form.crmContactCounties,
+        crmContactSourceTags: form.crmContactSourceTags,
       });
       return;
     }
@@ -547,6 +554,7 @@ export default function DeveloperCriteriaSettings() {
         productTypes: [],
         crmContactSectors: form.crmContactSectors,
         crmContactCounties: form.crmContactCounties,
+        crmContactSourceTags: form.crmContactSourceTags,
       });
       return;
     }
@@ -597,6 +605,7 @@ export default function DeveloperCriteriaSettings() {
       })),
       crmContactSectors: form.crmContactSectors,
       crmContactCounties: form.crmContactCounties,
+      crmContactSourceTags: form.crmContactSourceTags,
       countyMarketLabels: form.countyMarketLabels,
       qctOverridesRentMinimum: form.qctOverridesRentMinimum,
       ddaOverridesRentMinimum: form.ddaOverridesRentMinimum,
@@ -724,6 +733,23 @@ export default function DeveloperCriteriaSettings() {
                   placeholder="Mecklenburg, Wake, Buncombe"
                 />
                 <p className="mt-1 text-xs text-slate-500">Leave blank to include every county. County filtering applies to shared contacts only.</p>
+              </div>
+              <div>
+                <Label htmlFor="crm-contact-source-tags">Source tags</Label>
+                <select
+                  id="crm-contact-source-tags"
+                  multiple
+                  size={Math.min(Math.max(sourceTagsQuery.data?.length || 0, 3), 8)}
+                  value={form.crmContactSourceTags}
+                  onChange={(event) => update(
+                    "crmContactSourceTags",
+                    Array.from(event.target.selectedOptions).map((option) => option.value.toLowerCase()),
+                  )}
+                  className="mt-2 min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                >
+                  {(sourceTagsQuery.data || []).map((tag) => <option key={tag} value={tag.toLowerCase()}>{tag}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">Optional. Hold Ctrl/Cmd to select multiple. A contact is shown when it has at least one selected source tag.</p>
               </div>
             </CardContent>
           </Card>
