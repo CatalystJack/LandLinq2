@@ -147,6 +147,11 @@ export class DatabaseManager {
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS developer_broker_crm_profile_idx ON developer_broker_crm(developer_profile_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS developer_broker_crm_broker_idx ON developer_broker_crm(broker_id)`);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS brokers_shared_source_license_idx
+      ON brokers(source_license_number)
+      WHERE owner_developer_profile_id IS NULL AND source_license_number IS NOT NULL
+    `);
 
     // Internal sales pipeline tables used by the platform admin workspace.
     await db.execute(sql`

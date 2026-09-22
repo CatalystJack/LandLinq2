@@ -52,3 +52,4 @@
 - [Industrial asset-class onboarding](industrial-asset-class-onboarding.md) — industrial profiles store screening criteria separately and never use automatic multifamily YOC assumptions.
 - [Organization unsubscribe policy](organization-unsubscribe-policy.md) — one-click unsubscribe applies to developer-owned recipient mail; platform account and internal transactional mail remain excluded.
 - [Shared broker CRM boundary](shared-broker-crm-boundary.md) — shared broker identity is filtered by company settings; tags, notes, assignments, and outreach state are profile-scoped.
+- [Broker workbook import](broker-workbook-import.md) — import by source license with shared-email dedupe; never overwrite company-private CRM state.
