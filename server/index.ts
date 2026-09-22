@@ -310,6 +310,8 @@ setTimeout(() => {
           ADD COLUMN IF NOT EXISTS census_data_json jsonb,
           ADD COLUMN IF NOT EXISTS census_data_fetched_at timestamp,
           ADD COLUMN IF NOT EXISTS manual_is_coastal boolean;
+        ALTER TABLE brokers
+          ADD COLUMN IF NOT EXISTS source_tags text[] NOT NULL DEFAULT ARRAY[]::text[];
         ALTER TABLE developer_product_types
           ADD COLUMN IF NOT EXISTS dua numeric,
           ADD COLUMN IF NOT EXISTS hard_cost_pu numeric,

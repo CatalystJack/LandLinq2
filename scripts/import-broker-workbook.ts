@@ -25,6 +25,7 @@ type ImportRow = {
   sourceLicenseNumber: string;
   stateRegion: string;
   marketsCovered: string | null;
+  sourceTags: string[];
 };
 
 function clean(value: unknown): string | null {
@@ -51,6 +52,17 @@ function normalizePhone(value: unknown): string | null {
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
   return raw;
+}
+
+function normalizeTags(value: unknown): string[] {
+  const raw = clean(value);
+  if (!raw) return [];
+  return Array.from(new Set(
+    raw
+      .split(/[;,|]/)
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  ));
 }
 
 function splitName(name: string | null, first: string | null, last: string | null): {
@@ -114,6 +126,7 @@ function rowsFromSheet(
     const county = clean(row.County)?.toLowerCase() ?? null;
     const rowState = clean(row.State) ?? clean(row["Mailing State"]) ?? stateRegion;
     const specialty = clean(row.Specialty) ?? clean(row["Product Type"]);
+    const sourceTags = normalizeTags(row["DB Tags"] ?? row["Database Tags"] ?? row.Tags);
     imported.push({
       firstName,
       lastName,
@@ -129,6 +142,7 @@ function rowsFromSheet(
       sourceLicenseNumber,
       stateRegion: rowState.toUpperCase(),
       marketsCovered: county,
+      sourceTags,
     });
   }
   return imported;
@@ -152,6 +166,7 @@ function dedupeRows(rows: ImportRow[]): ImportRow[] {
       marketsCovered: existing.marketsCovered ?? row.marketsCovered,
       specialty: existing.specialty ?? row.specialty,
       confidence: existing.confidence ?? row.confidence,
+       sourceTags: Array.from(new Set([...existing.sourceTags, ...row.sourceTags])),
       sector: existing.sector === "commercial" || row.sector === "commercial"
         ? "commercial"
         : "residential",
@@ -191,6 +206,7 @@ function dedupeRows(rows: ImportRow[]): ImportRow[] {
       company: existing.company ?? row.company,
       phone: existing.phone ?? row.phone,
       county: existing.county ?? row.county,
+      sourceTags: Array.from(new Set([...existing.sourceTags, ...row.sourceTags])),
       stateRegion: [...states].join(", "),
       marketsCovered: counties.size ? [...counties].join(", ") : existing.marketsCovered,
     });
@@ -235,7 +251,8 @@ async function main(): Promise<void> {
         contact_specialty TEXT,
         contact_confidence TEXT,
         state_region TEXT NOT NULL,
-        markets_covered TEXT
+        markets_covered TEXT,
+        source_tags TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]
       ) ON COMMIT DROP
     `);
     await client.query(`
@@ -254,7 +271,7 @@ async function main(): Promise<void> {
       const batch = rows.slice(start, start + 3000);
       const values: unknown[] = [];
       const placeholders = batch.map((row, index) => {
-        const base = index * 14;
+        const base = index * 15;
         values.push(
           row.sourceLicenseNumber,
           row.firstName,
@@ -270,14 +287,15 @@ async function main(): Promise<void> {
           row.confidence,
           row.stateRegion,
           row.marketsCovered,
+          row.sourceTags,
         );
-        return `(${Array.from({ length: 14 }, (_, offset) => `$${base + offset + 1}`).join(",")})`;
+        return `(${Array.from({ length: 15 }, (_, offset) => `$${base + offset + 1}`).join(",")})`;
       }).join(",");
       await client.query(`
         INSERT INTO broker_workbook_import
         (source_license_number, first_name, last_name, email, phone, brokerage, company,
          license_number, contact_county, contact_sector, contact_specialty,
-         contact_confidence, state_region, markets_covered)
+         contact_confidence, state_region, markets_covered, source_tags)
         VALUES ${placeholders}
       `, values);
     }
@@ -298,6 +316,7 @@ async function main(): Promise<void> {
           source_license_number = i.source_license_number,
           state_region = i.state_region,
           markets_covered = COALESCE(i.markets_covered, b.markets_covered),
+           source_tags = i.source_tags,
           updated_at = NOW()
       FROM broker_workbook_import AS i
       WHERE b.owner_developer_profile_id IS NULL
@@ -329,6 +348,12 @@ async function main(): Promise<void> {
             WHEN i.markets_covered IS NULL OR i.markets_covered = '' THEN b.markets_covered
             ELSE b.markets_covered || ', ' || i.markets_covered
           END,
+           source_tags = ARRAY(
+             SELECT DISTINCT tag
+             FROM unnest(COALESCE(b.source_tags, ARRAY[]::TEXT[]) || COALESCE(i.source_tags, ARRAY[]::TEXT[])) AS tag
+             WHERE btrim(tag) <> ''
+             ORDER BY tag
+           ),
           updated_at = NOW()
       FROM broker_workbook_import AS i
       WHERE b.owner_developer_profile_id IS NULL
@@ -348,12 +373,12 @@ async function main(): Promise<void> {
       INSERT INTO brokers (
         id, first_name, last_name, email, phone, brokerage, company, license_number,
         contact_county, contact_sector, contact_specialty, contact_confidence,
-        source_license_number, state_region, markets_covered, owner_developer_profile_id,
+         source_license_number, state_region, markets_covered, source_tags, owner_developer_profile_id,
         is_active, created_at, updated_at
       )
       SELECT gen_random_uuid(), i.first_name, i.last_name, i.email, i.phone, i.brokerage, i.company,
              i.license_number, i.contact_county, i.contact_sector, i.contact_specialty,
-             i.contact_confidence, i.source_license_number, i.state_region, i.markets_covered,
+             i.contact_confidence, i.source_license_number, i.state_region, i.markets_covered, i.source_tags,
              NULL, TRUE, NOW(), NOW()
       FROM broker_workbook_import AS i
       WHERE NOT EXISTS (

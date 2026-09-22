@@ -30,6 +30,7 @@ type Contact = {
   stateRegion: string | null;
   assignedTo: string | null;
   crmTags: string[] | null;
+  sourceTags: string[] | null;
   smsOptIn: boolean | null;
   ownerDeveloperProfileId: string | null;
   createdAt: string | null;
@@ -104,6 +105,7 @@ function ContactTableSkeleton({ adminMode }: { adminMode: boolean }) {
             <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Brokerage</TableHead>
             <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Region</TableHead>
             <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Tags</TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source tags</TableHead>
             <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source</TableHead>
           </TableRow>
         </TableHeader>
@@ -131,6 +133,7 @@ function ContactTableSkeleton({ adminMode }: { adminMode: boolean }) {
                   <Skeleton className="h-6 w-12 rounded-full bg-[#e4ebf0]" />
                 </div>
               </TableCell>
+              <TableCell><Skeleton className="h-6 w-24 rounded-full bg-[#e4ebf0]" /></TableCell>
               <TableCell><Skeleton className="h-6 w-24 rounded-full bg-[#e4ebf0]" /></TableCell>
             </TableRow>
           ))}
@@ -161,6 +164,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [sourceTagFilter, setSourceTagFilter] = useState("all");
   const [stateFilter, setStateFilter] = useState("all");
   const [assignedToFilter, setAssignedToFilter] = useState("all");
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
@@ -250,21 +254,29 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     return contacts.filter((contact) => {
       const matchesCompany = companyFilter === "all" || contact.brokerage?.trim().toLowerCase() === companyFilter;
       const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => contact.crmTags?.includes(tag));
+      const matchesSourceTag = sourceTagFilter === "all" || contact.sourceTags?.includes(sourceTagFilter);
       const matchesState = stateFilter === "all" || contact.stateRegion?.trim() === stateFilter;
       const matchesAssignedTo = assignedToFilter === "all" || contact.assignedTo?.trim() === assignedToFilter;
       if (!matchesCompany) return false;
-      if (!matchesTags || !matchesState || !matchesAssignedTo) return false;
+      if (!matchesTags || !matchesSourceTag || !matchesState || !matchesAssignedTo) return false;
       if (!term) return true;
       return [contact.firstName, contact.lastName, contact.email, contact.phone, contact.brokerage, contact.stateRegion]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(term));
     });
-  }, [contactsQuery.data?.contacts, search, companyFilter, selectedTags, stateFilter, assignedToFilter]);
+  }, [contactsQuery.data?.contacts, search, companyFilter, selectedTags, sourceTagFilter, stateFilter, assignedToFilter]);
 
   const availableTags = useMemo(() => {
     if (!adminMode) return (tagsQuery.data || []).map((tag) => tag.trim()).filter(Boolean);
     return Array.from(new Set((contactsQuery.data?.contacts || []).flatMap((contact) => contact.crmTags || []).map((tag) => tag.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   }, [adminMode, tagsQuery.data, contactsQuery.data?.contacts]);
+
+  const availableSourceTags = useMemo(() => Array.from(new Set(
+    (contactsQuery.data?.contacts || [])
+      .flatMap((contact) => contact.sourceTags || [])
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b)), [contactsQuery.data?.contacts]);
 
   const availableStates = useMemo(() => Array.from(new Set(
     (contactsQuery.data?.contacts || [])
@@ -296,10 +308,11 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       : current.filter((id) => id !== contactId));
   };
 
-  const hasActiveFilters = companyFilter !== "all" || selectedTags.length > 0 || stateFilter !== "all" || assignedToFilter !== "all";
+  const hasActiveFilters = companyFilter !== "all" || selectedTags.length > 0 || sourceTagFilter !== "all" || stateFilter !== "all" || assignedToFilter !== "all";
   const clearFilters = () => {
     setCompanyFilter("all");
     setSelectedTags([]);
+    setSourceTagFilter("all");
     setStateFilter("all");
     setAssignedToFilter("all");
   };
@@ -420,6 +433,15 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                  )}
                </DropdownMenuContent>
              </DropdownMenu>
+              <select
+                value={sourceTagFilter}
+                onChange={(event) => setSourceTagFilter(event.target.value)}
+                aria-label="Source tag filter"
+                className="h-8 max-w-[220px] rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] outline-none"
+              >
+                <option value="all">Source tags: All</option>
+                {availableSourceTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+              </select>
              <select
                value={stateFilter}
                onChange={(event) => setStateFilter(event.target.value)}
@@ -555,6 +577,20 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                          {!contact.crmTags?.length && adminMode && <span className="text-sm text-[#9aa9b4]">—</span>}
                        </div>
                      </TableCell>
+                      <TableCell className="max-w-[300px]">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {(contact.sourceTags || []).filter(Boolean).map((tag, index) => (
+                            <span
+                              key={`${tag}-${index}`}
+                              title="Shared tag from the broker workbook"
+                              className="inline-flex max-w-[150px] items-center rounded-full border border-[#d7e7d7] bg-[#f2f8f1] px-2 py-1 text-[10px] font-medium text-[#4d7351]"
+                            >
+                              <span className="truncate">{tag}</span>
+                            </span>
+                          ))}
+                          {!contact.sourceTags?.length && <span className="text-sm text-[#9aa9b4]">—</span>}
+                        </div>
+                      </TableCell>
                     <TableCell>{contact.ownerDeveloperProfileId ? <Badge variant="secondary" className="border px-2 py-0.5 text-[10px]" style={{ backgroundColor: `${secondaryColor}15`, color: primaryColor, borderColor: `${secondaryColor}35` }}><UserRound className="mr-1 h-3 w-3" />Your contact</Badge> : <Badge variant="outline" className="border-[#d7e1e7] bg-[#f8fafb] text-[10px] text-[#718493]">Shared network</Badge>}</TableCell>
                   </TableRow>
                 ))}</TableBody>

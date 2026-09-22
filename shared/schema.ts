@@ -277,6 +277,7 @@ export const brokers = pgTable("brokers", {
   websiteUrl: varchar("website_url"),
   socialMediaLinks: jsonb("social_media_links"),
   crmTags: text("crm_tags").array(), // Internal CRM tags for contact segmentation
+  sourceTags: text("source_tags").array().default(sql`ARRAY[]::text[]`).notNull(), // Importer-controlled shared directory tags
   crmNotes: text("crm_notes"),       // Internal CRM notes about this contact
   lastContactedAt: timestamp("last_contacted_at"), // Last outreach activity
   stateRegion: varchar("state_region"), // State/region abbreviation (e.g. TN, NC)
