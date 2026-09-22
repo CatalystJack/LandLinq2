@@ -1,0 +1,25 @@
+On the marketing homepage (client/src/pages/marketing-home.tsx), the hero section's animated dashboard mockup (DashboardMockup, lines ~75-111, wrapped by DealOpsMachine) is meant to represent the real Deal Dashboard (client/src/pages/developer-dashboard.tsx). Right now it doesn't match the real page at all. Fix these specific things:
+
+1. FONT: The mockup's "Your Dashboard" heading is a small plain Inter <h3>. The real page's title uses font-serif (Newsreader) via the shared PageHeader component at 3xl size. Apply font-serif to this heading in the mockup to match.
+
+2. FABRICATED COLUMNS: The mockup table has 15 columns (ID, Status, Priority, Property Address, Name, YOC, Deal, Type, Analyst Notes, Summary, Dev Notes, Broker Notes, Top Rent/Unit, Top Rent PSF, OCC T.) — none of these except Property/Status exist on the real page. The real table has at most 8 columns: Property, Market, Acreage, Rent, optionally HUD FMR/HUD Income Limit/Programs, then Status, Action. Rebuild the mock table to use this real column set.
+
+3. FABRICATED STATUS VALUES: The mockup uses "Qualified" as a status shown as a bare colored dot. The real DealStatus values are Review / Passed / Pursuing, rendered as full pill badges (rounded-full) with a label and, for Pursuing, a filled Star icon — never a bare dot with no text. Fix the status rendering to match.
+
+4. FABRICATED VIEW TOGGLE: The mockup shows a "Table / Pipeline / Map" 3-way toggle. The real page only has Table and Map — there is no Pipeline view. Remove the Pipeline option.
+
+5. FABRICATED "COLUMNS 29/40" COUNTER: Remove this — the real Columns button just toggles 3 fixed optional columns with no counter.
+
+6. FABRICATED FILTER PILLS: Replace the "STATUS / PRIORITY / TYPE / NEXT" filter pills with the real filter set: Status, Product type, Programs (3 dropdowns — no "Priority" or "Next" filter exists on the real page).
+
+7. MISSING STAT-TILE ROW: The real page has a row of 4 KPI cards above the table (All deals / Review / Passed / Pursuing), each with a colored icon chip and the count rendered in font-serif text-3xl font-bold. Add an equivalent row to the mockup.
+
+8. ICONS: Replace the Unicode glyphs (+, ⇩, ☷, ⌄, ↕) with real lucide-react icons matching the real page's imports: Plus, Download, Columns3, Search, Table2, MapIcon, Star, RefreshCw.
+
+9. CARD RADIUS: The mockup's outer frame uses rounded-[1.1rem] (17.6px). The real Card component the table sits in uses rounded-lg (8px). Reduce the radius to match.
+
+10. COLORS: Replace all hardcoded one-off hex values (#4d94dc, #347fc8, #357bbb, #397ac0, #f4c84a, #35a66f) with the real brand tokens already defined in index.css: var(--landlinq-blue) / var(--catalyst-blue) (#498EDE), var(--catalyst-navy) (#081729), var(--status-green) (#2E9B62), var(--status-yellow) (#D9A441).
+
+Keep the existing hover/tilt animation and overall hero layout — this is about making the CONTENT inside the mockup window accurately represent the real product, not changing the hero's structure.
+
+Paste the diff and a screenshot when done.

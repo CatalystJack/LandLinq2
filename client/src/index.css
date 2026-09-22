@@ -2485,41 +2485,47 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 .ll-detail-section .ll-detail-tags { display:flex; flex-wrap:wrap; gap:4px; overflow:visible; border:0; padding:0; white-space:normal; }
 .ll-detail-tags i { border-radius:3px; background:rgba(73,142,222,.12); color:#498EDE; padding:3px 5px; font-style:normal; font-weight:600; }
 
-.ll-outreach-analytics { padding:11px; background:#f8fafc; }
-.ll-analytics-back { color:#7f909d; font-size:7px; }
-.ll-analytics-back button { float:right; border:1px solid #e0e7ec; border-radius:5px; background:#fff; padding:4px 8px; color:#6c7d88; font-size:7px; }
-.ll-outreach-analytics h3 { margin:19px 0 2px; font-size:14px; }
-.ll-outreach-analytics > p { margin:0; color:#7f8d99; font-size:7px; }
-.ll-periods { display:flex; width:max-content; margin-top:13px; overflow:hidden; border:1px solid #e1e8ed; border-radius:5px; background:#fff; }
-.ll-periods span, .ll-periods b { padding:6px 10px; color:#6e7e89; font-size:7px; font-weight:500; }
-.ll-periods b { background:#498EDE; color:#fff; }
-.ll-metric-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:15px; }
-.ll-metric-grid > div { min-width:0; border:1px solid #e4eaee; border-radius:7px; background:#fff; padding:9px; }
-.ll-metric-grid i { float:left; display:grid; place-items:center; width:20px; height:20px; margin-right:7px; border-radius:5px; background:rgba(73,142,222,.12); color:#498EDE; font-style:normal; }
-.ll-metric-grid small, .ll-metric-grid em { display:block; color:#7f8d98; font-size:6px; font-style:normal; }
-.ll-metric-grid b { display:block; margin-top:4px; font-size:14px; }
-.ll-metric-number { animation: ll-metric-progress 5.4s ease-in-out infinite; }
-.ll-metric-grid em { clear:both; padding-top:5px; color:#adb8bf; }
-@keyframes ll-metric-progress { 0%, 15%, 100% { color:#183047; transform:translateY(0); } 35%, 58% { color:#498EDE; transform:translateY(-2px); } 72% { color:#183047; transform:translateY(0); } }
-.ll-analytics-lower { display:grid; grid-template-columns:1.45fr .7fr; gap:8px; margin-top:15px; }
-.ll-volume, .ll-drip { min-height:130px; border:1px solid #e4eaee; border-radius:7px; background:#fff; padding:10px; }
-.ll-volume > b, .ll-drip > b { display:block; font-size:8px; }
-.ll-volume > b small { float:right; color:#8fa0aa; font-size:6px; font-weight:500; }
-.ll-volume > span { display:block; margin-top:27px; text-align:center; color:#cad3d8; font-size:17px; }
-.ll-volume > span small { display:block; color:#99a7b0; font-size:7px; }
-.ll-volume > .ll-volume-summary { display:flex; align-items:center; justify-content:space-between; margin-top:15px; color:#7e909c; font-size:7px; text-align:left; }
-.ll-volume-summary strong { color:#498EDE; font-size:7px; }
-.ll-volume-bars { display:flex; align-items:end; gap:4px; height:58px; margin-top:8px; border-bottom:1px solid #dfe8ed; }
-.ll-volume-bars i { flex:1; height:25%; background:rgba(73,142,222,.42); animation:ll-bar-grow 4s ease-in-out infinite; }
-.ll-volume-bars i:nth-child(2) { animation-delay:.3s; } .ll-volume-bars i:nth-child(3) { animation-delay:.6s; }
-.ll-volume-days { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-top:4px; color:#95a5ae; font-size:5px; text-align:center; }
-@keyframes ll-bar-grow { 0%, 100% { transform:scaleY(.3); transform-origin:bottom; opacity:.55; } 50% { transform:scaleY(1); opacity:1; } }
-.ll-drip > span { display:flex; justify-content:space-between; padding-top:9px; color:#7f909b; font-size:7px; }
-.ll-drip strong { color:#d59427; font-weight:600; }
-.ll-drip strong.is-blue { color:#498EDE; }
-.ll-drip strong.is-green { color:#2d9b69; }
-.ll-drip strong.is-red { color:#d85b5b; }
-.ll-drip hr { border:0; border-top:1px solid #edf1f3; margin:9px 0 0; }
+.ll-outreach-campaigns { padding: .8rem; background: #f8fafc; color: var(--catalyst-navy); }
+.ll-outreach-campaigns-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: .45rem .25rem .8rem; }
+.ll-outreach-campaigns-head small { color: #94a3b8; font-size: 6px; font-weight: 700; letter-spacing: .12em; }
+.ll-outreach-campaigns-head h3 { margin: .22rem 0 .12rem; font-size: 15px; font-weight: 700; letter-spacing: -.03em; }
+.ll-outreach-campaigns-head p { margin: 0; color: #64748b; font-size: 7px; }
+.ll-outreach-campaigns-head > button { display: inline-flex; align-items: center; gap: .3rem; border: 0; border-radius: .35rem; padding: .42rem .65rem; background: var(--catalyst-navy); color: #fff; font-size: 7px; font-weight: 700; white-space: nowrap; }
+.ll-outreach-campaigns-head > button svg { width: .7rem; height: .7rem; }
+.ll-outreach-campaigns-summary { display: grid; grid-template-columns: 1.05fr 1fr; gap: .55rem; }
+.ll-outreach-card { border: 1px solid #e2e8f0; border-radius: 1rem; background: #fff; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.ll-outreach-sender, .ll-outreach-ai { min-width: 0; padding: .65rem; }
+.ll-outreach-card-title { display: flex; align-items: center; gap: .35rem; color: var(--catalyst-navy); font-size: 8px; }
+.ll-outreach-card-title span { display: grid; width: 1.35rem; height: 1.35rem; place-items: center; border-radius: .65rem; background: color-mix(in srgb, var(--landlinq-blue) 15%, transparent); color: var(--landlinq-blue); }
+.ll-outreach-card-title svg { width: .7rem; height: .7rem; }
+.ll-outreach-sender > strong { display: block; margin-top: .65rem; color: #0f172a; font-size: 8px; }
+.ll-outreach-sender > small { display: block; margin-top: .15rem; color: #64748b; font-size: 6px; }
+.ll-outreach-sender > em { display: flex; align-items: center; gap: .25rem; margin-top: .55rem; color: #15803d; font-size: 6px; font-style: normal; font-weight: 700; }
+.ll-outreach-sender > em svg { width: .65rem; height: .65rem; }
+.ll-outreach-ai { background: color-mix(in srgb, var(--landlinq-blue) 5%, white); }
+.ll-outreach-ai p { margin: .55rem 0 .65rem; color: #64748b; font-size: 7px; line-height: 1.4; }
+.ll-outreach-ai > strong { display: inline-flex; align-items: center; gap: .25rem; color: var(--landlinq-blue); font-size: 7px; }
+.ll-outreach-ai > strong svg { width: .7rem; height: .7rem; }
+.ll-outreach-list-head { display: flex; align-items: center; justify-content: space-between; margin: .85rem .15rem .4rem; color: #64748b; font-size: 7px; }
+.ll-outreach-list-head b { display: inline-flex; align-items: center; gap: .3rem; color: var(--catalyst-navy); font-size: 8px; }
+.ll-outreach-list-head svg { width: .7rem; height: .7rem; color: var(--landlinq-blue); }
+.ll-outreach-campaign-list { display: grid; gap: .45rem; }
+.ll-outreach-campaign { display: grid; grid-template-columns: 1.45rem minmax(0, 1fr) auto; align-items: center; gap: .55rem; padding: .65rem; }
+.ll-outreach-campaign-icon { display: grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: .6rem; background: color-mix(in srgb, var(--landlinq-blue) 12%, transparent); color: var(--landlinq-blue); }
+.ll-outreach-campaign-icon svg { width: .72rem; height: .72rem; }
+.ll-outreach-campaign-copy { min-width: 0; }
+.ll-outreach-campaign-copy > div { display: flex; align-items: center; gap: .35rem; min-width: 0; }
+.ll-outreach-campaign-copy > div > b { overflow: hidden; color: #0f172a; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.ll-outreach-campaign-copy em { border-radius: 999px; background: #f1f5f9; padding: .12rem .32rem; color: #64748b; font-size: 5px; font-style: normal; font-weight: 700; text-transform: uppercase; }
+.ll-outreach-campaign-copy em.is-active { background: #dcfce7; color: #15803d; }
+.ll-outreach-campaign-copy p { overflow: hidden; margin: .2rem 0; color: #64748b; font-size: 6px; text-overflow: ellipsis; white-space: nowrap; }
+.ll-outreach-campaign-copy small { display: flex; align-items: center; gap: .25rem; overflow: hidden; color: #94a3b8; font-size: 5px; text-overflow: ellipsis; white-space: nowrap; }
+.ll-outreach-campaign-copy small svg { width: .58rem; height: .58rem; flex: 0 0 auto; color: var(--landlinq-blue); }
+.ll-outreach-campaign-copy small svg:nth-of-type(2) { margin-left: .25rem; }
+.ll-outreach-campaign-actions { display: flex; gap: .25rem; }
+.ll-outreach-campaign-actions button { display: inline-flex; align-items: center; gap: .2rem; border: 1px solid #e2e8f0; border-radius: .35rem; background: #fff; padding: .3rem .4rem; color: #64748b; font-size: 6px; font-weight: 700; white-space: nowrap; }
+.ll-outreach-campaign-actions button svg { width: .62rem; height: .62rem; }
+.ll-outreach-campaign-actions button.is-primary { border-color: var(--landlinq-blue); background: var(--landlinq-blue); color: #fff; }
 
 /* Drip campaign preview: a quiet, floating editor that leaves room for the
    journey copy to carry the story. */

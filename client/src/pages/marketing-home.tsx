@@ -1,17 +1,24 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import {
+  CheckCircle2,
   ChevronDown,
   Download,
   List,
+  Mail,
   Map,
+  MessageSquare,
   Menu,
   Pause,
   Plus,
   Play,
+  Rocket,
   Search,
   Send,
+  Sparkles,
   Table2,
+  Tag,
+  Users,
   X,
 } from "lucide-react";
 import Footer from "@/components/footer";
@@ -68,13 +75,64 @@ function ContactDetailMockup() {
   );
 }
 
-function OutreachAnalyticsMockup() {
+function OutreachCampaignsMockup() {
+  const campaigns = [
+    {
+      name: "Broker introduction",
+      subject: "Land site inquiry, {{targetMarket}}",
+      audience: "Interested Broker",
+      enrolled: "184 enrolled",
+      status: "Active",
+    },
+    {
+      name: "Staying top of mind",
+      subject: "Still actively acquiring in {{targetMarket}}",
+      audience: "Warm pipeline contacts",
+      enrolled: "96 enrolled",
+      status: "Paused",
+    },
+  ];
+
   return (
-    <div className="ll-app-frame ll-outreach-analytics">
-      <div className="ll-analytics-back">← Outreach Management <button>⟳ Refresh</button></div><h3>Outreach Analytics</h3><p>Email send activity, sender health, and drip campaign status</p>
-      <div className="ll-periods"><span>Today</span><span>7 Days</span><b>30 Days</b><span>YTD</span></div>
-      <div className="ll-metric-grid"><div><i>➤</i><small>EMAILS SENT</small><b className="ll-metric-number">1,284</b><em>7 failed · 98.9% delivered</em></div><div><i>⌁</i><small>CONTACTS REACHED</small><b className="ll-metric-number">642</b><em>418 unique opens · 65.1%</em></div><div><i>ϟ</i><small>AVG STEPS / CONTACT</small><b>2.4</b><em>Across 11 active campaigns</em></div><div><i>♧</i><small>IN DRIP SEQUENCES</small><b>178</b><em>26 due today · 11 due now</em></div></div>
-      <div className="ll-analytics-lower"><div className="ll-volume"><b>Daily Send Volume <small>Last 7 days · 324 sent</small></b><span className="ll-volume-summary">Peak volume: Tuesday <strong>67 sends</strong></span><div className="ll-volume-bars"><i style={{height:"48%"}}/><i style={{height:"72%"}}/><i style={{height:"91%"}}/><i style={{height:"63%"}}/><i style={{height:"84%"}}/><i style={{height:"56%"}}/><i style={{height:"38%"}}/></div><div className="ll-volume-days"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></div><div className="ll-drip"><b>◷ Drip Enrollment Status</b><span>◷ Pending <strong>42</strong></span><span>⌁ In Progress <strong className="is-blue">96</strong></span><span>✓ Completed <strong className="is-green">824</strong></span><span>⊗ Failed <strong className="is-red">7</strong></span><hr/><span>Due today <strong>26</strong></span><span>Due now <strong>11</strong></span></div></div>
+    <div className="ll-app-frame ll-outreach-campaigns">
+      <div className="ll-outreach-campaigns-head">
+        <div>
+          <small>RELATIONSHIP WORKSPACE</small>
+          <h3 className="font-serif">Campaigns</h3>
+          <p>Build follow-up from your connected Outlook account.</p>
+        </div>
+        <button type="button"><Plus /> New campaign</button>
+      </div>
+      <div className="ll-outreach-campaigns-summary">
+        <div className="ll-outreach-card ll-outreach-sender">
+          <div className="ll-outreach-card-title"><span><Mail /></span><b>Sending account</b></div>
+          <strong>Connected Outlook</strong>
+          <small>demo.owner@landlinq.ai</small>
+          <em><CheckCircle2 /> Ready to send</em>
+        </div>
+        <div className="ll-outreach-card ll-outreach-ai">
+          <div className="ll-outreach-card-title"><span><Sparkles /></span><b>Generate with AI</b></div>
+          <p>Answer a few questions and generate a complete multi-step sequence.</p>
+          <strong><Rocket /> Build a sequence</strong>
+        </div>
+      </div>
+      <div className="ll-outreach-list-head"><b><Send /> Your campaigns</b><span>2 campaigns</span></div>
+      <div className="ll-outreach-campaign-list">
+        {campaigns.map((campaign) => (
+          <article className="ll-outreach-card ll-outreach-campaign" key={campaign.name}>
+            <div className="ll-outreach-campaign-icon"><Mail /></div>
+            <div className="ll-outreach-campaign-copy">
+              <div><b>{campaign.name}</b><em className={campaign.status === "Active" ? "is-active" : ""}>{campaign.status}</em></div>
+              <p>{campaign.subject}</p>
+              <small><Users /> {campaign.enrolled} <Tag /> {campaign.audience}</small>
+            </div>
+            <div className="ll-outreach-campaign-actions">
+              <button type="button"><MessageSquare /> Steps</button>
+              <button type="button" className="is-primary"><Rocket /> Launch</button>
+            </div>
+          </article>
+        ))}
+      </div>
     </div>
   );
 }
@@ -502,7 +560,7 @@ function InvestmentCompanyDemo() {
     { label: "Pipeline", detail: "Move the right deals forward", render: <PipelineWorkspaceMockup /> },
     { label: "CRM", detail: "Keep relationships in view", render: <ContactDirectoryMockup /> },
     { label: "Outreach", detail: "Keep follow-up moving", render: <OutreachWorkspaceMockup /> },
-    { label: "Analytics", detail: "See performance clearly", render: <OutreachAnalyticsMockup /> },
+    { label: "Campaigns", detail: "Build follow-up sequences", render: <OutreachCampaignsMockup /> },
     { label: "Data Hub", detail: "Connect market signals", render: <DataHubMockup /> },
     { label: "Truss", detail: "Ask the workspace anything", render: <AIAssistantMockup /> },
   ];
@@ -539,14 +597,6 @@ function DealOpsMachine() {
       <DashboardMockup />
     </div>
   );
-}
-
-function OutreachMockup() {
-  return <ContactDirectoryMockup />;
-}
-
-function PipelineMockup() {
-  return <ContactDetailMockup />;
 }
 
 const heroStats = [
@@ -598,7 +648,7 @@ function HeroStats() {
       <div className="mx-auto grid max-w-7xl sm:grid-cols-2 lg:grid-cols-4">
         {heroStats.map((stat) => (
           <div className="ll-hero-stat" key={stat.label}>
-            <strong style={{ transform: `scale(${0.78 + progress * 0.22})` }}>
+            <strong className="font-serif" style={{ transform: `scale(${0.78 + progress * 0.22})` }}>
               {stat.format(stat.value * progress)}
             </strong>
             <p>{stat.label}</p>
@@ -694,7 +744,7 @@ export default function MarketingHome() {
                    <h3>Keep the relationship in view.</h3>
                    <p>Give every broker, owner, and partner a clear record with the context your team needs before the next conversation.</p>
                  </div>
-                 <div className="ll-step-surface ll-surface-paper"><OutreachMockup /></div>
+                  <div className="ll-step-surface ll-surface-paper"><ContactDirectoryMockup /></div>
                </article>
                <article className="ll-journey-step">
                  <div className="ll-step-copy">
@@ -702,7 +752,7 @@ export default function MarketingHome() {
                    <h3>Make the next conversation useful.</h3>
                    <p>See history, active campaigns, notes, and related deals together before your team reaches out.</p>
                  </div>
-                  <div className="ll-step-surface ll-surface-paper"><PipelineMockup /></div>
+                   <div className="ll-step-surface ll-surface-paper"><ContactDetailMockup /></div>
                </article>
                 <article className="ll-journey-step">
                   <div className="ll-step-copy">
@@ -718,7 +768,7 @@ export default function MarketingHome() {
                    <h3>Know what is moving.</h3>
                    <p>Track send activity, sender health, drip sequences, and the follow-up work that keeps the pipeline active.</p>
                  </div>
-                 <div className="ll-step-surface ll-surface-paper"><OutreachAnalyticsMockup /></div>
+                  <div className="ll-step-surface ll-surface-paper"><OutreachCampaignsMockup /></div>
                </article>
                 <article className="ll-journey-step ll-step-chat">
                   <div className="ll-step-copy">

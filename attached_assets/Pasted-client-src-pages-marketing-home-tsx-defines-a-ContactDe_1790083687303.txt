@@ -1,0 +1,17 @@
+client/src/pages/marketing-home.tsx defines a ContactDetailMockup component (lines ~54-62) that is never rendered on the live page — dead code. It's meant to represent clicking into a contact from the CRM, which in the real app (client/src/pages/crm.tsx) is a split-pane detail panel that opens next to the contact list, not a separate full-screen page.
+
+1. RE-ADD IT: Show this as a transition/state within the Contacts mockup section from Prompt 2 above (e.g. clicking a mock contact row reveals this detail panel), rather than as a fully separate section — matching how it actually behaves in the real product.
+
+2. REMOVE THE FABRICATED TOP NAV BAR: The mockup currently shows a horizontal nav bar with links "Deal Dashboard / CRM / Outreach Analytics / Outreach Setup / Data Hub / Analytics" plus a "SIGN OUT" button. None of these are real nav labels — the real app's nav is a left icon-rail sidebar (Home, Deal Dashboard, CRM, Outreach, Analytics, Settings), and the real contact detail panel has no separate top nav bar of its own at all. Remove this bar entirely.
+
+3. FIX THE TABS: Real page has exactly 2 tabs — Overview and Activity. Remove the "Deals" and "Notes" tabs (in the real app those are sections inside Overview, not separate tabs).
+
+4. FIX THE AVATAR: Real avatar is a rounded square (rounded-2xl, bg #2b82cf), not a circle. Update the mockup to match.
+
+5. ADD THE PREV/NEXT STEPPER: The real panel has chevron-left/chevron-right buttons to step between contacts next to "Back to contacts" — add this, it's a distinctive real interaction the mockup is missing.
+
+6. ICONS: Replace ✉/✎/✓/+ with real lucide icons: Mail, Phone, Pencil, Save, Trash2, ChevronLeft, ChevronRight, X.
+
+7. COLORS/SHAPES: Update hero background from #0e3d68 to #0b3159, avatar from #3696d8 to #2b82cf, and update the stat cards to rounded-xl with the real soft shadow (shadow-[0_2px_8px_rgba(28,67,101,0.04)]) instead of the mockup's flat 6px-radius, no-shadow cards.
+
+Paste the diff and a screenshot when done.
