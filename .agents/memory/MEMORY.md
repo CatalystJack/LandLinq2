@@ -53,3 +53,4 @@
 - [Organization unsubscribe policy](organization-unsubscribe-policy.md) — one-click unsubscribe applies to developer-owned recipient mail; platform account and internal transactional mail remain excluded.
 - [Shared broker CRM boundary](shared-broker-crm-boundary.md) — shared broker identity is filtered by company settings; tags, notes, assignments, and outreach state are profile-scoped.
 - [Broker workbook import](broker-workbook-import.md) — import by source license with shared-email dedupe; never overwrite company-private CRM state.
+- [Publishing schema drift](publishing-schema-drift.md) — successful builds can still fail at publish-time schema sync; inspect additive diffs before changing app code.
