@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -710,21 +711,30 @@ export default function AdminInvestmentCompanies() {
                placeholder="Mecklenburg, Wake"
              />
               <div className="sm:col-span-2">
-                <Label htmlFor="admin-crm-contact-source-tags">Source tags</Label>
-                <select
-                  id="admin-crm-contact-source-tags"
-                  multiple
-                  size={Math.min(Math.max(sourceTagsQuery.data?.length || 0, 3), 8)}
-                  value={form.crmContactSourceTags}
-                  onChange={(event) => update(
-                    "crmContactSourceTags",
-                    Array.from(event.target.selectedOptions).map((option) => option.value.toLowerCase()),
+                <Label>Source tags</Label>
+                <div className="mt-3 max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-white p-3">
+                  {sourceTagsQuery.data?.length ? (
+                    <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {sourceTagsQuery.data.map((tag) => (
+                        <label key={tag} className="flex items-center gap-2 text-sm text-slate-700">
+                          <Checkbox
+                            checked={form.crmContactSourceTags.includes(tag.toLowerCase())}
+                            onCheckedChange={(checked) => update(
+                              "crmContactSourceTags",
+                              checked
+                                ? Array.from(new Set([...form.crmContactSourceTags, tag.toLowerCase()]))
+                                : form.crmContactSourceTags.filter((value) => value !== tag.toLowerCase()),
+                            )}
+                          />
+                          {tag}
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">No imported source tags are available yet.</p>
                   )}
-                  className="mt-2 min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                >
-                  {(sourceTagsQuery.data || []).map((tag) => <option key={tag} value={tag.toLowerCase()}>{tag}</option>)}
-                </select>
-                <p className="mt-1 text-xs text-slate-500">Optional. Select one or more imported source tags; contacts matching any selected tag will be visible in this company CRM.</p>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Leave all unchecked to include every source tag. Contacts matching any selected source tag will be visible in this company CRM.</p>
               </div>
            </div>
          </section>

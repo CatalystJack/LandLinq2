@@ -735,21 +735,30 @@ export default function DeveloperCriteriaSettings() {
                 <p className="mt-1 text-xs text-slate-500">Leave blank to include every county. County filtering applies to shared contacts only.</p>
               </div>
               <div>
-                <Label htmlFor="crm-contact-source-tags">Source tags</Label>
-                <select
-                  id="crm-contact-source-tags"
-                  multiple
-                  size={Math.min(Math.max(sourceTagsQuery.data?.length || 0, 3), 8)}
-                  value={form.crmContactSourceTags}
-                  onChange={(event) => update(
-                    "crmContactSourceTags",
-                    Array.from(event.target.selectedOptions).map((option) => option.value.toLowerCase()),
+                <Label>Source tags</Label>
+                <div className="mt-3 max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-white p-3">
+                  {sourceTagsQuery.data?.length ? (
+                    <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {sourceTagsQuery.data.map((tag) => (
+                        <label key={tag} className="flex items-center gap-2 text-sm text-slate-700">
+                          <Checkbox
+                            checked={form.crmContactSourceTags.includes(tag.toLowerCase())}
+                            onCheckedChange={(checked) => update(
+                              "crmContactSourceTags",
+                              checked
+                                ? Array.from(new Set([...form.crmContactSourceTags, tag.toLowerCase()]))
+                                : form.crmContactSourceTags.filter((value) => value !== tag.toLowerCase()),
+                            )}
+                          />
+                          {tag}
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">No imported source tags are available yet.</p>
                   )}
-                  className="mt-2 min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-                >
-                  {(sourceTagsQuery.data || []).map((tag) => <option key={tag} value={tag.toLowerCase()}>{tag}</option>)}
-                </select>
-                <p className="mt-1 text-xs text-slate-500">Optional. Hold Ctrl/Cmd to select multiple. A contact is shown when it has at least one selected source tag.</p>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Leave all unchecked to include every source tag. A contact is shown when it has at least one selected source tag.</p>
               </div>
             </CardContent>
           </Card>
