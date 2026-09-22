@@ -1,0 +1,33 @@
+TOP FINDINGS (ranked, security/data-integrity first):
+
+1. Legacy broker/CRM routes skip tenant isolation entirely
+GET/PUT /api/brokers/:id (routes.ts ~3858, ~4143) and GET/PATCH/DELETE /api/crm/contacts/:id (routes.ts ~4311-4854) call storage.getBrokerById()/db.update() with no check that the broker belongs to the caller's developer profile. The sibling list route (GET /api/brokers) does filter by developerProfileId — these direct-record routes don't. Any authenticated developer/investor-company user who knows or enumerates a broker UUID can read or overwrite another tenant's private CRM contact (name, email, phone, notes, tags).
+
+2. POST /api/dev-login bypasses password verification (routes.ts ~3081-3097)
+The handler destructures `password` from the request body but never compares it against the stored hash (contrast with comparePasswords used correctly elsewhere in auth.ts) — it logs in any user found by email alone. It's gated by an env check (REPLIT_DEPLOYMENT/NODE_ENV), but if that variable is ever unset or misread in a deployed environment, this becomes a full account-takeover endpoint for any user, including admins.
+
+3. GET /api/crm/contacts (legacy dashboard) returns every tenant's contacts (routes.ts ~4311-4460)
+Pulls all rows from the brokers table with search/tag/market filters but no developerProfileId scoping. Any authenticated user hitting this legacy dashboard endpoint sees every other company's contacts, private CRM notes, and tag/assignment data.
+
+4. Cross-tenant outreach campaign enrollment abuse (routes.ts ~5081-5148, /api/crm/contacts/:id/enroll and /api/crm/enrollments/:id)
+Neither the broker being enrolled nor the enrollment being cancelled is checked against the caller's developer profile. One company can enroll another company's contact into its own campaign (spam/quota abuse) or cancel any other tenant's enrollment by guessing the ID.
+
+5. Circuit breaker admin endpoints are fully unauthenticated (routes.ts ~29855-29894)
+POST /api/circuit-breaker/reset/:apiName, /reset-all, and GET /status have no auth at all. Circuit breakers protect against runaway costs on external APIs — anyone can force-reset them (cost-abuse/DoS) or enumerate internal service health. The equivalent endpoint in apiSafetyRoutes.ts correctly requires isSuperAdmin; this one doesn't.
+
+6. apiRequest() called with swapped arguments breaks several features outright
+client/src/lib/queryClient.ts defines apiRequest(method, url, data), but 9 call sites across deal-details.tsx (~163, 188), database-management.tsx (~81, 105, 129), referral-dashboard.tsx (~120, 145), and email-template-system.tsx (~81, 96) call it as apiRequest(url, {method, body}) instead. This silently breaks document upload on deal pages, every database-management admin action (maintenance/backup/archive), referral link generation, partnership creation, and the email template preview/test-send panel — all fail every time, not just on edge cases.
+
+7. "Archive campaign" endpoint actually hard-deletes the record (routes.ts ~30350)
+storage.deleteOutreachCampaign() does a real db.delete(), but the API responds with "Campaign archived successfully" / action: "archived" (there's a TODO noting it should soft-delete once the schema supports it). Users believe archived campaigns are recoverable; they're permanently gone.
+
+8. /api/partner-developers/send-deal-email is unauthenticated and its guard is bypassable (routes.ts ~17609)
+The "apex gate" check only runs when dealId is supplied; omitting it skips the check entirely and lets the caller fully control developerEmails and dealData. This is usable as an open email-relay to send arbitrary crafted emails (with an attached "investment memo") to any address list using LandLinq's own mail infrastructure.
+
+9. Unauthenticated cost-abuse and info-leak endpoints: /api/classify-address and /api/templates/export
+/api/classify-address (routes.ts ~28571) triggers a real AI classification call with no auth or rate limit — usable to run up API costs. /api/templates/export (routes.ts ~23874) returns the full internal email/SMS template library to anyone, no login required.
+
+10. Migration runner is disabled; at least one migration was never actually applied (server/database/manager.ts ~48, 127, 496-501)
+migrationManager.migrate()/initialize()/rollback() are commented out ("disabled to prevent migration warnings"). The registered migration 2026-09-11_003_add_internal_sales_pipeline (server/database/migrations.ts ~91) that creates the internal_sales_pipeline table has no other creation path in the codebase, so it's likely never been applied in any deployed environment — any feature that depends on that table will fail silently with schema drift.
+
+No hardcoded secrets or API keys were found in the repo; SESSION_SECRET/DATABASE_URL/OPENAI_API_KEY all come from env with hard failures if missing, which is correctly done.
