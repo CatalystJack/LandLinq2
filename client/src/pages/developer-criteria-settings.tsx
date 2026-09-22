@@ -62,6 +62,8 @@ type Profile = {
   qctOverridesRentMinimum: boolean;
   ddaOverridesRentMinimum: boolean;
   ozOverridesRentMinimum: boolean;
+  crmContactSectors: string[];
+  crmContactCounties: string[];
 };
 
 type ProductType = {
@@ -385,6 +387,8 @@ export default function DeveloperCriteriaSettings() {
           isActive: productType.isActive !== false,
         })),
         countyMarketLabels: profile.countyMarketLabels || {},
+        crmContactSectors: profile.crmContactSectors || [],
+        crmContactCounties: profile.crmContactCounties || [],
         compSearchRadiusMiles: profile.compSearchRadiusMiles || "3",
          emailUnsubscribeEnabled: Boolean(profile.emailUnsubscribeEnabled),
       });
@@ -526,7 +530,11 @@ export default function DeveloperCriteriaSettings() {
   const save = () => {
     if (!form) return;
     if (form.profileType === "general_sales") {
-      saveMutation.mutate({ profileType: "general_sales" });
+      saveMutation.mutate({
+        profileType: "general_sales",
+        crmContactSectors: form.crmContactSectors,
+        crmContactCounties: form.crmContactCounties,
+      });
       return;
     }
     if (form.assetClass === "industrial") {
@@ -537,6 +545,8 @@ export default function DeveloperCriteriaSettings() {
         targetCounties: form.targetCounties,
         countyMarketLabels: form.countyMarketLabels,
         productTypes: [],
+        crmContactSectors: form.crmContactSectors,
+        crmContactCounties: form.crmContactCounties,
       });
       return;
     }
@@ -585,6 +595,8 @@ export default function DeveloperCriteriaSettings() {
         ])),
         unitMix: productType.unitMix || null,
       })),
+      crmContactSectors: form.crmContactSectors,
+      crmContactCounties: form.crmContactCounties,
       countyMarketLabels: form.countyMarketLabels,
       qctOverridesRentMinimum: form.qctOverridesRentMinimum,
       ddaOverridesRentMinimum: form.ddaOverridesRentMinimum,
@@ -671,6 +683,50 @@ export default function DeveloperCriteriaSettings() {
         />
 
         <div className="space-y-6">
+          <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <CardHeader>
+              <CardTitle>Shared broker contacts</CardTitle>
+              <CardDescription>
+                LandLinq contacts are shared across Investment Companies. Choose which directory records this company can see. Your CRM tags, notes, assignments, and outreach history remain private.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5 border-t border-slate-100 pt-5">
+              <div>
+                <Label>Contact sectors</Label>
+                <div className="mt-3 flex flex-wrap gap-5">
+                  {["commercial", "residential"].map((sector) => (
+                    <label key={sector} className="flex items-center gap-2 text-sm text-slate-700">
+                      <Checkbox
+                        checked={form.crmContactSectors.includes(sector)}
+                        onCheckedChange={(checked) => update(
+                          "crmContactSectors",
+                          checked
+                            ? Array.from(new Set([...form.crmContactSectors, sector]))
+                            : form.crmContactSectors.filter((value) => value !== sector),
+                        )}
+                      />
+                      {sector === "commercial" ? "Commercial" : "Residential"}
+                    </label>
+                  ))}
+                  <span className="text-xs text-slate-500">Leave both unchecked to include all sectors.</span>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="crm-contact-counties">North Carolina counties</Label>
+                <Input
+                  id="crm-contact-counties"
+                  className="mt-2"
+                  value={form.crmContactCounties.join(", ")}
+                  onChange={(event) => update(
+                    "crmContactCounties",
+                    event.target.value.split(",").map((value) => value.trim().toLowerCase()).filter(Boolean),
+                  )}
+                  placeholder="Mecklenburg, Wake, Buncombe"
+                />
+                <p className="mt-1 text-xs text-slate-500">Leave blank to include every county. County filtering applies to shared contacts only.</p>
+              </div>
+            </CardContent>
+          </Card>
           <div className="grid gap-6 lg:grid-cols-2">
           <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>

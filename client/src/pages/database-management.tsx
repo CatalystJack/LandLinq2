@@ -78,10 +78,7 @@ export default function DatabaseManagement() {
   // Maintenance mutation
   const maintenanceMutation = useMutation({
     mutationFn: async (options: any) => {
-      return apiRequest('/api/database/maintenance', {
-        method: 'POST',
-        body: { options }
-      });
+      return apiRequest('POST', '/api/database/maintenance', { options });
     },
     onSuccess: () => {
       toast({
@@ -102,10 +99,7 @@ export default function DatabaseManagement() {
   // Backup mutation
   const backupMutation = useMutation({
     mutationFn: async (type: string) => {
-      return apiRequest('/api/database/backup', {
-        method: 'POST',
-        body: { type }
-      });
+      return apiRequest('POST', '/api/database/backup', { type });
     },
     onSuccess: () => {
       toast({
@@ -126,10 +120,7 @@ export default function DatabaseManagement() {
   // Archive mutation
   const archiveMutation = useMutation({
     mutationFn: async (params: { tableName?: string; dryRun: boolean }) => {
-      return apiRequest('/api/database/archive', {
-        method: 'POST',
-        body: params
-      });
+      return apiRequest('POST', '/api/database/archive', params);
     },
     onSuccess: (data, variables) => {
       toast({

@@ -51,3 +51,4 @@
 - [Industrial site scoring data boundaries](industrial-site-scoring-data-boundaries.md) — acreage, point slope, tract population, and generic zoning proxies cannot establish geometry, drive-time, utilities, or entitlement.
 - [Industrial asset-class onboarding](industrial-asset-class-onboarding.md) — industrial profiles store screening criteria separately and never use automatic multifamily YOC assumptions.
 - [Organization unsubscribe policy](organization-unsubscribe-policy.md) — one-click unsubscribe applies to developer-owned recipient mail; platform account and internal transactional mail remain excluded.
+- [Shared broker CRM boundary](shared-broker-crm-boundary.md) — shared broker identity is filtered by company settings; tags, notes, assignments, and outreach state are profile-scoped.

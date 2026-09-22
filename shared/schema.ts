@@ -46,6 +46,10 @@ export const developerProfiles = pgTable("developer_profiles", {
   outreachTestModeEnabled: boolean("outreach_test_mode_enabled").default(false).notNull(),
   emailUnsubscribeEnabled: boolean("email_unsubscribe_enabled").default(false).notNull(),
   knownEmailDomains: text("known_email_domains").array(),
+  // Shared LandLinq broker directory visibility. An empty filter means all
+  // shared contacts; non-empty filters are applied together.
+  crmContactSectors: text("crm_contact_sectors").array().default(sql`ARRAY[]::text[]`).notNull(),
+  crmContactCounties: text("crm_contact_counties").array().default(sql`ARRAY[]::text[]`).notNull(),
 
   // Rent criteria — primary drives classification, secondary is reference only
   rentMetric: varchar("rent_metric").notNull(), // 'psf' | 'per_unit'
@@ -276,6 +280,11 @@ export const brokers = pgTable("brokers", {
   crmNotes: text("crm_notes"),       // Internal CRM notes about this contact
   lastContactedAt: timestamp("last_contacted_at"), // Last outreach activity
   stateRegion: varchar("state_region"), // State/region abbreviation (e.g. TN, NC)
+  contactSector: varchar("contact_sector"), // commercial | residential for shared LandLinq contacts
+  contactSpecialty: varchar("contact_specialty"),
+  contactConfidence: varchar("contact_confidence"),
+  contactCounty: varchar("contact_county"),
+  sourceLicenseNumber: varchar("source_license_number"),
   assignedTo: text("assigned_to"),   // Team member name/email responsible for outreach
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -285,6 +294,25 @@ export const brokers = pgTable("brokers", {
   uniqueIndex("brokers_shared_email_unique")
     .on(table.email)
     .where(sql`${table.ownerDeveloperProfileId} IS NULL AND ${table.email} IS NOT NULL`),
+]);
+
+// Company-specific CRM state for shared LandLinq broker records. The broker
+// row remains a shared directory record; notes, tags, assignments, and
+// contact history never leak between companies.
+export const developerBrokerCrm = pgTable("developer_broker_crm", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id, { onDelete: "cascade" }).notNull(),
+  brokerId: varchar("broker_id").references(() => brokers.id, { onDelete: "cascade" }).notNull(),
+  crmTags: text("crm_tags").array().default(sql`ARRAY[]::text[]`).notNull(),
+  crmNotes: text("crm_notes"),
+  lastContactedAt: timestamp("last_contacted_at"),
+  assignedTo: text("assigned_to"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique("developer_broker_crm_profile_broker_unique").on(table.developerProfileId, table.brokerId),
+  index("developer_broker_crm_profile_idx").on(table.developerProfileId),
+  index("developer_broker_crm_broker_idx").on(table.brokerId),
 ]);
 
 export const pipelineStages = pgTable("pipeline_stages", {

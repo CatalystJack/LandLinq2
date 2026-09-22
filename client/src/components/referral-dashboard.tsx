@@ -117,10 +117,7 @@ export function ReferralDashboard() {
   // Generate referral link mutation
   const generateLinkMutation = useMutation({
     mutationFn: async (linkType: string) => {
-      return await apiRequest(`/api/referrals/generate`, {
-        method: "POST",
-        body: { linkType }
-      });
+      return await apiRequest("POST", "/api/referrals/generate", { linkType });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/referrals/links"] });
@@ -142,10 +139,7 @@ export function ReferralDashboard() {
   // Create partnership mutation
   const createPartnershipMutation = useMutation({
     mutationFn: async (partnerData: any) => {
-      return await apiRequest(`/api/referrals/partnerships`, {
-        method: "POST",
-        body: partnerData
-      });
+      return await apiRequest("POST", "/api/referrals/partnerships", partnerData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/referrals/partnerships"] });

@@ -22,6 +22,7 @@ import {
   insertReviewEscalationSchema,
   users,
   brokers,
+  developerBrokerCrm,
   developerProfiles,
   developerQuickLinks,
   partnerDevelopers,
@@ -49,7 +50,7 @@ import {
   dealShareTokens,
 } from "@shared/schema";
 import { or, like, ilike, eq, ne, desc, asc, gte, lte, gt, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
-import { setupAuth, isAuthenticated, hashPassword, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
+import { setupAuth, isAuthenticated, hashPassword, comparePasswords, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
 import { isAnalyticsAuthorized } from "@shared/admin-auth";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
@@ -3069,16 +3070,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
 
     try {
-      const [ownedBroker] = await db
-        .select({ id: brokers.id })
-        .from(brokers)
-        .where(and(
-          eq(brokers.id, String(req.params.id)),
-          eq(brokers.ownerDeveloperProfileId, developerProfileId),
-          isNonDemoBroker(),
-        ))
-        .limit(1);
-      if (!ownedBroker) {
+      if (!await canDeveloperAccessBroker(String(req.params.id), developerProfileId)) {
         return res.status(404).json({ error: 'Contact not found for this Investment Company' });
       }
       next();
@@ -3096,7 +3088,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
 
     try {
-      const { email, password } = req.body;
+       const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+       const password = typeof req.body?.password === "string" ? req.body.password : "";
       
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password required" });
@@ -3106,6 +3099,10 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
+
+       if (!user.password || !(await comparePasswords(password, user.password))) {
+         return res.status(401).json({ message: "Invalid credentials" });
+       }
 
        req.login(user, (loginError: any) => {
          if (loginError) {
@@ -3463,7 +3460,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
   });
 
-  app.post('/api/service-status/reset-circuit-breaker', isAuthenticated, async (req: any, res) => {
+  app.post('/api/service-status/reset-circuit-breaker', isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
     try {
       const { apiName } = req.body;
       const user = req.user;
@@ -3853,10 +3850,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         const developerProfileId = getDeveloperProfileId(req, res);
         if (!developerProfileId) return;
         if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
-        allBrokers = allBrokers.filter((broker) =>
-          broker.ownerDeveloperProfileId === developerProfileId &&
-          (broker as any).userId !== '20974d7b-e103-4fc7-b42f-7a13d41041fb',
-        );
+        const visibility = await getDeveloperContactVisibility(developerProfileId);
+        allBrokers = allBrokers.filter((broker) => isSharedBrokerVisible(broker, developerProfileId, visibility));
       }
       res.json(allBrokers);
     } catch (error) {
@@ -4166,10 +4161,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         const developerProfileId = getDeveloperProfileId(req, res);
         if (!developerProfileId) return;
         if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
-        allBrokers = allBrokers.filter((broker) =>
-          broker.ownerDeveloperProfileId === developerProfileId &&
-          (broker as any).userId !== '20974d7b-e103-4fc7-b42f-7a13d41041fb',
-        );
+        const visibility = await getDeveloperContactVisibility(developerProfileId);
+        allBrokers = allBrokers.filter((broker) => isSharedBrokerVisible(broker, developerProfileId, visibility));
       }
       const searchLower = query.toLowerCase();
       
@@ -4231,6 +4224,14 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const existingBroker = await storage.getBrokerById(id);
       if (!existingBroker) {
         return res.status(404).json({ message: "Broker not found" });
+      }
+      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        if (existingBroker.ownerDeveloperProfileId !== developerProfileId) {
+          return res.status(403).json({ message: "Shared contact identity is managed by LandLinq" });
+        }
       }
 
       // If updating email, check for duplicates
@@ -4380,6 +4381,13 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const brokerageFilter = (req.query.brokerage as string || '').trim();
       const multiCampaignTagFilter = req.query.multiCampaignTag === 'true';
       const offset = (page - 1) * limit;
+      const isDeveloper = String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER';
+      const developerProfileId = isDeveloper ? getDeveloperProfileId(req, res) : null;
+      if (isDeveloper && !developerProfileId) return;
+      if (developerProfileId && !await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const contactVisibility = developerProfileId
+        ? await getDeveloperContactVisibility(developerProfileId)
+        : { sectors: [], counties: [] };
 
       // For geo filters: build set of county names that match the requested state/MSA
       let geoCountySet: Set<string> | null = null;
@@ -4409,7 +4417,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       }
 
       // Fetch all brokers then filter — brokers table is typically < 10k rows
-      const allBrokers: any[] = await db.select({
+      let allBrokers: any[] = await db.select({
         id: brokers.id,
         firstName: brokers.firstName,
         lastName: brokers.lastName,
@@ -4425,8 +4433,34 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         lastContactedAt: (brokers as any).lastContactedAt,
         stateRegion: (brokers as any).stateRegion,
         ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
+        contactSector: (brokers as any).contactSector,
+        contactCounty: (brokers as any).contactCounty,
+        userId: brokers.userId,
         createdAt: brokers.createdAt,
       }).from(brokers).orderBy(desc(brokers.createdAt));
+
+      if (developerProfileId) {
+        const privateCrmRows = await db.select({
+          brokerId: developerBrokerCrm.brokerId,
+          crmTags: developerBrokerCrm.crmTags,
+          crmNotes: developerBrokerCrm.crmNotes,
+          lastContactedAt: developerBrokerCrm.lastContactedAt,
+          assignedTo: developerBrokerCrm.assignedTo,
+        }).from(developerBrokerCrm).where(eq(developerBrokerCrm.developerProfileId, developerProfileId));
+        const privateCrmByBroker = new Map(privateCrmRows.map((row) => [row.brokerId, row]));
+        allBrokers = allBrokers
+          .filter((broker) => isSharedBrokerVisible(broker, developerProfileId, contactVisibility))
+          .map((broker) => {
+            const privateCrm = privateCrmByBroker.get(broker.id);
+            if (privateCrm) return { ...broker, ...privateCrm };
+            // Shared directory identity is readable, but CRM state belongs to
+            // the company and must never fall back to another company's state.
+            if (broker.ownerDeveloperProfileId === null || broker.ownerDeveloperProfileId === undefined) {
+              return { ...broker, crmTags: [], crmNotes: null, lastContactedAt: null, assignedTo: null };
+            }
+            return broker;
+          });
+      }
 
       const companyMemberCounts = allBrokers.reduce((counts: Record<string, number>, broker: any) => {
         const key = String(broker.brokerage || "").trim().toLowerCase();
@@ -4531,6 +4565,27 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // GET /api/crm/tags — list all unique tags across all contacts + registry
   app.get("/api/crm/tags", isAuthenticated, async (req, res) => {
     try {
+      const developerProfileId = String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER'
+        ? getDeveloperProfileId(req, res)
+        : null;
+      if (developerProfileId) {
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        const [ownedResult, privateResult, registryResult] = await Promise.all([
+          db.select({ crmTags: brokers.crmTags }).from(brokers).where(and(
+            eq(brokers.ownerDeveloperProfileId, developerProfileId),
+            isNonDemoBroker(),
+          )),
+          db.select({ crmTags: developerBrokerCrm.crmTags }).from(developerBrokerCrm)
+            .where(eq(developerBrokerCrm.developerProfileId, developerProfileId)),
+          db.select({ name: crmTagRegistry.name }).from(crmTagRegistry),
+        ]);
+        const tagSet = new Set<string>();
+        [...ownedResult, ...privateResult].forEach((row: any) => {
+          if (Array.isArray(row.crmTags)) row.crmTags.forEach((tag: string) => tagSet.add(tag));
+        });
+        registryResult.forEach((row) => tagSet.add(row.name));
+        return res.json(Array.from(tagSet).sort());
+      }
       const [contactResult, registryResult] = await Promise.all([
         db.select({ crmTags: (brokers as any).crmTags }).from(brokers),
         db.select({ name: crmTagRegistry.name }).from(crmTagRegistry),
@@ -4837,6 +4892,11 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         const existing = await storage.getBrokerByPhone(phone.trim());
         if (existing) return res.status(400).json({ message: "A contact with this phone number already exists" });
       }
+      const creatorProfileId = String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER'
+        ? getDeveloperProfileId(req, res)
+        : null;
+      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER' && !creatorProfileId) return;
+      if (creatorProfileId && !await requireActiveDeveloperProfile(creatorProfileId, res)) return;
       const broker = await storage.createBroker({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -4848,6 +4908,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         crmTags: Array.isArray(crmTags) ? crmTags : [],
         isActive: true,
         smsOptIn: false,
+        ownerDeveloperProfileId: creatorProfileId,
       } as any);
       res.status(201).json(broker);
     } catch (error) {
@@ -4861,6 +4922,19 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     try {
       const { id } = req.params;
       const { crmTags, crmNotes, lastContactedAt, assignedTo, firstName, lastName, email, phone, brokerage, addTag, removeTag } = req.body;
+      const isDeveloper = String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER';
+      const developerProfileId = isDeveloper ? getDeveloperProfileId(req, res) : null;
+      if (isDeveloper && !developerProfileId) return;
+      if (developerProfileId && !await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const [targetBroker] = await db.select({
+        id: brokers.id,
+        ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
+      }).from(brokers).where(and(eq(brokers.id, id), isNonDemoBroker())).limit(1);
+      if (!targetBroker) return res.status(404).json({ message: "Contact not found" });
+      const isSharedContact = !!developerProfileId && targetBroker.ownerDeveloperProfileId !== developerProfileId;
+      if (isSharedContact && [firstName, lastName, email, phone, brokerage].some((value) => value !== undefined)) {
+        return res.status(403).json({ message: "Shared contact identity is managed by LandLinq" });
+      }
       if (email !== undefined && email !== null && email !== "") {
         if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           return res.status(400).json({ message: "Enter a valid email address" });
@@ -4896,6 +4970,46 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       if (email !== undefined) updates.email = email || null;
       if (phone !== undefined) updates.phone = phone || null;
       if (brokerage !== undefined) updates.brokerage = brokerage || null;
+
+      if (isSharedContact) {
+        const [existingCrm] = await db.select().from(developerBrokerCrm).where(and(
+          eq(developerBrokerCrm.developerProfileId, developerProfileId!),
+          eq(developerBrokerCrm.brokerId, id),
+        )).limit(1);
+        let nextTags = Array.isArray(existingCrm?.crmTags) ? [...existingCrm.crmTags] : [];
+        if (addTag !== undefined && !nextTags.includes(addTag.trim())) nextTags.push(addTag.trim());
+        if (removeTag !== undefined) nextTags = nextTags.filter((tag) => tag !== removeTag.trim());
+        if (crmTags !== undefined) {
+          if (!Array.isArray(crmTags) || crmTags.some((tag: unknown) => typeof tag !== 'string')) {
+            return res.status(400).json({ message: "crmTags must be an array of strings" });
+          }
+          nextTags = crmTags;
+        }
+        const crmValues = {
+          developerProfileId: developerProfileId!,
+          brokerId: id,
+          crmTags: nextTags,
+          crmNotes: crmNotes !== undefined ? crmNotes : existingCrm?.crmNotes || null,
+          lastContactedAt: lastContactedAt !== undefined
+            ? (lastContactedAt ? new Date(lastContactedAt) : null)
+            : existingCrm?.lastContactedAt || null,
+          assignedTo: assignedTo !== undefined ? assignedTo || null : existingCrm?.assignedTo || null,
+          updatedAt: new Date(),
+        };
+        const [privateCrm] = await db.insert(developerBrokerCrm).values(crmValues as any)
+          .onConflictDoUpdate({
+            target: [developerBrokerCrm.developerProfileId, developerBrokerCrm.brokerId],
+            set: {
+              crmTags: crmValues.crmTags,
+              crmNotes: crmValues.crmNotes,
+              lastContactedAt: crmValues.lastContactedAt,
+              assignedTo: crmValues.assignedTo,
+              updatedAt: new Date(),
+            },
+          }).returning();
+        const sharedBroker = await storage.getBrokerById(id);
+        return res.json({ ...sharedBroker, ...privateCrm });
+      }
 
       const tagCondition = addTag !== undefined
         ? sql`NOT (${addTag.trim()} = ANY(COALESCE(${brokers.crmTags}, ARRAY[]::text[])))`
@@ -5048,6 +5162,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.get("/api/crm/contacts/:id/activity", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
+      const developerProfileId = String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER'
+        ? getDeveloperProfileId(req, res)
+        : null;
+      if (developerProfileId && !await canDeveloperAccessBroker(id, developerProfileId)) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
 
       // Broker info
       const [broker] = await db.select().from(brokers).where(eq(brokers.id, id));
@@ -5138,6 +5258,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.post("/api/crm/contacts/:id/enroll", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
+      const developerProfileId = String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER'
+        ? getDeveloperProfileId(req, res)
+        : null;
+      if (developerProfileId && !await canDeveloperAccessBroker(id, developerProfileId)) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
       const { templateId, senderId, targetState } = req.body;
       if (!templateId) return res.status(400).json({ message: "templateId is required" });
       // targetState: 2-letter state abbreviation (e.g. "NC") — used to split sender daily limit across geo campaigns
@@ -13384,6 +13510,22 @@ RULES:
       }
     }
     stringArray("knownEmailDomains", "Known email domains");
+    if (body.crmContactSectors !== undefined) {
+      if (!Array.isArray(body.crmContactSectors) || body.crmContactSectors.some((value: unknown) => !["commercial", "residential"].includes(String(value).trim().toLowerCase()))) {
+        throw new Error("CRM contact sectors must contain only commercial or residential");
+      }
+      payload.crmContactSectors = Array.from(new Set(body.crmContactSectors.map((value: string) => value.trim().toLowerCase())));
+    } else if (!partial) {
+      payload.crmContactSectors = [];
+    }
+    if (body.crmContactCounties !== undefined) {
+      if (!Array.isArray(body.crmContactCounties) || body.crmContactCounties.some((value: unknown) => typeof value !== "string")) {
+        throw new Error("CRM contact counties must be an array of strings");
+      }
+      payload.crmContactCounties = Array.from(new Set(body.crmContactCounties.map((value: string) => value.trim().toLowerCase()).filter(Boolean)));
+    } else if (!partial) {
+      payload.crmContactCounties = [];
+    }
     if ((!partial || body.maxAcres !== undefined || body.minAcres !== undefined) &&
       payload.maxAcres !== null && payload.maxAcres !== undefined &&
       Number(payload.maxAcres) < Number(payload.minAcres ?? body.minAcres)) {
@@ -14056,6 +14198,51 @@ RULES:
     return new Set(rows.map((row) => row.dealId));
   }
 
+  async function getDeveloperContactVisibility(developerProfileId: string): Promise<{ sectors: string[]; counties: string[] }> {
+    const [profile] = await db.select({
+      sectors: developerProfiles.crmContactSectors,
+      counties: developerProfiles.crmContactCounties,
+    }).from(developerProfiles).where(and(
+      eq(developerProfiles.id, developerProfileId),
+      eq(developerProfiles.isActive, true),
+    )).limit(1);
+    return {
+      sectors: Array.isArray(profile?.sectors)
+        ? profile.sectors.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
+        : [],
+      counties: Array.isArray(profile?.counties)
+        ? profile.counties.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
+        : [],
+    };
+  }
+
+  function isSharedBrokerVisible(
+    broker: { ownerDeveloperProfileId?: string | null; contactSector?: string | null; contactCounty?: string | null; userId?: string | null },
+    developerProfileId: string,
+    visibility: { sectors: string[]; counties: string[] },
+  ): boolean {
+    if (broker.ownerDeveloperProfileId === developerProfileId) return true;
+    if (broker.ownerDeveloperProfileId !== null && broker.ownerDeveloperProfileId !== undefined) return false;
+    if (broker.userId === '20974d7b-e103-4fc7-b42f-7a13d41041fb') return false;
+    const sector = String(broker.contactSector || '').trim().toLowerCase();
+    const county = String(broker.contactCounty || '').trim().toLowerCase();
+    return (
+      (visibility.sectors.length === 0 || visibility.sectors.includes(sector)) &&
+      (visibility.counties.length === 0 || visibility.counties.includes(county))
+    );
+  }
+
+  async function canDeveloperAccessBroker(brokerId: string, developerProfileId: string): Promise<boolean> {
+    const visibility = await getDeveloperContactVisibility(developerProfileId);
+    const [broker] = await db.select({
+      ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
+      contactSector: brokers.contactSector,
+      contactCounty: brokers.contactCounty,
+      userId: brokers.userId,
+    }).from(brokers).where(and(eq(brokers.id, brokerId), isNonDemoBroker())).limit(1);
+    return !!broker && isSharedBrokerVisible(broker, developerProfileId, visibility);
+  }
+
   function escapeEmailHtml(value: string): string {
     return value.replace(/[&<>"']/g, (character) => ({
       '&': '&amp;',
@@ -14707,6 +14894,19 @@ RULES:
         throw new Error('County market labels must be an object');
       }
 
+      if (body.crmContactSectors !== undefined) {
+        if (!Array.isArray(body.crmContactSectors) || body.crmContactSectors.some((value: unknown) => !['commercial', 'residential'].includes(String(value).trim().toLowerCase()))) {
+          throw new Error('CRM contact sectors must contain only commercial or residential');
+        }
+        updates.crmContactSectors = Array.from(new Set(body.crmContactSectors.map((value: string) => value.trim().toLowerCase())));
+      }
+      if (body.crmContactCounties !== undefined) {
+        if (!Array.isArray(body.crmContactCounties) || body.crmContactCounties.some((value: unknown) => typeof value !== 'string')) {
+          throw new Error('CRM contact counties must be an array of strings');
+        }
+        updates.crmContactCounties = Array.from(new Set(body.crmContactCounties.map((value: string) => value.trim().toLowerCase()).filter(Boolean)));
+      }
+
       for (const field of ['qctOverridesRentMinimum', 'ddaOverridesRentMinimum', 'ozOverridesRentMinimum']) {
         if (body[field] !== undefined) {
           if (typeof body[field] !== 'boolean') throw new Error(`${field} must be boolean`);
@@ -14880,7 +15080,9 @@ RULES:
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
-      const contacts = await db.select({
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const visibility = await getDeveloperContactVisibility(developerProfileId);
+      const allContacts = await db.select({
         id: brokers.id,
         firstName: brokers.firstName,
         lastName: brokers.lastName,
@@ -14894,13 +15096,29 @@ RULES:
         crmNotes: brokers.crmNotes,
         lastContactedAt: brokers.lastContactedAt,
         ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
+         contactSector: brokers.contactSector,
+         contactCounty: brokers.contactCounty,
+         userId: brokers.userId,
         createdAt: brokers.createdAt,
-      }).from(brokers)
-        .where(and(
-          eq(brokers.ownerDeveloperProfileId, developerProfileId),
-          isNonDemoBroker(),
-        ))
-        .orderBy(desc(brokers.createdAt));
+       }).from(brokers).where(isNonDemoBroker()).orderBy(desc(brokers.createdAt));
+      const privateCrmRows = await db.select({
+        brokerId: developerBrokerCrm.brokerId,
+        crmTags: developerBrokerCrm.crmTags,
+        crmNotes: developerBrokerCrm.crmNotes,
+        lastContactedAt: developerBrokerCrm.lastContactedAt,
+        assignedTo: developerBrokerCrm.assignedTo,
+      }).from(developerBrokerCrm).where(eq(developerBrokerCrm.developerProfileId, developerProfileId));
+      const privateCrmByBroker = new Map(privateCrmRows.map((row) => [row.brokerId, row]));
+      const contacts = allContacts
+        .filter((contact) => isSharedBrokerVisible(contact, developerProfileId, visibility))
+        .map((contact) => {
+          const privateCrm = privateCrmByBroker.get(contact.id);
+          if (privateCrm) return { ...contact, ...privateCrm };
+          if (contact.ownerDeveloperProfileId === null) {
+            return { ...contact, crmTags: [], crmNotes: null, lastContactedAt: null, assignedTo: null };
+          }
+          return contact;
+        });
       return res.json({ contacts });
     } catch (error: any) {
       console.error('[developer-profile/me/contacts] Error:', error);
@@ -17750,28 +17968,39 @@ RULES:
 
   // ── POST /api/partner-developers/send-deal-email ─────────────────────────
   // Sends a deal info email to one or more developers with investment memo PDF attached
-  app.post('/api/partner-developers/send-deal-email', async (req, res) => {
+  app.post('/api/partner-developers/send-deal-email', isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
-      const { dealId, developerEmails, dealData, zoning: zoningOverride, summary } = req.body as {
+      const { dealId, developerEmails, zoning: zoningOverride, summary } = req.body as {
         dealId?: string;
         developerEmails: string[];
-        dealData: any;
         zoning?: string;
         summary?: string;
       };
 
-      if (!developerEmails?.length) {
+      if (!dealId || !Array.isArray(developerEmails) || developerEmails.length === 0 || developerEmails.length > 100) {
         return res.status(400).json({ error: 'developerEmails is required' });
       }
 
-      // ── Apex gate — verify the deal is flagged as an apex deal before sending ──
-      if (dealId) {
-        const { eq } = await import('drizzle-orm');
-        const [dealRecord] = await db.select({ apex: deals.apex }).from(deals).where(eq(deals.id, dealId)).limit(1);
-        if (dealRecord && !dealRecord.apex) {
-          return res.status(403).json({ error: 'Only apex deals can be sent to developers. Mark this deal as an Apex deal in the deal dashboard first.' });
-        }
+      const normalizedDeveloperEmails = Array.from(new Set(
+        developerEmails
+          .filter((email): email is string => typeof email === 'string')
+          .map((email) => email.trim().toLowerCase())
+          .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
+      ));
+      if (normalizedDeveloperEmails.length === 0) {
+        return res.status(400).json({ error: 'At least one valid developer email is required' });
       }
+
+      // The deal must come from LandLinq's database. Never accept arbitrary
+      // caller-supplied dealData for an email relay.
+      const [dealRecord] = await db.select().from(deals).where(eq(deals.id, dealId)).limit(1);
+      if (!dealRecord) {
+        return res.status(404).json({ error: 'Deal not found' });
+      }
+      if (!dealRecord.apex) {
+        return res.status(403).json({ error: 'Only apex deals can be sent to developers. Mark this deal as an Apex deal in the deal dashboard first.' });
+      }
+      const dealData = dealRecord;
 
       const { sendNotificationEmail } = await import('./emailService');
       const { objectStorageService } = await import('./objectStorage');
@@ -17876,7 +18105,7 @@ RULES:
       const subject = `New LandLinq Deal: ${addr}${yoc ? ` — ${yoc} YOC` : ''}`;
       let sent = 0, failed = 0;
 
-      for (const toEmail of developerEmails) {
+       for (const toEmail of normalizedDeveloperEmails) {
         try {
           await sendNotificationEmail({
             to: toEmail,
@@ -24018,7 +24247,7 @@ RULES:
   });
 
   // EXPORT ALL TEMPLATES - Download as JSON file (CORS enabled for production)
-  app.get('/api/templates/export', async (req: any, res) => {
+  app.get('/api/templates/export', isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
     try {
       // Enable CORS for production domain
       res.setHeader('Access-Control-Allow-Origin', 'https://landlinq.ai');
@@ -28715,7 +28944,7 @@ RULES:
   });
 
   // Address-only classification endpoint (legacy - keeping for backward compatibility)
-  app.post("/api/classify-address", async (req, res) => {
+  app.post("/api/classify-address", isAuthenticated, generalApiLimiter, async (req, res) => {
     try {
       const { address } = req.body;
       
@@ -29999,7 +30228,7 @@ RULES:
   app.get('/api/validation/config', configurationEndpoints.getValidationConfig);
 
   // Circuit breaker reset endpoints
-  app.post('/api/circuit-breaker/reset/:apiName', async (req, res) => {
+  app.post('/api/circuit-breaker/reset/:apiName', isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { apiName } = req.params;
       CircuitBreakerManager.resetBreaker(apiName);
@@ -30014,7 +30243,7 @@ RULES:
     }
   });
 
-  app.post('/api/circuit-breaker/reset-all', async (req, res) => {
+  app.post('/api/circuit-breaker/reset-all', isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       CircuitBreakerManager.resetAllBreakers();
       res.json({ 
@@ -30028,7 +30257,7 @@ RULES:
     }
   });
 
-  app.get('/api/circuit-breaker/status', async (req, res) => {
+  app.get('/api/circuit-breaker/status', isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       res.json({ 
         success: true,
@@ -30494,9 +30723,17 @@ RULES:
         });
       }
       
-      // TODO: Mark as archived instead of hard delete (when schema is updated)
-      // For now, still using delete but with safety checks
-      await storage.deleteOutreachCampaign(campaignId);
+      if ((campaign as any).isArchived || (campaign as any).isDeleted) {
+        return res.status(409).json({ error: 'Campaign is already archived' });
+      }
+
+      await storage.updateOutreachCampaign(campaignId, {
+        isArchived: true,
+        archivedAt: new Date(),
+        archivedBy: user.email || null,
+        isDeleted: false,
+        status: 'archived',
+      } as any);
       
       // Audit log the action
       console.log(`🗄️ [AUDIT] Campaign ARCHIVED by ${user.email}: ${campaign.name} (ID: ${campaignId})`);

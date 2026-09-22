@@ -164,20 +164,18 @@ export default function DealDetails() {
 
       for (const file of Array.from(files)) {
         // Get presigned URL (note: API returns uploadURL, not uploadUrl)
-        const response = await apiRequest('/api/deals/upload-url', {
-          method: 'POST',
-          body: JSON.stringify({
-            filename: file.name,
-            contentType: file.type,
-          }),
+        const response = await apiRequest('POST', '/api/deals/upload-url', {
+          filename: file.name,
+          contentType: file.type,
         });
+        const uploadData = await response.json();
 
-        if (!response.uploadURL || !response.objectPath) {
+        if (!uploadData.uploadURL || !uploadData.objectPath) {
           throw new Error('Failed to get upload URL');
         }
 
         // Upload file to presigned URL
-        await fetch(response.uploadURL, {
+        await fetch(uploadData.uploadURL, {
           method: 'PUT',
           body: file,
           headers: {
@@ -185,18 +183,15 @@ export default function DealDetails() {
           },
         });
 
-        uploadedFilePaths.push(response.objectPath);
+        uploadedFilePaths.push(uploadData.objectPath);
       }
 
       // Update deal with new analyst documents
-      await apiRequest(`/api/deals/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          analystDocumentUrls: [
-            ...((deal as any)?.analystDocumentUrls || []),
-            ...uploadedFilePaths,
-          ],
-        }),
+      await apiRequest('PATCH', `/api/deals/${id}`, {
+        analystDocumentUrls: [
+          ...((deal as any)?.analystDocumentUrls || []),
+          ...uploadedFilePaths,
+        ],
       });
 
       // Refresh deal data

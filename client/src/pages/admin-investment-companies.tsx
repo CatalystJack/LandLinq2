@@ -60,6 +60,8 @@ interface InvestmentCompany {
   ozOverridesRentMinimum: boolean | null;
   targetStates: string[];
   targetCounties: string[];
+  crmContactSectors: string[];
+  crmContactCounties: string[];
   productTypes: ProductType[];
   countyMarketLabels: Record<string, string>;
   isActive: boolean;
@@ -87,6 +89,8 @@ interface CompanyForm {
   ozOverridesRentMinimum: boolean;
   targetStates: string[];
   targetCounties: string[];
+  crmContactSectors: string[];
+  crmContactCounties: string[];
   productTypes: ProductType[];
   countyMarketLabels: Record<string, string>;
   isActive: boolean;
@@ -158,6 +162,8 @@ const blankForm: CompanyForm = {
   ozOverridesRentMinimum: false,
   targetStates: [],
   targetCounties: [],
+  crmContactSectors: [],
+  crmContactCounties: [],
   productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
   countyMarketLabels: {},
   isActive: true,
@@ -428,6 +434,8 @@ export default function AdminInvestmentCompanies() {
       ozOverridesRentMinimum: editing.ozOverridesRentMinimum === true,
       targetStates: editing.targetStates || [],
       targetCounties: editing.targetCounties || [],
+      crmContactSectors: editing.crmContactSectors || [],
+      crmContactCounties: editing.crmContactCounties || [],
       productTypes: (editing.productTypes?.length ? editing.productTypes : [{
         ...createEmptyYocAssumptions(),
         name: "General",
@@ -457,6 +465,8 @@ export default function AdminInvestmentCompanies() {
       knownEmailDomains: [],
       targetStates: [],
       targetCounties: [],
+      crmContactSectors: [],
+      crmContactCounties: [],
       productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
       countyMarketLabels: {},
     });
@@ -674,6 +684,24 @@ export default function AdminInvestmentCompanies() {
          <section><h3 className="mb-3 font-semibold">Affordable housing overrides</h3><div className="grid gap-3 sm:grid-cols-3"><ToggleRow label="QCT override" description="QCT status may override the rent minimum." checked={form.qctOverridesRentMinimum} onChange={(value) => update("qctOverridesRentMinimum", value)} /><ToggleRow label="DDA override" description="DDA status may override the rent minimum." checked={form.ddaOverridesRentMinimum} onChange={(value) => update("ddaOverridesRentMinimum", value)} /><ToggleRow label="OZ override" description="Opportunity Zone status may override rent." checked={form.ozOverridesRentMinimum} onChange={(value) => update("ozOverridesRentMinimum", value)} /></div></section>
          <section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><TagsField label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} placeholder="NC, SC, GA" /><CountyMarketEditor values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
          {form.profileType === "real_estate" && form.assetClass === "industrial" && <><section className="rounded-lg border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Industrial site-screening criteria</h3><p className="mt-1 text-sm text-amber-900">These values drive the initial site search and manual review queue. Automated multifamily YOC and rent underwriting are intentionally disabled for this company.</p><div className="mt-5"><IndustrialCriteriaFields value={form.industrialCriteria} onChange={(value) => update("industrialCriteria", value)} compact /></div></section><section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><TagsField label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} placeholder="NC, SC, GA" /><CountyMarketEditor values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
+         <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+           <h3 className="font-semibold text-slate-900">Shared broker contact access</h3>
+           <p className="mt-1 text-sm text-slate-600">Choose which shared LandLinq contacts this company can see. Leave both sector and county lists empty for all contacts.</p>
+           <div className="mt-4 grid gap-4 sm:grid-cols-2">
+             <TagsField
+               label="Sectors"
+               values={form.crmContactSectors}
+               onChange={(values) => update("crmContactSectors", values.map((value) => value.toLowerCase()).filter((value) => value === "commercial" || value === "residential"))}
+               placeholder="commercial or residential"
+             />
+             <TagsField
+               label="North Carolina counties"
+               values={form.crmContactCounties}
+               onChange={(values) => update("crmContactCounties", values.map((value) => value.toLowerCase()))}
+               placeholder="Mecklenburg, Wake"
+             />
+           </div>
+         </section>
          {form.profileType === "general_sales" && <section className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900"><p className="font-semibold">General Sales profile</p><p className="mt-1">This profile has no Deal Dashboard, acquisition criteria, geographic targeting, product types, or affordable housing overrides. Team members will use CRM, Outreach, Analytics, and Settings.</p></section>}
         <section className="grid gap-3 sm:grid-cols-2"><ToggleRow label="Internal company" description="Marks this as a LandLinq/Catalyst internal profile." checked={form.isInternal} onChange={(value) => update("isInternal", value)} /><ToggleRow label="Profile active" description="Allows assigned users to enter the company portal." checked={form.isActive} onChange={(value) => update("isActive", value)} /></section>
        </div><DialogFooter><Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button><Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || logoMutation.isPending}>{saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? "Save changes" : "Create Development Partner"}</Button></DialogFooter>

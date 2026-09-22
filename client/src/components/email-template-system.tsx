@@ -78,13 +78,11 @@ export default function EmailTemplateSystem({ dealData, brokerData, onSendEmail 
         throw new Error('No template selected');
       }
       
-      return await apiRequest(`/api/email-preview`, {
-        method: 'POST',
-        body: JSON.stringify({
-          templateType: selectedTemplate.event,
-          variables: templateVariables
-        })
+      const response = await apiRequest('POST', '/api/email-preview', {
+        templateType: selectedTemplate.event,
+        variables: templateVariables
       });
+      return await response.json();
     },
     enabled: !!selectedTemplate?.event,
     refetchOnWindowFocus: false
@@ -93,13 +91,10 @@ export default function EmailTemplateSystem({ dealData, brokerData, onSendEmail 
   // Test email sending mutation
   const testEmailMutation = useMutation({
     mutationFn: async ({ templateType, testEmail }: { templateType: string; testEmail: string }) => {
-      return await apiRequest(`/api/send-test-email`, {
-        method: 'POST',
-        body: JSON.stringify({
-          templateType,
-          testEmail,
-          variables: templateVariables
-        })
+      return await apiRequest('POST', '/api/send-test-email', {
+        templateType,
+        testEmail,
+        variables: templateVariables
       });
     },
     onSuccess: (data) => {
