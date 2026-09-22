@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
-import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, SlidersHorizontal, Pencil, Plus, X } from "lucide-react";
+import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, Pencil, Plus, X } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import Navigation from "@/components/navigation";
@@ -168,11 +168,13 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [stateFilter, setStateFilter] = useState("all");
   const [assignedToFilter, setAssignedToFilter] = useState("all");
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [tagEditor, setTagEditor] = useState<{ contactIds: string[]; action: "add" | "remove"; initialTag?: string } | null>(null);
   const [tagValue, setTagValue] = useState("");
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameOldTag, setRenameOldTag] = useState("");
   const [renameNewTag, setRenameNewTag] = useState("");
+  const [createTagValue, setCreateTagValue] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -184,6 +186,12 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const contactsQuery = useQuery<{ contacts: Contact[] }>({
     queryKey: [contactsQueryKey],
     queryFn: () => requestJson(contactsEndpoint),
+  });
+
+  const activityQuery = useQuery<any>({
+    queryKey: ["/api/crm/contacts", selectedContact?.id, "activity"],
+    queryFn: () => requestJson(`/api/crm/contacts/${selectedContact?.id}/activity`),
+    enabled: Boolean(selectedContact?.id),
   });
 
   const tagsQuery = useQuery<string[]>({
@@ -246,6 +254,20 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       toast({ title: "Tag renamed", description: `Updated “${data.oldTag}” on ${data.updatedCount} contacts.` });
     },
     onError: (error: Error) => toast({ title: "Tag rename failed", description: error.message, variant: "destructive" }),
+  });
+
+  const createTagMutation = useMutation({
+    mutationFn: (name: string) => requestJson("/api/developer-profile/me/crm-tags/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/crm-tags"] });
+      setCreateTagValue("");
+      toast({ title: data.created ? "Tag created" : "Tag already exists", description: `“${data.name}” is available in your CRM.` });
+    },
+    onError: (error: Error) => toast({ title: "Tag creation failed", description: error.message, variant: "destructive" }),
   });
 
   const filteredContacts = useMemo(() => {
@@ -395,7 +417,6 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
             </div>
           </div>
            <div className="flex flex-wrap items-center gap-2 border-b border-[#e6edf1] px-5 py-3 text-xs text-[#718493]">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
              <span className="mr-1 font-medium">Filters</span>
              <div className="flex items-center gap-2">
               <Building2 className="h-3.5 w-3.5" />
@@ -498,7 +519,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
              <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search.trim() || hasActiveFilters ? "No matching contacts" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search.trim() || hasActiveFilters ? "Try clearing a filter or broadening your search." : "Import a contact list to get started."}</p>{(search.trim() || hasActiveFilters) && <Button variant="outline" onClick={() => { setSearch(""); clearFilters(); }} className="mt-4 h-9">Clear search and filters</Button>}</div>
           ) : (
             <div className="table-scroll-container">
-               <Table className="min-w-[1120px]">
+               <Table className="min-w-[1280px]">
                  <TableHeader>
                    <TableRow className="border-[#e3e9ee] bg-[#f8fafb] hover:bg-[#f8fafb]">
                      {!adminMode && <TableHead className="h-11 w-12 pl-5"><Checkbox aria-label="Select all visible contacts" checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false} onCheckedChange={(checked) => toggleAllVisible(checked === true)} /></TableHead>}
@@ -508,12 +529,25 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Brokerage</TableHead>
                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Region</TableHead>
                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Tags</TableHead>
+                     <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source tags</TableHead>
                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source</TableHead>
                    </TableRow>
                  </TableHeader>
                 <TableBody>{filteredContacts.map((contact) => (
-                  <TableRow key={contact.id} className="border-[#e8edf1] transition-colors hover:bg-[#f4f8fa]">
-                     {!adminMode && <TableCell className="pl-5"><Checkbox aria-label={`Select ${[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "contact"}`} checked={selectedContactIds.includes(contact.id)} onCheckedChange={(checked) => toggleContact(contact.id, checked === true)} /></TableCell>}
+                   <TableRow
+                     key={contact.id}
+                     className="cursor-pointer border-[#e8edf1] transition-colors hover:bg-[#f4f8fa]"
+                     tabIndex={0}
+                     onClick={() => setSelectedContact(contact)}
+                     onKeyDown={(event) => {
+                       if (event.key === "Enter" || event.key === " ") {
+                         event.preventDefault();
+                         setSelectedContact(contact);
+                       }
+                     }}
+                     aria-label={`Open profile for ${[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "contact"}`}
+                   >
+                      {!adminMode && <TableCell className="pl-5" onClick={(event) => event.stopPropagation()}><Checkbox aria-label={`Select ${[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "contact"}`} checked={selectedContactIds.includes(contact.id)} onCheckedChange={(checked) => toggleContact(contact.id, checked === true)} /></TableCell>}
                     <TableCell className="pl-5">
                       <div className="flex items-center gap-3">
                         <div
@@ -534,17 +568,20 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                             </div>
                           ))}
                         </div>
-                        <span className="font-semibold text-[#21394c]">{[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unknown"}</span>
+                         <span className="font-semibold text-[#21394c]">{[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unknown"}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-[#5f7382]">{contact.email || "—"}</TableCell>
                     <TableCell className="text-sm text-[#5f7382]">{contact.phone || "—"}</TableCell>
                     <TableCell className="max-w-[210px] text-sm text-[#5f7382]">
                       {contact.brokerage ? (
-                        <button
+                         <button
                           type="button"
                           className="group flex max-w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-[#eaf1f6]"
-                          onClick={() => setCompanyFilter(contact.brokerage?.trim().toLowerCase() || "all")}
+                           onClick={(event) => {
+                             event.stopPropagation();
+                             setCompanyFilter(contact.brokerage?.trim().toLowerCase() || "all");
+                           }}
                         >
                           <Building2 className="h-3.5 w-3.5 shrink-0 text-[#8195a5]" />
                           <span className="min-w-0">
@@ -566,14 +603,17 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                              key={`${tag}-${index}`}
                              type="button"
                              title={`Remove ${tag}`}
-                             onClick={() => openTagEditor([contact.id], "remove", tag)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openTagEditor([contact.id], "remove", tag);
+                              }}
                              className="inline-flex max-w-[140px] items-center gap-1 rounded-full border border-[#d8e6ee] bg-[#f4f8fb] px-2 py-1 text-[10px] font-medium text-[#405a70] hover:border-[#b8d0df] hover:bg-[#eaf3f8]"
                            >
                              <span className="truncate">{tag}</span>
                              <X className="h-3 w-3 shrink-0 text-[#8298a8]" />
                            </button>
                          ))}
-                         {!adminMode && <button type="button" onClick={() => openTagEditor([contact.id], "add")} className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-catalyst-blue hover:bg-[#edf4fa]"><Plus className="h-3 w-3" />Add</button>}
+                          {!adminMode && <button type="button" onClick={(event) => { event.stopPropagation(); openTagEditor([contact.id], "add"); }} className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-catalyst-blue hover:bg-[#edf4fa]"><Plus className="h-3 w-3" />Add</button>}
                          {!contact.crmTags?.length && adminMode && <span className="text-sm text-[#9aa9b4]">—</span>}
                        </div>
                      </TableCell>
@@ -599,6 +639,75 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           )}
         </Card>
       </main>
+
+      <Dialog open={Boolean(selectedContact)} onOpenChange={(open) => { if (!open) setSelectedContact(null); }}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          {selectedContact && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-xl text-[#21394c]">
+                  {[selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(" ") || "Contact profile"}
+                </DialogTitle>
+                <DialogDescription>
+                  {selectedContact.brokerage || "Broker contact"} · {selectedContact.stateRegion || "Region not provided"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Email</p>
+                  {selectedContact.email ? (
+                    <a className="mt-1 block break-all text-sm font-medium text-catalyst-blue hover:underline" href={`mailto:${selectedContact.email}`}>{selectedContact.email}</a>
+                  ) : <p className="mt-1 text-sm text-slate-400">Not provided</p>}
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Phone</p>
+                  {selectedContact.phone ? (
+                    <a className="mt-1 block text-sm font-medium text-catalyst-blue hover:underline" href={`tel:${selectedContact.phone}`}>{selectedContact.phone}</a>
+                  ) : <p className="mt-1 text-sm text-slate-400">Not provided</p>}
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned to</p>
+                  <p className="mt-1 text-sm font-medium text-slate-800">{selectedContact.assignedTo || "Unassigned"}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Relationship</p>
+                  <p className="mt-1 text-sm font-medium text-slate-800">{selectedContact.ownerDeveloperProfileId ? "Your company contact" : "Shared network contact"}</p>
+                </div>
+              </div>
+              {(selectedContact.crmTags?.length || selectedContact.sourceTags?.length) ? (
+                <div className="space-y-3">
+                  {selectedContact.crmTags?.length ? (
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold text-slate-600">Your CRM tags</p>
+                      <div className="flex flex-wrap gap-1.5">{selectedContact.crmTags.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}</div>
+                    </div>
+                  ) : null}
+                  {selectedContact.sourceTags?.length ? (
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold text-slate-600">Shared source tags</p>
+                      <div className="flex flex-wrap gap-1.5">{selectedContact.sourceTags.map((tag) => <Badge key={tag} variant="secondary" className="bg-[#f2f8f1] text-[#4d7351]">{tag}</Badge>)}</div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="border-t border-slate-200 pt-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Activity</p>
+                {activityQuery.isLoading ? (
+                  <p className="text-sm text-slate-500">Loading activity…</p>
+                ) : activityQuery.isError ? (
+                  <p className="text-sm text-slate-500">Activity is unavailable for this contact.</p>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-lg border border-slate-200 p-3"><p className="text-xs text-slate-500">Deals</p><p className="mt-1 text-lg font-semibold text-slate-800">{activityQuery.data?.deals?.length || 0}</p></div>
+                    <div className="rounded-lg border border-slate-200 p-3"><p className="text-xs text-slate-500">Communications</p><p className="mt-1 text-lg font-semibold text-slate-800">{activityQuery.data?.communications?.length || 0}</p></div>
+                    <div className="rounded-lg border border-slate-200 p-3"><p className="text-xs text-slate-500">Campaigns</p><p className="mt-1 text-lg font-semibold text-slate-800">{activityQuery.data?.enrollments?.length || 0}</p></div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={importOpen} onOpenChange={(open) => (open ? setImportOpen(true) : reset())}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
@@ -681,12 +790,36 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           <Dialog open={renameOpen} onOpenChange={(open) => { if (!open && !renameMutation.isPending) setRenameOpen(false); }}>
             <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle>Rename CRM tag</DialogTitle>
+                <DialogTitle>Manage CRM tags</DialogTitle>
                 <DialogDescription>
-                  This updates the tag everywhere it is currently applied across your company’s contacts. It will not affect another company’s tags or contacts.
+                  Create private tags for your company or rename an existing tag. These do not affect another company’s contacts or shared source tags.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
+                <div className="rounded-lg border border-[#d7e2e9] bg-[#f8fafb] p-3">
+                  <Label htmlFor="crm-create-tag">Create a new tag</Label>
+                  <div className="mt-1.5 flex gap-2">
+                    <Input
+                      id="crm-create-tag"
+                      value={createTagValue}
+                      onChange={(event) => setCreateTagValue(event.target.value)}
+                      placeholder="e.g. Priority Land Broker"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && createTagValue.trim()) createTagMutation.mutate(createTagValue.trim());
+                      }}
+                    />
+                    <Button
+                      onClick={() => createTagMutation.mutate(createTagValue.trim())}
+                      disabled={!createTagValue.trim() || createTagMutation.isPending}
+                      style={{ backgroundColor: primaryColor }}
+                      className="shrink-0 text-white"
+                    >
+                      {createTagMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create"}
+                    </Button>
+                  </div>
+                  <p className="mt-1.5 text-xs text-slate-500">The tag will appear in the Tags filter and can be applied to contacts.</p>
+                </div>
+                <div className="border-t border-slate-200 pt-4">
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">
                   Renaming is company-wide. Every contact in this company with the old tag will receive the new tag.
                 </div>
@@ -700,6 +833,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                 <div>
                   <Label htmlFor="crm-new-tag">New tag name</Label>
                   <Input id="crm-new-tag" value={renameNewTag} onChange={(event) => setRenameNewTag(event.target.value)} placeholder="e.g. Priority Land Broker" className="mt-1.5" />
+                </div>
                 </div>
               </div>
               <DialogFooter>

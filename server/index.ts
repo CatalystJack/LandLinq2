@@ -344,6 +344,16 @@ setTimeout(() => {
         );
         CREATE INDEX IF NOT EXISTS developer_quick_links_profile_idx
           ON developer_quick_links (developer_profile_id);
+        CREATE TABLE IF NOT EXISTS developer_crm_tags (
+          id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+          developer_profile_id varchar NOT NULL REFERENCES developer_profiles(id) ON DELETE CASCADE,
+          name text NOT NULL,
+          created_at timestamp DEFAULT now(),
+          updated_at timestamp DEFAULT now(),
+          CONSTRAINT developer_crm_tags_profile_name_unique UNIQUE (developer_profile_id, name)
+        );
+        CREATE INDEX IF NOT EXISTS developer_crm_tags_profile_idx
+          ON developer_crm_tags (developer_profile_id);
         CREATE TABLE IF NOT EXISTS hello_data_raw_responses (
           id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
           endpoint varchar NOT NULL,

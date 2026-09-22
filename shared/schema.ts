@@ -316,6 +316,19 @@ export const developerBrokerCrm = pgTable("developer_broker_crm", {
   index("developer_broker_crm_broker_idx").on(table.brokerId),
 ]);
 
+// Company-owned CRM tag vocabulary. Tags can exist before they are applied to
+// a contact, and never overlap with importer-controlled source tags.
+export const developerCrmTags = pgTable("developer_crm_tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique("developer_crm_tags_profile_name_unique").on(table.developerProfileId, table.name),
+  index("developer_crm_tags_profile_idx").on(table.developerProfileId),
+]);
+
 export const pipelineStages = pgTable("pipeline_stages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   developerProfileId: varchar("developer_profile_id")

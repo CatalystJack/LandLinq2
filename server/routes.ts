@@ -23,6 +23,7 @@ import {
   users,
   brokers,
   developerBrokerCrm,
+  developerCrmTags,
   developerProfiles,
   developerQuickLinks,
   partnerDevelopers,
@@ -15128,9 +15129,9 @@ RULES:
     }
   });
 
-  // CRM tags available to this Investment Company. Tags are derived only from
-  // contacts owned by the current developer profile; do not expose the
-  // system-wide registry or tags from another company's contacts here.
+  // CRM tags available to this Investment Company. The registry allows a
+  // company to create a tag before applying it; the legacy owned-contact
+  // values are included so existing tags remain available.
   app.get("/api/developer-profile/me/crm-tags", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
@@ -15138,17 +15139,23 @@ RULES:
 
       const result = await db.execute(sql`
         SELECT DISTINCT tag
-        FROM brokers AS owned_broker
-        CROSS JOIN LATERAL unnest(owned_broker.crm_tags) AS tag
-        WHERE owned_broker.owner_developer_profile_id = ${developerProfileId}
-          AND owned_broker.crm_tags IS NOT NULL
-          AND tag IS NOT NULL
-          AND NOT EXISTS (
-            SELECT 1
-            FROM users AS demo_owner
-            WHERE demo_owner.id = owned_broker.user_id
-              AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
-          )
+        FROM (
+          SELECT name AS tag
+          FROM developer_crm_tags
+          WHERE developer_profile_id = ${developerProfileId}
+          UNION ALL
+          SELECT unnest(owned_broker.crm_tags) AS tag
+          FROM brokers AS owned_broker
+          WHERE owned_broker.owner_developer_profile_id = ${developerProfileId}
+            AND owned_broker.crm_tags IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1
+              FROM users AS demo_owner
+              WHERE demo_owner.id = owned_broker.user_id
+                AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+            )
+        ) AS company_tags
+        WHERE tag IS NOT NULL AND BTRIM(tag) <> ''
         ORDER BY tag
       `);
 
@@ -15161,9 +15168,35 @@ RULES:
     }
   });
 
-  // Apply or remove a free-text CRM tag from contacts owned by this
-  // Investment Company. There is no separate tag registry for company CRM
-  // tags; the vocabulary is derived from brokers.crm_tags.
+  app.post("/api/developer-profile/me/crm-tags/create", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+      if (!name || name.length > 160) {
+        return res.status(400).json({ error: "Tag name must be between 1 and 160 characters" });
+      }
+
+      const [tag] = await db.insert(developerCrmTags).values({
+        developerProfileId,
+        name,
+        updatedAt: new Date(),
+      }).onConflictDoNothing({
+        target: [developerCrmTags.developerProfileId, developerCrmTags.name],
+      }).returning();
+
+      return res.status(tag ? 201 : 200).json({ name, created: Boolean(tag) });
+    } catch (error: any) {
+      console.error("[developer-profile/me/crm-tags/create] Error:", error);
+      return res.status(500).json({ error: "Failed to create CRM tag" });
+    }
+  });
+
+  // Apply or remove a private CRM tag from contacts visible to this
+  // Investment Company. Shared contacts store the tag in developer_broker_crm;
+  // company-owned contacts retain their legacy brokers.crm_tags storage.
   app.post("/api/developer-profile/me/crm-tags/apply", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
@@ -15186,30 +15219,67 @@ RULES:
         return res.status(400).json({ error: "Tag action must be add or remove" });
       }
 
+      const visibility = await getDeveloperContactVisibility(developerProfileId);
       const updatedContactIds = await db.transaction(async (tx) => {
-        const ownedContacts = await tx.select({
+        const visibleContacts = await tx.select({
           id: brokers.id,
           crmTags: brokers.crmTags,
+          ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
+          contactSector: brokers.contactSector,
+          contactCounty: brokers.contactCounty,
+          userId: brokers.userId,
         }).from(brokers).where(and(
           inArray(brokers.id, contactIds),
-          eq(brokers.ownerDeveloperProfileId, developerProfileId),
           isNonDemoBroker(),
         ));
 
+        if (action === "add") {
+          await tx.insert(developerCrmTags).values({
+            developerProfileId,
+            name: tag,
+            updatedAt: new Date(),
+          }).onConflictDoNothing({
+            target: [developerCrmTags.developerProfileId, developerCrmTags.name],
+          });
+        }
+
         const updatedIds: string[] = [];
-        for (const contact of ownedContacts) {
+        for (const contact of visibleContacts.filter((candidate) => isSharedBrokerVisible(candidate, developerProfileId, visibility))) {
           const currentTags = Array.isArray(contact.crmTags) ? contact.crmTags : [];
           const nextTags = action === "add"
             ? Array.from(new Set([...currentTags, tag]))
             : currentTags.filter((currentTag) => currentTag !== tag);
 
-          await tx.update(brokers)
-            .set({ crmTags: nextTags, updatedAt: new Date() } as any)
-            .where(and(
-              eq(brokers.id, contact.id),
-              eq(brokers.ownerDeveloperProfileId, developerProfileId),
-              isNonDemoBroker(),
-            ));
+          if (contact.ownerDeveloperProfileId === developerProfileId) {
+            await tx.update(brokers)
+              .set({ crmTags: nextTags, updatedAt: new Date() } as any)
+              .where(and(
+                eq(brokers.id, contact.id),
+                eq(brokers.ownerDeveloperProfileId, developerProfileId),
+                isNonDemoBroker(),
+              ));
+          } else {
+            const [existingCrm] = await tx.select().from(developerBrokerCrm).where(and(
+              eq(developerBrokerCrm.developerProfileId, developerProfileId),
+              eq(developerBrokerCrm.brokerId, contact.id),
+            )).limit(1);
+            const crmValues = {
+              developerProfileId,
+              brokerId: contact.id,
+              crmTags: nextTags,
+              crmNotes: existingCrm?.crmNotes || null,
+              lastContactedAt: existingCrm?.lastContactedAt || null,
+              assignedTo: existingCrm?.assignedTo || null,
+              updatedAt: new Date(),
+            };
+            await tx.insert(developerBrokerCrm).values(crmValues as any).onConflictDoUpdate({
+              target: [developerBrokerCrm.developerProfileId, developerBrokerCrm.brokerId],
+              set: {
+                crmTags: nextTags,
+                updatedAt: new Date(),
+              },
+            });
+          }
           updatedIds.push(contact.id);
         }
         return updatedIds;
@@ -15263,7 +15333,24 @@ RULES:
               isNonDemoBroker(),
             ));
         }
-        return ownedContacts.length;
+        const [registryUpdate] = await tx.update(developerCrmTags)
+          .set({ name: newTag, updatedAt: new Date() })
+          .where(and(
+            eq(developerCrmTags.developerProfileId, developerProfileId),
+            eq(developerCrmTags.name, oldTag),
+          ))
+          .returning();
+        await tx.execute(sql`
+          UPDATE developer_broker_crm
+          SET crm_tags = ARRAY(
+            SELECT DISTINCT CASE WHEN tag = ${oldTag} THEN ${newTag} ELSE tag END
+            FROM unnest(COALESCE(crm_tags, ARRAY[]::text[])) AS tag
+          ),
+          updated_at = NOW()
+          WHERE developer_profile_id = ${developerProfileId}
+            AND ${oldTag} = ANY(COALESCE(crm_tags, ARRAY[]::text[]))
+        `);
+        return ownedContacts.length + (registryUpdate ? 1 : 0);
       });
 
       return res.json({ oldTag, newTag, updatedCount });
