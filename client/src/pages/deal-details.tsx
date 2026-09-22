@@ -85,6 +85,10 @@ export default function DealDetails() {
   });
   const authenticatedEmail = String((user as any)?.claims?.email || (user as any)?.email || "");
   const canAuditIntake = isPlatformAdminEmail(authenticatedEmail);
+  const authenticatedRole = String((user as any)?.role || "").toUpperCase();
+  const canDownloadInvestmentCommitteeReport =
+    isPlatformAdminEmail(authenticatedEmail) ||
+    ["ADMIN", "SUPER_ADMIN", "ANALYST", "DEVELOPER"].includes(authenticatedRole);
   const { data: intakeAudit } = useQuery<{
     intake?: Record<string, any>;
     deal?: Record<string, any>;
@@ -342,10 +346,10 @@ export default function DealDetails() {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(objectUrl);
-      toast({ title: "Deal Memo downloaded", description: "The one-page PDF is ready." });
+       toast({ title: "Investment Committee Report downloaded", description: "The PDF is ready." });
     } catch (error: any) {
       console.error("Failed to generate deal summary PDF:", error);
-      toast({ title: "Deal Memo download failed", description: error.message || "Unable to generate the Deal Memo. Please try again.", variant: "destructive" });
+       toast({ title: "Report download failed", description: error.message || "Unable to generate the Investment Committee Report. Please try again.", variant: "destructive" });
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -513,20 +517,22 @@ export default function DealDetails() {
                     <LinkIcon className="mr-2" size={16} />
                     {isSharing ? "Creating link..." : "Share"}
                   </Button>
-                  <Button
-                    onClick={generateDealSummaryPdf}
-                    variant="outline"
-                    size="sm"
-                    disabled={isGeneratingPdf}
-                    data-testid="button-export-pdf"
-                  >
-                    {isGeneratingPdf ? (
-                      <Loader2 className="mr-2 animate-spin" size={16} />
-                    ) : (
-                      <FileText className="mr-2" size={16} />
-                    )}
-                    {isGeneratingPdf ? "Preparing PDF..." : "Download Deal Memo"}
-                  </Button>
+                  {canDownloadInvestmentCommitteeReport && (
+                    <Button
+                      onClick={generateDealSummaryPdf}
+                      variant="outline"
+                      size="sm"
+                      disabled={isGeneratingPdf}
+                      data-testid="button-export-pdf"
+                    >
+                      {isGeneratingPdf ? (
+                        <Loader2 className="mr-2 animate-spin" size={16} />
+                      ) : (
+                        <FileText className="mr-2" size={16} />
+                      )}
+                      {isGeneratingPdf ? "Preparing PDF..." : "Download Investment Committee Report"}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

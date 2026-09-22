@@ -8963,7 +8963,7 @@ Provide your analysis in this exact JSON format:
     }
   });
 
-  // ── GET /api/deals/:id/memo-pdf — generate and download the one-page Deal Memo ──
+  // ── GET /api/deals/:id/memo-pdf — generate and download the Investment Committee Report ──
   app.get("/api/deals/:id/memo-pdf", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -8975,7 +8975,7 @@ Provide your analysis in this exact JSON format:
         ["ADMIN", "SUPER_ADMIN", "ANALYST"].includes(role) ||
         isPlatformAdminEmail(userEmail);
       if (role !== "DEVELOPER" && !isInternalViewer) {
-        return res.status(403).json({ message: "You do not have permission to export Deal Memos" });
+        return res.status(403).json({ message: "You do not have permission to export Investment Committee Reports" });
       }
 
       const [deal] = await db.select().from(deals).where(eq(deals.id, id)).limit(1);
@@ -9021,7 +9021,7 @@ Provide your analysis in this exact JSON format:
         .replace(/^-+|-+$/g, "")
         .slice(0, 80);
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${safeAddress || "deal"}-Deal-Memo.pdf"`);
+       res.setHeader("Content-Disposition", `attachment; filename="${safeAddress || "deal"}-Investment-Committee-Report.pdf"`);
       res.setHeader("Content-Length", pdf.length.toString());
       res.setHeader("Cache-Control", "private, no-store");
       return res.end(pdf);
@@ -9031,7 +9031,7 @@ Provide your analysis in this exact JSON format:
         if (err?.code === "DEAL_MEMO_BUSY") {
           return res.status(503).json({ message: err.message });
         }
-        return res.status(500).json({ message: "Failed to generate Deal Memo PDF" });
+         return res.status(500).json({ message: "Failed to generate Investment Committee Report PDF" });
       }
     }
   });

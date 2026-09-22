@@ -291,7 +291,7 @@ h1{max-width:6.8in;margin:0;color:${primary};font-size:32px;font-weight:600;line
   <div class="top-rule"></div>
   <header class="header">
     <div class="brand">${logo}</div>
-    <div class="eyebrow">Deal Memo</div>
+    <div class="eyebrow">Investment Committee Report</div>
   </header>
   <section class="title-block">
     <h1>${escapeHtml(address)}</h1>
