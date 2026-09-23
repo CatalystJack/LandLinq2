@@ -1,0 +1,21 @@
+IMPORTANT: actually implement this in code, including the schema migration, the classification logic, and the UI — not just the schema.
+
+Investment companies need to be able to set different minimum/maximum acreage and rent thresholds by state for a given product type — e.g. a different minimum acreage in NC vs SC for the same multifamily product type, since site requirements vary by market. Today every criteria value (minAcres, maxAcres, minRentPsf, minRentPerUnit for multifamily product types; minSingleLoadAcres/minCrossDockAcres for industrial) is a single flat number that applies regardless of the deal's state.
+
+CONTEXT: deal.state already flows into server/developerClassificationService.ts's classifyDealForProfile (it's already used there for market-gating against developerProfiles.targetStates) — you don't need to newly wire state into the pipeline, just use it when picking which criteria values to apply.
+
+NOTE: there's an existing, unused field — developerProfiles.acreageOverridesByProductType (shared/schema.ts) — that was apparently built for a similar per-product-type override concept but is never actually read anywhere in developerClassificationService.ts (confirmed via grep — it's only round-tripped through the API/settings form, never consulted during classification). Decide whether to repurpose/extend this field for the new state-keyed structure below, or replace it entirely — don't leave it as dead, unused weight either way.
+
+IMPLEMENTATION:
+
+1. SCHEMA: Add state-scoped override support to developerProductTypes (for multifamily) and to the industrialCriteria structure (for industrial):
+   - developerProductTypes: add a new jsonb column, e.g. stateOverrides, shaped as a map from state code to a partial override of {minAcres, maxAcres, minRentPsf, minRentPerUnit} — e.g. { "NC": { "minAcres": 5 }, "SC": { "minAcres": 8, "maxAcres": 40 } }. Only the fields actually being overridden need to be present per state; anything not specified falls back to the product type's existing flat default.
+   - industrialCriteria (shared/industrial-criteria.ts, stored as jsonb on developerProfiles): restructure to support the same pattern — e.g. { default: { minSingleLoadAcres, minCrossDockAcres, notes }, stateOverrides?: { [state]: Partial<{minSingleLoadAcres, minCrossDockAcres}> } }. Write a migration/normalization path for existing data so current flat values become the "default" and stateOverrides starts empty — don't lose or corrupt any existing developer's current industrial criteria.
+
+2. CLASSIFICATION LOGIC (server/developerClassificationService.ts): when evaluating a deal's acreage/rent gates for a product type, first check productType.stateOverrides?.[deal.state] for each field; use that value if present, otherwise fall back to the product type's flat default (existing behavior). Same pattern for the industrial branch using industrialCriteria.stateOverrides?.[deal.state]. Write this as a small reusable helper (e.g. resolveStateAwareCriteria(base, overrides, state)) rather than duplicating the fallback logic per field.
+
+3. UI (client/src/pages/developer-criteria-settings.tsx for multifamily product types, client/src/components/industrial-criteria-fields.tsx for industrial): add a "State overrides" section to each product type's criteria editor. Let the user add an override for a specific state (scope the state picker to developerProfiles.targetStates, the states this company already operates in — don't let them add an override for a state they haven't indicated they operate in), enter only the fields they want to override for that state (leaving others blank means "use the flat default"), and remove an override. Show existing overrides as a clear list/table, not buried in a generic JSON editor.
+
+4. Make sure the existing flat minAcres/maxAcres/minRentPsf/minRentPerUnit fields remain fully functional as the default/fallback for any state without an explicit override — this must be purely additive, not a breaking change for developers who never set a state override.
+
+Paste the diff (schema migration, classification logic, and UI) when done, and confirm what happened to the existing unused acreageOverridesByProductType field.
