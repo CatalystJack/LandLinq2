@@ -1,0 +1,18 @@
+IMPORTANT: actually implement this in code. Do not create a documentation file, notes file, or summary — make the actual code changes described below.
+
+client/src/components/state-criteria-overrides.tsx (the "State overrides" panel shown under each product type, and under industrial criteria) currently only lets you add a state override if that state is already in the company's "Target states" list elsewhere on the page. If Target states is empty, the panel just shows the message "Add target states above before creating state overrides" and offers no way to pick a state at all. This is confusing — the user has to leave this section, scroll to a separate part of the form, add the state there, then come back.
+
+Change this so the "Add state..." dropdown in StateCriteriaOverrides always offers the full US state list (use US_STATE_OPTIONS from shared/us-states.ts), not just the ones already in targetStates. Remove the "Add target states above before creating state overrides" blocking message entirely.
+
+When the user picks a state from this dropdown to add an override:
+1. Add the state override entry as it does today.
+2. If that state isn't already in the company's Target states list, add it there too, automatically — so the user never has to separately maintain both lists.
+
+To do this, add a new prop to StateCriteriaOverrides: `onAddTargetState: (stateCode: string) => void`, called whenever a new state override is added for a state not already in targetStates. Wire this prop through every place StateCriteriaOverrides is rendered:
+- client/src/components/industrial-criteria-fields.tsx (it already receives targetStates as a prop — add an equivalent onAddTargetState prop and pass it through to StateCriteriaOverrides)
+- client/src/pages/developer-criteria-settings.tsx — both the per-product-type StateCriteriaOverrides usage and the IndustrialCriteriaFields usage. The handler should append the new state code to form.targetStates (dedup, same normalizeUsStateCode handling already used elsewhere in this file).
+- client/src/pages/admin-investment-companies.tsx — same wiring, both in ProductTypeEditorRow (which renders StateCriteriaOverrides directly) and the IndustrialCriteriaFields usage.
+
+Keep the existing server-side validation as-is (state overrides must be one of the company's target states) — since we're now auto-adding the state to targetStates the moment an override is created for it, that constraint will still always hold; just make sure the target states update and the override update both end up in the same form state before save, so a save right after adding a new override state doesn't drop the state addition.
+
+Verify it builds and confirm via git log that the commit contains a real diff to these files, not a text file.
