@@ -725,19 +725,16 @@ export default function AdminInvestmentCompanies() {
                 sectors={form.crmContactSectors}
                 states={form.crmContactStates}
                 counties={form.crmContactCounties}
-                productTypes={form.crmContactProductTypes}
                 sourceTags={form.crmContactSourceTags}
                 sectorOptions={sourceTagsQuery.data?.sectors || []}
                 stateOptions={sourceTagsQuery.data?.states || []}
                 countyOptions={sourceTagsQuery.data?.counties || []}
-                productTypeOptions={sourceTagsQuery.data?.productTypes || []}
                 sourceTagOptions={sourceTagsQuery.data?.sourceTags || []}
                 optionsLoading={sourceTagsQuery.isLoading}
                 optionsError={sourceTagsQuery.isError}
                 onSectorsChange={(values) => update("crmContactSectors", values)}
                 onStatesChange={(values) => update("crmContactStates", values)}
                 onCountiesChange={(values) => update("crmContactCounties", values)}
-                onProductTypesChange={(values) => update("crmContactProductTypes", values)}
                 onSourceTagsChange={(values) => update("crmContactSourceTags", values)}
               />
             </div>

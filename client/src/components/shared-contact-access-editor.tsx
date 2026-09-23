@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-type FilterKey = "sectors" | "states" | "counties" | "productTypes" | "sourceTags";
+type FilterKey = "sectors" | "states" | "counties" | "sourceTags";
 
 export type ContactFilterOption = {
   value: string;
@@ -23,19 +23,16 @@ type SharedContactAccessEditorProps = {
   sectors: string[];
   states: string[];
   counties: string[];
-  productTypes: string[];
   sourceTags: string[];
   sectorOptions?: ContactFilterOption[];
   stateOptions: ContactFilterOption[];
   countyOptions: ContactCountyOption[];
-  productTypeOptions: string[];
   sourceTagOptions: string[];
   optionsLoading?: boolean;
   optionsError?: boolean;
   onSectorsChange: (values: string[]) => void;
   onStatesChange: (values: string[]) => void;
   onCountiesChange: (values: string[]) => void;
-  onProductTypesChange: (values: string[]) => void;
   onSourceTagsChange: (values: string[]) => void;
 };
 
@@ -43,7 +40,6 @@ const FILTER_LABELS: Record<FilterKey, string> = {
   sectors: "Contact sectors",
   states: "States",
   counties: "Counties",
-  productTypes: "Product types",
   sourceTags: "Source tags",
 };
 
@@ -57,26 +53,22 @@ export default function SharedContactAccessEditor({
   sectors,
   states,
   counties,
-  productTypes,
   sourceTags,
   sectorOptions = [],
   stateOptions,
   countyOptions,
-  productTypeOptions,
   sourceTagOptions,
   optionsLoading = false,
   optionsError = false,
   onSectorsChange,
   onStatesChange,
   onCountiesChange,
-  onProductTypesChange,
   onSourceTagsChange,
 }: SharedContactAccessEditorProps) {
   const [openFilters, setOpenFilters] = useState<FilterKey[]>(() => [
     ...(sectors.length ? ["sectors" as FilterKey] : []),
     ...(states.length ? ["states" as FilterKey] : []),
     ...(counties.length ? ["counties" as FilterKey] : []),
-    ...(productTypes.length ? ["productTypes" as FilterKey] : []),
     ...(sourceTags.length ? ["sourceTags" as FilterKey] : []),
   ]);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -87,10 +79,9 @@ export default function SharedContactAccessEditor({
       ...(sectors.length ? ["sectors" as FilterKey] : []),
       ...(states.length ? ["states" as FilterKey] : []),
       ...(counties.length ? ["counties" as FilterKey] : []),
-      ...(productTypes.length ? ["productTypes" as FilterKey] : []),
       ...(sourceTags.length ? ["sourceTags" as FilterKey] : []),
     ])));
-  }, [sectors.length, states.length, counties.length, productTypes.length, sourceTags.length]);
+  }, [sectors.length, states.length, counties.length, sourceTags.length]);
 
   const availableFilters = useMemo(
     () => (Object.keys(FILTER_LABELS) as FilterKey[]).filter((key) => !openFilters.includes(key)),
@@ -106,7 +97,6 @@ export default function SharedContactAccessEditor({
     if (key === "sectors") onSectorsChange([]);
     if (key === "states") onStatesChange([]);
     if (key === "counties") onCountiesChange([]);
-    if (key === "productTypes") onProductTypesChange([]);
     if (key === "sourceTags") onSourceTagsChange([]);
   };
 
@@ -114,7 +104,6 @@ export default function SharedContactAccessEditor({
     if (key === "sectors") return sectors.length ? sectors.map(formatTag).join(", ") : "No sectors selected";
     if (key === "states") return states.length ? states.join(", ") : "No states selected";
     if (key === "counties") return counties.length ? `${counties.length} selected` : "No counties selected";
-    if (key === "productTypes") return productTypes.length ? `${productTypes.length} selected` : "No product types selected";
     return sourceTags.length ? `${sourceTags.length} selected` : "No source tags selected";
   };
 
@@ -172,21 +161,28 @@ export default function SharedContactAccessEditor({
               </div>
 
               {key === "sectors" && (
-                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
-                  {["commercial", "residential"].map((sector) => (
-                    <label key={sector} className="flex items-center gap-2 text-sm text-slate-700">
-                      <Checkbox
-                        checked={sectors.includes(sector)}
-                        onCheckedChange={(checked) => onSectorsChange(
-                          checked
-                            ? Array.from(new Set([...sectors, sector]))
-                            : sectors.filter((value) => value !== sector),
-                        )}
-                      />
-                      {formatTag(sector)}
-                      {sectorCount(sector) ? <span className="text-xs text-slate-400">({sectorCount(sector)?.toLocaleString()})</span> : null}
-                    </label>
-                  ))}
+                <div className="mt-3">
+                  <div className="flex flex-wrap gap-x-5 gap-y-2">
+                    {["commercial", "residential"].map((sector) => (
+                      <label key={sector} className="flex items-center gap-2 text-sm text-slate-700">
+                        <Checkbox
+                          checked={sectors.includes(sector)}
+                          onCheckedChange={(checked) => onSectorsChange(
+                            checked
+                              ? Array.from(new Set([...sectors, sector]))
+                              : sectors.filter((value) => value !== sector),
+                          )}
+                        />
+                        {formatTag(sector)}
+                        {sectorCount(sector) ? <span className="text-xs text-slate-400">({sectorCount(sector)?.toLocaleString()})</span> : null}
+                      </label>
+                    ))}
+                  </div>
+                  {sectors.length > 0 && (
+                    <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                      Sector tags were scrubbed with AI-assisted rules and may not be 100% accurate. The underlying broker data was pulled in September 2026.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -241,30 +237,6 @@ export default function SharedContactAccessEditor({
                 </div>
               )}
 
-              {key === "productTypes" && (
-                <div className="mt-3 max-h-52 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3">
-                  {productTypeOptions.length ? (
-                    <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-                      {productTypeOptions.map((productType) => (
-                        <label key={productType} className="flex items-center gap-2 text-sm text-slate-700">
-                          <Checkbox
-                            checked={productTypes.includes(productType.toLowerCase())}
-                            onCheckedChange={(checked) => onProductTypesChange(
-                              checked
-                                ? Array.from(new Set([...productTypes, productType.toLowerCase()]))
-                                : productTypes.filter((value) => value !== productType.toLowerCase()),
-                            )}
-                          />
-                          {formatTag(productType)}
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500">{optionsLoading ? "Loading product types…" : optionsError ? "Product types could not be loaded." : "No product-type tags are available yet."}</p>
-                  )}
-                </div>
-              )}
-
               {key === "sourceTags" && (
                 <div className="mt-3 max-h-44 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3">
                   {sourceTagOptions.length ? (
@@ -296,7 +268,6 @@ export default function SharedContactAccessEditor({
                 {key === "sectors" && "Leave all sectors unchecked to include every sector."}
                 {key === "states" && "Choose NC, TN, or any other state represented in the imported directory."}
                 {key === "counties" && "Choose counties from the imported contact data. Use States too when you need state-specific matching."}
-                {key === "productTypes" && "Product types are derived from the imported Product Type field and contact tags."}
                 {key === "sourceTags" && "Select any source tags this company should see. Leave all unchecked to include every source tag."}
               </p>
             </div>
