@@ -169,6 +169,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [assignedToFilter, setAssignedToFilter] = useState("all");
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [removeConfirmationIds, setRemoveConfirmationIds] = useState<string[] | null>(null);
   const [tagEditor, setTagEditor] = useState<{ contactIds: string[]; action: "add" | "remove"; initialTag?: string } | null>(null);
   const [tagValue, setTagValue] = useState("");
   const [renameOpen, setRenameOpen] = useState(false);
@@ -538,11 +539,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (window.confirm(`Remove ${selectedContactIds.length} ${selectedContactIds.length === 1 ? "contact" : "contacts"} from your CRM? Shared contacts will remain available to other companies.`)) {
-                            removeContactsMutation.mutate(selectedContactIds);
-                          }
-                        }}
+                        onClick={() => setRemoveConfirmationIds(selectedContactIds)}
                         disabled={removeContactsMutation.isPending}
                         className="inline-flex h-8 items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
                       >
@@ -754,12 +751,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                     variant="outline"
                     className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                     disabled={removeContactsMutation.isPending}
-                    onClick={() => {
-                      const name = [selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(" ") || "this contact";
-                      if (window.confirm(`Remove ${name} from your CRM? Shared contacts will remain available to other companies.`)) {
-                        removeContactsMutation.mutate([selectedContact.id]);
-                      }
-                    }}
+                    onClick={() => setRemoveConfirmationIds([selectedContact.id])}
                   >
                     <UserRound className="mr-2 h-4 w-4" />Remove from my CRM
                   </Button>
@@ -767,6 +759,36 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               )}
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(removeConfirmationIds)} onOpenChange={(open) => { if (!open) setRemoveConfirmationIds(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove from your CRM?</DialogTitle>
+            <DialogDescription>
+              Remove {removeConfirmationIds?.length || 0} {removeConfirmationIds?.length === 1 ? "contact" : "contacts"} from your CRM? Shared contacts will remain available to other companies.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRemoveConfirmationIds(null)} disabled={removeContactsMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              disabled={removeContactsMutation.isPending}
+              onClick={() => {
+                if (!removeConfirmationIds?.length) return;
+                const ids = removeConfirmationIds;
+                setRemoveConfirmationIds(null);
+                removeContactsMutation.mutate(ids);
+              }}
+            >
+              {removeContactsMutation.isPending ? "Removing…" : "Remove contact"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
