@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
-import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, Pencil, Plus, X } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import Navigation from "@/components/navigation";
@@ -256,20 +256,19 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     onError: (error: Error) => toast({ title: "Tag rename failed", description: error.message, variant: "destructive" }),
   });
 
-  const deleteTagMutation = useMutation({
-    mutationFn: (name: string) => requestJson("/api/developer-profile/me/crm-tags/delete", {
+  const removeContactsMutation = useMutation({
+    mutationFn: (contactIds: string[]) => requestJson("/api/developer-profile/me/contacts/remove", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ contactIds }),
     }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [contactsQueryKey] });
-      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/crm-tags"] });
-      setSelectedTags((current) => current.filter((tag) => tag !== data.name));
-      setRenameOldTag("");
-      toast({ title: "Tag deleted", description: `Removed “${data.name}” from ${data.updatedCount} contacts and your company tag list.` });
+      setSelectedContactIds([]);
+      setSelectedContact(null);
+      toast({ title: "Contacts removed", description: `Removed ${data.removedCount} ${data.removedCount === 1 ? "contact" : "contacts"} from your CRM. Other companies can still see shared contacts.` });
     },
-    onError: (error: Error) => toast({ title: "Tag deletion failed", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => toast({ title: "Contact removal failed", description: error.message, variant: "destructive" }),
   });
 
   const createTagMutation = useMutation({
@@ -521,6 +520,18 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                       <button type="button" onClick={() => openTagEditor(selectedContactIds, "remove")} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] hover:bg-[#f5f8fa]">
                         <X className="h-3.5 w-3.5" />Remove tag
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Remove ${selectedContactIds.length} ${selectedContactIds.length === 1 ? "contact" : "contacts"} from your CRM? Shared contacts will remain available to other companies.`)) {
+                            removeContactsMutation.mutate(selectedContactIds);
+                          }
+                        }}
+                        disabled={removeContactsMutation.isPending}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                      >
+                        <UserRound className="h-3.5 w-3.5" />Remove contact
+                      </button>
                     </>
                   )}
                 </>
@@ -720,6 +731,24 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                   </div>
                 )}
               </div>
+              {!adminMode && (
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    disabled={removeContactsMutation.isPending}
+                    onClick={() => {
+                      const name = [selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(" ") || "this contact";
+                      if (window.confirm(`Remove ${name} from your CRM? Shared contacts will remain available to other companies.`)) {
+                        removeContactsMutation.mutate([selectedContact.id]);
+                      }
+                    }}
+                  >
+                    <UserRound className="mr-2 h-4 w-4" />Remove from my CRM
+                  </Button>
+                </DialogFooter>
+              )}
             </>
           )}
         </DialogContent>
@@ -803,12 +832,12 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={renameOpen} onOpenChange={(open) => { if (!open && !renameMutation.isPending && !deleteTagMutation.isPending) setRenameOpen(false); }}>
+          <Dialog open={renameOpen} onOpenChange={(open) => { if (!open && !renameMutation.isPending) setRenameOpen(false); }}>
             <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>Manage CRM tags</DialogTitle>
                 <DialogDescription>
-                  Create, rename, or delete private tags for your company. These actions do not affect another company’s contacts or shared source tags.
+                  Create or rename private tags for your company. These actions do not affect another company’s contacts or shared source tags.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
@@ -841,27 +870,10 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                 </div>
                 <div>
                   <Label htmlFor="crm-old-tag">Existing tag</Label>
-                   <div className="mt-1.5 flex gap-2">
-                     <select id="crm-old-tag" value={renameOldTag} onChange={(event) => setRenameOldTag(event.target.value)} className="h-10 min-w-0 flex-1 rounded-md border border-[#d7e2e9] bg-white px-3 text-sm text-[#405a70] outline-none">
-                       <option value="">Choose a tag</option>
-                       {availableTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
-                     </select>
-                     <Button
-                       type="button"
-                       variant="outline"
-                       className="h-10 shrink-0 border-red-200 px-3 text-red-600 hover:bg-red-50 hover:text-red-700"
-                       disabled={!renameOldTag.trim() || renameMutation.isPending || deleteTagMutation.isPending}
-                       onClick={() => {
-                         const tag = renameOldTag.trim();
-                         if (tag && window.confirm(`Delete “${tag}” from all of your CRM contacts? This cannot be undone.`)) {
-                           deleteTagMutation.mutate(tag);
-                         }
-                       }}
-                     >
-                       {deleteTagMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
-                       Delete
-                     </Button>
-                   </div>
+                   <select id="crm-old-tag" value={renameOldTag} onChange={(event) => setRenameOldTag(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-[#d7e2e9] bg-white px-3 text-sm text-[#405a70] outline-none">
+                     <option value="">Choose a tag</option>
+                     {availableTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+                   </select>
                 </div>
                 <div>
                   <Label htmlFor="crm-new-tag">New tag name</Label>
@@ -870,10 +882,10 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                 </div>
               </div>
                <DialogFooter>
-                 <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={renameMutation.isPending || deleteTagMutation.isPending}>Cancel</Button>
+                 <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={renameMutation.isPending}>Cancel</Button>
                 <Button
                   onClick={() => renameMutation.mutate({ oldTag: renameOldTag.trim(), newTag: renameNewTag.trim() })}
-                   disabled={!renameOldTag.trim() || !renameNewTag.trim() || renameOldTag.trim() === renameNewTag.trim() || renameMutation.isPending || deleteTagMutation.isPending}
+                   disabled={!renameOldTag.trim() || !renameNewTag.trim() || renameOldTag.trim() === renameNewTag.trim() || renameMutation.isPending}
                   style={{ backgroundColor: primaryColor }}
                   className="text-white"
                 >

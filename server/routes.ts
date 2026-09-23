@@ -4448,6 +4448,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         const privateCrmRows = await db.select({
           brokerId: developerBrokerCrm.brokerId,
           crmTags: developerBrokerCrm.crmTags,
+         isRemoved: developerBrokerCrm.isRemoved,
           crmNotes: developerBrokerCrm.crmNotes,
           lastContactedAt: developerBrokerCrm.lastContactedAt,
           assignedTo: developerBrokerCrm.assignedTo,
@@ -15262,6 +15263,7 @@ RULES:
       const privateCrmRows = await db.select({
         brokerId: developerBrokerCrm.brokerId,
         crmTags: developerBrokerCrm.crmTags,
+         isRemoved: developerBrokerCrm.isRemoved,
         crmNotes: developerBrokerCrm.crmNotes,
         lastContactedAt: developerBrokerCrm.lastContactedAt,
         assignedTo: developerBrokerCrm.assignedTo,
@@ -15269,6 +15271,7 @@ RULES:
       const privateCrmByBroker = new Map(privateCrmRows.map((row) => [row.brokerId, row]));
       const contacts = allContacts
         .filter((contact) => isSharedBrokerVisible(contact, developerProfileId, visibility))
+         .filter((contact) => !privateCrmByBroker.get(contact.id)?.isRemoved)
         .map((contact) => {
           const privateCrm = privateCrmByBroker.get(contact.id);
           if (privateCrm) return { ...contact, ...privateCrm };
@@ -15281,6 +15284,72 @@ RULES:
     } catch (error: any) {
       console.error('[developer-profile/me/contacts] Error:', error);
       return res.status(500).json({ error: 'Failed to load contacts' });
+    }
+  });
+
+  app.post("/api/developer-profile/me/contacts/remove", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const contactIds = Array.isArray(req.body?.contactIds)
+        ? Array.from(new Set(req.body.contactIds
+          .filter((id: unknown): id is string => typeof id === "string" && id.trim())
+          .map((id: string) => id.trim())))
+        : [];
+      if (!contactIds.length || contactIds.length > 500) {
+        return res.status(400).json({ error: "Between one and 500 contact IDs are required" });
+      }
+
+      const visibility = await getDeveloperContactVisibility(developerProfileId);
+      const removedIds = await db.transaction(async (tx) => {
+        const visibleContacts = await tx.select({
+          id: brokers.id,
+          firstName: brokers.firstName,
+          lastName: brokers.lastName,
+          email: brokers.email,
+          phone: brokers.phone,
+          brokerage: brokers.brokerage,
+          stateRegion: brokers.stateRegion,
+          contactSector: brokers.contactSector,
+          contactCounty: brokers.contactCounty,
+          contactSpecialty: brokers.contactSpecialty,
+          ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
+          userId: brokers.userId,
+        }).from(brokers).where(and(
+          inArray(brokers.id, contactIds),
+          isNonDemoBroker(),
+        ));
+        const eligibleContacts = visibleContacts.filter((contact) => isSharedBrokerVisible(contact, developerProfileId, visibility));
+        const removed: string[] = [];
+        for (const contact of eligibleContacts) {
+          const [existingCrm] = await tx.select().from(developerBrokerCrm).where(and(
+            eq(developerBrokerCrm.developerProfileId, developerProfileId),
+            eq(developerBrokerCrm.brokerId, contact.id),
+          )).limit(1);
+          await tx.insert(developerBrokerCrm).values({
+            developerProfileId,
+            brokerId: contact.id,
+            crmTags: existingCrm?.crmTags || [],
+            isRemoved: true,
+            crmNotes: existingCrm?.crmNotes || null,
+            lastContactedAt: existingCrm?.lastContactedAt || null,
+            assignedTo: existingCrm?.assignedTo || null,
+            updatedAt: new Date(),
+          } as any).onConflictDoUpdate({
+            target: [developerBrokerCrm.developerProfileId, developerBrokerCrm.brokerId],
+            set: { isRemoved: true, updatedAt: new Date() },
+          });
+          removed.push(contact.id);
+        }
+        return removed;
+      });
+
+      return res.json({ removedCount: removedIds.length, removedIds });
+    } catch (error: any) {
+      console.error("[developer-profile/me/contacts/remove] Error:", error);
+      return res.status(500).json({ error: "Failed to remove contacts from your CRM" });
     }
   });
 
@@ -15514,55 +15583,6 @@ RULES:
     } catch (error: any) {
       console.error("[developer-profile/me/crm-tags/rename] Error:", error);
       return res.status(500).json({ error: "Failed to rename CRM tag" });
-    }
-  });
-
-  // Delete a private CRM tag everywhere it appears for this Investment Company.
-  // Shared-contact state is scoped through developer_broker_crm; company-owned
-  // contacts use the legacy brokers.crm_tags column.
-  app.post("/api/developer-profile/me/crm-tags/delete", isAuthenticated, async (req: any, res) => {
-    try {
-      const developerProfileId = getDeveloperProfileId(req, res);
-      if (!developerProfileId) return;
-      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
-
-      const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
-      if (!name || name.length > 160) {
-        return res.status(400).json({ error: "Tag name must be between 1 and 160 characters" });
-      }
-
-      const updatedCount = await db.transaction(async (tx) => {
-        const ownedResult = await tx.execute(sql`
-          UPDATE brokers
-          SET crm_tags = array_remove(crm_tags, ${name}::text),
-              updated_at = NOW()
-          WHERE owner_developer_profile_id = ${developerProfileId}
-            AND ${name} = ANY(COALESCE(crm_tags, ARRAY[]::text[]))
-            AND NOT EXISTS (
-              SELECT 1
-              FROM users AS demo_owner
-              WHERE demo_owner.id = brokers.user_id
-                AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
-            )
-        `);
-        const sharedResult = await tx.execute(sql`
-          UPDATE developer_broker_crm
-          SET crm_tags = array_remove(crm_tags, ${name}::text),
-              updated_at = NOW()
-          WHERE developer_profile_id = ${developerProfileId}
-            AND ${name} = ANY(COALESCE(crm_tags, ARRAY[]::text[]))
-        `);
-        await tx.delete(developerCrmTags).where(and(
-          eq(developerCrmTags.developerProfileId, developerProfileId),
-          eq(developerCrmTags.name, name),
-        ));
-        return Number(ownedResult.rowCount || 0) + Number(sharedResult.rowCount || 0);
-      });
-
-      return res.json({ name, updatedCount });
-    } catch (error: any) {
-      console.error("[developer-profile/me/crm-tags/delete] Error:", error);
-      return res.status(500).json({ error: "Failed to delete CRM tag" });
     }
   });
 

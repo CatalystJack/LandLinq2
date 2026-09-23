@@ -349,6 +349,8 @@ setTimeout(() => {
              ADD COLUMN IF NOT EXISTS crm_contact_states text[] NOT NULL DEFAULT ARRAY[]::text[],
              ADD COLUMN IF NOT EXISTS crm_contact_product_types text[] NOT NULL DEFAULT ARRAY[]::text[],
             ADD COLUMN IF NOT EXISTS crm_contact_source_tags text[] NOT NULL DEFAULT ARRAY[]::text[];
+        ALTER TABLE IF EXISTS developer_broker_crm
+          ADD COLUMN IF NOT EXISTS is_removed boolean NOT NULL DEFAULT false;
         CREATE TABLE IF NOT EXISTS developer_quick_links (
           id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
           developer_profile_id varchar NOT NULL REFERENCES developer_profiles(id) ON DELETE CASCADE,

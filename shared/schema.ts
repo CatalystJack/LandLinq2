@@ -308,6 +308,7 @@ export const developerBrokerCrm = pgTable("developer_broker_crm", {
   developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id, { onDelete: "cascade" }).notNull(),
   brokerId: varchar("broker_id").references(() => brokers.id, { onDelete: "cascade" }).notNull(),
   crmTags: text("crm_tags").array().default(sql`ARRAY[]::text[]`).notNull(),
+  isRemoved: boolean("is_removed").default(false).notNull(),
   crmNotes: text("crm_notes"),
   lastContactedAt: timestamp("last_contacted_at"),
   assignedTo: text("assigned_to"),

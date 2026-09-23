@@ -141,6 +141,7 @@ export class DatabaseManager {
         developer_profile_id VARCHAR NOT NULL REFERENCES developer_profiles(id) ON DELETE CASCADE,
         broker_id VARCHAR NOT NULL REFERENCES brokers(id) ON DELETE CASCADE,
         crm_tags TEXT[] NOT NULL DEFAULT ARRAY[]::text[],
+        is_removed BOOLEAN NOT NULL DEFAULT FALSE,
         crm_notes TEXT,
         last_contacted_at TIMESTAMP,
         assigned_to TEXT,
@@ -151,6 +152,7 @@ export class DatabaseManager {
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS developer_broker_crm_profile_idx ON developer_broker_crm(developer_profile_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS developer_broker_crm_broker_idx ON developer_broker_crm(broker_id)`);
+    await db.execute(sql`ALTER TABLE developer_broker_crm ADD COLUMN IF NOT EXISTS is_removed BOOLEAN NOT NULL DEFAULT FALSE`);
 
     // Internal sales pipeline tables used by the platform admin workspace.
     await db.execute(sql`
