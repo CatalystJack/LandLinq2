@@ -296,7 +296,7 @@ export default function SharedContactAccessEditor({
                 {key === "sectors" && "Leave all sectors unchecked to include every sector."}
                 {key === "states" && "Choose NC, TN, or any other state represented in the imported directory."}
                 {key === "counties" && "Choose counties from the imported contact data. Use States too when you need state-specific matching."}
-                {key === "productTypes" && "Product types are derived from the imported contact tags."}
+                {key === "productTypes" && "Product types are derived from the imported Product Type field and contact tags."}
                 {key === "sourceTags" && "Select any source tags this company should see. Leave all unchecked to include every source tag."}
               </p>
             </div>

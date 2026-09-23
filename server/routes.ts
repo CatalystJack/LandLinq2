@@ -4439,6 +4439,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
         contactSector: (brokers as any).contactSector,
         contactCounty: (brokers as any).contactCounty,
+        contactSpecialty: (brokers as any).contactSpecialty,
         userId: brokers.userId,
         createdAt: brokers.createdAt,
       }).from(brokers).orderBy(desc(brokers.createdAt));
@@ -13612,13 +13613,24 @@ RULES:
 
   app.get("/api/crm/source-tags", isAuthenticated, async (_req: any, res) => {
     try {
-      const [tagResult, stateResult, countyResult, sectorResult] = await Promise.all([
+      const [tagResult, specialtyResult, stateResult, countyResult, sectorResult] = await Promise.all([
         db.execute(sql`
         SELECT DISTINCT LOWER(BTRIM(tag_value)) AS tag
         FROM brokers
         CROSS JOIN LATERAL unnest(COALESCE(source_tags, ARRAY[]::text[])) AS tag_value
         WHERE BTRIM(tag_value) <> ''
         ORDER BY tag
+        `),
+        db.execute(sql`
+          SELECT DISTINCT LOWER(BTRIM(specialty_value)) AS product_type
+          FROM brokers
+          CROSS JOIN LATERAL regexp_split_to_table(
+            COALESCE(contact_specialty, ''),
+            '\\s*[;,|]\\s*'
+          ) AS specialty_value
+          WHERE BTRIM(specialty_value) <> ''
+            AND LOWER(BTRIM(specialty_value)) NOT IN ('unknown', 'needs review')
+          ORDER BY product_type
         `),
         db.execute(sql`
           SELECT UPPER(BTRIM(state_value)) AS state, COUNT(*)::int AS contacts
@@ -13655,7 +13667,7 @@ RULES:
         "nh", "nj", "nm", "ny", "nc", "nd", "oh", "ok", "or", "pa", "ri", "sc", "sd", "tn",
         "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "dc",
       ]);
-      const productTypes = sourceTags.filter((tag) =>
+      const sourceTagProductTypes = sourceTags.filter((tag) =>
         !stateCodes.has(tag) &&
         tag !== "residential" &&
         tag !== "commercial" &&
@@ -13664,6 +13676,13 @@ RULES:
         !tag.endsWith(" county") &&
         !tag.startsWith("out of state ("),
       );
+      const importedProductTypes = (specialtyResult.rows as Array<{ product_type: unknown }>)
+        .map((row) => String(row.product_type || "").trim().toLowerCase())
+        .filter(Boolean);
+      const productTypes = Array.from(new Set([
+        ...importedProductTypes,
+        ...sourceTagProductTypes,
+      ])).sort((a, b) => a.localeCompare(b));
       const countyMap = new Map<string, { state: string; county: string; contacts: number }>();
       for (const row of countyResult.rows as Array<{ state_region: unknown; county: unknown; contacts: unknown }>) {
         const county = String(row.county || "").trim();
@@ -14356,6 +14375,7 @@ RULES:
       ownerDeveloperProfileId?: string | null;
       contactSector?: string | null;
       contactCounty?: string | null;
+      contactSpecialty?: string | null;
       stateRegion?: string | null;
       sourceTags?: string[] | null;
       userId?: string | null;
@@ -14381,11 +14401,18 @@ RULES:
     const brokerSourceTags = Array.isArray(broker.sourceTags)
       ? broker.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
       : [];
+    const brokerProductTypes = new Set([
+      ...brokerSourceTags,
+      ...String(broker.contactSpecialty || "")
+        .split(/[;,|]/g)
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean),
+    ]);
     return (
       (visibility.sectors.length === 0 || visibility.sectors.includes(sector)) &&
       (visibility.states.length === 0 || brokerStates.some((state) => visibility.states.includes(state))) &&
       (visibility.counties.length === 0 || visibility.counties.includes(county)) &&
-      (visibility.productTypes.length === 0 || visibility.productTypes.some((productType) => brokerSourceTags.includes(productType))) &&
+      (visibility.productTypes.length === 0 || visibility.productTypes.some((productType) => brokerProductTypes.has(productType))) &&
       (visibility.sourceTags.length === 0 || visibility.sourceTags.some((tag) => brokerSourceTags.includes(tag)))
     );
   }
@@ -14396,6 +14423,7 @@ RULES:
       ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
       contactSector: brokers.contactSector,
       contactCounty: brokers.contactCounty,
+      contactSpecialty: brokers.contactSpecialty,
       stateRegion: brokers.stateRegion,
       sourceTags: brokers.sourceTags,
       userId: brokers.userId,
@@ -15277,6 +15305,7 @@ RULES:
         ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
          contactSector: brokers.contactSector,
          contactCounty: brokers.contactCounty,
+         contactSpecialty: brokers.contactSpecialty,
          userId: brokers.userId,
         createdAt: brokers.createdAt,
        }).from(brokers).where(isNonDemoBroker()).orderBy(desc(brokers.createdAt));
@@ -15404,6 +15433,7 @@ RULES:
           stateRegion: brokers.stateRegion,
           contactSector: brokers.contactSector,
           contactCounty: brokers.contactCounty,
+          contactSpecialty: brokers.contactSpecialty,
           userId: brokers.userId,
         }).from(brokers).where(and(
           inArray(brokers.id, contactIds),
