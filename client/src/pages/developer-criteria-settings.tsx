@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import IndustrialCriteriaFields from "@/components/industrial-criteria-fields";
+import SharedContactAccessEditor from "@/components/shared-contact-access-editor";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
   type DeveloperAssetClass,
@@ -300,6 +301,7 @@ export default function DeveloperCriteriaSettings() {
   const [quickLinkLabel, setQuickLinkLabel] = useState("");
   const [quickLinkUrl, setQuickLinkUrl] = useState("");
   const [editingQuickLinkId, setEditingQuickLinkId] = useState<string | null>(null);
+  const [quickLinksOpen, setQuickLinksOpen] = useState(false);
   const [assumptionsOpenIndex, setAssumptionsOpenIndex] = useState<number | null>(null);
 
   const profileQuery = useQuery<{ profile: Profile }>({
@@ -503,6 +505,7 @@ export default function DeveloperCriteriaSettings() {
       setQuickLinkLabel("");
       setQuickLinkUrl("");
       setEditingQuickLinkId(null);
+      setQuickLinksOpen(false);
       toast({ title: "Quick link saved" });
     },
     onError: (error: Error) => toast({
@@ -520,6 +523,7 @@ export default function DeveloperCriteriaSettings() {
         setQuickLinkLabel("");
         setQuickLinkUrl("");
         setEditingQuickLinkId(null);
+        setQuickLinksOpen(false);
       }
       toast({ title: "Quick link deleted" });
     },
@@ -700,66 +704,15 @@ export default function DeveloperCriteriaSettings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 border-t border-slate-100 pt-5">
-              <div>
-                <Label>Contact sectors</Label>
-                <div className="mt-3 flex flex-wrap gap-5">
-                  {["commercial", "residential"].map((sector) => (
-                    <label key={sector} className="flex items-center gap-2 text-sm text-slate-700">
-                      <Checkbox
-                        checked={form.crmContactSectors.includes(sector)}
-                        onCheckedChange={(checked) => update(
-                          "crmContactSectors",
-                          checked
-                            ? Array.from(new Set([...form.crmContactSectors, sector]))
-                            : form.crmContactSectors.filter((value) => value !== sector),
-                        )}
-                      />
-                      {sector === "commercial" ? "Commercial" : "Residential"}
-                    </label>
-                  ))}
-                  <span className="text-xs text-slate-500">Leave both unchecked to include all sectors.</span>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="crm-contact-counties">North Carolina counties</Label>
-                <Input
-                  id="crm-contact-counties"
-                  className="mt-2"
-                  value={form.crmContactCounties.join(", ")}
-                  onChange={(event) => update(
-                    "crmContactCounties",
-                    event.target.value.split(",").map((value) => value.trim().toLowerCase()).filter(Boolean),
-                  )}
-                  placeholder="Mecklenburg, Wake, Buncombe"
-                />
-                <p className="mt-1 text-xs text-slate-500">Leave blank to include every county. County filtering applies to shared contacts only.</p>
-              </div>
-              <div>
-                <Label>Source tags</Label>
-                <div className="mt-3 max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-white p-3">
-                  {sourceTagsQuery.data?.length ? (
-                    <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-                      {sourceTagsQuery.data.map((tag) => (
-                        <label key={tag} className="flex items-center gap-2 text-sm text-slate-700">
-                          <Checkbox
-                            checked={form.crmContactSourceTags.includes(tag.toLowerCase())}
-                            onCheckedChange={(checked) => update(
-                              "crmContactSourceTags",
-                              checked
-                                ? Array.from(new Set([...form.crmContactSourceTags, tag.toLowerCase()]))
-                                : form.crmContactSourceTags.filter((value) => value !== tag.toLowerCase()),
-                            )}
-                          />
-                          {tag}
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500">No imported source tags are available yet.</p>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-slate-500">Leave all unchecked to include every source tag. A contact is shown when it has at least one selected source tag.</p>
-              </div>
+              <SharedContactAccessEditor
+                sectors={form.crmContactSectors}
+                counties={form.crmContactCounties}
+                sourceTags={form.crmContactSourceTags}
+                sourceTagOptions={sourceTagsQuery.data || []}
+                onSectorsChange={(values) => update("crmContactSectors", values)}
+                onCountiesChange={(values) => update("crmContactCounties", values)}
+                onSourceTagsChange={(values) => update("crmContactSourceTags", values)}
+              />
             </CardContent>
           </Card>
           <div className="grid gap-6 lg:grid-cols-2">
@@ -1127,14 +1080,30 @@ export default function DeveloperCriteriaSettings() {
 
           <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>
-              <div className="flex items-start gap-3">
-                <div className="rounded-xl p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>
-                  <ExternalLink className="h-5 w-5" />
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="rounded-xl p-2" style={{ backgroundColor: `${secondaryColor}18`, color: primaryColor }}>
+                    <ExternalLink className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle>Quick Links</CardTitle>
+                    <CardDescription>Save the software and resources your team uses most.</CardDescription>
+                  </div>
                 </div>
-                <div>
-                  <CardTitle>Quick Links</CardTitle>
-                  <CardDescription>Save the software and resources your team uses most.</CardDescription>
-                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => {
+                    setEditingQuickLinkId(null);
+                    setQuickLinkLabel("");
+                    setQuickLinkUrl("");
+                    setQuickLinksOpen(true);
+                  }}
+                >
+                  <Plus className="mr-1 h-4 w-4" />Add link
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-5 border-t border-slate-100 pt-5">
@@ -1165,6 +1134,7 @@ export default function DeveloperCriteriaSettings() {
                             setEditingQuickLinkId(link.id);
                             setQuickLinkLabel(link.label);
                             setQuickLinkUrl(link.url);
+                            setQuickLinksOpen(true);
                           }}
                           aria-label={`Edit ${link.label}`}
                         >
@@ -1188,10 +1158,25 @@ export default function DeveloperCriteriaSettings() {
                 <p className="rounded-lg bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">No quick links saved yet.</p>
               )}
 
-              <div className="border-t border-slate-100 pt-5">
-                <p className="mb-3 text-sm font-semibold text-slate-800">
-                  {editingQuickLinkId ? "Edit link" : "Add Link"}
-                </p>
+              {quickLinksOpen && <div className="border-t border-slate-100 pt-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-800">
+                    {editingQuickLinkId ? "Edit link" : "Add link"}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditingQuickLinkId(null);
+                      setQuickLinkLabel("");
+                      setQuickLinkUrl("");
+                      setQuickLinksOpen(false);
+                    }}
+                  >
+                    Close
+                  </Button>
+                </div>
                 <div className="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.4fr)_auto] md:items-end">
                   <div>
                     <Label htmlFor="quick-link-label">Label</Label>
@@ -1237,22 +1222,9 @@ export default function DeveloperCriteriaSettings() {
                       {quickLinkMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                       Save
                     </Button>
-                    {editingQuickLinkId && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingQuickLinkId(null);
-                          setQuickLinkLabel("");
-                          setQuickLinkUrl("");
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    )}
                   </div>
                 </div>
-              </div>
+              </div>}
             </CardContent>
           </Card>
 
