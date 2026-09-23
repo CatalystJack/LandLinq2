@@ -54,3 +54,4 @@
 - [Shared broker CRM boundary](shared-broker-crm-boundary.md) — shared broker identity is filtered by company settings; tags, notes, assignments, and outreach state are profile-scoped.
 - [Broker workbook import](broker-workbook-import.md) — import by source license with shared-email dedupe; never overwrite company-private CRM state.
 - [Publishing schema drift](publishing-schema-drift.md) — successful builds can still fail at publish-time schema sync; inspect additive diffs before changing app code.
+- [Broker import promotion](broker-import-production-promotion.md) — importing into development does not populate the published CRM; production must be initialized from current development data during publish.
