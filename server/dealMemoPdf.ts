@@ -30,7 +30,15 @@ function loadNewsreaderFonts(): string {
   }).join("");
 }
 
-const newsreaderFontFaces = loadNewsreaderFonts();
+let newsreaderFontFaces = "";
+try {
+  newsreaderFontFaces = loadNewsreaderFonts();
+} catch (error) {
+  console.error(
+    "[deal memo PDF] Newsreader font loading failed; using the system serif fallback",
+    error,
+  );
+}
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "")
@@ -234,11 +242,12 @@ export function renderDealMemoHtml(deal: DealMemoInput, branding: DealMemoBrandi
   const costPerUnit = totalProjectCost !== null && unitCount
     ? formatMoney(totalProjectCost / unitCount)
     : "—";
-  const computedIrr = formatPercent(deal.automatedIrr) !== "—"
-    ? formatPercent(deal.automatedIrr)
+  const automatedIrr = formatPercent(deal.automatedIrr);
+  const computedIrr = automatedIrr !== "—"
+    ? automatedIrr
     : getComputedFiveYearIrr(deal);
   const fifthMetric = computedIrr !== "—"
-    ? { label: deal.automatedIrr ? "Auto-IRR" : "5-Yr Auto-IRR", value: computedIrr }
+    ? { label: automatedIrr !== "—" ? "Auto-IRR" : "5-Yr Auto-IRR", value: computedIrr }
     : { label: "Exit Cap", value: formatPercent(deal.marketCapRate) };
   const metrics = [
     { label: "Total Development Cost", value: formatMoney(deal.totalProjectCost) },
