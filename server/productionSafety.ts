@@ -81,6 +81,28 @@ export const REQUIRED_ENV_VARS = {
   }
 } as const;
 
+const EMAIL_DELIVERY_ENV_VARS = [
+  'HELP_EMAIL_PASSWORD',
+  'MICROSOFT_CLIENT_ID',
+  'MICROSOFT_CLIENT_SECRET',
+  'MICROSOFT_TENANT_ID',
+] as const;
+
+export type EmailConfigurationStatus = {
+  configured: boolean;
+  status: 'configured' | 'warning';
+  missing: string[];
+};
+
+export function getEmailConfigurationStatus(): EmailConfigurationStatus {
+  const missing = EMAIL_DELIVERY_ENV_VARS.filter((envVar) => !process.env[envVar]);
+  return {
+    configured: missing.length === 0,
+    status: missing.length === 0 ? 'configured' : 'warning',
+    missing: [...missing],
+  };
+}
+
 /**
  * Validate all required environment variables
  */
@@ -171,6 +193,20 @@ export async function runProductionSafetyCheck(): Promise<{
   
   if (!envValidation.valid) {
     recommendations.push('Configure missing environment variables immediately');
+  }
+
+  // Email delivery is important for password resets and account invitations,
+  // but missing credentials should warn without blocking application startup.
+  const emailConfiguration = getEmailConfigurationStatus();
+  checks.push({
+    name: 'Email Delivery Configuration',
+    status: emailConfiguration.configured ? 'PASS' : 'WARN',
+    message: emailConfiguration.configured
+      ? 'Password-reset and account-invitation email credentials are configured'
+      : `Missing email configuration: ${emailConfiguration.missing.join(', ')}`,
+  });
+  if (!emailConfiguration.configured) {
+    recommendations.push('Configure email delivery credentials before relying on password resets or account invitations');
   }
   
   // Database Backup Check

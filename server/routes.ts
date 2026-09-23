@@ -19089,6 +19089,56 @@ RULES:
         VALUES (${email.toLowerCase()}, ${passwordHash}, ${firstName}, ${lastName}, ${brokerage || null}, ${phone || null}, ${status || 'active'}, ${toSqlArr(targetStates || [])}, ${toSqlArr(targetMsas || [])}, ${toSqlArr(targetCities || [])}, ${notes || null})
         RETURNING id, email, first_name, last_name, brokerage, status, created_at
       `).then(r => r.rows as any[]);
+
+      const baseUrl = (process.env.BASE_URL || 'https://landlinq.ai').replace(/\/$/, '');
+      const loginUrl = `${baseUrl}/broker-portal`;
+      const welcomeHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1e293b">
+          <div style="margin-bottom:28px">
+            <img src="https://landlinq.ai/assets/landlinq-email-logo.png" alt="LandLinq" style="height:32px" />
+          </div>
+          <h2 style="color:#0d2d4e;margin:0 0 12px">Welcome to the LandLinq Partner Broker Portal</h2>
+          <p style="margin:0 0 16px;color:#475569;line-height:1.6">
+            Hi ${firstName},<br/><br/>
+            Your LandLinq Partner Broker Portal account is ready. You can sign in to view active deals in your target markets.
+          </p>
+          <a href="${loginUrl}" style="display:inline-block;background:#0d2d4e;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:14px;margin:8px 0 24px">
+            Sign In to Broker Portal →
+          </a>
+          <p style="margin:0 0 16px;color:#475569;line-height:1.6">
+            Use the password provided by your administrator to sign in.
+          </p>
+          <p style="color:#94a3b8;font-size:12px;margin:24px 0 0;border-top:1px solid #e2e8f0;padding-top:16px">
+            LandLinq · Partner Broker Portal · <a href="${loginUrl}" style="color:#0d2d4e">${loginUrl}</a>
+          </p>
+        </div>`;
+
+      try {
+        const { sendNotificationEmail } = await import('./emailService');
+        const emailSent = await sendNotificationEmail({
+          to: account.email,
+          subject: 'Welcome to the LandLinq Partner Broker Portal',
+          html: welcomeHtml,
+          type: 'broker_welcome',
+          priority: 'high',
+        });
+        if (!emailSent) {
+          console.error('❌ [broker-portal] Account created but welcome email was not accepted', {
+            accountId: account.id,
+            email: account.email,
+          });
+          return res.status(502).json({
+            message: 'Broker account created, but the welcome email could not be sent. Please verify the email settings and try again.',
+          });
+        }
+      } catch (emailError) {
+        console.error('❌ [broker-portal] Account created but welcome email failed:', emailError);
+        return res.status(502).json({
+          message: 'Broker account created, but the welcome email could not be sent. Please verify the email settings and try again.',
+        });
+      }
+
+      console.log(`✅ [broker-portal] Welcome email sent to ${account.email}`);
       res.status(201).json({ id: account.id, email: account.email, firstName: account.first_name, lastName: account.last_name, brokerage: account.brokerage, status: account.status });
     } catch (err: any) {
       if (err.message?.includes('unique')) return res.status(409).json({ message: 'An account with this email already exists' });

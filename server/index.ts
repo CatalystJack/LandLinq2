@@ -3,9 +3,20 @@ import compression from "compression";
 import { createServer } from "http";
 import { setupVite, serveStatic, log } from "./vite";
 import { EmailTestEndpoint } from "./emailTestEndpoint";
+import { getEmailConfigurationStatus } from "./productionSafety";
 
 if (!process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET is required; refusing to start");
+}
+
+const emailConfiguration = getEmailConfigurationStatus();
+if (!emailConfiguration.configured) {
+  console.error(
+    `🚨 EMAIL DELIVERY CONFIGURATION WARNING: missing ${emailConfiguration.missing.join(", ")}. ` +
+    "Password resets and account invitations may fail until these credentials are configured.",
+  );
+} else {
+  console.log("✅ Email delivery configuration detected for password resets and account invitations");
 }
 // DEPLOYMENT FIX: Removed static imports of heavy modules
 // These are now dynamically imported AFTER deployment health checks pass
@@ -188,7 +199,8 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
     service: "landlinq-api",
     serverStarted,
-    routesLoaded
+    routesLoaded,
+    email: getEmailConfigurationStatus(),
   });
 });
 
@@ -210,12 +222,17 @@ app.get("/", (req, res, next) => {
 app.get("/ready", (req, res) => {
   // INSTANT response for deployment - check env vars only (synchronous)
   const hasRequiredEnvVars = !!(process.env.DATABASE_URL && process.env.SESSION_SECRET);
+  const emailConfiguration = getEmailConfigurationStatus();
   
   if (!hasRequiredEnvVars) {
     return res.status(503).json({ 
       status: "not_ready", 
       reason: "Missing required environment variables",
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      checks: {
+        environment: "missing_required_variables",
+        email: emailConfiguration,
+      },
     });
   }
 
@@ -227,7 +244,8 @@ app.get("/ready", (req, res) => {
     routesLoaded,
     heavyInitComplete,
     checks: {
-      environment: "configured"
+      environment: "configured",
+      email: emailConfiguration,
     }
   });
 });
@@ -1250,6 +1268,11 @@ setTimeout(() => {
         // Run immediate safety check
         const safetyCheck = await runProductionSafetyCheck();
         log(`🔒 Production Safety Status: ${safetyCheck.overall}`);
+
+        const emailCheck = safetyCheck.checks.find((check) => check.name === 'Email Delivery Configuration');
+        if (emailCheck?.status === 'WARN') {
+          log(`🚨 ${emailCheck.name}: ${emailCheck.message}`);
+        }
         
         if (safetyCheck.overall === 'CRITICAL') {
           log("🚨 CRITICAL PRODUCTION ISSUES DETECTED:");

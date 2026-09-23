@@ -1,4 +1,5 @@
 import { storage } from './storage.js';
+import { randomBytes } from 'crypto';
 import { AutoClassificationEngine } from './autoClassificationEngine.js';
 import { hellodataService } from './hellodataService.js';
 import { geocodioService } from './geocodioService.js';
@@ -2391,7 +2392,7 @@ export class UnifiedDealPipeline {
         } else {
           // Create user account for new broker
           const { hashPassword } = await import('./auth');
-          tempPassword = `temp${Date.now()}`; // Temporary password
+          tempPassword = randomBytes(12).toString('base64url'); // Cryptographically random temporary password
           const hashedPassword = await hashPassword(tempPassword);
           
           console.log(`👤 Creating user account for broker: ${submissionData.contactEmail}`);
