@@ -5003,6 +5003,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
       }).from(brokers).where(and(eq(brokers.id, id), isNonDemoBroker())).limit(1);
       if (!targetBroker) return res.status(404).json({ message: "Contact not found" });
+      if (developerProfileId && !await canDeveloperAccessBroker(id, developerProfileId)) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
       const isSharedContact = !!developerProfileId && targetBroker.ownerDeveloperProfileId !== developerProfileId;
       if (isSharedContact && [firstName, lastName, email, phone, brokerage].some((value) => value !== undefined)) {
         return res.status(403).json({ message: "Shared contact identity is managed by LandLinq" });
@@ -5186,12 +5189,26 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.delete("/api/crm/contacts/:id", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      const userEmail = user?.email || "";
-      if (!isPlatformAdminEmail(userEmail) && !isSuperAdminEmail(userEmail)) {
-        return res.status(403).json({ message: "Access denied. Admin privileges are required to delete CRM contacts." });
-      }
+      const userEmail = user?.email || user?.claims?.email || "";
+      const isAdmin = isPlatformAdminEmail(userEmail) || isSuperAdminEmail(userEmail);
+      const isDeveloper = String(user?.role || "").toUpperCase() === "DEVELOPER";
+      const developerProfileId = isDeveloper ? getDeveloperProfileId(req, res) : null;
+      if (isDeveloper && !developerProfileId) return;
+      if (developerProfileId && !await requireActiveDeveloperProfile(developerProfileId, res)) return;
 
       const { id } = req.params;
+      if (!isAdmin) {
+        if (!developerProfileId || !await canDeveloperAccessBroker(id, developerProfileId)) {
+          return res.status(404).json({ message: "Contact not found" });
+        }
+        const [targetBroker] = await db.select({
+          ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
+        }).from(brokers).where(and(eq(brokers.id, id), isNonDemoBroker())).limit(1);
+        if (!targetBroker || targetBroker.ownerDeveloperProfileId !== developerProfileId) {
+          return res.status(403).json({ message: "Shared contact identity is managed by LandLinq" });
+        }
+      }
+
       const pg = safePgArray([id]);
       await db.transaction(async (tx) => {
         await tx.execute(sql.raw(`UPDATE brokers SET referred_by = NULL WHERE referred_by = ANY(${pg})`));
@@ -5399,6 +5416,30 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.delete("/api/crm/enrollments/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
+      const user = req.user as any;
+      const userEmail = user?.email || user?.claims?.email || "";
+      const isAdmin = isPlatformAdminEmail(userEmail) || isSuperAdminEmail(userEmail);
+      if (!isAdmin) {
+        const isDeveloper = String(user?.role || "").toUpperCase() === "DEVELOPER";
+        const developerProfileId = isDeveloper ? getDeveloperProfileId(req, res) : null;
+        if (isDeveloper && !developerProfileId) return;
+        if (!developerProfileId) {
+          return res.status(403).json({ message: "Access denied. Investment Company access is required." });
+        }
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+        const enrollment = await db.execute(sql`
+          SELECT broker_id
+          FROM drip_campaign_enrollments
+          WHERE id = ${id}
+          LIMIT 1
+        `);
+        const brokerId = (enrollment.rows?.[0] as any)?.broker_id;
+        if (!brokerId || !await canDeveloperAccessBroker(String(brokerId), developerProfileId)) {
+          return res.status(404).json({ message: "Enrollment not found" });
+        }
+      }
+
       await db.execute(sql`
         UPDATE drip_campaign_enrollments SET status = 'cancelled' WHERE id = ${id}
       `);
@@ -14055,14 +14096,6 @@ RULES:
         }
         return saved;
       });
-      if (payload.assetClass !== "industrial") {
-        try {
-          const { recomputeDealsForDeveloperProfile } = await import("./services/yocUnderwritingService");
-          await recomputeDealsForDeveloperProfile(req.params.profileId);
-        } catch (yocError) {
-          console.error("[admin investment companies PATCH] YOC recompute failed:", yocError);
-        }
-      }
       return res.json({ profile });
     } catch (error: any) {
       console.error("[admin investment companies PATCH] Error:", error);
@@ -14867,7 +14900,7 @@ RULES:
       });
       try {
         const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
-        const recomputed = await recomputeDealYoc(result.deal.id, req.params.profileId);
+        const recomputed = await recomputeDealYoc(result.deal.id);
         if (recomputed) result.deal = recomputed;
       } catch (yocError) {
         console.error("[admin investment company deal POST] YOC recompute failed:", yocError);
@@ -15207,14 +15240,6 @@ RULES:
         };
       });
       if (!updated) return res.status(404).json({ error: 'Investment Company profile not found' });
-      if (!isIndustrial) {
-        try {
-          const { recomputeDealsForDeveloperProfile } = await import("./services/yocUnderwritingService");
-          await recomputeDealsForDeveloperProfile(developerProfileId);
-        } catch (yocError) {
-          console.error("[developer-profile/me PATCH] YOC recompute failed:", yocError);
-        }
-      }
       return res.json({ profile: updated });
     } catch (error: any) {
       console.error('[developer-profile/me PATCH] Error:', error);
@@ -17921,7 +17946,10 @@ RULES:
 
             try {
               const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
-              deal = await recomputeDealYoc(deal.id, developerProfileId) || deal;
+              // This deal row is shared. Persist only the platform baseline;
+              // the importing company's private assumptions are not a shared
+              // deal value.
+              deal = await recomputeDealYoc(deal.id) || deal;
             } catch (yocError) {
               console.error(`[developer import] YOC recompute failed for ${deal.id}:`, yocError);
             }
@@ -21835,12 +21863,6 @@ RULES:
           status: 'sent',
           matchedAt: new Date(),
         }).onConflictDoNothing();
-        try {
-          const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
-          await recomputeDealYoc(newDeal.id, developerProfileId);
-        } catch (yocError) {
-          console.error(`[quick deal] YOC recompute failed for ${newDeal.id}:`, yocError);
-        }
       }
       
       // PERFORMANCE OPTIMIZATION: Return deal IMMEDIATELY, run classification in background

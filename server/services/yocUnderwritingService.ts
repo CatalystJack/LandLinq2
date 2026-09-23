@@ -4,7 +4,6 @@ import {
   deals,
   developerProfiles,
   developerProductTypes,
-  partnerDeveloperSends,
 } from "@shared/schema";
 import { isAutomaticallyCoastal } from "@shared/coastal-counties";
 
@@ -871,41 +870,12 @@ export async function calculateYOCForProductTypes(
   return parts.join(" | ");
 }
 
-async function getDeveloperProfileIdsForDeal(dealId: string): Promise<string[]> {
-  const rows = await db.select({ developerProfileId: partnerDeveloperSends.developerProfileId })
-    .from(partnerDeveloperSends)
-    .where(eq(partnerDeveloperSends.dealId, dealId));
-  return Array.from(new Set(
-    rows.map((row) => row.developerProfileId).filter((id): id is string => Boolean(id)),
-  ));
-}
-
-export async function recomputeDealYoc(
-  dealId: string,
-  developerProfileId?: string,
-): Promise<any | undefined> {
-  const [deal] = await db.select().from(deals).where(eq(deals.id, dealId)).limit(1);
-  if (!deal) return undefined;
-  const profileId = developerProfileId || (await getDeveloperProfileIdsForDeal(dealId))[0];
-  if (profileId) {
-    const [profile] = await db.select({ assetClass: developerProfiles.assetClass })
-      .from(developerProfiles)
-      .where(eq(developerProfiles.id, profileId))
-      .limit(1);
-    if (profile?.assetClass === "industrial") {
-      // Industrial profiles are criteria-screening only until their
-      // underwriting methodology is explicitly configured.
-      return deal;
-    }
-  }
-  const breakdown = await calculateYOCBreakdown(deal, profileId);
+function formatComputedYocFields(breakdown: YocBreakdown): Record<string, string | null> {
   if (!breakdown) {
-    const [updated] = await db.update(deals).set({
+    return {
       automatedYoc: null,
       automatedIrr: null,
-      updatedAt: new Date(),
-    }).where(eq(deals.id, dealId)).returning();
-    return updated;
+    };
   }
 
   const best = breakdown.types.reduce((winner, current) => current.yoc > winner.yoc ? current : winner);
@@ -925,7 +895,8 @@ export async function recomputeDealYoc(
     : irrTypes.length > 1
       ? `BEST: ${(bestIrr.irr.irr * 100).toFixed(1)}% | ${irrTypes.map((type) => `${type.presetLabel}: ${(type.irr.irr * 100).toFixed(1)}%`).join(" | ")}`
       : `${bestIrr.presetLabel}: ${(bestIrr.irr.irr * 100).toFixed(1)}%`;
-  const [updated] = await db.update(deals).set({
+
+  return {
     automatedYoc,
     automatedIrr,
     projectedNOI: best.noi.toFixed(2),
@@ -937,23 +908,49 @@ export async function recomputeDealYoc(
     projectedSoftCost: best.softCostTotal.toFixed(2),
     projectedVacancyLoss: best.vacancyLoss.toFixed(2),
     projectedRentPerUnit: best.blendedRent.toFixed(2),
+  };
+}
+
+export async function recomputeDealYoc(
+  dealId: string,
+  developerProfileId?: string,
+): Promise<any | undefined> {
+  const [deal] = await db.select().from(deals).where(eq(deals.id, dealId)).limit(1);
+  if (!deal) return undefined;
+  if (developerProfileId) {
+    const [profile] = await db.select({ assetClass: developerProfiles.assetClass })
+      .from(developerProfiles)
+      .where(eq(developerProfiles.id, developerProfileId))
+      .limit(1);
+    if (profile?.assetClass === "industrial") {
+      // Industrial profiles are criteria-screening only until their
+      // underwriting methodology is explicitly configured.
+      return deal;
+    }
+  }
+  // The persisted deal columns are a single shared baseline. Never infer a
+  // tenant from partnerDeveloperSends here: a deal can belong to multiple
+  // companies, each with different private presets.
+  const breakdown = await calculateYOCBreakdown(deal, developerProfileId);
+  const computedFields = formatComputedYocFields(breakdown);
+
+  // An explicit profile is a caller-scoped calculation. Return the values to
+  // that caller, but never write private assumptions into shared deal columns.
+  if (developerProfileId) {
+    return { ...deal, ...computedFields };
+  }
+
+  if (!breakdown) {
+    const [updated] = await db.update(deals).set({
+      ...computedFields,
+      updatedAt: new Date(),
+    }).where(eq(deals.id, dealId)).returning();
+    return updated;
+  }
+
+  const [updated] = await db.update(deals).set({
+    ...computedFields,
     updatedAt: new Date(),
   }).where(eq(deals.id, dealId)).returning();
   return updated;
-}
-
-export async function recomputeDealsForDeveloperProfile(developerProfileId: string): Promise<number> {
-  const [profile] = await db.select({ assetClass: developerProfiles.assetClass })
-    .from(developerProfiles)
-    .where(eq(developerProfiles.id, developerProfileId))
-    .limit(1);
-  if (profile?.assetClass === "industrial") return 0;
-  const rows = await db.select({ dealId: partnerDeveloperSends.dealId })
-    .from(partnerDeveloperSends)
-    .where(eq(partnerDeveloperSends.developerProfileId, developerProfileId));
-  const dealIds = Array.from(new Set(rows.map((row) => row.dealId)));
-  for (const dealId of dealIds) {
-    await recomputeDealYoc(dealId, developerProfileId);
-  }
-  return dealIds.length;
 }

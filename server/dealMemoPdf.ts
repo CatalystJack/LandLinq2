@@ -1,4 +1,5 @@
 import { createRequire } from "module";
+import { execFileSync } from "child_process";
 import fs from "fs";
 import { chromium } from "playwright-core";
 import {
@@ -218,7 +219,18 @@ function getComputedFiveYearIrr(deal: DealMemoInput): string {
 }
 
 function resolveChromiumExecutable(): string {
+  const pathExecutable = (() => {
+    try {
+      return execFileSync("which", ["chromium"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    } catch {
+      return "";
+    }
+  })();
   const candidates = [
+    pathExecutable,
     process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
     process.env.CHROMIUM_PATH,
     "/repl/tools/bin/chromium",

@@ -321,7 +321,7 @@ async function main(): Promise<void> {
       FROM broker_workbook_import AS i
       WHERE b.owner_developer_profile_id IS NULL
         AND b.source_license_number = i.source_license_number
-        AND UPPER(COALESCE(b.state_region, '')) = UPPER(i.state_region)
+        AND UPPER(i.state_region) = ANY(string_to_array(UPPER(COALESCE(b.state_region, '')), ', '))
     `);
 
     const updateByEmail = await client.query(`
@@ -365,7 +365,7 @@ async function main(): Promise<void> {
           FROM brokers AS same_license
           WHERE same_license.owner_developer_profile_id IS NULL
             AND same_license.source_license_number = i.source_license_number
-            AND UPPER(COALESCE(same_license.state_region, '')) = UPPER(i.state_region)
+            AND UPPER(i.state_region) = ANY(string_to_array(UPPER(COALESCE(same_license.state_region, '')), ', '))
         )
     `);
 
@@ -385,7 +385,7 @@ async function main(): Promise<void> {
         SELECT 1 FROM brokers AS b
         WHERE b.owner_developer_profile_id IS NULL
           AND b.source_license_number = i.source_license_number
-          AND UPPER(COALESCE(b.state_region, '')) = UPPER(i.state_region)
+          AND UPPER(i.state_region) = ANY(string_to_array(UPPER(COALESCE(b.state_region, '')), ', '))
       )
       AND NOT EXISTS (
         SELECT 1 FROM brokers AS b

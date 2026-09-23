@@ -1429,8 +1429,9 @@ export class DatabaseStorage implements IStorage {
     const [newDeal] = await db.insert(deals).values(cleanDeal).returning();
 
     // Automated YOC is server-owned. Deal creation may not yet have a
-    // developer send relationship, so this first pass uses the national
-    // fallback; a later profile send/update pass can recompute with overrides.
+    // developer send relationship, so this first pass uses the deterministic
+    // platform baseline. A partner's private assumptions must never change
+    // the shared deal columns.
     try {
       const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
       const computedDeal = await recomputeDealYoc(newDeal.id);
