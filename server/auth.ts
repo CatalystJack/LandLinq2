@@ -348,7 +348,7 @@ export function setupAuth(app: Express) {
       if (user) {
         // Main system user (Catalyst team / internal)
         const isDeveloper = String(user.role || '').toUpperCase() === 'DEVELOPER';
-        const needsPasswordReset = isDeveloper && user.mustResetPassword === true;
+        const needsPasswordReset = user.mustResetPassword === true;
 
         return (async () => {
           const passwordResetToken = needsPasswordReset

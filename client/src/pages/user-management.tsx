@@ -39,7 +39,6 @@ interface NewUser {
   email: string;
   firstName: string;
   lastName: string;
-  password: string;
   role: string;
   dealRole?: string;
 }
@@ -55,7 +54,6 @@ export default function UserManagement() {
     email: "",
     firstName: "",
     lastName: "",
-    password: "",
     role: "admin",
     dealRole: ""
   });
@@ -102,10 +100,10 @@ export default function UserManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setIsAddUserOpen(false);
-      setNewUser({ email: "", firstName: "", lastName: "", password: "", role: "admin", dealRole: "" });
+      setNewUser({ email: "", firstName: "", lastName: "", role: "admin", dealRole: "" });
       toast({
         title: "Success",
-        description: "User created successfully",
+        description: "User created successfully. Login instructions were sent by email.",
       });
     },
     onError: (error: Error) => {
@@ -257,7 +255,7 @@ export default function UserManagement() {
   };
 
   const handleCreateUser = () => {
-    if (!newUser.email || !newUser.firstName || !newUser.lastName || !newUser.password) {
+    if (!newUser.email || !newUser.firstName || !newUser.lastName) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -437,16 +435,9 @@ export default function UserManagement() {
                             data-testid="new-user-email"
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="password">Password</Label>
-                          <Input
-                            id="password"
-                            type="password"
-                            value={newUser.password}
-                            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                            data-testid="new-user-password"
-                          />
-                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          A secure temporary password will be generated and emailed to the new user. They will be required to change it after signing in.
+                        </p>
                         <div className="space-y-2">
                           <Label htmlFor="role">Role</Label>
                           <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
@@ -664,19 +655,24 @@ export default function UserManagement() {
 
                   <div className="space-y-2">
                     <Label htmlFor="editUserType">Access Role</Label>
-                    <Select
-                      value={editingUser.role === "SUPER_ADMIN" ? "ADMIN" : (editingUser.role || "ADMIN")}
-                      onValueChange={(value) => setEditingUser({ ...editingUser, role: value })}
-                      disabled={editingUser.role === "SUPER_ADMIN"}
-                    >
-                      <SelectTrigger data-testid="edit-user-type">
-                        <SelectValue placeholder="Select user type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ADMIN">Admin Team</SelectItem>
-                        <SelectItem value="DEVELOPER">Investment Company Team</SelectItem>
-                      </SelectContent>
-                    </Select>
+                     {editingUser.role === "DEVELOPER" ? (
+                       <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                         Investment Company Team accounts are managed through the company invitation flow.
+                       </p>
+                     ) : (
+                       <Select
+                         value={editingUser.role === "SUPER_ADMIN" ? "ADMIN" : (editingUser.role || "ADMIN")}
+                         onValueChange={(value) => setEditingUser({ ...editingUser, role: value })}
+                         disabled={editingUser.role === "SUPER_ADMIN"}
+                       >
+                         <SelectTrigger data-testid="edit-user-type">
+                           <SelectValue placeholder="Select user type" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="ADMIN">Admin Team</SelectItem>
+                         </SelectContent>
+                       </Select>
+                     )}
                     {editingUser.role === "SUPER_ADMIN" && (
                       <p className="text-xs text-slate-500">This protected system administrator account retains its existing authority.</p>
                     )}

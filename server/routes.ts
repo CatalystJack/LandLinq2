@@ -2947,7 +2947,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       // browser receives the dashboard HTML for JS/CSS requests and fails
       // strict MIME checking.
       if (!isDocumentRequest) return next();
-      if (role === 'DEVELOPER' && req.user?.mustResetPassword === true && req.path !== '/reset-password') {
+      if (req.user?.mustResetPassword === true && req.path !== '/reset-password') {
         try {
           const { passwordResetService } = await import('./passwordReset');
           const token = await passwordResetService.generateForcedResetToken(req.user.email);
@@ -3296,35 +3296,100 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         return res.status(403).json({ message: "Unauthorized - Super admin access required" });
       }
 
-      const { email, firstName, lastName, password, role } = req.body;
+      const { email, firstName, lastName, role } = req.body;
       
-      if (!email || !firstName || !lastName || !password) {
+      if (!email || !firstName || !lastName) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
       const normalizedRole = String(role || "ADMIN").toUpperCase();
-      if (!["ADMIN", "BROKER", "DEVELOPER"].includes(normalizedRole)) {
+      if (!["ADMIN", "BROKER"].includes(normalizedRole)) {
         return res.status(400).json({ message: "Unsupported user role" });
       }
 
       // Check if user already exists
-      const existingUser = await storage.getUserByEmail(email);
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const existingUser = await storage.getUserByEmail(normalizedEmail);
       if (existingUser) {
         return res.status(400).json({ message: "User with this email already exists" });
       }
 
-      // Hash the password
-      const { hashPassword } = await import('./auth');
-      const hashedPassword = await hashPassword(password);
+      // Generate the initial credential server-side. It is delivered only by
+      // the welcome email and must be replaced after the first login.
+      const temporaryPassword = randomBytes(12).toString("base64url");
+      const hashedPassword = await hashPassword(temporaryPassword);
 
       // Create the user
       const newUser = await storage.createUser({
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         firstName,
         lastName,
         role: normalizedRole,
+        mustResetPassword: true,
       });
+
+      try {
+        const baseUrl = (
+          process.env.BASE_URL ||
+          (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "") ||
+          "https://landlinq.ai"
+        ).replace(/\/$/, "");
+        const loginUrl = `${baseUrl}/login`;
+        const safeFirstName = escapeEmailHtml(String(firstName));
+        const safeEmail = escapeEmailHtml(normalizedEmail);
+        const safeTemporaryPassword = escapeEmailHtml(temporaryPassword);
+        const roleLabel = normalizedRole === "BROKER" ? "Partner Broker" : "LandLinq team";
+        const welcomeHtml = renderBrandedEmail({
+          title: "Your LandLinq account is ready",
+          preheader: "Your LandLinq account access is ready.",
+          companyName: "LandLinq",
+          supportEmail: "help@landlinq.ai",
+          bodyHtml: `
+            <p style="margin:0 0 16px;">Hi ${safeFirstName},</p>
+            <p style="margin:0 0 20px;">
+              Your ${roleLabel} account has been created. Use the temporary credentials below to sign in.
+            </p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f7faff;border:1px solid #cfe0f2;">
+              <tr>
+                <td style="padding:20px 22px;color:#334E68;font-size:14px;line-height:22px;">
+                  <div style="margin-bottom:8px;"><strong>Email:</strong> ${safeEmail}</div>
+                  <div><strong>Temporary password:</strong></div>
+                  <div style="margin-top:8px;padding:12px 14px;background-color:#ffffff;border:1px solid #b8cee5;color:#0A2B4A;font-family:'Courier New',Courier,monospace;font-size:18px;line-height:24px;letter-spacing:.04em;word-break:break-all;">${safeTemporaryPassword}</div>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:22px 0 0;color:#52677D;font-size:14px;line-height:22px;">
+              For your security, you will be required to set a new password after signing in.
+            </p>`,
+          button: { label: "Open LandLinq", url: loginUrl },
+        });
+        const emailSent = await sendNotificationEmail({
+          to: normalizedEmail,
+          subject: "Your LandLinq account is ready",
+          html: welcomeHtml,
+          text: `Hi ${firstName},\n\nYour LandLinq account is ready.\nEmail: ${normalizedEmail}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be required to set a new password after signing in.`,
+          type: "user-account-invite",
+          priority: "high",
+          transactional: true,
+        });
+        if (!emailSent) {
+          throw new Error("The welcome email could not be sent");
+        }
+      } catch (emailError) {
+        try {
+          await db.delete(users).where(eq(users.id, newUser.id));
+        } catch (cleanupError) {
+          console.error("Error rolling back user after welcome email failure:", cleanupError);
+          return res.status(500).json({
+            message: "The welcome email failed and the new account could not be rolled back. Please contact support.",
+          });
+        }
+        console.error("Welcome email failed; user account rolled back:", emailError);
+        return res.status(502).json({
+          message: "The user account was not created because the welcome email could not be sent. Please try again.",
+        });
+      }
 
       // Remove password from response
       const { password: _, ...userResponse } = newUser;

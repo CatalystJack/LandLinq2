@@ -64,7 +64,7 @@ export default function AuthPage() {
     onSuccess: async (userData) => {
       let authenticatedUser = userData;
       const isDeveloper = String(userData?.role || "").toUpperCase() === "DEVELOPER";
-      const forcedResetToken = isDeveloper
+        const forcedResetToken = userData?.mustResetPassword === true
         ? String(userData?.passwordResetToken || "")
         : "";
       if (isDeveloper) {

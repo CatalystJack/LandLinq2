@@ -224,25 +224,26 @@ function Router() {
     );
   }
 
+  if (isAuthenticated && user && (user as any).mustResetPassword === true) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <Switch>
+          <Route path="/reset-password" component={PasswordResetPage} />
+          <Route>
+            {() => {
+              window.location.replace("/reset-password");
+              return <LoadingFallback />;
+            }}
+          </Route>
+        </Switch>
+      </Suspense>
+    );
+  }
+
   // DEVELOPER users have a separate tenant-scoped navigation and route surface.
   // Keep this branch before all internal role branches so they cannot fall
   // through to the shared Catalyst navigation.
   if (isAuthenticated && user && userRole === UserRole.DEVELOPER) {
-    if ((user as any).mustResetPassword === true) {
-      return (
-        <Suspense fallback={<LoadingFallback />}>
-          <Switch>
-            <Route path="/reset-password" component={PasswordResetPage} />
-            <Route>
-              {() => {
-                window.location.replace("/reset-password");
-                return <LoadingFallback />;
-              }}
-            </Route>
-          </Switch>
-        </Suspense>
-      );
-    }
     return (
       <Suspense fallback={<LoadingFallback />}>
         <Switch>
