@@ -109,7 +109,6 @@ interface CompanyForm {
 
 type ContactFilterOptions = {
   sourceTags: string[];
-  productTypes: string[];
   states: ContactFilterOption[];
   counties: ContactCountyOption[];
   sectors: ContactFilterOption[];

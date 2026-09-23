@@ -13613,24 +13613,13 @@ RULES:
 
   app.get("/api/crm/source-tags", isAuthenticated, async (_req: any, res) => {
     try {
-      const [tagResult, specialtyResult, stateResult, countyResult, sectorResult] = await Promise.all([
+      const [tagResult, stateResult, countyResult, sectorResult] = await Promise.all([
         db.execute(sql`
         SELECT DISTINCT LOWER(BTRIM(tag_value)) AS tag
         FROM brokers
         CROSS JOIN LATERAL unnest(COALESCE(source_tags, ARRAY[]::text[])) AS tag_value
         WHERE BTRIM(tag_value) <> ''
         ORDER BY tag
-        `),
-        db.execute(sql`
-          SELECT DISTINCT LOWER(BTRIM(specialty_value)) AS product_type
-          FROM brokers
-          CROSS JOIN LATERAL regexp_split_to_table(
-            COALESCE(contact_specialty, ''),
-            '\\s*[;,|]\\s*'
-          ) AS specialty_value
-          WHERE BTRIM(specialty_value) <> ''
-            AND LOWER(BTRIM(specialty_value)) NOT IN ('unknown', 'needs review')
-          ORDER BY product_type
         `),
         db.execute(sql`
           SELECT UPPER(BTRIM(state_value)) AS state, COUNT(*)::int AS contacts
@@ -13661,28 +13650,6 @@ RULES:
       const sourceTags = (tagResult.rows as Array<{ tag: unknown }>)
         .map((row) => String(row.tag || "").trim())
         .filter(Boolean);
-      const stateCodes = new Set([
-        "al", "ak", "az", "ar", "ca", "co", "ct", "de", "fl", "ga", "hi", "id", "il", "in",
-        "ia", "ks", "ky", "la", "me", "md", "ma", "mi", "mn", "ms", "mo", "mt", "ne", "nv",
-        "nh", "nj", "nm", "ny", "nc", "nd", "oh", "ok", "or", "pa", "ri", "sc", "sd", "tn",
-        "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "dc",
-      ]);
-      const sourceTagProductTypes = sourceTags.filter((tag) =>
-        !stateCodes.has(tag) &&
-        tag !== "residential" &&
-        tag !== "commercial" &&
-        tag !== "unknown" &&
-        tag !== "needs review" &&
-        !tag.endsWith(" county") &&
-        !tag.startsWith("out of state ("),
-      );
-      const importedProductTypes = (specialtyResult.rows as Array<{ product_type: unknown }>)
-        .map((row) => String(row.product_type || "").trim().toLowerCase())
-        .filter(Boolean);
-      const productTypes = Array.from(new Set([
-        ...importedProductTypes,
-        ...sourceTagProductTypes,
-      ])).sort((a, b) => a.localeCompare(b));
       const countyMap = new Map<string, { state: string; county: string; contacts: number }>();
       for (const row of countyResult.rows as Array<{ state_region: unknown; county: unknown; contacts: unknown }>) {
         const county = String(row.county || "").trim();
@@ -13699,7 +13666,6 @@ RULES:
       }
       return res.json({
         sourceTags,
-        productTypes,
         states: (stateResult.rows as Array<{ state: unknown; contacts: unknown }>).map((row) => ({
           value: String(row.state || "").trim(),
           contacts: Number(row.contacts || 0),
@@ -14338,14 +14304,12 @@ RULES:
     sectors: string[];
     states: string[];
     counties: string[];
-    productTypes: string[];
     sourceTags: string[];
   }> {
     const [profile] = await db.select({
       sectors: developerProfiles.crmContactSectors,
       states: developerProfiles.crmContactStates,
       counties: developerProfiles.crmContactCounties,
-      productTypes: developerProfiles.crmContactProductTypes,
       sourceTags: developerProfiles.crmContactSourceTags,
     }).from(developerProfiles).where(and(
       eq(developerProfiles.id, developerProfileId),
@@ -14361,9 +14325,6 @@ RULES:
       counties: Array.isArray(profile?.counties)
         ? profile.counties.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
         : [],
-      productTypes: Array.isArray(profile?.productTypes)
-        ? profile.productTypes.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
-        : [],
       sourceTags: Array.isArray(profile?.sourceTags)
         ? profile.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
         : [],
@@ -14375,7 +14336,6 @@ RULES:
       ownerDeveloperProfileId?: string | null;
       contactSector?: string | null;
       contactCounty?: string | null;
-      contactSpecialty?: string | null;
       stateRegion?: string | null;
       sourceTags?: string[] | null;
       userId?: string | null;
@@ -14385,7 +14345,6 @@ RULES:
       sectors: string[];
       states: string[];
       counties: string[];
-      productTypes: string[];
       sourceTags: string[];
     },
   ): boolean {
@@ -14401,18 +14360,10 @@ RULES:
     const brokerSourceTags = Array.isArray(broker.sourceTags)
       ? broker.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
       : [];
-    const brokerProductTypes = new Set([
-      ...brokerSourceTags,
-      ...String(broker.contactSpecialty || "")
-        .split(/[;,|]/g)
-        .map((value) => value.trim().toLowerCase())
-        .filter(Boolean),
-    ]);
     return (
       (visibility.sectors.length === 0 || visibility.sectors.includes(sector)) &&
       (visibility.states.length === 0 || brokerStates.some((state) => visibility.states.includes(state))) &&
       (visibility.counties.length === 0 || visibility.counties.includes(county)) &&
-      (visibility.productTypes.length === 0 || visibility.productTypes.some((productType) => brokerProductTypes.has(productType))) &&
       (visibility.sourceTags.length === 0 || visibility.sourceTags.some((tag) => brokerSourceTags.includes(tag)))
     );
   }
@@ -14423,7 +14374,6 @@ RULES:
       ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
       contactSector: brokers.contactSector,
       contactCounty: brokers.contactCounty,
-      contactSpecialty: brokers.contactSpecialty,
       stateRegion: brokers.stateRegion,
       sourceTags: brokers.sourceTags,
       userId: brokers.userId,

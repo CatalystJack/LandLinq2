@@ -75,7 +75,6 @@ type Profile = {
 
 type ContactFilterOptions = {
   sourceTags: string[];
-  productTypes: string[];
   states: ContactFilterOption[];
   counties: ContactCountyOption[];
   sectors: ContactFilterOption[];
