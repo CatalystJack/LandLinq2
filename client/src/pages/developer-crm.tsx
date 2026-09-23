@@ -257,11 +257,27 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   });
 
   const removeContactsMutation = useMutation({
-    mutationFn: (contactIds: string[]) => requestJson("/api/developer-profile/me/contacts/remove", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contactIds }),
-    }),
+    mutationFn: async (contactIds: string[]) => {
+      const batchSize = 500;
+      const batches = Array.from(
+        { length: Math.ceil(contactIds.length / batchSize) },
+        (_, index) => contactIds.slice(index * batchSize, (index + 1) * batchSize),
+      );
+      let removedCount = 0;
+      const removedIds: string[] = [];
+
+      for (const batch of batches) {
+        const data = await requestJson("/api/developer-profile/me/contacts/remove", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contactIds: batch }),
+        });
+        removedCount += data.removedCount || 0;
+        removedIds.push(...(data.removedIds || []));
+      }
+
+      return { removedCount, removedIds };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [contactsQueryKey] });
       setSelectedContactIds([]);
