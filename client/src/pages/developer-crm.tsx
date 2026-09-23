@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
-import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, Pencil, Plus, X } from "lucide-react";
+import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, Pencil, Plus, Trash2, X } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import Navigation from "@/components/navigation";
@@ -254,6 +254,22 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       toast({ title: "Tag renamed", description: `Updated “${data.oldTag}” on ${data.updatedCount} contacts.` });
     },
     onError: (error: Error) => toast({ title: "Tag rename failed", description: error.message, variant: "destructive" }),
+  });
+
+  const deleteTagMutation = useMutation({
+    mutationFn: (name: string) => requestJson("/api/developer-profile/me/crm-tags/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [contactsQueryKey] });
+      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/crm-tags"] });
+      setSelectedTags((current) => current.filter((tag) => tag !== data.name));
+      setRenameOldTag("");
+      toast({ title: "Tag deleted", description: `Removed “${data.name}” from ${data.updatedCount} contacts and your company tag list.` });
+    },
+    onError: (error: Error) => toast({ title: "Tag deletion failed", description: error.message, variant: "destructive" }),
   });
 
   const createTagMutation = useMutation({
@@ -787,12 +803,12 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={renameOpen} onOpenChange={(open) => { if (!open && !renameMutation.isPending) setRenameOpen(false); }}>
+          <Dialog open={renameOpen} onOpenChange={(open) => { if (!open && !renameMutation.isPending && !deleteTagMutation.isPending) setRenameOpen(false); }}>
             <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>Manage CRM tags</DialogTitle>
                 <DialogDescription>
-                  Create private tags for your company or rename an existing tag. These do not affect another company’s contacts or shared source tags.
+                  Create, rename, or delete private tags for your company. These actions do not affect another company’s contacts or shared source tags.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
@@ -825,10 +841,27 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                 </div>
                 <div>
                   <Label htmlFor="crm-old-tag">Existing tag</Label>
-                  <select id="crm-old-tag" value={renameOldTag} onChange={(event) => setRenameOldTag(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-[#d7e2e9] bg-white px-3 text-sm text-[#405a70] outline-none">
-                    <option value="">Choose a tag</option>
-                    {availableTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
-                  </select>
+                   <div className="mt-1.5 flex gap-2">
+                     <select id="crm-old-tag" value={renameOldTag} onChange={(event) => setRenameOldTag(event.target.value)} className="h-10 min-w-0 flex-1 rounded-md border border-[#d7e2e9] bg-white px-3 text-sm text-[#405a70] outline-none">
+                       <option value="">Choose a tag</option>
+                       {availableTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+                     </select>
+                     <Button
+                       type="button"
+                       variant="outline"
+                       className="h-10 shrink-0 border-red-200 px-3 text-red-600 hover:bg-red-50 hover:text-red-700"
+                       disabled={!renameOldTag.trim() || renameMutation.isPending || deleteTagMutation.isPending}
+                       onClick={() => {
+                         const tag = renameOldTag.trim();
+                         if (tag && window.confirm(`Delete “${tag}” from all of your CRM contacts? This cannot be undone.`)) {
+                           deleteTagMutation.mutate(tag);
+                         }
+                       }}
+                     >
+                       {deleteTagMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
+                       Delete
+                     </Button>
+                   </div>
                 </div>
                 <div>
                   <Label htmlFor="crm-new-tag">New tag name</Label>
@@ -836,11 +869,11 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                 </div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={renameMutation.isPending}>Cancel</Button>
+               <DialogFooter>
+                 <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={renameMutation.isPending || deleteTagMutation.isPending}>Cancel</Button>
                 <Button
                   onClick={() => renameMutation.mutate({ oldTag: renameOldTag.trim(), newTag: renameNewTag.trim() })}
-                  disabled={!renameOldTag.trim() || !renameNewTag.trim() || renameOldTag.trim() === renameNewTag.trim() || renameMutation.isPending}
+                   disabled={!renameOldTag.trim() || !renameNewTag.trim() || renameOldTag.trim() === renameNewTag.trim() || renameMutation.isPending || deleteTagMutation.isPending}
                   style={{ backgroundColor: primaryColor }}
                   className="text-white"
                 >

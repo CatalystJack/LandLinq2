@@ -15517,6 +15517,55 @@ RULES:
     }
   });
 
+  // Delete a private CRM tag everywhere it appears for this Investment Company.
+  // Shared-contact state is scoped through developer_broker_crm; company-owned
+  // contacts use the legacy brokers.crm_tags column.
+  app.post("/api/developer-profile/me/crm-tags/delete", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+      if (!name || name.length > 160) {
+        return res.status(400).json({ error: "Tag name must be between 1 and 160 characters" });
+      }
+
+      const updatedCount = await db.transaction(async (tx) => {
+        const ownedResult = await tx.execute(sql`
+          UPDATE brokers
+          SET crm_tags = array_remove(crm_tags, ${name}::text),
+              updated_at = NOW()
+          WHERE owner_developer_profile_id = ${developerProfileId}
+            AND ${name} = ANY(COALESCE(crm_tags, ARRAY[]::text[]))
+            AND NOT EXISTS (
+              SELECT 1
+              FROM users AS demo_owner
+              WHERE demo_owner.id = brokers.user_id
+                AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+            )
+        `);
+        const sharedResult = await tx.execute(sql`
+          UPDATE developer_broker_crm
+          SET crm_tags = array_remove(crm_tags, ${name}::text),
+              updated_at = NOW()
+          WHERE developer_profile_id = ${developerProfileId}
+            AND ${name} = ANY(COALESCE(crm_tags, ARRAY[]::text[]))
+        `);
+        await tx.delete(developerCrmTags).where(and(
+          eq(developerCrmTags.developerProfileId, developerProfileId),
+          eq(developerCrmTags.name, name),
+        ));
+        return Number(ownedResult.rowCount || 0) + Number(sharedResult.rowCount || 0);
+      });
+
+      return res.json({ name, updatedCount });
+    } catch (error: any) {
+      console.error("[developer-profile/me/crm-tags/delete] Error:", error);
+      return res.status(500).json({ error: "Failed to delete CRM tag" });
+    }
+  });
+
   app.post("/api/developer-profile/me/assistant/query", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
