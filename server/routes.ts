@@ -56,6 +56,7 @@ import { isAnalyticsAuthorized } from "@shared/admin-auth";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
   normalizeIndustrialCriteria,
+  validateIndustrialCriteria,
   type DeveloperAssetClass,
 } from "@shared/industrial-criteria";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
@@ -13418,7 +13419,7 @@ RULES:
     const isIndustrial = assetClass === "industrial";
     if (!partial || body.industrialCriteria !== undefined) {
       payload.industrialCriteria = isIndustrial
-        ? normalizeIndustrialCriteria(body.industrialCriteria)
+        ? validateIndustrialCriteria(normalizeIndustrialCriteria(body.industrialCriteria))
         : normalizeIndustrialCriteria(body.industrialCriteria || DEFAULT_INDUSTRIAL_CRITERIA);
     }
     const requiredString = (field: string, label: string) => {
@@ -14937,7 +14938,7 @@ RULES:
       updates.assetClass = effectiveAssetClass as DeveloperAssetClass;
       if (isIndustrial || body.industrialCriteria !== undefined) {
         updates.industrialCriteria = isIndustrial
-          ? normalizeIndustrialCriteria(body.industrialCriteria ?? currentProfile.industrialCriteria)
+          ? validateIndustrialCriteria(normalizeIndustrialCriteria(body.industrialCriteria ?? currentProfile.industrialCriteria))
           : normalizeIndustrialCriteria(body.industrialCriteria ?? DEFAULT_INDUSTRIAL_CRITERIA);
       }
 

@@ -47,7 +47,12 @@ export default function IndustrialCriteriaFields({ value, onChange, compact = fa
                 value={String(criteria[field.key] ?? "")}
                 onChange={(event) => {
                   const raw = event.target.value;
-                  update(field.key, raw === "" ? 0 : field.integer ? Number.parseInt(raw, 10) : Number.parseFloat(raw));
+                  if (raw === "") {
+                    return;
+                  }
+                  const parsed = field.integer ? Number.parseInt(raw, 10) : Number.parseFloat(raw);
+                  if (!Number.isFinite(parsed) || parsed < 0) return;
+                  update(field.key, parsed);
                 }}
                 className={field.suffix ? "pr-16 bg-white" : "bg-white"}
               />
