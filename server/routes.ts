@@ -31871,6 +31871,17 @@ RULES:
   // Get all outreach senders
   app.get('/api/outreach/senders', isAuthenticated, async (req: any, res) => {
     try {
+      const user = req.user as any;
+      const userEmail = (user?.claims?.email || user?.email || '').toLowerCase();
+      const isPlatformAdmin = isPlatformAdminEmail(userEmail);
+      let developerProfileId: string | null = null;
+
+      if (!isPlatformAdmin) {
+        developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      }
+
       // Prevent caching of sender data to avoid stale IDs
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       res.set('Pragma', 'no-cache');
@@ -31898,6 +31909,8 @@ RULES:
           is_active as "isActive",
           created_at as "createdAt"
         FROM outreach_senders
+        WHERE TRUE
+          ${isPlatformAdmin ? sql`` : sql`AND developer_profile_id = ${developerProfileId}`}
         ORDER BY created_at DESC
       `);
       
