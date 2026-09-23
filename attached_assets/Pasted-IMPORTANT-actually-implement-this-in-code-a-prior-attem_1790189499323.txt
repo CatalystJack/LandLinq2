@@ -1,0 +1,14 @@
+IMPORTANT: actually implement this in code — a prior attempt at this exact fix did not land; instead of writing the code, a note admitting the feature was missing got saved to the repo (attached_assets/Pasted-IMPORTANT-actually-implement-this-in-code-a-prior-attem_1790184837735.txt) and nothing else changed. server/routes.ts's POST /api/users handler and client/src/pages/user-management.tsx are both still completely unchanged. Please actually write and commit the code this time, not another note.
+
+POST /api/users (server/routes.ts ~lines 3299-3327), used by the "Add User" form in User Management, still creates a new ADMIN/BROKER/DEVELOPER account using whatever plaintext password the admin typed into the form (line 3299 destructures `password` from the request body, line 3318 hashes and stores it directly), and never sends any email to the new user.
+
+Fix this to follow the same pattern already correctly used elsewhere in the codebase for developer invites (server/routes.ts's createDeveloperInvitation function) and for admin-created broker accounts (POST /api/broker-portal/accounts, ~lines 19116-19139, which correctly generates its own outcome and reports email failures — use it as your reference for the "check the send result and handle failure" part):
+
+1. Generate a real random temporary password server-side (crypto randomBytes, not a password field from the request) instead of accepting one from the client.
+2. Set mustResetPassword: true on the new user so they're forced to set their own password on first login.
+3. Send a welcome/invite email containing the temp password and a login link.
+4. If the email fails to send, roll back the account creation (delete the row) rather than leaving an account nobody was told about.
+
+Also still needs fixing: this endpoint still allows role: "DEVELOPER" (line 3306) with no developerProfileId required or set — a Developer account created this way can log in but then gets blocked from every developer-portal API call with "No Investment Company profile is assigned to this account." Either remove DEVELOPER from the allowed roles on this endpoint (developers should go through the existing investment-company invite flow instead), or require developerProfileId in the request body when role is DEVELOPER, and update the "Add User" form in client/src/pages/user-management.tsx (currently still offers "Investment Company Team" as a role option with no profile picker, line ~677) to match whichever approach you take.
+
+Paste the diff of both the route handler and the User Management form when done — the actual code diff, not a summary or a notes file.
