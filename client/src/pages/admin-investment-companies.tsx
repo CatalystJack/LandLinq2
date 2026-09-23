@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
 import IndustrialCriteriaFields from "@/components/industrial-criteria-fields";
 import StateCriteriaOverrides, { type CriteriaOverrideValue } from "@/components/state-criteria-overrides";
+import ProductTypeNameField from "@/components/product-type-name-field";
 import SharedContactAccessEditor, {
   type ContactCountyOption,
   type ContactFilterOption,
@@ -292,7 +293,12 @@ function ProductTypeEditorRow({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_auto] lg:items-end">
         <div>
           <Label>Product type <span className="text-red-500">*</span></Label>
-          <Input className="mt-1 bg-white" value={productType.name} onChange={(event) => onChange({ name: event.target.value })} placeholder="e.g. 3-Story Garden" />
+          <ProductTypeNameField
+            id={`admin-product-type-${index}`}
+            value={productType.name}
+            onChange={(name) => onChange({ name })}
+            className="mt-1 bg-white"
+          />
         </div>
         <NumberField label="Min acres" value={productType.minAcres} onChange={(value) => onChange({ minAcres: value })} required />
         <NumberField label="Max acres" value={productType.maxAcres || ""} onChange={(value) => onChange({ maxAcres: value })} placeholder="No maximum" />

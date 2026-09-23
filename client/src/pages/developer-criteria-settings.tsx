@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import IndustrialCriteriaFields from "@/components/industrial-criteria-fields";
 import StateCriteriaOverrides, { type CriteriaOverrideValue } from "@/components/state-criteria-overrides";
+import ProductTypeNameField from "@/components/product-type-name-field";
 import SharedContactAccessEditor, {
   type ContactCountyOption,
   type ContactFilterOption,
@@ -1030,10 +1031,10 @@ export default function DeveloperCriteriaSettings() {
                         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_auto] lg:items-end">
                           <div>
                             <Label>Product type <span className="text-red-500">*</span></Label>
-                            <Input
+                            <ProductTypeNameField
+                              id={`developer-product-type-${index}`}
                               value={productType.name}
-                              onChange={(event) => updateProductType(index, { name: event.target.value })}
-                              placeholder="e.g. 3-Story Garden"
+                              onChange={(name) => updateProductType(index, { name })}
                               className="mt-2 bg-white"
                             />
                           </div>
