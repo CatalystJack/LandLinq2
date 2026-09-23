@@ -563,7 +563,14 @@ export function setupAuth(app: Express) {
       // No longer block Catalyst emails - they can set individual passwords
 
       const { passwordResetService } = await import('./passwordReset');
-      await passwordResetService.generateResetToken(email);
+      try {
+        await passwordResetService.generateResetToken(email);
+      } catch (error) {
+        console.error("Password reset email delivery error:", error);
+        return res.status(502).json({
+          message: "If that email exists, we're having trouble sending right now — please try again shortly",
+        });
+      }
       
       // Always return success to prevent email enumeration
       res.json({ message: "If the email exists, a reset link has been sent" });

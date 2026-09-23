@@ -38,6 +38,7 @@ export class PasswordResetService {
       await emailService.sendPasswordResetEmail(email, resetToken);
     } catch (error) {
       console.error('Failed to send password reset email:', error);
+      throw error;
     }
 
     return resetToken;

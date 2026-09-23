@@ -12442,16 +12442,20 @@ RULES:
             </p>
           </div>`;
         const { sendNotificationEmail } = await import('./emailService');
-        await sendNotificationEmail({
+        const sent = await sendNotificationEmail({
           to: broker.email,
           subject: 'Your LandLinq Partner Broker Account is Approved',
           html,
           type: 'broker_approval',
           priority: 'high',
         });
+        if (!sent) throw new Error('Broker approval email failed to send');
         console.log(`✅ Approval email sent to ${broker.email}`);
       } catch (emailErr) {
         console.error('⚠️ Approval email failed (account still approved):', emailErr);
+        return res.status(502).json({
+          message: 'Broker approved, but the approval email could not be sent. Please try again.',
+        });
       }
 
       res.json({ message: "Broker approved and notified" });
@@ -19194,10 +19198,14 @@ RULES:
               </p>
             </div>`;
           const { sendNotificationEmail } = await import('./emailService');
-          await sendNotificationEmail({ to: prior.email || email, subject: 'Your LandLinq Partner Broker Account is Approved', html: approvalHtml, type: 'broker_approval', priority: 'high' });
+          const sent = await sendNotificationEmail({ to: prior.email || email, subject: 'Your LandLinq Partner Broker Account is Approved', html: approvalHtml, type: 'broker_approval', priority: 'high' });
+          if (!sent) throw new Error('Broker approval email failed to send');
           console.log(`✅ Approval email sent to ${prior.email || email}`);
         } catch (emailErr) {
           console.error('⚠️ Approval email failed (account still updated):', emailErr);
+          return res.status(502).json({
+            message: 'Account updated, but the approval email could not be sent. Please try again.',
+          });
         }
       }
       res.json({ success: true });

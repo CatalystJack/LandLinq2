@@ -1,4 +1,5 @@
 - [Shared transactional email rendering](email-rendering-conversion.md) — render one inline branded shell before Microsoft Graph or authenticated mailbox SMTP delivery; do not use SendGrid.
+- [Email delivery failure handling](email-delivery-failure-handling.md) — sendNotificationEmail can resolve false; callers must check it before reporting delivery success.
 - [Developer notification sender boundary](developer-notification-sender-boundary.md) — connected Outlook is for tenant outreach campaigns; broker deal-status notifications use shared transactional delivery unless explicitly overridden.
 - [Unclassified deal reasons](unclassified-deal-ui.md) — "unclassified" can be a legitimate completed-classification outcome (e.g. no HelloData coverage), not just "never ran"; UI must check rejectionReason/comparableNotes before showing generic "not run" message.
 - [deals.comparables_json shape](deals-comparables-json-shape.md) — comp entries use camelCase keys (propertyName, yearBuilt, unitCount, rentPSF, rentPerUnit, distance), not snake_case.

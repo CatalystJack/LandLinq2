@@ -668,7 +668,7 @@ const emailService = {
       }
       
       // Send email using the locally-rendered template.
-      await sendNotificationEmail({
+      const sent = await sendNotificationEmail({
         to: email,
         subject: template.subject,
         html: template.html,
@@ -677,6 +677,7 @@ const emailService = {
         priority: 'high',
         transactional: true
       });
+      if (!sent) throw new Error('Password reset email failed to send');
       
       console.log(`✅ Password reset email sent to: ${email}`);
       
