@@ -8561,6 +8561,19 @@ Provide your analysis in this exact JSON format:
     try {
       const { id } = req.params;
       if (!validateDealId(id)) return res.status(400).json({ message: "Invalid deal ID format" });
+
+      const role = String((req as any).user?.role || "").toUpperCase();
+      const email = String((req as any).user?.email || (req as any).user?.claims?.email || "").trim().toLowerCase();
+      if (!isFullDealInternalViewer(role, email)) {
+        if (role !== "DEVELOPER") return res.status(404).json({ message: "Deal not found" });
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        if (!await canDeveloperAccessDeal(id, developerProfileId)) {
+          return res.status(404).json({ message: "Deal not found" });
+        }
+      }
+
       const deal = await getFullDeal(id);
       if (!deal) return res.status(404).json({ message: "Deal not found" });
       return res.json(deal);
@@ -10529,6 +10542,59 @@ Provide your analysis in this exact JSON format:
       const { id } = req.params;
       const userId = (req.user as any)?.id;
       const updateData = req.body;
+      const role = String((req as any).user?.role || "").toUpperCase();
+      const email = String((req as any).user?.email || (req as any).user?.claims?.email || "").trim().toLowerCase();
+      const isDeveloper = role === "DEVELOPER";
+
+      if (!isFullDealInternalViewer(role, email) && !isDeveloper) {
+        return res.status(404).json({ message: "Deal not found" });
+      }
+
+      if (isDeveloper) {
+        const developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+        const ownedSend = await getDeveloperDealSend(id, developerProfileId);
+        if (!ownedSend) return res.status(404).json({ message: "Deal not found" });
+
+        const developerStatusFields = new Set([
+          "greenFlag",
+          "pursue",
+          "pursuing",
+          "greenFlaggedByDeveloper",
+        ]);
+        const requestedFields = Object.keys(updateData || {});
+        if (requestedFields.some((field) => !developerStatusFields.has(field))) {
+          return res.status(403).json({
+            message: "Investment Company users may only update their own deal pursuit status",
+          });
+        }
+        if (requestedFields.length === 0) {
+          return res.status(400).json({ message: "No developer-facing fields were provided" });
+        }
+
+        const statusField = requestedFields.find((field) => developerStatusFields.has(field))!;
+        const greenFlagged = updateData[statusField];
+        if (typeof greenFlagged !== "boolean") {
+          return res.status(400).json({ message: `${statusField} must be a boolean` });
+        }
+
+        const [updatedSend] = await db
+          .update(partnerDeveloperSends)
+          .set({
+            greenFlaggedByDeveloper: greenFlagged,
+            greenFlaggedAt: greenFlagged ? new Date() : null,
+          })
+          .where(eq(partnerDeveloperSends.id, ownedSend.id))
+          .returning({
+            greenFlaggedByDeveloper: partnerDeveloperSends.greenFlaggedByDeveloper,
+            greenFlaggedAt: partnerDeveloperSends.greenFlaggedAt,
+          });
+        const deal = await storage.getDealById(id);
+        if (!deal || !updatedSend) return res.status(404).json({ message: "Deal not found" });
+        return res.json({ ...deal, ...updatedSend });
+      }
 
       // Debug logging for productTypes updates
       if ('productTypes' in updateData) {
@@ -14407,6 +14473,33 @@ RULES:
       return null;
     }
     return developerProfileId;
+  }
+
+  function isFullDealInternalViewer(role: string, email: string): boolean {
+    return isPlatformAdminEmail(email) || ["ADMIN", "SUPER_ADMIN", "ANALYST", "BROKER"].includes(role);
+  }
+
+  async function getDeveloperDealSend(dealId: string, developerProfileId: string) {
+    const [send] = await db
+      .select({
+        id: partnerDeveloperSends.id,
+        greenFlaggedByDeveloper: partnerDeveloperSends.greenFlaggedByDeveloper,
+      })
+      .from(partnerDeveloperSends)
+      .leftJoin(partnerDevelopers, eq(partnerDeveloperSends.developerId, partnerDevelopers.id))
+      .where(and(
+        eq(partnerDeveloperSends.dealId, dealId),
+        or(
+          eq(partnerDeveloperSends.developerProfileId, developerProfileId),
+          eq(partnerDevelopers.developerProfileId, developerProfileId),
+        ),
+      ))
+      .limit(1);
+    return send || null;
+  }
+
+  async function canDeveloperAccessDeal(dealId: string, developerProfileId: string): Promise<boolean> {
+    return !!await getDeveloperDealSend(dealId, developerProfileId);
   }
 
   async function getDeveloperVisibleDealIds(developerProfileId: string): Promise<Set<string>> {
