@@ -48,6 +48,7 @@ import {
   type DeveloperAssetClass,
   type IndustrialCriteria,
 } from "@shared/industrial-criteria";
+import { getUsStateLabel, normalizeUsStateCode, US_STATE_OPTIONS } from "@shared/us-states";
 
 type Profile = {
   companyName: string;
@@ -149,6 +150,43 @@ async function jsonRequest(url: string, options?: RequestInit) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || data.message || "Request failed");
   return data;
+}
+
+function StateMultiSelect({
+  label,
+  values,
+  onChange,
+}: {
+  label: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const selectedCodes = Array.from(new Set(values.map(normalizeUsStateCode).filter(Boolean)));
+  return (
+    <div>
+      <Label>{label}</Label>
+      <select
+        multiple
+        size={6}
+        value={selectedCodes}
+        onChange={(event) => onChange(Array.from(event.target.selectedOptions, (option) => option.value))}
+        className="mt-2 min-h-36 w-full rounded-md border border-slate-200 bg-white p-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+        aria-label={label}
+      >
+        {US_STATE_OPTIONS.map((state) => (
+          <option key={state.code} value={state.code}>{state.name}</option>
+        ))}
+      </select>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {selectedCodes.length > 0 ? selectedCodes.map((code) => (
+          <Badge key={code} variant="outline" className="border-catalyst-blue/20 bg-catalyst-blue/10 text-catalyst-navy">
+            {getUsStateLabel(code)} ({code})
+          </Badge>
+        )) : <span className="text-xs text-slate-500">Select one or more states.</span>}
+      </div>
+      <p className="mt-1 text-xs text-slate-500">Use Ctrl/Cmd-click or Shift-click to select multiple states.</p>
+    </div>
+  );
 }
 
 function TagEditor({
@@ -377,7 +415,7 @@ export default function DeveloperCriteriaSettings() {
         ...profile,
         assetClass: profile.assetClass || "multifamily",
         industrialCriteria: profile.industrialCriteria || DEFAULT_INDUSTRIAL_CRITERIA,
-        targetStates: profile.targetStates || [],
+        targetStates: Array.from(new Set((profile.targetStates || []).map(normalizeUsStateCode).filter(Boolean))),
         targetCounties: profile.targetCounties || [],
         productTypes: (profile.productTypes || []).map((productType) => ({
           ...productType,
@@ -933,7 +971,7 @@ export default function DeveloperCriteriaSettings() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-5 md:grid-cols-2">
-                <TagEditor label="Target states" values={form.targetStates} onChange={(value) => update("targetStates", value)} placeholder="e.g. North Carolina" />
+                <StateMultiSelect label="Target states" values={form.targetStates} onChange={(value) => update("targetStates", value)} />
                 <CountyMarketEditor
                   values={form.targetCounties}
                   labels={form.countyMarketLabels}
@@ -1091,7 +1129,7 @@ export default function DeveloperCriteriaSettings() {
                  targetStates={form.targetStates}
               />
               <div className="grid gap-5 border-t border-amber-200 pt-5 md:grid-cols-2">
-                <TagEditor label="Target states" values={form.targetStates} onChange={(value) => update("targetStates", value)} placeholder="e.g. North Carolina" />
+                <StateMultiSelect label="Target states" values={form.targetStates} onChange={(value) => update("targetStates", value)} />
                 <CountyMarketEditor
                   values={form.targetCounties}
                   labels={form.countyMarketLabels}

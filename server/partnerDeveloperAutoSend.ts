@@ -4,6 +4,7 @@ import type { DeveloperProductType, DeveloperProfile } from '../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { deals } from '../shared/schema';
 import { classifyDealForProfile, isDealInProfileMarket } from './developerClassificationService';
+import { normalizeUsStateCode } from '../shared/us-states';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Auto-send engine: matches a newly-classified deal against every active
@@ -225,13 +226,13 @@ export function doesDealMatchDeveloper(deal: any, dev: any): boolean {
 }
 
 export function doesDealMatchDeveloperMarket(deal: any, dev: any): boolean {
-  const matches = (value: unknown, accepted: unknown) => {
+  const matches = (value: unknown, accepted: unknown, normalize = (entry: unknown) => String(entry ?? "").trim().toLowerCase()) => {
     if (!Array.isArray(accepted) || accepted.length === 0) return true;
-    const normalized = String(value ?? "").trim().toLowerCase();
-    return Boolean(normalized) && accepted.some((entry) => String(entry).trim().toLowerCase() === normalized);
+    const normalized = normalize(value);
+    return Boolean(normalized) && accepted.some((entry) => normalize(entry) === normalized);
   };
 
-  return matches(deal.state, dev.targetStates)
+  return matches(deal.state, dev.targetStates, normalizeUsStateCode)
     && matches(deal.msaName, dev.targetMsas)
     && matches(deal.county, dev.targetCounties);
 }

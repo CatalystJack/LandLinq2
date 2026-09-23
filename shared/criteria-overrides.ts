@@ -1,3 +1,5 @@
+import { normalizeUsStateCode } from "./us-states";
+
 export type MultifamilyCriteriaOverride = Partial<{
   minAcres: number;
   maxAcres: number;
@@ -13,7 +15,7 @@ export type IndustrialCriteriaOverride = Partial<{
 export type StateOverrideMap<T extends object> = Record<string, Partial<T>>;
 
 export function normalizeStateKey(value: unknown): string {
-  return String(value ?? "").trim().toUpperCase();
+  return normalizeUsStateCode(value);
 }
 
 export function resolveStateAwareCriteria<T extends object>(

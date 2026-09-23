@@ -4,6 +4,7 @@ import { createServer } from "http";
 import { setupVite, serveStatic, log } from "./vite";
 import { EmailTestEndpoint } from "./emailTestEndpoint";
 import { getEmailConfigurationStatus } from "./productionSafety";
+import { isUsStateCode, normalizeUsStateCode } from "@shared/us-states";
 
 if (!process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET is required; refusing to start");
@@ -482,6 +483,21 @@ setTimeout(() => {
         CREATE UNIQUE INDEX IF NOT EXISTS outreach_senders_profile_email_lower_unique
           ON outreach_senders (developer_profile_id, LOWER(email));
       `);
+      const legacyStateProfiles = await migrationPool.query<{
+        id: string;
+        target_states: string[] | null;
+      }>(`SELECT id, target_states FROM developer_profiles WHERE target_states IS NOT NULL`);
+      for (const profile of legacyStateProfiles.rows) {
+        const normalizedStates = Array.from(new Set(
+          (profile.target_states || []).map(normalizeUsStateCode).filter(isUsStateCode),
+        ));
+        if (JSON.stringify(normalizedStates) !== JSON.stringify(profile.target_states || [])) {
+          await migrationPool.query(
+            `UPDATE developer_profiles SET target_states = $1::text[], updated_at = NOW() WHERE id = $2`,
+            [normalizedStates, profile.id],
+          );
+        }
+      }
       log("✅ Email intake reliability schema ready");
     
     // Set up webhook endpoints BEFORE routes to prevent catch-all blocking

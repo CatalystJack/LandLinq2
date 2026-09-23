@@ -2,6 +2,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getUsStateLabel, normalizeUsStateCode, US_STATE_OPTIONS } from "@shared/us-states";
 
 export type CriteriaOverrideValue = Record<string, Partial<Record<string, string | number | null>>>;
 
@@ -18,17 +19,19 @@ type Props = {
   onChange: (value: CriteriaOverrideValue) => void;
 };
 
-const stateKey = (value: string) => value.trim().toUpperCase();
-
 export default function StateCriteriaOverrides({ targetStates, value, fields, onChange }: Props) {
-  const overrides = value || {};
-  const normalizedTargets = targetStates.map((state) => state.trim()).filter(Boolean);
-  const availableStates = normalizedTargets.filter(
-    (state) => !Object.keys(overrides).some((existing) => stateKey(existing) === stateKey(state)),
+  const overrides = Object.entries(value || {}).reduce<CriteriaOverrideValue>((result, [rawState, stateOverride]) => {
+    const state = normalizeUsStateCode(rawState);
+    if (state) result[state] = stateOverride;
+    return result;
+  }, {});
+  const normalizedTargets = Array.from(new Set(targetStates.map(normalizeUsStateCode).filter(Boolean)));
+  const availableStates = US_STATE_OPTIONS.filter((state) =>
+    normalizedTargets.includes(state.code) && !Object.prototype.hasOwnProperty.call(overrides, state.code),
   );
 
   const addState = (state: string) => {
-    const key = stateKey(state);
+    const key = normalizeUsStateCode(state);
     if (!key || overrides[key]) return;
     onChange({ ...overrides, [key]: {} });
   };
@@ -71,7 +74,7 @@ export default function StateCriteriaOverrides({ targetStates, value, fields, on
               aria-label="Add state override"
             >
               <option value="">Add state…</option>
-              {availableStates.map((state) => <option key={state} value={stateKey(state)}>{state}</option>)}
+              {availableStates.map((state) => <option key={state.code} value={state.code}>{state.name}</option>)}
             </select>
             <Plus className="h-4 w-4 text-slate-400" />
           </label>
@@ -90,9 +93,9 @@ export default function StateCriteriaOverrides({ targetStates, value, fields, on
             <div key={state} className="rounded-lg border border-slate-200 bg-white p-3">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-slate-800">
-                  {normalizedTargets.find((target) => stateKey(target) === stateKey(state)) || state}
+                  {getUsStateLabel(state)} ({state})
                 </span>
-                <Button type="button" variant="ghost" size="icon" onClick={() => removeState(state)} aria-label={`Remove ${state} override`}>
+                <Button type="button" variant="ghost" size="icon" onClick={() => removeState(state)} aria-label={`Remove ${getUsStateLabel(state)} override`}>
                   <Trash2 className="h-4 w-4 text-slate-400" />
                 </Button>
               </div>

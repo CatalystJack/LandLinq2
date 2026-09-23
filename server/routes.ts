@@ -63,6 +63,7 @@ import {
   normalizeNumericStateOverrides,
   resolveStateAwareCriteria,
 } from "@shared/criteria-overrides";
+import { isUsStateCode, normalizeUsStateCode } from "@shared/us-states";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
@@ -13555,7 +13556,9 @@ RULES:
       if (!Array.isArray(body[field]) || body[field].some((entry: unknown) => typeof entry !== "string")) {
         throw new Error(`${label} must be a list`);
       }
-      payload[field] = Array.from(new Set(body[field].map((entry: string) => entry.trim()).filter(Boolean)));
+      payload[field] = Array.from(new Set(body[field].map((entry: string) =>
+        field === "targetStates" ? normalizeUsStateCode(entry) : entry.trim(),
+      ).filter(Boolean)));
     };
     const decimal = (field: string, label: string, required = false) => {
       if (partial && body[field] === undefined) return;
@@ -15067,7 +15070,9 @@ RULES:
         if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) {
           throw new Error(`${field} must be an array of strings`);
         }
-        updates[field] = value.map((entry: string) => entry.trim()).filter(Boolean);
+        updates[field] = field === "targetStates"
+          ? Array.from(new Set(value.map(normalizeUsStateCode).filter(isUsStateCode)))
+          : value.map((entry: string) => entry.trim()).filter(Boolean);
       };
       if (isGeneralSales) {
         updates.targetStates = [];
@@ -16423,7 +16428,7 @@ RULES:
     `);
     const profile = profileResult.rows?.[0] as any;
     if (!profile) throw new Error('ACTIVE_DEVELOPER_PROFILE_REQUIRED');
-    const targetStates = (profile.target_states || []).map((value: string) => value.toUpperCase());
+    const targetStates = (profile.target_states || []).map((value: string) => normalizeUsStateCode(value)).filter(Boolean);
     const targetCounties = (profile.target_counties || []).map((value: string) => value.toLowerCase());
     const result = await db.execute(sql`
       SELECT DISTINCT b.id, b.first_name as "firstName", b.last_name as "lastName",
@@ -18319,7 +18324,7 @@ RULES:
 
           // State match (market)
           if (dev.targetStates && dev.targetStates.length > 0) {
-            if (!deal.state || !dev.targetStates.includes(deal.state)) continue;
+            if (!deal.state || !dev.targetStates.some((state: string) => normalizeUsStateCode(state) === normalizeUsStateCode(deal.state))) continue;
             matchReasons.push(`State: ${deal.state}`);
           }
 
