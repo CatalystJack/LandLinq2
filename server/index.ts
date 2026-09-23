@@ -312,6 +312,20 @@ setTimeout(() => {
           ADD COLUMN IF NOT EXISTS manual_is_coastal boolean;
         ALTER TABLE brokers
           ADD COLUMN IF NOT EXISTS source_tags text[] NOT NULL DEFAULT ARRAY[]::text[];
+        CREATE TABLE IF NOT EXISTS broker_developer_email_suppressions (
+          id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+          broker_id varchar NOT NULL REFERENCES brokers(id) ON DELETE CASCADE,
+          developer_profile_id varchar NOT NULL REFERENCES developer_profiles(id) ON DELETE CASCADE,
+          unsubscribed_at timestamp NOT NULL DEFAULT NOW(),
+          created_at timestamp NOT NULL DEFAULT NOW(),
+          updated_at timestamp NOT NULL DEFAULT NOW(),
+          CONSTRAINT broker_developer_email_suppression_unique
+            UNIQUE (broker_id, developer_profile_id)
+        );
+        CREATE INDEX IF NOT EXISTS broker_developer_email_suppression_broker_idx
+          ON broker_developer_email_suppressions (broker_id);
+        CREATE INDEX IF NOT EXISTS broker_developer_email_suppression_profile_idx
+          ON broker_developer_email_suppressions (developer_profile_id);
         ALTER TABLE developer_product_types
           ADD COLUMN IF NOT EXISTS dua numeric,
           ADD COLUMN IF NOT EXISTS hard_cost_pu numeric,

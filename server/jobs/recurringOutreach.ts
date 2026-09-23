@@ -7,7 +7,7 @@ import * as cron from 'node-cron';
 import { outreachService } from '../services/outreachService';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { markBrokerEmailUnavailable } from '../emailUnsubscribe';
+import { isBrokerEmailSuppressed, markBrokerEmailUnavailable } from '../emailUnsubscribe';
 
 function formatDeveloperTargetMarket(states: unknown, counties: unknown): string {
   const values = [...(Array.isArray(states) ? states : []), ...(Array.isArray(counties) ? counties : [])]
@@ -460,6 +460,12 @@ export async function processDripEnrollments(): Promise<void> {
           AND e.status IN ('pending', 'in_progress')
           AND t.is_active = true
           AND s.is_active = true
+           AND NOT EXISTS (
+             SELECT 1
+             FROM broker_developer_email_suppressions suppression
+             WHERE suppression.broker_id = e.broker_id
+               AND suppression.developer_profile_id = s.developer_profile_id
+           )
           AND NOT EXISTS (
             SELECT 1
             FROM outreach_campaigns c
@@ -499,6 +505,22 @@ export async function processDripEnrollments(): Promise<void> {
 
     for (const enrollment of dueEnrollments) {
       try {
+        if (
+          enrollment.developer_profile_id &&
+          await isBrokerEmailSuppressed(enrollment.broker_id, enrollment.developer_profile_id)
+        ) {
+          await db.execute(sql`
+            UPDATE drip_campaign_enrollments
+            SET status = 'cancelled',
+                paused_reason = 'Unsubscribed by recipient',
+                updated_at = NOW()
+            WHERE id = ${enrollment.id}
+              AND status IN ('pending', 'in_progress')
+          `);
+          skipped++;
+          continue;
+        }
+
         // Per-sender daily limit: use daily_limit_override from DB, fall back to global default
         const senderDailyLimit = parseInt(enrollment.daily_limit_override || '0') || DAILY_SEND_LIMIT_PER_SENDER;
 
@@ -676,6 +698,25 @@ export async function processDripEnrollments(): Promise<void> {
               } catch (parseErr) {
                 console.error(`   ⚠️ [DRIP] Failed to parse attachments for step:`, parseErr);
               }
+            }
+
+            // Re-check immediately before the provider call because a
+            // recipient can unsubscribe while content or attachments are
+            // being prepared.
+            if (
+              enrollment.developer_profile_id &&
+              await isBrokerEmailSuppressed(enrollment.broker_id, enrollment.developer_profile_id)
+            ) {
+              await db.execute(sql`
+                UPDATE drip_campaign_enrollments
+                SET status = 'cancelled',
+                    paused_reason = 'Unsubscribed by recipient',
+                    updated_at = NOW()
+                WHERE id = ${enrollment.id}
+                  AND status IN ('pending', 'in_progress')
+              `);
+              skipped++;
+              continue;
             }
 
             const { sendDripEmailViaMicrosoft } = await import('../microsoftAuth');
@@ -1271,6 +1312,12 @@ export async function processCrmTaggedContacts(): Promise<{
         WHERE b.owner_developer_profile_id = ${template.developer_profile_id}
           AND ${template.hubspot_trigger_tag} = ANY(b.crm_tags)
           AND b.is_active = true
+          AND NOT EXISTS (
+            SELECT 1
+            FROM broker_developer_email_suppressions suppression
+            WHERE suppression.broker_id = b.id
+              AND suppression.developer_profile_id = ${template.developer_profile_id}
+          )
       `);
       const tagged = (taggedResult.rows || []) as any[];
       if (!tagged.length) continue;

@@ -374,8 +374,12 @@ export interface IStorage {
   // Deduplication helper - check if message already exists for period
   checkMessageExists(campaignId: string, brokerId: string, channel: string, periodKey: string): Promise<boolean>;
   
-  // Get eligible brokers for outreach (active, with contact preferences)
-  getEligibleBrokersForOutreach(brokerFilter: any): Promise<Broker[]>;
+  // Get eligible brokers for outreach (active, with contact preferences),
+  // excluding broker-specific email suppressions for the developer campaign.
+  getEligibleBrokersForOutreach(
+    brokerFilter: any,
+    developerProfileId?: string | null,
+  ): Promise<Broker[]>;
 
   // Email deduplication operations - Permanent storage to prevent SendGrid replays
   checkEmailProcessed(emailHash: string): Promise<ProcessedEmail | undefined>;
@@ -3360,8 +3364,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Get eligible brokers for outreach (active, with contact preferences)
-  async getEligibleBrokersForOutreach(brokerFilter: any): Promise<Broker[]> {
+  async getEligibleBrokersForOutreach(
+    brokerFilter: any,
+    developerProfileId?: string | null,
+  ): Promise<Broker[]> {
     const conditions = [eq(brokers.isActive, true)];
+    if (developerProfileId) {
+      conditions.push(sql`
+        NOT EXISTS (
+          SELECT 1
+          FROM broker_developer_email_suppressions suppression
+          WHERE suppression.broker_id = ${brokers.id}
+            AND suppression.developer_profile_id = ${developerProfileId}
+        )
+      `);
+    }
     
     // Apply additional filters from brokerFilter object
     if (brokerFilter.marketsCovered) {

@@ -8,6 +8,7 @@ import { sendNotificationEmail, transformTextToHTML } from '../emailService';
 import { sendSMS, SendSMSResult } from '../smsService';
 import { TemplateService, TemplateVariables } from '../templateService';
 import { outreachSafeguardService } from '../outreachSafeguardService';
+import { isBrokerEmailSuppressed } from '../emailUnsubscribe';
 import type { OutreachCampaign, OutreachRun, OutreachMessage, Broker, InsertOutreachRun, InsertOutreachMessage } from '@shared/schema';
 
 export interface OutreachExecutionOptions {
@@ -73,7 +74,10 @@ export class OutreachService {
       console.log(`🎯 Building target brokers for campaign: ${campaign.name}`);
       
       // Get eligible brokers based on campaign filters
-      const eligibleBrokers = await storage.getEligibleBrokersForOutreach(campaign.brokerFilter || {});
+      const eligibleBrokers = await storage.getEligibleBrokersForOutreach(
+        campaign.brokerFilter || {},
+        campaign.developerProfileId,
+      );
       
       // Filter out brokers who already received outreach this period
       const currentPeriodKey = this.getCurrentPeriodKey();
@@ -86,7 +90,7 @@ export class OutreachService {
         
         for (const channel of channels) {
           // Check if broker should receive this channel based on preferences
-          if (!this.shouldSendToChannel(broker, channel)) {
+          if (!await this.shouldSendToChannel(broker, channel, campaign.developerProfileId)) {
             continue;
           }
           
@@ -202,7 +206,7 @@ export class OutreachService {
         for (const channel of channels) {
           try {
             // Check if we should send to this channel
-            if (!this.shouldSendToChannel(broker, channel)) {
+            if (!await this.shouldSendToChannel(broker, channel, campaign.developerProfileId)) {
               console.log(`   [${brokerIndex}/${brokersToProcess.length}] ⏭️ ${brokerName} - ${channel} skipped (no ${channel === 'email' ? 'email' : 'phone/opt-in'})`);
               result.skippedCount++;
               continue;
@@ -492,7 +496,11 @@ export class OutreachService {
   /**
    * Check if we should send to this broker on this channel
    */
-  private shouldSendToChannel(broker: Broker, channel: string): boolean {
+  private async shouldSendToChannel(
+    broker: Broker,
+    channel: string,
+    developerProfileId?: string | null,
+  ): Promise<boolean> {
     // CRITICAL: Never send to inactive brokers (opt-out compliance)
     if (!broker.isActive) {
       console.log(`🚫 Skipping inactive broker ${broker.firstName} ${broker.lastName} (${broker.email || broker.phone})`);
@@ -500,6 +508,10 @@ export class OutreachService {
     }
     
     if (channel === 'email') {
+      if (developerProfileId && await isBrokerEmailSuppressed(broker.id, developerProfileId)) {
+        console.log(`🚫 Skipping developer-suppressed broker ${broker.firstName} ${broker.lastName} for ${developerProfileId}`);
+        return false;
+      }
       return !!(broker.email && broker.email.trim());
     } else if (channel === 'sms') {
       // Respect SMS opt-in preference

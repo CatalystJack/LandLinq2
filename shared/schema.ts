@@ -319,6 +319,21 @@ export const developerBrokerCrm = pgTable("developer_broker_crm", {
   index("developer_broker_crm_broker_idx").on(table.brokerId),
 ]);
 
+// A broker can opt out of one Investment Company's outreach while remaining
+// eligible for outreach from other companies that share the broker record.
+export const brokerDeveloperEmailSuppressions = pgTable("broker_developer_email_suppressions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  brokerId: varchar("broker_id").references(() => brokers.id, { onDelete: "cascade" }).notNull(),
+  developerProfileId: varchar("developer_profile_id").references(() => developerProfiles.id, { onDelete: "cascade" }).notNull(),
+  unsubscribedAt: timestamp("unsubscribed_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("broker_developer_email_suppression_unique").on(table.brokerId, table.developerProfileId),
+  index("broker_developer_email_suppression_broker_idx").on(table.brokerId),
+  index("broker_developer_email_suppression_profile_idx").on(table.developerProfileId),
+]);
+
 // Company-owned CRM tag vocabulary. Tags can exist before they are applied to
 // a contact, and never overlap with importer-controlled source tags.
 export const developerCrmTags = pgTable("developer_crm_tags", {
@@ -1844,6 +1859,7 @@ export type LoginData = z.infer<typeof loginSchema>;
 export type RegisterData = z.infer<typeof registerSchema>;
 export type InsertBroker = z.infer<typeof insertBrokerSchema>;
 export type Broker = typeof brokers.$inferSelect;
+export type BrokerDeveloperEmailSuppression = typeof brokerDeveloperEmailSuppressions.$inferSelect;
 export type InsertDeal = z.infer<typeof insertDealSchema>;
 export type Deal = typeof deals.$inferSelect;
 export type InsertCommunication = z.infer<typeof insertCommunicationSchema>;

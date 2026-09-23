@@ -384,7 +384,7 @@ export async function sendNotificationEmailViaOutlookSender(
         if (!brokerId) {
           throw new Error(`Cannot send organization notification without a scoped broker for ${notification.to}`);
         }
-        htmlBody = appendUnsubscribeFooter(htmlBody, brokerId);
+        htmlBody = appendUnsubscribeFooter(htmlBody, brokerId, sender.developerProfileId);
       }
     }
     const attachments = [

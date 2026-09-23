@@ -317,6 +317,7 @@ import { sendSMS, landLinqSMSTemplates } from "./smsService";
 import { TemplateService, renderBrandedEmail } from "./templateService";
 import {
   EMAIL_UNSUBSCRIBED_TAG,
+  recordBrokerEmailUnsubscribe,
   unsubscribeConfirmationHtml,
   verifyUnsubscribeToken,
 } from "./emailUnsubscribe";
@@ -3917,37 +3918,38 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // the broker without exposing the email address or requiring a form.
   app.get("/api/email/unsubscribe/:token", async (req, res) => {
     try {
-      const brokerId = verifyUnsubscribeToken(String(req.params.token || ""));
-      if (!brokerId) {
+      const token = verifyUnsubscribeToken(String(req.params.token || ""));
+      if (!token) {
         return res.status(400).type("html").send("<h1>Invalid unsubscribe link</h1><p>This link is not valid or has been altered.</p>");
       }
 
-      const result = await db.execute(sql`
-        UPDATE brokers
-        SET is_active = false,
-            sms_opt_in = false,
-            sms_opt_out_date = NOW(),
-            crm_tags = ARRAY(
-              SELECT DISTINCT unnest(
-                COALESCE(crm_tags, ARRAY[]::text[])
-                || ARRAY[${EMAIL_UNSUBSCRIBED_TAG}]::text[]
-              )
-            ),
-            updated_at = NOW()
-        WHERE id = ${brokerId}
-        RETURNING id
-      `);
-      if ((result.rows || []).length === 0) {
+      let developerProfileId = token.developerProfileId;
+      if (!developerProfileId) {
+        const ownerResult = await db.execute(sql`
+          SELECT owner_developer_profile_id
+          FROM brokers
+          WHERE id = ${token.brokerId}
+          LIMIT 1
+        `);
+        developerProfileId = (ownerResult.rows?.[0] as any)?.owner_developer_profile_id || null;
+      }
+      if (!developerProfileId || !await recordBrokerEmailUnsubscribe(token.brokerId, developerProfileId)) {
         return res.status(404).type("html").send("<h1>Contact not found</h1><p>This unsubscribe link is no longer active.</p>");
       }
 
       await db.execute(sql`
-        UPDATE drip_campaign_enrollments
+        UPDATE drip_campaign_enrollments e
         SET status = 'cancelled',
             paused_reason = 'Unsubscribed by recipient',
             updated_at = NOW()
-        WHERE broker_id = ${brokerId}
+        WHERE e.broker_id = ${token.brokerId}
           AND status IN ('pending', 'in_progress')
+          AND EXISTS (
+            SELECT 1
+            FROM outreach_senders s
+            WHERE s.id = e.sender_id
+              AND s.developer_profile_id = ${developerProfileId}
+          )
       `);
 
       return res.type("html").send(unsubscribeConfirmationHtml());
@@ -16270,6 +16272,12 @@ RULES:
       WHERE b.is_active = true
         AND b.email IS NOT NULL
         AND (b.owner_developer_profile_id = ${developerProfileId} OR b.owner_developer_profile_id IS NULL)
+        AND NOT EXISTS (
+          SELECT 1
+          FROM broker_developer_email_suppressions suppression
+          WHERE suppression.broker_id = b.id
+            AND suppression.developer_profile_id = ${developerProfileId}
+        )
         AND (
           ${targetStates.length === 0}
           OR UPPER(COALESCE(b.state_region, '')) = ANY(${targetStates}::text[])

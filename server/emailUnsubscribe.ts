@@ -6,6 +6,11 @@ export const EMAIL_UNAVAILABLE_TAG = "Email unavailable";
 export const EMAIL_HARD_BOUNCE_TAG = "Hard bounce";
 export const EMAIL_UNSUBSCRIBED_TAG = "Email unsubscribed";
 
+export type UnsubscribeToken = {
+  brokerId: string;
+  developerProfileId: string | null;
+};
+
 function getSigningSecret(): string {
   const secret = process.env.SESSION_SECRET?.trim();
   if (!secret) {
@@ -18,23 +23,54 @@ function sign(value: string): string {
   return crypto.createHmac("sha256", getSigningSecret()).update(value).digest("base64url");
 }
 
-export function createUnsubscribeToken(brokerId: string): string {
-  const encodedBrokerId = Buffer.from(brokerId, "utf8").toString("base64url");
-  return `${encodedBrokerId}.${sign(encodedBrokerId)}`;
+export function createUnsubscribeToken(brokerId: string, developerProfileId: string): string {
+  const encodedPayload = Buffer.from(
+    JSON.stringify({ brokerId, developerProfileId }),
+    "utf8",
+  ).toString("base64url");
+  return `${encodedPayload}.${sign(encodedPayload)}`;
 }
 
-export function verifyUnsubscribeToken(token: string): string | null {
-  const [encodedBrokerId, providedSignature] = token.split(".");
-  if (!encodedBrokerId || !providedSignature) return null;
+export function verifyUnsubscribeToken(token: string): UnsubscribeToken | null {
+  const [encodedPayload, providedSignature] = token.split(".");
+  if (!encodedPayload || !providedSignature) return null;
 
-  const expectedSignature = sign(encodedBrokerId);
+  const expectedSignature = sign(encodedPayload);
   const provided = Buffer.from(providedSignature);
   const expected = Buffer.from(expectedSignature);
   if (provided.length !== expected.length || !crypto.timingSafeEqual(provided, expected)) return null;
 
   try {
-    const brokerId = Buffer.from(encodedBrokerId, "base64url").toString("utf8");
-    return brokerId || null;
+    const decoded = Buffer.from(encodedPayload, "base64url").toString("utf8");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(decoded);
+    } catch {
+      // Tokens issued before developer scope was added encoded the broker ID
+      // directly rather than as JSON.
+      return decoded ? { brokerId: decoded, developerProfileId: null } : null;
+    }
+    const payload = parsed && typeof parsed === "object"
+      ? parsed as { brokerId?: unknown; developerProfileId?: unknown }
+      : null;
+    if (
+      payload &&
+      typeof payload.brokerId === "string" &&
+      typeof payload.developerProfileId === "string"
+    ) {
+      return {
+        brokerId: payload.brokerId,
+        developerProfileId: payload.developerProfileId,
+      };
+    }
+
+    // Legacy links only identified the broker. They remain usable for
+    // developer-owned brokers, but can never safely identify an organization
+    // for a shared broker.
+    if (typeof parsed === "string" && parsed) {
+      return { brokerId: parsed, developerProfileId: null };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -45,14 +81,14 @@ export function getPublicApplicationUrl(): string {
   return domain ? `https://${domain}` : "https://landlinq.ai";
 }
 
-export function buildUnsubscribeUrl(brokerId: string): string {
-  return `${getPublicApplicationUrl()}/api/email/unsubscribe/${createUnsubscribeToken(brokerId)}`;
+export function buildUnsubscribeUrl(brokerId: string, developerProfileId: string): string {
+  return `${getPublicApplicationUrl()}/api/email/unsubscribe/${createUnsubscribeToken(brokerId, developerProfileId)}`;
 }
 
-export function appendUnsubscribeFooter(html: string, brokerId: string): string {
+export function appendUnsubscribeFooter(html: string, brokerId: string, developerProfileId: string): string {
   if (html.includes("data-landlinq-unsubscribe-footer")) return html;
 
-  const unsubscribeUrl = buildUnsubscribeUrl(brokerId);
+  const unsubscribeUrl = buildUnsubscribeUrl(brokerId, developerProfileId);
   const footer = `
     <div data-landlinq-unsubscribe-footer="true" style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.5; color: #6b7280;">
       <a href="${unsubscribeUrl}" style="display: inline-block; color: #2563eb; text-decoration: underline;">Unsubscribe from future emails</a>
@@ -62,6 +98,48 @@ export function appendUnsubscribeFooter(html: string, brokerId: string): string 
   return /<\/body\s*>/i.test(html)
     ? html.replace(/<\/body\s*>/i, `${footer}\n</body>`)
     : `${html}${footer}`;
+}
+
+export async function recordBrokerEmailUnsubscribe(
+  brokerId: string,
+  developerProfileId: string,
+): Promise<boolean> {
+  const result = await db.execute(sql`
+    INSERT INTO broker_developer_email_suppressions (
+      broker_id,
+      developer_profile_id,
+      unsubscribed_at,
+      created_at,
+      updated_at
+    )
+    SELECT ${brokerId}, ${developerProfileId}, NOW(), NOW(), NOW()
+    FROM brokers
+    WHERE id = ${brokerId}
+      AND (
+        owner_developer_profile_id = ${developerProfileId}
+        OR owner_developer_profile_id IS NULL
+      )
+    ON CONFLICT (broker_id, developer_profile_id)
+    DO UPDATE SET
+      unsubscribed_at = EXCLUDED.unsubscribed_at,
+      updated_at = NOW()
+    RETURNING broker_id
+  `);
+  return (result.rows || []).length > 0;
+}
+
+export async function isBrokerEmailSuppressed(
+  brokerId: string,
+  developerProfileId: string,
+): Promise<boolean> {
+  const result = await db.execute(sql`
+    SELECT 1
+    FROM broker_developer_email_suppressions
+    WHERE broker_id = ${brokerId}
+      AND developer_profile_id = ${developerProfileId}
+    LIMIT 1
+  `);
+  return (result.rows || []).length > 0;
 }
 
 export async function resolveScopedBrokerId(

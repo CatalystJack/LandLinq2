@@ -392,7 +392,7 @@ export async function sendDripEmailViaMicrosoft(enrollment: {
       if (!brokerId) {
         throw new Error(`Cannot send organization email without a scoped broker for ${enrollment.contact_email}`);
       }
-      htmlBody = appendUnsubscribeFooter(htmlBody, brokerId);
+      htmlBody = appendUnsubscribeFooter(htmlBody, brokerId, enrollment.developer_profile_id);
     }
   }
 
