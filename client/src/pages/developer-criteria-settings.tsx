@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import IndustrialCriteriaFields from "@/components/industrial-criteria-fields";
+import StateCriteriaOverrides, { type CriteriaOverrideValue } from "@/components/state-criteria-overrides";
 import SharedContactAccessEditor, {
   type ContactCountyOption,
   type ContactFilterOption,
@@ -87,6 +88,7 @@ type ProductType = {
   maxAcres: string | null;
   minRentPsf: string | null;
   minRentPerUnit: string | null;
+  stateOverrides: CriteriaOverrideValue;
   dua: string | null;
   hardCostPu: string | null;
   assumedLandCostPu: string | null;
@@ -383,6 +385,7 @@ export default function DeveloperCriteriaSettings() {
           maxAcres: productType.maxAcres || "",
           minRentPsf: productType.minRentPsf || "",
           minRentPerUnit: productType.minRentPerUnit || "",
+          stateOverrides: productType.stateOverrides || {},
           dua: productType.dua || "",
           hardCostPu: productType.hardCostPu || "",
           assumedLandCostPu: productType.assumedLandCostPu || "",
@@ -619,6 +622,7 @@ export default function DeveloperCriteriaSettings() {
         maxAcres: productType.maxAcres || null,
         minRentPsf: productType.minRentPsf || null,
         minRentPerUnit: productType.minRentPerUnit || null,
+        stateOverrides: productType.stateOverrides || {},
         ...Object.fromEntries(YOC_ASSUMPTION_KEYS.map((key) => [
           key,
           productType[key] === "" || productType[key] === undefined ? null : productType[key],
@@ -647,6 +651,7 @@ export default function DeveloperCriteriaSettings() {
         maxAcres: "",
         minRentPsf: "",
         minRentPerUnit: "",
+        stateOverrides: {},
         dua: "",
         hardCostPu: "",
         assumedLandCostPu: "",
@@ -1022,6 +1027,19 @@ export default function DeveloperCriteriaSettings() {
                             <Trash2 className="h-4 w-4 text-slate-400" />
                           </Button>
                         </div>
+                        <div className="mt-4">
+                          <StateCriteriaOverrides
+                            targetStates={form.targetStates}
+                            value={productType.stateOverrides}
+                            fields={[
+                              { key: "minAcres", label: "Minimum acreage", suffix: "acres" },
+                              { key: "maxAcres", label: "Maximum acreage", suffix: "acres" },
+                              { key: "minRentPsf", label: "Minimum rent $/SF", suffix: "$/SF" },
+                              { key: "minRentPerUnit", label: "Minimum rent $/Unit", suffix: "$/Unit" },
+                            ]}
+                            onChange={(stateOverrides) => updateProductType(index, { stateOverrides })}
+                          />
+                        </div>
                         <div className="mt-4 border-t border-slate-100 pt-4">
                           <Button
                             type="button"
@@ -1070,6 +1088,7 @@ export default function DeveloperCriteriaSettings() {
               <IndustrialCriteriaFields
                 value={form.industrialCriteria}
                 onChange={(value) => update("industrialCriteria", value)}
+                 targetStates={form.targetStates}
               />
               <div className="grid gap-5 border-t border-amber-200 pt-5 md:grid-cols-2">
                 <TagEditor label="Target states" values={form.targetStates} onChange={(value) => update("targetStates", value)} placeholder="e.g. North Carolina" />

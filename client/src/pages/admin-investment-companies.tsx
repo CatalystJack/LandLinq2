@@ -23,6 +23,7 @@ import { AlertCircle, Building2, CheckCircle2, ChevronDown, ChevronUp, Edit3, Ke
 import { Textarea } from "@/components/ui/textarea";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
 import IndustrialCriteriaFields from "@/components/industrial-criteria-fields";
+import StateCriteriaOverrides, { type CriteriaOverrideValue } from "@/components/state-criteria-overrides";
 import SharedContactAccessEditor, {
   type ContactCountyOption,
   type ContactFilterOption,
@@ -40,6 +41,7 @@ type ProductType = YocAssumptionsValue & {
   maxAcres: string | null;
   minRentPsf: string | null;
   minRentPerUnit: string | null;
+  stateOverrides: CriteriaOverrideValue;
   isActive: boolean;
 };
 
@@ -185,7 +187,7 @@ const blankForm: CompanyForm = {
   crmContactCounties: [],
   crmContactProductTypes: [],
   crmContactSourceTags: [],
-  productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
+  productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", stateOverrides: {}, isActive: true }],
   countyMarketLabels: {},
   isActive: true,
 };
@@ -268,6 +270,7 @@ function ProductTypeEditorRow({
   productType,
   index,
   rentMetric,
+  targetStates,
   allProductTypes,
   assumptionsOpen,
   onToggleAssumptions,
@@ -277,6 +280,7 @@ function ProductTypeEditorRow({
   productType: ProductType;
   index: number;
   rentMetric: "psf" | "per_unit";
+  targetStates: string[];
   allProductTypes: ProductType[];
   assumptionsOpen: boolean;
   onToggleAssumptions: () => void;
@@ -323,6 +327,19 @@ function ProductTypeEditorRow({
               }))}
           />
         )}
+        <div className="mt-4">
+          <StateCriteriaOverrides
+            targetStates={targetStates}
+            value={productType.stateOverrides}
+            fields={[
+              { key: "minAcres", label: "Minimum acreage", suffix: "acres" },
+              { key: "maxAcres", label: "Maximum acreage", suffix: "acres" },
+              { key: "minRentPsf", label: "Minimum rent $/SF", suffix: "$/SF" },
+              { key: "minRentPerUnit", label: "Minimum rent $/Unit", suffix: "$/Unit" },
+            ]}
+            onChange={(stateOverrides) => onChange({ stateOverrides })}
+          />
+        </div>
       </div>
     </div>
   );
@@ -472,6 +489,7 @@ export default function AdminInvestmentCompanies() {
         maxAcres: editing.maxAcres || "",
         minRentPsf: editing.minRentPsf || "",
         minRentPerUnit: editing.minRentPerUnit || "",
+         stateOverrides: {},
         isActive: true,
       }]).map((productType) => ({
         ...createEmptyYocAssumptions(),
@@ -480,6 +498,7 @@ export default function AdminInvestmentCompanies() {
         maxAcres: productType.maxAcres || "",
         minRentPsf: productType.minRentPsf || "",
         minRentPerUnit: productType.minRentPerUnit || "",
+        stateOverrides: productType.stateOverrides || {},
         ...Object.fromEntries(YOC_ASSUMPTION_KEYS.map((key) => [
           key,
           productType[key] === undefined ? null : productType[key],
@@ -499,7 +518,7 @@ export default function AdminInvestmentCompanies() {
       crmContactCounties: [],
       crmContactProductTypes: [],
       crmContactSourceTags: [],
-      productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
+       productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", stateOverrides: {}, isActive: true }],
       countyMarketLabels: {},
     });
     setAssumptionsOpenIndex(null);
@@ -543,6 +562,7 @@ export default function AdminInvestmentCompanies() {
             maxAcres: productType.maxAcres || null,
             minRentPsf: productType.minRentPsf || null,
             minRentPerUnit: productType.minRentPerUnit || null,
+            stateOverrides: productType.stateOverrides || {},
             ...Object.fromEntries(YOC_ASSUMPTION_KEYS.map((key) => [
               key,
               productType[key] === "" || productType[key] === undefined ? null : productType[key],
@@ -639,7 +659,7 @@ export default function AdminInvestmentCompanies() {
   const updateProductType = (index: number, patch: Partial<ProductType>) =>
     update("productTypes", form.productTypes.map((productType, productIndex) => productIndex === index ? { ...productType, ...patch } : productType));
   const addProductType = () =>
-    update("productTypes", [...form.productTypes, { ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }]);
+     update("productTypes", [...form.productTypes, { ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", stateOverrides: {}, isActive: true }]);
   const openCreate = () => { setEditing(null); setFormOpen(true); };
   const openEdit = (profile: InvestmentCompany) => { setEditing(profile); setFormOpen(true); };
   const openInvite = (profile: InvestmentCompany) => {
@@ -703,6 +723,7 @@ export default function AdminInvestmentCompanies() {
                      productType={productType}
                      index={index}
                      rentMetric={form.rentMetric}
+                      targetStates={form.targetStates}
                      allProductTypes={form.productTypes}
                      assumptionsOpen={assumptionsOpenIndex === index}
                      onToggleAssumptions={() => setAssumptionsOpenIndex((current) => current === index ? null : index)}
@@ -715,7 +736,7 @@ export default function AdminInvestmentCompanies() {
            </section>
          <section><h3 className="mb-3 font-semibold">Affordable housing overrides</h3><div className="grid gap-3 sm:grid-cols-3"><ToggleRow label="QCT override" description="QCT status may override the rent minimum." checked={form.qctOverridesRentMinimum} onChange={(value) => update("qctOverridesRentMinimum", value)} /><ToggleRow label="DDA override" description="DDA status may override the rent minimum." checked={form.ddaOverridesRentMinimum} onChange={(value) => update("ddaOverridesRentMinimum", value)} /><ToggleRow label="OZ override" description="Opportunity Zone status may override rent." checked={form.ozOverridesRentMinimum} onChange={(value) => update("ozOverridesRentMinimum", value)} /></div></section>
          <section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><TagsField label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} placeholder="NC, SC, GA" /><CountyMarketEditor values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
-         {form.profileType === "real_estate" && form.assetClass === "industrial" && <><section className="rounded-lg border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Industrial site-screening criteria</h3><p className="mt-1 text-sm text-amber-900">These values drive the initial site search and manual review queue. Automated multifamily YOC and rent underwriting are intentionally disabled for this company.</p><div className="mt-5"><IndustrialCriteriaFields value={form.industrialCriteria} onChange={(value) => update("industrialCriteria", value)} compact /></div></section><section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><TagsField label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} placeholder="NC, SC, GA" /><CountyMarketEditor values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
+          {form.profileType === "real_estate" && form.assetClass === "industrial" && <><section className="rounded-lg border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Industrial site-screening criteria</h3><p className="mt-1 text-sm text-amber-900">These values drive the initial site search and manual review queue. Automated multifamily YOC and rent underwriting are intentionally disabled for this company.</p><div className="mt-5"><IndustrialCriteriaFields value={form.industrialCriteria} onChange={(value) => update("industrialCriteria", value)} targetStates={form.targetStates} compact /></div></section><section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><TagsField label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} placeholder="NC, SC, GA" /><CountyMarketEditor values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
           <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <h3 className="font-semibold text-slate-900">Shared broker contact access</h3>
             <p className="mt-1 text-sm text-slate-600">Choose which shared LandLinq contacts this company can see.</p>

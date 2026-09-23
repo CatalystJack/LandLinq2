@@ -60,10 +60,10 @@ export const developerProfiles = pgTable("developer_profiles", {
   minRentPerUnit: decimal("min_rent_per_unit"),
   compSearchRadiusMiles: decimal("comp_search_radius_miles").default("3"),
 
-  // Acreage — flat default + optional per-product-type overrides
+  // Legacy flat defaults retained for older integrations; classification reads
+  // the product-type criteria below.
   minAcres: decimal("min_acres").notNull(),
   maxAcres: decimal("max_acres"),
-  acreageOverridesByProductType: jsonb("acreage_overrides_by_product_type").default('{}'),
 
   // QCT/DDA/OZ rent-minimum override toggles
   qctOverridesRentMinimum: boolean("qct_overrides_rent_minimum").default(false),
@@ -111,6 +111,7 @@ export const developerProductTypes = pgTable("developer_product_types", {
   maxAcres: decimal("max_acres"),
   minRentPsf: decimal("min_rent_psf"),
   minRentPerUnit: decimal("min_rent_per_unit"),
+  stateOverrides: jsonb("state_overrides").default('{}').notNull(),
   // Optional developer-specific underwriting overrides. A null value means
   // "use the national YOC preset for this field."
   dua: decimal("dua"),

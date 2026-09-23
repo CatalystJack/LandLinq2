@@ -59,6 +59,10 @@ import {
   validateIndustrialCriteria,
   type DeveloperAssetClass,
 } from "@shared/industrial-criteria";
+import {
+  normalizeNumericStateOverrides,
+  resolveStateAwareCriteria,
+} from "@shared/criteria-overrides";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
@@ -13529,7 +13533,10 @@ RULES:
     const isIndustrial = assetClass === "industrial";
     if (!partial || body.industrialCriteria !== undefined) {
       payload.industrialCriteria = isIndustrial
-        ? validateIndustrialCriteria(normalizeIndustrialCriteria(body.industrialCriteria))
+        ? validateIndustrialCriteria(normalizeIndustrialCriteria(
+          body.industrialCriteria,
+          Array.isArray(body.targetStates) ? body.targetStates : undefined,
+        ))
         : normalizeIndustrialCriteria(body.industrialCriteria || DEFAULT_INDUSTRIAL_CRITERIA);
     }
     const requiredString = (field: string, label: string) => {
@@ -13583,20 +13590,6 @@ RULES:
     decimal("minRentPerUnit", "Minimum rent per unit");
     decimal("minAcres", "Minimum acreage", !isGeneralSales && !isIndustrial);
     decimal("maxAcres", "Maximum acreage");
-    if (!partial || body.acreageOverridesByProductType !== undefined) {
-      const raw = body.acreageOverridesByProductType ?? {};
-      if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Product acreage overrides must be an object");
-      const overrides: Record<string, number> = {};
-      for (const [key, rawValue] of Object.entries(raw)) {
-        const productType = key.trim();
-        const value = Number(rawValue);
-        if (!productType || !Number.isFinite(value) || value < 0) {
-          throw new Error("Each product acreage override needs a product type and non-negative acreage");
-        }
-        overrides[productType] = value;
-      }
-      payload.acreageOverridesByProductType = overrides;
-    }
     for (const field of [
       "qctOverridesRentMinimum", "ddaOverridesRentMinimum", "ozOverridesRentMinimum",
       "isInternal", "isActive",
@@ -13613,7 +13606,6 @@ RULES:
       payload.maxAcres = null;
       payload.minRentPsf = null;
       payload.minRentPerUnit = null;
-      payload.acreageOverridesByProductType = {};
     } else {
       stringArray("targetStates", "Target states");
       stringArray("targetCounties", "Target counties");
@@ -13623,7 +13615,6 @@ RULES:
         payload.maxAcres = payload.maxAcres ?? null;
         payload.minRentPsf = null;
         payload.minRentPerUnit = null;
-        payload.acreageOverridesByProductType = {};
       }
     }
     stringArray("knownEmailDomains", "Known email domains");
@@ -13909,7 +13900,29 @@ RULES:
     return parsed;
   }
 
-  function parseAdminProductTypes(body: any, legacy: Record<string, any>) {
+  const multifamilyStateOverrideFields = ["minAcres", "maxAcres", "minRentPsf", "minRentPerUnit"] as const;
+
+  function parseProductTypeStateOverrides(raw: any, targetStates: string[]) {
+    const stateOverrides = normalizeNumericStateOverrides(
+      raw?.stateOverrides,
+      multifamilyStateOverrideFields,
+      targetStates,
+    );
+    for (const [state, override] of Object.entries(stateOverrides)) {
+      const resolved = resolveStateAwareCriteria({
+        minAcres: Number(raw?.minAcres),
+        maxAcres: raw?.maxAcres === null || raw?.maxAcres === undefined || raw?.maxAcres === "" ? null : Number(raw.maxAcres),
+        minRentPsf: raw?.minRentPsf === null || raw?.minRentPsf === undefined || raw?.minRentPsf === "" ? null : Number(raw.minRentPsf),
+        minRentPerUnit: raw?.minRentPerUnit === null || raw?.minRentPerUnit === undefined || raw?.minRentPerUnit === "" ? null : Number(raw.minRentPerUnit),
+      }, { [state]: override }, state);
+      if (resolved.maxAcres !== null && resolved.maxAcres < resolved.minAcres) {
+        throw new Error(`${state} maximum acreage must be greater than or equal to minimum acreage`);
+      }
+    }
+    return stateOverrides;
+  }
+
+  function parseAdminProductTypes(body: any, legacy: Record<string, any>, targetStates: string[] = []) {
     if (
       (body.profileType ?? legacy.profileType) === "general_sales" ||
       (body.assetClass ?? legacy.assetClass) === "industrial"
@@ -13922,6 +13935,7 @@ RULES:
         maxAcres: legacy.maxAcres ?? null,
         minRentPsf: legacy.minRentPsf ?? null,
         minRentPerUnit: legacy.minRentPerUnit ?? null,
+        stateOverrides: parseProductTypeStateOverrides(legacy, targetStates),
         ...parseProductTypeUnderwriting(legacy),
         isActive: true,
       }];
@@ -13959,6 +13973,7 @@ RULES:
         maxAcres: maxAcres === null ? null : String(maxAcres),
         minRentPsf: minRentPsf === null ? null : String(minRentPsf),
         minRentPerUnit: minRentPerUnit === null ? null : String(minRentPerUnit),
+        stateOverrides: parseProductTypeStateOverrides(raw, targetStates),
         ...parseProductTypeUnderwriting(raw),
         isActive,
       };
@@ -13996,7 +14011,7 @@ RULES:
     try {
       const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import("@shared/schema");
       const payload = parseInvestmentCompanyPayload(req.body || {});
-      const productTypes = parseAdminProductTypes(req.body || {}, payload);
+      const productTypes = parseAdminProductTypes(req.body || {}, payload, payload.targetStates || []);
       const firstActive = productTypes.find((productType: any) => productType.isActive);
       const countyLabels = parseAdminCountyMarketLabels(req.body?.countyMarketLabels, payload.targetCounties || []);
       if (firstActive) {
@@ -14005,7 +14020,6 @@ RULES:
         payload.minRentPsf = firstActive.minRentPsf;
         payload.minRentPerUnit = firstActive.minRentPerUnit;
       }
-      payload.acreageOverridesByProductType = {};
       const [existing] = await db.select({ id: developerProfiles.id }).from(developerProfiles)
         .where(eq(developerProfiles.slug, payload.slug)).limit(1);
       if (existing) return res.status(409).json({ error: "That slug is already in use" });
@@ -14049,6 +14063,7 @@ RULES:
       const productTypes = parseAdminProductTypes(
         { ...(req.body || {}), rentMetric: payload.rentMetric },
         existingProductTypes[0] || payload,
+        payload.targetStates || current.targetStates || [],
       );
       const firstActive = productTypes.find((productType: any) => productType.isActive);
       const countyLabels = parseAdminCountyMarketLabels(
@@ -14061,7 +14076,6 @@ RULES:
         payload.minRentPsf = firstActive.minRentPsf;
         payload.minRentPerUnit = firstActive.minRentPerUnit;
       }
-      payload.acreageOverridesByProductType = {};
       if (payload.slug) {
         const duplicate = await db.execute(sql`
           SELECT id FROM developer_profiles
@@ -15024,6 +15038,7 @@ RULES:
         assetClass: developerProfiles.assetClass,
         industrialCriteria: developerProfiles.industrialCriteria,
         rentMetric: developerProfiles.rentMetric,
+         targetStates: developerProfiles.targetStates,
       }).from(developerProfiles).where(and(
         eq(developerProfiles.id, developerProfileId),
         eq(developerProfiles.isActive, true),
@@ -15040,7 +15055,10 @@ RULES:
       updates.assetClass = effectiveAssetClass as DeveloperAssetClass;
       if (isIndustrial || body.industrialCriteria !== undefined) {
         updates.industrialCriteria = isIndustrial
-          ? validateIndustrialCriteria(normalizeIndustrialCriteria(body.industrialCriteria ?? currentProfile.industrialCriteria))
+          ? validateIndustrialCriteria(normalizeIndustrialCriteria(
+            body.industrialCriteria ?? currentProfile.industrialCriteria,
+            body.targetStates ?? currentProfile.targetStates ?? [],
+          ))
           : normalizeIndustrialCriteria(body.industrialCriteria ?? DEFAULT_INDUSTRIAL_CRITERIA);
       }
 
@@ -15097,6 +15115,7 @@ RULES:
         const minRentPerUnit = raw?.minRentPerUnit === null || raw?.minRentPerUnit === undefined || raw?.minRentPerUnit === ''
           ? null
           : Number(raw.minRentPerUnit);
+        const stateOverrides = parseProductTypeStateOverrides(raw, body.targetStates ?? currentProfile.targetStates ?? []);
         const isActive = raw?.isActive !== false;
         if (!name) throw new Error(`Product type ${index + 1} needs a name`);
         if (!Number.isFinite(minAcres) || minAcres < 0) throw new Error(`${name}: minimum acreage must be a non-negative number`);
@@ -15115,6 +15134,7 @@ RULES:
           maxAcres: maxAcres === null ? null : String(maxAcres),
           minRentPsf: minRentPsf === null ? null : String(minRentPsf),
           minRentPerUnit: minRentPerUnit === null ? null : String(minRentPerUnit),
+           stateOverrides,
           ...parseProductTypeUnderwriting(raw),
           isActive,
         };
@@ -15190,8 +15210,6 @@ RULES:
       updates.maxAcres = isGeneralSales || isIndustrial ? null : firstActive.maxAcres;
       updates.minRentPsf = isGeneralSales || isIndustrial ? null : firstActive.minRentPsf;
       updates.minRentPerUnit = isGeneralSales || isIndustrial ? null : firstActive.minRentPerUnit;
-      updates.acreageOverridesByProductType = {};
-
       const updated = await db.transaction(async (tx) => {
         const [saved] = await tx.update(developerProfiles)
           .set({ ...updates, updatedAt: new Date() })

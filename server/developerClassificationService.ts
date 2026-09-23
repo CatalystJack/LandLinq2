@@ -1,5 +1,6 @@
 import type { DeveloperProductType, DeveloperProfile } from "@shared/schema";
 import { normalizeIndustrialCriteria } from "@shared/industrial-criteria";
+import { resolveStateAwareCriteria } from "@shared/criteria-overrides";
 
 export type DealClassification = "passed" | "review" | "red" | "yellow";
 export interface DeveloperClassificationResult {
@@ -50,8 +51,14 @@ export function classifyDealForProfile(
   }
   const countyMatch = isDealInProfileMarket(deal, profile);
   const dealAcreage = numericValue(deal?.sizeAcres);
+  const dealState = deal?.state;
   if (profile.assetClass === "industrial") {
     const industrialCriteria = normalizeIndustrialCriteria(profile.industrialCriteria);
+    const effectiveIndustrialCriteria = resolveStateAwareCriteria(
+      industrialCriteria.default,
+      industrialCriteria.stateOverrides,
+      dealState,
+    );
     if (!countyMatch) {
       return {
         classification: "red",
@@ -66,17 +73,17 @@ export function classifyDealForProfile(
       };
     }
 
-    if (dealAcreage < industrialCriteria.minSingleLoadAcres) {
+    if (dealAcreage < effectiveIndustrialCriteria.minSingleLoadAcres) {
       return {
         classification: "red",
-        matchedProductTypes: [`Passed: below ${industrialCriteria.minSingleLoadAcres} acre minimum`],
+        matchedProductTypes: [`Passed: below ${effectiveIndustrialCriteria.minSingleLoadAcres} acre minimum`],
       };
     }
 
     const matchedProductTypes = [
       "Review: target market and acreage minimum met",
-      ...(dealAcreage >= industrialCriteria.minSingleLoadAcres ? ["Single-load candidate"] : []),
-      ...(dealAcreage >= industrialCriteria.minCrossDockAcres ? ["Cross-dock candidate"] : []),
+      ...(dealAcreage >= effectiveIndustrialCriteria.minSingleLoadAcres ? ["Single-load candidate"] : []),
+      ...(dealAcreage >= effectiveIndustrialCriteria.minCrossDockAcres ? ["Cross-dock candidate"] : []),
       "Review: industrial site diligence required",
     ];
 
@@ -106,11 +113,26 @@ export function classifyDealForProfile(
   const matchedProductTypes = productTypes
     .filter((productType) => productType.isActive)
     .filter((productType) => {
-      const requiredAcreage = numericValue(productType.minAcres);
-      const maxAcreage = numericValue(productType.maxAcres);
+      const criteria = resolveStateAwareCriteria(
+        {
+          minAcres: numericValue(productType.minAcres),
+          maxAcres: numericValue(productType.maxAcres),
+          minRentPsf: numericValue(productType.minRentPsf),
+          minRentPerUnit: numericValue(productType.minRentPerUnit),
+        },
+        productType.stateOverrides as Record<string, Partial<{
+          minAcres: number;
+          maxAcres: number;
+          minRentPsf: number;
+          minRentPerUnit: number;
+        }>> | null | undefined,
+        dealState,
+      );
+      const requiredAcreage = criteria.minAcres;
+      const maxAcreage = criteria.maxAcres;
       const requiredRent = profile.rentMetric === "psf"
-        ? numericValue(productType.minRentPsf)
-        : numericValue(productType.minRentPerUnit);
+        ? criteria.minRentPsf
+        : criteria.minRentPerUnit;
       const acreagePass =
         dealAcreage !== null &&
         requiredAcreage !== null &&

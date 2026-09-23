@@ -3,16 +3,19 @@ import { Label } from "@/components/ui/label";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
   type IndustrialCriteria,
+  type IndustrialCriteriaDefaults,
 } from "@shared/industrial-criteria";
+import StateCriteriaOverrides from "@/components/state-criteria-overrides";
 
 type Props = {
   value?: Partial<IndustrialCriteria> | null;
   onChange: (value: IndustrialCriteria) => void;
+  targetStates?: string[];
   compact?: boolean;
 };
 
 const numberFields: Array<{
-  key: keyof IndustrialCriteria;
+  key: keyof Pick<IndustrialCriteriaDefaults, "minSingleLoadAcres" | "minCrossDockAcres">;
   label: string;
   suffix?: string;
   description?: string;
@@ -22,14 +25,19 @@ const numberFields: Array<{
   { key: "minCrossDockAcres", label: "Cross-dock minimum parcel", suffix: "acres" },
 ];
 
-export default function IndustrialCriteriaFields({ value, onChange, compact = false }: Props) {
+export default function IndustrialCriteriaFields({ value, onChange, targetStates = [], compact = false }: Props) {
   const criteria: IndustrialCriteria = {
     ...DEFAULT_INDUSTRIAL_CRITERIA,
     ...(value || {}),
+    default: {
+      ...DEFAULT_INDUSTRIAL_CRITERIA.default,
+      ...((value as IndustrialCriteria | null)?.default || {}),
+    },
+    stateOverrides: (value as IndustrialCriteria | null)?.stateOverrides || {},
   };
 
-  const update = (key: keyof IndustrialCriteria, nextValue: unknown) => {
-    onChange({ ...criteria, [key]: nextValue });
+  const update = (key: keyof IndustrialCriteria["default"], nextValue: unknown) => {
+    onChange({ ...criteria, default: { ...criteria.default, [key]: nextValue } });
   };
 
   return (
@@ -44,7 +52,7 @@ export default function IndustrialCriteriaFields({ value, onChange, compact = fa
                 type="number"
                 min="0"
                 step={field.integer ? "1" : "0.1"}
-                value={String(criteria[field.key] ?? "")}
+                value={String(criteria.default[field.key] ?? "")}
                 onChange={(event) => {
                   const raw = event.target.value;
                   if (raw === "") {
@@ -61,6 +69,16 @@ export default function IndustrialCriteriaFields({ value, onChange, compact = fa
           </div>
         ))}
       </div>
+
+      <StateCriteriaOverrides
+        targetStates={targetStates}
+        value={criteria.stateOverrides}
+        fields={[
+          { key: "minSingleLoadAcres", label: "Single-load minimum", suffix: "acres" },
+          { key: "minCrossDockAcres", label: "Cross-dock minimum", suffix: "acres" },
+        ]}
+        onChange={(stateOverrides) => onChange({ ...criteria, stateOverrides })}
+      />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
@@ -99,8 +117,8 @@ export default function IndustrialCriteriaFields({ value, onChange, compact = fa
         <Label htmlFor="industrial-criteria-notes">Additional industrial screening notes</Label>
         <textarea
           id="industrial-criteria-notes"
-          value={criteria.notes}
-          onChange={(event) => update("notes", event.target.value)}
+           value={criteria.default.notes}
+           onChange={(event) => update("notes", event.target.value)}
           placeholder="Add criteria the team will review manually, such as truck courts, rail, building height, or utility capacity."
           className="mt-2 min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-300"
         />

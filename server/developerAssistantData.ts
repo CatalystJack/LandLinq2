@@ -370,7 +370,7 @@ export async function getMyCriteria(developerProfileId: string) {
   const profileResult = await db.execute(sql`
     SELECT company_name, rent_metric, min_rent_psf, min_rent_per_unit,
       comp_search_radius_miles, min_acres, max_acres, target_states,
-      target_counties, acreage_overrides_by_product_type,
+      target_counties,
       qct_overrides_rent_minimum, dda_overrides_rent_minimum,
       oz_overrides_rent_minimum
     FROM developer_profiles
@@ -381,7 +381,7 @@ export async function getMyCriteria(developerProfileId: string) {
   if (!profile) return null;
 
   const productResult = await db.execute(sql`
-    SELECT name, min_acres, max_acres, min_rent_psf, min_rent_per_unit
+    SELECT name, min_acres, max_acres, min_rent_psf, min_rent_per_unit, state_overrides
     FROM developer_product_types
     WHERE developer_profile_id = ${developerProfileId} AND is_active = true
     ORDER BY name
@@ -397,7 +397,6 @@ export async function getMyCriteria(developerProfileId: string) {
     maxAcres: profile.max_acres,
     targetStates: profile.target_states || [],
     targetCounties: profile.target_counties || [],
-    acreageOverridesByProductType: profile.acreage_overrides_by_product_type || {},
     overrides: {
       qct: Boolean(profile.qct_overrides_rent_minimum),
       dda: Boolean(profile.dda_overrides_rent_minimum),
@@ -409,6 +408,7 @@ export async function getMyCriteria(developerProfileId: string) {
       maxAcres: row.max_acres,
       minRentPsf: row.min_rent_psf,
       minRentPerUnit: row.min_rent_per_unit,
+      stateOverrides: row.state_overrides || {},
     })),
   };
 }

@@ -345,6 +345,7 @@ setTimeout(() => {
         CREATE INDEX IF NOT EXISTS broker_developer_email_suppression_profile_idx
           ON broker_developer_email_suppressions (developer_profile_id);
         ALTER TABLE developer_product_types
+           ADD COLUMN IF NOT EXISTS state_overrides jsonb NOT NULL DEFAULT '{}',
           ADD COLUMN IF NOT EXISTS dua numeric,
           ADD COLUMN IF NOT EXISTS hard_cost_pu numeric,
           ADD COLUMN IF NOT EXISTS assumed_land_cost_pu numeric,
@@ -367,6 +368,33 @@ setTimeout(() => {
              ADD COLUMN IF NOT EXISTS crm_contact_states text[] NOT NULL DEFAULT ARRAY[]::text[],
              ADD COLUMN IF NOT EXISTS crm_contact_product_types text[] NOT NULL DEFAULT ARRAY[]::text[],
             ADD COLUMN IF NOT EXISTS crm_contact_source_tags text[] NOT NULL DEFAULT ARRAY[]::text[];
+        ALTER TABLE developer_profiles
+          DROP COLUMN IF EXISTS acreage_overrides_by_product_type;
+        UPDATE developer_profiles
+        SET industrial_criteria = jsonb_build_object(
+          'default', jsonb_build_object(
+            'minSingleLoadAcres', COALESCE(
+              industrial_criteria->'default'->'minSingleLoadAcres',
+              industrial_criteria->'minSingleLoadAcres',
+              to_jsonb(15)
+            ),
+            'minCrossDockAcres', COALESCE(
+              industrial_criteria->'default'->'minCrossDockAcres',
+              industrial_criteria->'minCrossDockAcres',
+              to_jsonb(30)
+            ),
+            'notes', COALESCE(
+              industrial_criteria->'default'->'notes',
+              industrial_criteria->'notes',
+              to_jsonb(''::text)
+            )
+          ),
+          'stateOverrides', CASE
+            WHEN jsonb_typeof(industrial_criteria->'stateOverrides') = 'object'
+              THEN industrial_criteria->'stateOverrides'
+            ELSE '{}'::jsonb
+          END
+        );
         ALTER TABLE IF EXISTS developer_broker_crm
           ADD COLUMN IF NOT EXISTS is_removed boolean NOT NULL DEFAULT false;
         CREATE TABLE IF NOT EXISTS developer_quick_links (
