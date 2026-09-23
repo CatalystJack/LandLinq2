@@ -38,7 +38,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import IndustrialCriteriaFields from "@/components/industrial-criteria-fields";
-import SharedContactAccessEditor from "@/components/shared-contact-access-editor";
+import SharedContactAccessEditor, {
+  type ContactCountyOption,
+  type ContactFilterOption,
+} from "@/components/shared-contact-access-editor";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
   type DeveloperAssetClass,
@@ -64,8 +67,18 @@ type Profile = {
   ddaOverridesRentMinimum: boolean;
   ozOverridesRentMinimum: boolean;
   crmContactSectors: string[];
+  crmContactStates: string[];
   crmContactCounties: string[];
+  crmContactProductTypes: string[];
   crmContactSourceTags: string[];
+};
+
+type ContactFilterOptions = {
+  sourceTags: string[];
+  productTypes: string[];
+  states: ContactFilterOption[];
+  counties: ContactCountyOption[];
+  sectors: ContactFilterOption[];
 };
 
 type ProductType = {
@@ -308,7 +321,7 @@ export default function DeveloperCriteriaSettings() {
     queryKey: ["/api/developer-profile/me"],
     queryFn: () => jsonRequest("/api/developer-profile/me"),
   });
-  const sourceTagsQuery = useQuery<string[]>({
+  const sourceTagsQuery = useQuery<ContactFilterOptions>({
     queryKey: ["/api/crm/source-tags"],
     queryFn: () => jsonRequest("/api/crm/source-tags"),
   });
@@ -395,7 +408,9 @@ export default function DeveloperCriteriaSettings() {
         })),
         countyMarketLabels: profile.countyMarketLabels || {},
         crmContactSectors: profile.crmContactSectors || [],
+        crmContactStates: profile.crmContactStates || [],
         crmContactCounties: profile.crmContactCounties || [],
+        crmContactProductTypes: profile.crmContactProductTypes || [],
         crmContactSourceTags: profile.crmContactSourceTags || [],
         compSearchRadiusMiles: profile.compSearchRadiusMiles || "3",
          emailUnsubscribeEnabled: Boolean(profile.emailUnsubscribeEnabled),
@@ -543,7 +558,9 @@ export default function DeveloperCriteriaSettings() {
       saveMutation.mutate({
         profileType: "general_sales",
         crmContactSectors: form.crmContactSectors,
+        crmContactStates: form.crmContactStates,
         crmContactCounties: form.crmContactCounties,
+        crmContactProductTypes: form.crmContactProductTypes,
         crmContactSourceTags: form.crmContactSourceTags,
       });
       return;
@@ -557,7 +574,9 @@ export default function DeveloperCriteriaSettings() {
         countyMarketLabels: form.countyMarketLabels,
         productTypes: [],
         crmContactSectors: form.crmContactSectors,
+        crmContactStates: form.crmContactStates,
         crmContactCounties: form.crmContactCounties,
+        crmContactProductTypes: form.crmContactProductTypes,
         crmContactSourceTags: form.crmContactSourceTags,
       });
       return;
@@ -608,7 +627,9 @@ export default function DeveloperCriteriaSettings() {
         unitMix: productType.unitMix || null,
       })),
       crmContactSectors: form.crmContactSectors,
+      crmContactStates: form.crmContactStates,
       crmContactCounties: form.crmContactCounties,
+      crmContactProductTypes: form.crmContactProductTypes,
       crmContactSourceTags: form.crmContactSourceTags,
       countyMarketLabels: form.countyMarketLabels,
       qctOverridesRentMinimum: form.qctOverridesRentMinimum,
@@ -706,11 +727,21 @@ export default function DeveloperCriteriaSettings() {
             <CardContent className="space-y-5 border-t border-slate-100 pt-5">
               <SharedContactAccessEditor
                 sectors={form.crmContactSectors}
+                states={form.crmContactStates}
                 counties={form.crmContactCounties}
+                productTypes={form.crmContactProductTypes}
                 sourceTags={form.crmContactSourceTags}
-                sourceTagOptions={sourceTagsQuery.data || []}
+                sectorOptions={sourceTagsQuery.data?.sectors || []}
+                stateOptions={sourceTagsQuery.data?.states || []}
+                countyOptions={sourceTagsQuery.data?.counties || []}
+                productTypeOptions={sourceTagsQuery.data?.productTypes || []}
+                sourceTagOptions={sourceTagsQuery.data?.sourceTags || []}
+                optionsLoading={sourceTagsQuery.isLoading}
+                optionsError={sourceTagsQuery.isError}
                 onSectorsChange={(values) => update("crmContactSectors", values)}
+                onStatesChange={(values) => update("crmContactStates", values)}
                 onCountiesChange={(values) => update("crmContactCounties", values)}
+                onProductTypesChange={(values) => update("crmContactProductTypes", values)}
                 onSourceTagsChange={(values) => update("crmContactSourceTags", values)}
               />
             </CardContent>

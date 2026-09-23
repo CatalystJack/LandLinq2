@@ -3,25 +3,47 @@ import { ChevronDown, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-type FilterKey = "sectors" | "counties" | "sourceTags";
+type FilterKey = "sectors" | "states" | "counties" | "productTypes" | "sourceTags";
+
+export type ContactFilterOption = {
+  value: string;
+  contacts: number;
+};
+
+export type ContactCountyOption = {
+  state: string;
+  county: string;
+  contacts: number;
+};
 
 type SharedContactAccessEditorProps = {
   sectors: string[];
+  states: string[];
   counties: string[];
+  productTypes: string[];
   sourceTags: string[];
+  sectorOptions?: ContactFilterOption[];
+  stateOptions: ContactFilterOption[];
+  countyOptions: ContactCountyOption[];
+  productTypeOptions: string[];
   sourceTagOptions: string[];
+  optionsLoading?: boolean;
+  optionsError?: boolean;
   onSectorsChange: (values: string[]) => void;
+  onStatesChange: (values: string[]) => void;
   onCountiesChange: (values: string[]) => void;
+  onProductTypesChange: (values: string[]) => void;
   onSourceTagsChange: (values: string[]) => void;
 };
 
 const FILTER_LABELS: Record<FilterKey, string> = {
   sectors: "Contact sectors",
-  counties: "North Carolina counties",
+  states: "States",
+  counties: "Counties",
+  productTypes: "Product types",
   sourceTags: "Source tags",
 };
 
@@ -33,16 +55,28 @@ const formatTag = (value: string) => value
 
 export default function SharedContactAccessEditor({
   sectors,
+  states,
   counties,
+  productTypes,
   sourceTags,
+  sectorOptions = [],
+  stateOptions,
+  countyOptions,
+  productTypeOptions,
   sourceTagOptions,
+  optionsLoading = false,
+  optionsError = false,
   onSectorsChange,
+  onStatesChange,
   onCountiesChange,
+  onProductTypesChange,
   onSourceTagsChange,
 }: SharedContactAccessEditorProps) {
   const [openFilters, setOpenFilters] = useState<FilterKey[]>(() => [
     ...(sectors.length ? ["sectors" as FilterKey] : []),
+    ...(states.length ? ["states" as FilterKey] : []),
     ...(counties.length ? ["counties" as FilterKey] : []),
+    ...(productTypes.length ? ["productTypes" as FilterKey] : []),
     ...(sourceTags.length ? ["sourceTags" as FilterKey] : []),
   ]);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -51,10 +85,12 @@ export default function SharedContactAccessEditor({
     setOpenFilters((current) => Array.from(new Set([
       ...current,
       ...(sectors.length ? ["sectors" as FilterKey] : []),
+      ...(states.length ? ["states" as FilterKey] : []),
       ...(counties.length ? ["counties" as FilterKey] : []),
+      ...(productTypes.length ? ["productTypes" as FilterKey] : []),
       ...(sourceTags.length ? ["sourceTags" as FilterKey] : []),
     ])));
-  }, [sectors.length, counties.length, sourceTags.length]);
+  }, [sectors.length, states.length, counties.length, productTypes.length, sourceTags.length]);
 
   const availableFilters = useMemo(
     () => (Object.keys(FILTER_LABELS) as FilterKey[]).filter((key) => !openFilters.includes(key)),
@@ -68,15 +104,21 @@ export default function SharedContactAccessEditor({
   const removeFilter = (key: FilterKey) => {
     setOpenFilters((current) => current.filter((filter) => filter !== key));
     if (key === "sectors") onSectorsChange([]);
+    if (key === "states") onStatesChange([]);
     if (key === "counties") onCountiesChange([]);
+    if (key === "productTypes") onProductTypesChange([]);
     if (key === "sourceTags") onSourceTagsChange([]);
   };
 
   const summaryFor = (key: FilterKey) => {
     if (key === "sectors") return sectors.length ? sectors.map(formatTag).join(", ") : "No sectors selected";
-    if (key === "counties") return counties.length ? counties.map(formatTag).join(", ") : "No counties selected";
+    if (key === "states") return states.length ? states.join(", ") : "No states selected";
+    if (key === "counties") return counties.length ? `${counties.length} selected` : "No counties selected";
+    if (key === "productTypes") return productTypes.length ? `${productTypes.length} selected` : "No product types selected";
     return sourceTags.length ? `${sourceTags.length} selected` : "No source tags selected";
   };
+
+  const sectorCount = (sector: string) => sectorOptions.find((option) => option.value === sector)?.contacts;
 
   return (
     <div className="space-y-4">
@@ -86,6 +128,11 @@ export default function SharedContactAccessEditor({
           <p className="mt-1 text-xs text-slate-500">
             Add only the criteria this company should use when viewing shared broker contacts.
           </p>
+          {optionsError && (
+            <p className="mt-2 text-xs font-medium text-red-600">
+              Imported contact options could not be loaded. Refresh the page before saving a new filter.
+            </p>
+          )}
         </div>
         <Select value="" onValueChange={(value) => addFilter(value as FilterKey)} disabled={!availableFilters.length}>
           <SelectTrigger className="w-full sm:w-36">
@@ -137,20 +184,85 @@ export default function SharedContactAccessEditor({
                         )}
                       />
                       {formatTag(sector)}
+                      {sectorCount(sector) ? <span className="text-xs text-slate-400">({sectorCount(sector)?.toLocaleString()})</span> : null}
                     </label>
                   ))}
                 </div>
               )}
 
+              {key === "states" && (
+                <div className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {stateOptions.length ? stateOptions.map((option) => (
+                    <label key={option.value} className="flex items-center gap-2 text-sm text-slate-700">
+                      <Checkbox
+                        checked={states.includes(option.value)}
+                        onCheckedChange={(checked) => onStatesChange(
+                          checked
+                            ? Array.from(new Set([...states, option.value]))
+                            : states.filter((value) => value !== option.value),
+                        )}
+                      />
+                      {option.value}
+                      <span className="text-xs text-slate-400">({option.contacts.toLocaleString()})</span>
+                    </label>
+                  )) : <p className="text-sm text-slate-500">{optionsLoading ? "Loading contact states…" : optionsError ? "Contact states could not be loaded." : "No contact state data is available yet."}</p>}
+                </div>
+              )}
+
               {key === "counties" && (
-                <Input
-                  className="mt-3"
-                  value={counties.join(", ")}
-                  onChange={(event) => onCountiesChange(
-                    event.target.value.split(",").map((value) => value.trim().toLowerCase()).filter(Boolean),
+                <div className="mt-3 max-h-60 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3">
+                  {countyOptions.length ? Object.entries(countyOptions.reduce<Record<string, ContactCountyOption[]>>((groups, option) => {
+                    (groups[option.state] ||= []).push(option);
+                    return groups;
+                  }, {})).map(([state, options]) => (
+                    <div key={state} className="mb-4 last:mb-0">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{state}</p>
+                      <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {options.map((option) => {
+                          const county = option.county.toLowerCase();
+                          return (
+                            <label key={`${state}-${county}`} className="flex items-center gap-2 text-sm text-slate-700">
+                              <Checkbox
+                                checked={counties.includes(county)}
+                                onCheckedChange={(checked) => onCountiesChange(
+                                  checked
+                                    ? Array.from(new Set([...counties, county]))
+                                    : counties.filter((value) => value !== county),
+                                )}
+                              />
+                              <span className="truncate">{formatTag(option.county)}</span>
+                              <span className="text-xs text-slate-400">({option.contacts.toLocaleString()})</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )) : <p className="text-sm text-slate-500">{optionsLoading ? "Loading contact counties…" : optionsError ? "Contact counties could not be loaded." : "No contact county data is available yet."}</p>}
+                </div>
+              )}
+
+              {key === "productTypes" && (
+                <div className="mt-3 max-h-52 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3">
+                  {productTypeOptions.length ? (
+                    <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {productTypeOptions.map((productType) => (
+                        <label key={productType} className="flex items-center gap-2 text-sm text-slate-700">
+                          <Checkbox
+                            checked={productTypes.includes(productType.toLowerCase())}
+                            onCheckedChange={(checked) => onProductTypesChange(
+                              checked
+                                ? Array.from(new Set([...productTypes, productType.toLowerCase()]))
+                                : productTypes.filter((value) => value !== productType.toLowerCase()),
+                            )}
+                          />
+                          {formatTag(productType)}
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">{optionsLoading ? "Loading product types…" : optionsError ? "Product types could not be loaded." : "No product-type tags are available yet."}</p>
                   )}
-                  placeholder="Mecklenburg, Wake, Buncombe"
-                />
+                </div>
               )}
 
               {key === "sourceTags" && (
@@ -169,20 +281,22 @@ export default function SharedContactAccessEditor({
                                   : sourceTags.filter((value) => value !== normalizedTag),
                               )}
                             />
-                            {formatTag(tag)}
+                            <span className="truncate">{formatTag(tag)}</span>
                           </label>
                         );
                       })}
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-500">No imported source tags are available yet.</p>
+                    <p className="text-sm text-slate-500">{optionsLoading ? "Loading imported source tags…" : optionsError ? "Imported source tags could not be loaded." : "No imported source tags are available yet."}</p>
                   )}
                 </div>
               )}
 
               <p className="mt-2 text-xs text-slate-500">
                 {key === "sectors" && "Leave all sectors unchecked to include every sector."}
-                {key === "counties" && "Separate counties with commas. Leave blank to include every county."}
+                {key === "states" && "Choose NC, TN, or any other state represented in the imported directory."}
+                {key === "counties" && "Choose counties from the imported contact data. Use States too when you need state-specific matching."}
+                {key === "productTypes" && "Product types are derived from the imported contact tags."}
                 {key === "sourceTags" && "Select any source tags this company should see. Leave all unchecked to include every source tag."}
               </p>
             </div>

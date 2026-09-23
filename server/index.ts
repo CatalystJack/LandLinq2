@@ -332,6 +332,8 @@ setTimeout(() => {
           ADD COLUMN IF NOT EXISTS asset_class varchar NOT NULL DEFAULT 'multifamily',
            ADD COLUMN IF NOT EXISTS industrial_criteria jsonb NOT NULL DEFAULT '{}',
             ADD COLUMN IF NOT EXISTS email_unsubscribe_enabled boolean NOT NULL DEFAULT false,
+             ADD COLUMN IF NOT EXISTS crm_contact_states text[] NOT NULL DEFAULT ARRAY[]::text[],
+             ADD COLUMN IF NOT EXISTS crm_contact_product_types text[] NOT NULL DEFAULT ARRAY[]::text[],
             ADD COLUMN IF NOT EXISTS crm_contact_source_tags text[] NOT NULL DEFAULT ARRAY[]::text[];
         CREATE TABLE IF NOT EXISTS developer_quick_links (
           id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -49,7 +49,9 @@ export const developerProfiles = pgTable("developer_profiles", {
   // Shared LandLinq broker directory visibility. An empty filter means all
   // shared contacts; non-empty filters are applied together.
   crmContactSectors: text("crm_contact_sectors").array().default(sql`ARRAY[]::text[]`).notNull(),
+  crmContactStates: text("crm_contact_states").array().default(sql`ARRAY[]::text[]`).notNull(),
   crmContactCounties: text("crm_contact_counties").array().default(sql`ARRAY[]::text[]`).notNull(),
+  crmContactProductTypes: text("crm_contact_product_types").array().default(sql`ARRAY[]::text[]`).notNull(),
   crmContactSourceTags: text("crm_contact_source_tags").array().default(sql`ARRAY[]::text[]`).notNull(),
 
   // Rent criteria — primary drives classification, secondary is reference only

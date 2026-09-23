@@ -23,7 +23,10 @@ import { AlertCircle, Building2, CheckCircle2, ChevronDown, ChevronUp, Edit3, Ke
 import { Textarea } from "@/components/ui/textarea";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
 import IndustrialCriteriaFields from "@/components/industrial-criteria-fields";
-import SharedContactAccessEditor from "@/components/shared-contact-access-editor";
+import SharedContactAccessEditor, {
+  type ContactCountyOption,
+  type ContactFilterOption,
+} from "@/components/shared-contact-access-editor";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
   type DeveloperAssetClass,
@@ -63,7 +66,9 @@ interface InvestmentCompany {
   targetStates: string[];
   targetCounties: string[];
   crmContactSectors: string[];
+  crmContactStates: string[];
   crmContactCounties: string[];
+  crmContactProductTypes: string[];
   crmContactSourceTags: string[];
   productTypes: ProductType[];
   countyMarketLabels: Record<string, string>;
@@ -93,12 +98,22 @@ interface CompanyForm {
   targetStates: string[];
   targetCounties: string[];
   crmContactSectors: string[];
+  crmContactStates: string[];
   crmContactCounties: string[];
+  crmContactProductTypes: string[];
   crmContactSourceTags: string[];
   productTypes: ProductType[];
   countyMarketLabels: Record<string, string>;
   isActive: boolean;
 }
+
+type ContactFilterOptions = {
+  sourceTags: string[];
+  productTypes: string[];
+  states: ContactFilterOption[];
+  counties: ContactCountyOption[];
+  sectors: ContactFilterOption[];
+};
 
 interface InviteRow {
   id: string;
@@ -167,7 +182,9 @@ const blankForm: CompanyForm = {
   targetStates: [],
   targetCounties: [],
   crmContactSectors: [],
+  crmContactStates: [],
   crmContactCounties: [],
+  crmContactProductTypes: [],
   crmContactSourceTags: [],
   productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
   countyMarketLabels: {},
@@ -415,7 +432,7 @@ export default function AdminInvestmentCompanies() {
     queryFn: () => requestJson("/api/admin/investment-companies"),
     enabled: isPlatformAdmin,
   });
-  const sourceTagsQuery = useQuery<string[]>({
+  const sourceTagsQuery = useQuery<ContactFilterOptions>({
     queryKey: ["/api/crm/source-tags"],
     queryFn: () => requestJson("/api/crm/source-tags"),
     enabled: isPlatformAdmin,
@@ -445,7 +462,9 @@ export default function AdminInvestmentCompanies() {
       targetStates: editing.targetStates || [],
       targetCounties: editing.targetCounties || [],
       crmContactSectors: editing.crmContactSectors || [],
+      crmContactStates: editing.crmContactStates || [],
       crmContactCounties: editing.crmContactCounties || [],
+      crmContactProductTypes: editing.crmContactProductTypes || [],
       crmContactSourceTags: editing.crmContactSourceTags || [],
       productTypes: (editing.productTypes?.length ? editing.productTypes : [{
         ...createEmptyYocAssumptions(),
@@ -477,7 +496,9 @@ export default function AdminInvestmentCompanies() {
       targetStates: [],
       targetCounties: [],
       crmContactSectors: [],
+      crmContactStates: [],
       crmContactCounties: [],
+      crmContactProductTypes: [],
       crmContactSourceTags: [],
       productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", isActive: true }],
       countyMarketLabels: {},
@@ -702,11 +723,21 @@ export default function AdminInvestmentCompanies() {
             <div className="mt-4">
               <SharedContactAccessEditor
                 sectors={form.crmContactSectors}
+                states={form.crmContactStates}
                 counties={form.crmContactCounties}
+                productTypes={form.crmContactProductTypes}
                 sourceTags={form.crmContactSourceTags}
-                sourceTagOptions={sourceTagsQuery.data || []}
+                sectorOptions={sourceTagsQuery.data?.sectors || []}
+                stateOptions={sourceTagsQuery.data?.states || []}
+                countyOptions={sourceTagsQuery.data?.counties || []}
+                productTypeOptions={sourceTagsQuery.data?.productTypes || []}
+                sourceTagOptions={sourceTagsQuery.data?.sourceTags || []}
+                optionsLoading={sourceTagsQuery.isLoading}
+                optionsError={sourceTagsQuery.isError}
                 onSectorsChange={(values) => update("crmContactSectors", values)}
+                onStatesChange={(values) => update("crmContactStates", values)}
                 onCountiesChange={(values) => update("crmContactCounties", values)}
+                onProductTypesChange={(values) => update("crmContactProductTypes", values)}
                 onSourceTagsChange={(values) => update("crmContactSourceTags", values)}
               />
             </div>

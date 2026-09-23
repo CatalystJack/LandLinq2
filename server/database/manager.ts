@@ -126,6 +126,10 @@ export class DatabaseManager {
       ADD COLUMN IF NOT EXISTS crm_contact_sectors TEXT[] NOT NULL DEFAULT ARRAY[]::text[]`);
     await db.execute(sql`ALTER TABLE developer_profiles
       ADD COLUMN IF NOT EXISTS crm_contact_counties TEXT[] NOT NULL DEFAULT ARRAY[]::text[]`);
+    await db.execute(sql`ALTER TABLE developer_profiles
+      ADD COLUMN IF NOT EXISTS crm_contact_states TEXT[] NOT NULL DEFAULT ARRAY[]::text[]`);
+    await db.execute(sql`ALTER TABLE developer_profiles
+      ADD COLUMN IF NOT EXISTS crm_contact_product_types TEXT[] NOT NULL DEFAULT ARRAY[]::text[]`);
     await db.execute(sql`ALTER TABLE brokers ADD COLUMN IF NOT EXISTS contact_sector VARCHAR`);
     await db.execute(sql`ALTER TABLE brokers ADD COLUMN IF NOT EXISTS contact_specialty VARCHAR`);
     await db.execute(sql`ALTER TABLE brokers ADD COLUMN IF NOT EXISTS contact_confidence VARCHAR`);

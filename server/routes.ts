@@ -13512,6 +13512,14 @@ RULES:
       }
     }
     stringArray("knownEmailDomains", "Known email domains");
+    if (body.crmContactStates !== undefined) {
+      if (!Array.isArray(body.crmContactStates) || body.crmContactStates.some((value: unknown) => typeof value !== "string")) {
+        throw new Error("CRM contact states must be an array of strings");
+      }
+      payload.crmContactStates = Array.from(new Set(body.crmContactStates.map((value: string) => value.trim().toUpperCase()).filter(Boolean)));
+    } else if (!partial) {
+      payload.crmContactStates = [];
+    }
     if (body.crmContactSectors !== undefined) {
       if (!Array.isArray(body.crmContactSectors) || body.crmContactSectors.some((value: unknown) => !["commercial", "residential"].includes(String(value).trim().toLowerCase()))) {
         throw new Error("CRM contact sectors must contain only commercial or residential");
@@ -13527,6 +13535,14 @@ RULES:
       payload.crmContactCounties = Array.from(new Set(body.crmContactCounties.map((value: string) => value.trim().toLowerCase()).filter(Boolean)));
     } else if (!partial) {
       payload.crmContactCounties = [];
+    }
+    if (body.crmContactProductTypes !== undefined) {
+      if (!Array.isArray(body.crmContactProductTypes) || body.crmContactProductTypes.some((value: unknown) => typeof value !== "string")) {
+        throw new Error("CRM contact product types must be an array of strings");
+      }
+      payload.crmContactProductTypes = Array.from(new Set(body.crmContactProductTypes.map((value: string) => value.trim().toLowerCase()).filter(Boolean)));
+    } else if (!partial) {
+      payload.crmContactProductTypes = [];
     }
     if (body.crmContactSourceTags !== undefined) {
       if (!Array.isArray(body.crmContactSourceTags) || body.crmContactSourceTags.some((value: unknown) => typeof value !== "string")) {
@@ -13594,16 +13610,87 @@ RULES:
 
   app.get("/api/crm/source-tags", isAuthenticated, async (_req: any, res) => {
     try {
-      const result = await db.execute(sql`
-        SELECT DISTINCT LOWER(BTRIM(tag)) AS tag
+      const [tagResult, stateResult, countyResult, sectorResult] = await Promise.all([
+        db.execute(sql`
+        SELECT DISTINCT LOWER(BTRIM(tag_value)) AS tag
         FROM brokers
-        CROSS JOIN LATERAL unnest(COALESCE(source_tags, ARRAY[]::text[])) AS tag
-        WHERE BTRIM(tag) <> ''
+        CROSS JOIN LATERAL unnest(COALESCE(source_tags, ARRAY[]::text[])) AS tag_value
+        WHERE BTRIM(tag_value) <> ''
         ORDER BY tag
-      `);
-      return res.json((result.rows as Array<{ tag: unknown }>)
+        `),
+        db.execute(sql`
+          SELECT UPPER(BTRIM(state_value)) AS state, COUNT(*)::int AS contacts
+          FROM brokers
+          CROSS JOIN LATERAL unnest(string_to_array(COALESCE(state_region, ''), ',')) AS state_value
+          WHERE BTRIM(state_value) <> ''
+          GROUP BY UPPER(BTRIM(state_value))
+          ORDER BY state
+        `),
+        db.execute(sql`
+          SELECT UPPER(BTRIM(state_region)) AS state_region,
+            LOWER(BTRIM(contact_county)) AS county,
+            COUNT(*)::int AS contacts
+          FROM brokers
+          WHERE contact_county IS NOT NULL AND BTRIM(contact_county) <> ''
+          GROUP BY UPPER(BTRIM(state_region)), LOWER(BTRIM(contact_county))
+          ORDER BY state_region, county
+        `),
+        db.execute(sql`
+          SELECT LOWER(BTRIM(contact_sector)) AS sector, COUNT(*)::int AS contacts
+          FROM brokers
+          WHERE contact_sector IS NOT NULL AND BTRIM(contact_sector) <> ''
+          GROUP BY LOWER(BTRIM(contact_sector))
+          ORDER BY sector
+        `),
+      ]);
+
+      const sourceTags = (tagResult.rows as Array<{ tag: unknown }>)
         .map((row) => String(row.tag || "").trim())
-        .filter(Boolean));
+        .filter(Boolean);
+      const stateCodes = new Set([
+        "al", "ak", "az", "ar", "ca", "co", "ct", "de", "fl", "ga", "hi", "id", "il", "in",
+        "ia", "ks", "ky", "la", "me", "md", "ma", "mi", "mn", "ms", "mo", "mt", "ne", "nv",
+        "nh", "nj", "nm", "ny", "nc", "nd", "oh", "ok", "or", "pa", "ri", "sc", "sd", "tn",
+        "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "dc",
+      ]);
+      const productTypes = sourceTags.filter((tag) =>
+        !stateCodes.has(tag) &&
+        tag !== "residential" &&
+        tag !== "commercial" &&
+        tag !== "unknown" &&
+        tag !== "needs review" &&
+        !tag.endsWith(" county") &&
+        !tag.startsWith("out of state ("),
+      );
+      const countyMap = new Map<string, { state: string; county: string; contacts: number }>();
+      for (const row of countyResult.rows as Array<{ state_region: unknown; county: unknown; contacts: unknown }>) {
+        const county = String(row.county || "").trim();
+        const states = String(row.state_region || "").split(",").map((value) => value.trim()).filter(Boolean);
+        for (const state of states.length ? states : [""]) {
+          const key = `${state.toUpperCase()}:${county.toLowerCase()}`;
+          const current = countyMap.get(key);
+          countyMap.set(key, {
+            state: state.toUpperCase() || "Other",
+            county,
+            contacts: (current?.contacts || 0) + Number(row.contacts || 0),
+          });
+        }
+      }
+      return res.json({
+        sourceTags,
+        productTypes,
+        states: (stateResult.rows as Array<{ state: unknown; contacts: unknown }>).map((row) => ({
+          value: String(row.state || "").trim(),
+          contacts: Number(row.contacts || 0),
+        })).filter((row) => row.value),
+        counties: Array.from(countyMap.values()).sort((a, b) =>
+          a.state.localeCompare(b.state) || a.county.localeCompare(b.county),
+        ),
+        sectors: (sectorResult.rows as Array<{ sector: unknown; contacts: unknown }>).map((row) => ({
+          value: String(row.sector || "").trim().toLowerCase(),
+          contacts: Number(row.contacts || 0),
+        })).filter((row) => row.value),
+      });
     } catch (error: any) {
       console.error("[crm source tags] Error:", error);
       return res.status(500).json({ error: "Failed to load source tags" });
@@ -14226,10 +14313,18 @@ RULES:
     return new Set(rows.map((row) => row.dealId));
   }
 
-  async function getDeveloperContactVisibility(developerProfileId: string): Promise<{ sectors: string[]; counties: string[]; sourceTags: string[] }> {
+  async function getDeveloperContactVisibility(developerProfileId: string): Promise<{
+    sectors: string[];
+    states: string[];
+    counties: string[];
+    productTypes: string[];
+    sourceTags: string[];
+  }> {
     const [profile] = await db.select({
       sectors: developerProfiles.crmContactSectors,
+      states: developerProfiles.crmContactStates,
       counties: developerProfiles.crmContactCounties,
+      productTypes: developerProfiles.crmContactProductTypes,
       sourceTags: developerProfiles.crmContactSourceTags,
     }).from(developerProfiles).where(and(
       eq(developerProfiles.id, developerProfileId),
@@ -14239,8 +14334,14 @@ RULES:
       sectors: Array.isArray(profile?.sectors)
         ? profile.sectors.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
         : [],
+      states: Array.isArray(profile?.states)
+        ? profile.states.map((value) => String(value).trim().toUpperCase()).filter(Boolean)
+        : [],
       counties: Array.isArray(profile?.counties)
         ? profile.counties.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
+        : [],
+      productTypes: Array.isArray(profile?.productTypes)
+        ? profile.productTypes.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
         : [],
       sourceTags: Array.isArray(profile?.sourceTags)
         ? profile.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
@@ -14249,21 +14350,40 @@ RULES:
   }
 
   function isSharedBrokerVisible(
-    broker: { ownerDeveloperProfileId?: string | null; contactSector?: string | null; contactCounty?: string | null; sourceTags?: string[] | null; userId?: string | null },
+    broker: {
+      ownerDeveloperProfileId?: string | null;
+      contactSector?: string | null;
+      contactCounty?: string | null;
+      stateRegion?: string | null;
+      sourceTags?: string[] | null;
+      userId?: string | null;
+    },
     developerProfileId: string,
-    visibility: { sectors: string[]; counties: string[]; sourceTags: string[] },
+    visibility: {
+      sectors: string[];
+      states: string[];
+      counties: string[];
+      productTypes: string[];
+      sourceTags: string[];
+    },
   ): boolean {
     if (broker.ownerDeveloperProfileId === developerProfileId) return true;
     if (broker.ownerDeveloperProfileId !== null && broker.ownerDeveloperProfileId !== undefined) return false;
     if (broker.userId === '20974d7b-e103-4fc7-b42f-7a13d41041fb') return false;
     const sector = String(broker.contactSector || '').trim().toLowerCase();
     const county = String(broker.contactCounty || '').trim().toLowerCase();
+    const brokerStates = String(broker.stateRegion || "")
+      .split(",")
+      .map((value) => value.trim().toUpperCase())
+      .filter(Boolean);
     const brokerSourceTags = Array.isArray(broker.sourceTags)
       ? broker.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
       : [];
     return (
       (visibility.sectors.length === 0 || visibility.sectors.includes(sector)) &&
+      (visibility.states.length === 0 || brokerStates.some((state) => visibility.states.includes(state))) &&
       (visibility.counties.length === 0 || visibility.counties.includes(county)) &&
+      (visibility.productTypes.length === 0 || visibility.productTypes.some((productType) => brokerSourceTags.includes(productType))) &&
       (visibility.sourceTags.length === 0 || visibility.sourceTags.some((tag) => brokerSourceTags.includes(tag)))
     );
   }
@@ -14274,6 +14394,7 @@ RULES:
       ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
       contactSector: brokers.contactSector,
       contactCounty: brokers.contactCounty,
+      stateRegion: brokers.stateRegion,
       sourceTags: brokers.sourceTags,
       userId: brokers.userId,
     }).from(brokers).where(and(eq(brokers.id, brokerId), isNonDemoBroker())).limit(1);
@@ -14937,11 +15058,23 @@ RULES:
         }
         updates.crmContactSectors = Array.from(new Set(body.crmContactSectors.map((value: string) => value.trim().toLowerCase())));
       }
+      if (body.crmContactStates !== undefined) {
+        if (!Array.isArray(body.crmContactStates) || body.crmContactStates.some((value: unknown) => typeof value !== 'string')) {
+          throw new Error('CRM contact states must be an array of strings');
+        }
+        updates.crmContactStates = Array.from(new Set(body.crmContactStates.map((value: string) => value.trim().toUpperCase()).filter(Boolean)));
+      }
       if (body.crmContactCounties !== undefined) {
         if (!Array.isArray(body.crmContactCounties) || body.crmContactCounties.some((value: unknown) => typeof value !== 'string')) {
           throw new Error('CRM contact counties must be an array of strings');
         }
         updates.crmContactCounties = Array.from(new Set(body.crmContactCounties.map((value: string) => value.trim().toLowerCase()).filter(Boolean)));
+      }
+      if (body.crmContactProductTypes !== undefined) {
+        if (!Array.isArray(body.crmContactProductTypes) || body.crmContactProductTypes.some((value: unknown) => typeof value !== 'string')) {
+          throw new Error('CRM contact product types must be an array of strings');
+        }
+        updates.crmContactProductTypes = Array.from(new Set(body.crmContactProductTypes.map((value: string) => value.trim().toLowerCase()).filter(Boolean)));
       }
       if (body.crmContactSourceTags !== undefined) {
         if (!Array.isArray(body.crmContactSourceTags) || body.crmContactSourceTags.some((value: unknown) => typeof value !== 'string')) {
@@ -15266,6 +15399,7 @@ RULES:
           id: brokers.id,
           crmTags: brokers.crmTags,
           ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
+          stateRegion: brokers.stateRegion,
           contactSector: brokers.contactSector,
           contactCounty: brokers.contactCounty,
           userId: brokers.userId,
