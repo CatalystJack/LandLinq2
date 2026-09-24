@@ -8,6 +8,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { AuthModal } from "@/components/auth-modal";
 import ErrorBoundary from "@/components/error-boundary";
 import { Label } from "@/components/ui/label";
+import { queryClient } from "@/lib/queryClient";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 type TokenStatus = "idle" | "checking" | "valid" | "invalid" | "error";
 
@@ -16,6 +18,22 @@ type ResetIdentity = {
   lastName: string | null;
   companyName: string | null;
 };
+
+type AuthenticatedUserResponse = {
+  id: string;
+  email: string;
+  role: string;
+  mustResetPassword?: boolean;
+};
+
+function isAuthenticatedUserResponse(value: unknown): value is AuthenticatedUserResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const user = value as Record<string, unknown>;
+  return typeof user.id === "string" && user.id.length > 0
+    && typeof user.email === "string" && user.email.length > 0
+    && typeof user.role === "string" && user.role.length > 0
+    && user.mustResetPassword !== true;
+}
 
 const inputStyles = "h-12 rounded-lg border-[#bac9dc] bg-[#eaf2ff] px-3 text-base shadow-none placeholder:text-slate-400 focus:border-[#4A90E2] focus:ring-2 focus:ring-[#4A90E2]/20";
 const primaryButtonStyles = "h-12 w-full rounded-lg border border-transparent bg-[#4A90E2] text-sm font-bold uppercase tracking-wide text-white shadow-sm transition-colors hover:border-[#4A90E2] hover:bg-white hover:text-[#4A90E2]";
@@ -162,31 +180,59 @@ function PasswordResetContent() {
         })
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (response.ok) {
+        const developerSlug = new URLSearchParams(window.location.search).get("developerSlug");
+        if (!isAuthenticatedUserResponse(data)) {
+          try {
+            await fetch("/api/logout", {
+              method: "POST",
+              credentials: "include",
+            });
+          } catch {
+            // The password reset already succeeded; continue to the login fallback.
+          }
+          queryClient.removeQueries({ queryKey: ["/api/user"] });
+          window.location.replace(
+            developerSlug
+              ? `/developer/${encodeURIComponent(developerSlug)}/login`
+              : "/login",
+          );
+          return;
+        }
+
+        const userData = data;
         toast({
           title: "Success!",
           description: "Your password has been reset successfully.",
         });
-        const developerSlug = new URLSearchParams(window.location.search).get("developerSlug");
-        // A reset can be completed while an old authenticated session is still
-        // open. Clear that session and perform a full navigation so App.tsx
-        // cannot make a decision from stale mustResetPassword state.
-        try {
-          await fetch("/api/logout", {
-            method: "POST",
-            credentials: "include",
-          });
-        } catch {
-          // The password was already changed; continue to the login page even
-          // if the best-effort session cleanup is unavailable.
+        queryClient.setQueryData(["/api/user"], userData);
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+
+        if (isPlatformAdminEmail(userData.email)) {
+          window.location.replace("/dashboard");
+          return;
         }
-        window.location.replace(
-          developerSlug
-            ? `/developer/${encodeURIComponent(developerSlug)}/login`
-            : "/login",
-        );
+
+        if (String(userData.role).toUpperCase() === "DEVELOPER") {
+          let profileType = "real_estate";
+          try {
+            const currentUserResponse = await fetch("/api/user", { credentials: "include" });
+            if (currentUserResponse.ok) {
+              const currentUser = await currentUserResponse.json();
+              profileType = currentUser?.developerProfile?.profileType || "real_estate";
+            }
+          } catch {
+            // Keep the same safe default used by the developer login flow.
+          }
+          window.location.replace(profileType === "general_sales"
+            ? "/developer/crm"
+            : "/developer/dashboard");
+          return;
+        }
+
+        window.location.replace("/dashboard");
       } else {
         setError(data.message || "Failed to reset password");
       }

@@ -1,0 +1,22 @@
+auto-login a developer right after they set their first password, instead of sending them back to a login form
+
+IMPORTANT: actually implement this in code. Do not create a documentation file, notes file, or summary file — make the actual code changes described below.
+
+Right now, client/src/pages/password-reset.tsx's handleResetPassword (~line 139) does the opposite of what we want on success: it explicitly logs the user out and redirects to the login page (~line 174-190), forcing them to type their brand-new password right back in. Change this so setting the password logs them straight into the app.
+
+1. server/passwordReset.ts — change resetPassword(token, newPassword) (~line 93) to return the user's email (a string) on success instead of true, and null instead of false. It already computes email internally via validateResetToken(token) before deleting the token — just return that instead of the boolean.
+
+2. server/auth.ts, POST /api/password-reset/confirm (~line 626-650) — after a successful reset:
+
+Look up the user with storage.getUserByEmail(email) (the email now returned from step 1).
+Log them in the same way POST /api/login does just above it in this file (~line 337-376): call req.login(user, callback) to establish the session, then respond with the same shape that endpoint returns — { ...user, password: undefined, role: <computed the same way the login handler computes it — isPlatformAdminEmail / isDeveloper / catalyst-domain / fallback to user.role>, mustResetPassword: false }. (mustResetPassword is already false in the database at this point since updateUserPassword clears it, so this is accurate, not just cosmetic.)
+Change the route handler signature to (req, res, next) so req.login's error can be passed to next, matching the /api/login handler's pattern.
+Keep returning the existing 400 responses for an invalid/expired token or a too-short password.
+
+3. client/src/pages/password-reset.tsx, handleResetPassword — on a successful /api/password-reset/confirm response, the JSON body is now an authenticated user object (not just { message }). Replace the current logout-and-redirect-to-login behavior with:
+
+queryClient.setQueryData(["/api/user"], userData); queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+Redirect based on the returned user, mirroring the logic already in client/src/pages/developer-login.tsx's loginMutation.onSuccess: if isPlatformAdminEmail(userData.email), go to /dashboard; else if the role is DEVELOPER, fetch /api/user to read developerProfile.profileType and go to /developer/crm for general_sales or /developer/dashboard otherwise; else go to /dashboard.
+Use window.location.replace(...) for the redirect (not href), same as the rest of the login flows, so the reset page doesn't stay in browser history.
+Keep a safe fallback: if the response doesn't come back looking like an authenticated user for some reason, fall back to the old behavior (redirect to the login page) rather than leaving the user on a broken page.
+The AuthModal/"Back to Login" button and the unauthenticated "request a reset link" step (no token) are unaffected — this only changes what happens after the password is actually set.

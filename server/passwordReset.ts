@@ -90,15 +90,15 @@ export class PasswordResetService {
   }
 
   // Reset password using token
-  async resetPassword(token: string, newPassword: string): Promise<boolean> {
+  async resetPassword(token: string, newPassword: string): Promise<string | null> {
     const email = await this.validateResetToken(token);
     if (!email) {
-      return false;
+      return null;
     }
 
     const user = await this.resetStorage.getUserByEmail(email);
     if (!user) {
-      return false;
+      return null;
     }
 
     // Hash and update password
@@ -108,7 +108,7 @@ export class PasswordResetService {
     await this.resetStorage.updateUserPassword(user.id, hashedPassword);
     await this.resetStorage.deletePasswordResetToken(token);
 
-    return true;
+    return email;
   }
 }
 

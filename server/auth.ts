@@ -623,7 +623,7 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/password-reset/confirm", async (req, res) => {
+  app.post("/api/password-reset/confirm", async (req, res, next) => {
     try {
       const { token, newPassword } = req.body;
       
@@ -636,13 +636,36 @@ export function setupAuth(app: Express) {
       }
 
       const { passwordResetService } = await import('./passwordReset');
-      const success = await passwordResetService.resetPassword(token, newPassword);
+      const email = await passwordResetService.resetPassword(token, newPassword);
       
-      if (!success) {
+      if (!email) {
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
-      
-      res.json({ message: "Password reset successfully" });
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(500).json({ message: "Failed to load user after password reset" });
+      }
+
+      const isDeveloper = String(user.role || '').toUpperCase() === 'DEVELOPER';
+      return req.login(user, (loginErr) => {
+        if (loginErr) return next(loginErr);
+
+        const role = isPlatformAdminEmail(user.email)
+          ? platformRoleForEmail(user.email, user.role || "ADMIN")
+          : isDeveloper
+            ? 'DEVELOPER'
+            : (user.email?.endsWith('@catalystcp.com') || user.email?.endsWith('@landlinq.ai')
+              ? 'CATALYST'
+              : (user.role || 'USER'));
+
+        return res.status(200).json({
+          ...user,
+          password: undefined,
+          role,
+          mustResetPassword: false,
+        });
+      });
     } catch (error: any) {
       console.error("Password reset confirmation error:", error);
       res.status(500).json({ message: "Failed to reset password" });
