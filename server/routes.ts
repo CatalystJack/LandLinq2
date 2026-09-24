@@ -64,7 +64,9 @@ import {
   resolveStateAwareCriteria,
 } from "@shared/criteria-overrides";
 import { isUsStateCode, normalizeUsStateCode } from "@shared/us-states";
+import { getBrokerStateCodes, getOutOfStateCodeFromCounty } from "@shared/broker-location";
 import { countyTargetMatchesDeal, parseCountyTarget } from "@shared/county-targets";
+import { getDeveloperCrmContacts } from "./developerCrmContacts";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
@@ -4592,6 +4594,29 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const contactVisibility = developerProfileId
         ? await getDeveloperContactVisibility(developerProfileId)
         : { sectors: [], counties: [], sourceTags: [] };
+
+      if (developerProfileId) {
+        const result = await getDeveloperCrmContacts({
+          developerProfileId,
+          visibility: contactVisibility,
+          page,
+          limit,
+          search,
+          tag,
+          tagFilters,
+          sourceTagFilter,
+          crmStateFilter,
+          stateFilter,
+          msaFilter,
+          countyFilter,
+          market,
+          smsFilter,
+          assignedToFilter,
+          brokerageFilter,
+          multiCampaignTagFilter,
+        });
+        return res.json(result);
+      }
 
       // For geo filters: build set of county names that match the requested state/MSA
       let geoCountySet: Set<string> | null = null;
@@ -14158,11 +14183,21 @@ RULES:
         ORDER BY tag
         `),
         db.execute(sql`
-          SELECT UPPER(BTRIM(state_value)) AS state, COUNT(*)::int AS contacts
-          FROM brokers
-          CROSS JOIN LATERAL unnest(string_to_array(COALESCE(state_region, ''), ',')) AS state_value
-          WHERE BTRIM(state_value) <> ''
-          GROUP BY UPPER(BTRIM(state_value))
+          SELECT state, COUNT(*)::int AS contacts
+          FROM (
+            SELECT brokers.id AS broker_id, UPPER(BTRIM(state_value)) AS state
+            FROM brokers
+            CROSS JOIN LATERAL unnest(string_to_array(COALESCE(state_region, ''), ',')) AS state_value
+            WHERE BTRIM(state_value) <> ''
+            UNION
+            SELECT
+              brokers.id AS broker_id,
+              UPPER(BTRIM(SPLIT_PART(SPLIT_PART(contact_county, '(', 2), ')', 1))) AS state
+            FROM brokers
+            WHERE LOWER(BTRIM(COALESCE(contact_county, ''))) LIKE 'out of state (%'
+              AND BTRIM(SPLIT_PART(SPLIT_PART(contact_county, '(', 2), ')', 1)) ~ '^[A-Za-z]{2}$'
+          ) AS contact_states
+          GROUP BY state
           ORDER BY state
         `),
         db.execute(sql`
@@ -14189,6 +14224,7 @@ RULES:
       const countyMap = new Map<string, { state: string; county: string; contacts: number }>();
       for (const row of countyResult.rows as Array<{ state_region: unknown; county: unknown; contacts: unknown }>) {
         const county = String(row.county || "").trim();
+        if (getOutOfStateCodeFromCounty(county)) continue;
         const states = String(row.state_region || "").split(",").map((value) => value.trim()).filter(Boolean);
         for (const state of states.length ? states : [""]) {
           const key = `${state.toUpperCase()}:${county.toLowerCase()}`;
@@ -14923,11 +14959,19 @@ RULES:
       sectors: Array.isArray(profile?.sectors)
         ? profile.sectors.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
         : [],
-      states: Array.isArray(profile?.states)
-        ? profile.states.map((value) => String(value).trim().toUpperCase()).filter(Boolean)
-        : [],
+      states: Array.from(new Set([
+        ...(Array.isArray(profile?.states)
+          ? profile.states.map((value) => String(value).trim().toUpperCase()).filter(Boolean)
+          : []),
+        ...(Array.isArray(profile?.counties)
+          ? profile.counties.map(getOutOfStateCodeFromCounty).filter((value): value is string => Boolean(value))
+          : []),
+      ])),
       counties: Array.isArray(profile?.counties)
-        ? profile.counties.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
+        ? profile.counties
+          .filter((value) => !getOutOfStateCodeFromCounty(value))
+          .map((value) => String(value).trim().toLowerCase())
+          .filter(Boolean)
         : [],
       sourceTags: Array.isArray(profile?.sourceTags)
         ? profile.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
@@ -14957,10 +15001,7 @@ RULES:
     if (broker.userId === '20974d7b-e103-4fc7-b42f-7a13d41041fb') return false;
     const sector = String(broker.contactSector || '').trim().toLowerCase();
     const county = String(broker.contactCounty || '').trim().toLowerCase();
-    const brokerStates = String(broker.stateRegion || "")
-      .split(",")
-      .map((value) => value.trim().toUpperCase())
-      .filter(Boolean);
+    const brokerStates = getBrokerStateCodes(broker.stateRegion, broker.contactCounty);
     const brokerSourceTags = Array.isArray(broker.sourceTags)
       ? broker.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
       : [];
@@ -15911,6 +15952,27 @@ RULES:
     }
   });
 
+  app.get("/api/admin/investment-companies/:profileId/team", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const developerProfileId = String(req.params.profileId || "").trim();
+      if (!developerProfileId) return res.status(400).json({ error: "Investment Company profile ID is required" });
+      const rows = await db.select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        createdAt: users.createdAt,
+      }).from(users).where(and(
+        eq(users.developerProfileId, developerProfileId),
+        eq(users.role, "DEVELOPER"),
+      )).orderBy(desc(users.createdAt));
+      return res.json({ team: rows });
+    } catch (error: any) {
+      console.error("[admin investment company team] Error:", error);
+      return res.status(500).json({ error: "Failed to load company users" });
+    }
+  });
+
   app.post("/api/developer-profile/me/team", isAuthenticated, async (req: any, res) => {
     const developerProfileId = getDeveloperProfileId(req, res);
     if (!developerProfileId) return;
@@ -16269,6 +16331,54 @@ RULES:
     } catch (error: any) {
       console.error("[developer-profile/me/crm-tags/rename] Error:", error);
       return res.status(500).json({ error: "Failed to rename CRM tag" });
+    }
+  });
+
+  app.post("/api/developer-profile/me/crm-tags/delete", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+      if (!name || name.length > 160) {
+        return res.status(400).json({ error: "Tag name must be between 1 and 160 characters" });
+      }
+
+      const removedCount = await db.transaction(async (tx) => {
+        const ownedResult = await tx.execute(sql`
+          UPDATE brokers
+          SET crm_tags = array_remove(COALESCE(crm_tags, ARRAY[]::text[]), ${name}),
+              updated_at = NOW()
+          WHERE owner_developer_profile_id = ${developerProfileId}
+            AND ${name} = ANY(COALESCE(crm_tags, ARRAY[]::text[]))
+            AND NOT EXISTS (
+              SELECT 1
+              FROM users AS demo_owner
+              WHERE demo_owner.id = brokers.user_id
+                AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+            )
+          RETURNING id
+        `);
+        const sharedResult = await tx.execute(sql`
+          UPDATE developer_broker_crm
+          SET crm_tags = array_remove(COALESCE(crm_tags, ARRAY[]::text[]), ${name}),
+              updated_at = NOW()
+          WHERE developer_profile_id = ${developerProfileId}
+            AND ${name} = ANY(COALESCE(crm_tags, ARRAY[]::text[]))
+          RETURNING broker_id
+        `);
+        await tx.delete(developerCrmTags).where(and(
+          eq(developerCrmTags.developerProfileId, developerProfileId),
+          eq(developerCrmTags.name, name),
+        ));
+        return (ownedResult.rows?.length || 0) + (sharedResult.rows?.length || 0);
+      });
+
+      return res.json({ name, removedCount });
+    } catch (error: any) {
+      console.error("[developer-profile/me/crm-tags/delete] Error:", error);
+      return res.status(500).json({ error: "Failed to delete CRM tag" });
     }
   });
 
