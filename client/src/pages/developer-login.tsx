@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import { useMutation } from "@tanstack/react-query";
-import { Eye, EyeOff, Loader2, LogIn, Building2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 type DeveloperBranding = {
   companyName: string;
+  logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
 };
@@ -201,9 +202,11 @@ export default function DeveloperLogin() {
                 className="mx-auto mb-5 flex min-h-8 max-w-full items-center justify-center text-center"
                 aria-label={`${branding.companyName} home`}
               >
-                <span className="max-w-full break-words text-xl font-bold leading-tight text-[#0A2B4A] sm:text-2xl">
-                  {branding.companyName}
-                </span>
+                <img
+                  src={branding.logoUrl?.trim() || "/assets/landlinq-color-logo.png"}
+                  alt={branding.logoUrl?.trim() ? `${branding.companyName} logo` : "LandLinq"}
+                  className="h-8 w-auto max-w-full object-contain object-center"
+                />
               </Link>
               <CardTitle className="text-xl font-bold text-slate-900">Sign In</CardTitle>
               <CardDescription className="mt-1 text-[15px] leading-6 text-slate-500">
@@ -260,7 +263,7 @@ export default function DeveloperLogin() {
                   className="h-12 w-full rounded-lg border border-transparent bg-[var(--company-primary-color)] text-sm font-bold uppercase tracking-wide text-white shadow-sm transition-colors hover:border-[#4A90E2] hover:bg-white hover:text-[#4A90E2]"
                   style={{ "--company-primary-color": primaryColor } as React.CSSProperties}
                 >
-                  {loginMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
+                  {loginMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {loginMutation.isPending ? "Signing in..." : "Sign In"}
                 </Button>
               </form>

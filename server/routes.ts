@@ -7206,9 +7206,6 @@ Provide your analysis in this exact JSON format:
       // Jan 7, 2026: Support multi-select deal type filter (land/acquisition)
       const dealTypesParam = req.query.dealTypes as string || '';
       const dealTypes = dealTypesParam ? dealTypesParam.split(',').filter(d => d.trim()) : [];
-      // Jul 6, 2026: Support Apex checkbox filter (yes/no)
-      const apexParam = req.query.apex as string || '';
-      const apexValues = apexParam ? apexParam.split(',').filter(a => a.trim()) : [];
       console.log(`🔍 [DEAL-FILTER] dealTypesParam='${dealTypesParam}', parsed dealTypes:`, dealTypes);
       const sortBy = req.query.sortBy as string || '';
       const sortOrder = (req.query.sortOrder as string || 'asc') as 'asc' | 'desc';
@@ -7292,13 +7289,7 @@ Provide your analysis in this exact JSON format:
           const dealDealType = (deal as any).dealType || 'land';
           matchesDealType = dealTypes.includes(dealDealType);
         }
-        // Jul 6, 2026: Handle Apex checkbox filter (yes/no)
-        let matchesApex = true;
-        if (apexValues.length > 0) {
-          const dealApex = (deal as any).apex ? 'yes' : 'no';
-          matchesApex = apexValues.includes(dealApex);
-        }
-        const matches = matchesSearch && matchesClassification && matchesPriority && matchesDealType && matchesApex;
+        const matches = matchesSearch && matchesClassification && matchesPriority && matchesDealType;
         return matches;
       });
       
@@ -18239,7 +18230,7 @@ RULES:
         .where(isNotNull(deals.classification));
 
       const qualifying = allDeals.filter(d =>
-        (d.classification === 'green' || d.classification === 'yellow') && d.apex === true
+        d.classification === 'green' || d.classification === 'yellow'
       );
 
       let queued = 0;
@@ -18249,7 +18240,7 @@ RULES:
         for (const { developer: dev, profile } of recipients) {
           if (profile) {
             if (profile.profileType === 'general_sales') continue;
-            if (!deal.apex || !isDealInProfileMarket(deal, profile)) continue;
+            if (!isDealInProfileMarket(deal, profile)) continue;
           } else if (!doesDealMatchDeveloper(deal, dev)) {
             continue;
           }
@@ -18430,8 +18421,6 @@ RULES:
 
       const [deal] = await db.select().from(deals).where(eq(deals.id, record.dealId)).limit(1);
       if (!deal) return res.status(404).json({ error: 'Deal not found' });
-      if (!deal.apex) return res.status(403).json({ error: 'Only apex deals can be sent to developers. Mark this deal as an Apex deal in the deal dashboard first.' });
-
       const { sendDeveloperDealEmail } = await import('./partnerDeveloperAutoSend');
       await sendDeveloperDealEmail(deal, dev, {
         zoning: record.zoningOverride || undefined,
@@ -18519,7 +18508,6 @@ RULES:
           apex: deals.apex,
         })
         .from(deals)
-        .where(eq(deals.apex, true))
         .orderBy(sql`CASE WHEN classification = 'green' THEN 0 WHEN classification = 'yellow' THEN 1 WHEN classification = 'red' THEN 2 ELSE 3 END`, desc(deals.createdAt))
         .limit(500);
 
@@ -18647,9 +18635,6 @@ RULES:
       const [dealRecord] = await db.select().from(deals).where(eq(deals.id, dealId)).limit(1);
       if (!dealRecord) {
         return res.status(404).json({ error: 'Deal not found' });
-      }
-      if (!dealRecord.apex) {
-        return res.status(403).json({ error: 'Only apex deals can be sent to developers. Mark this deal as an Apex deal in the deal dashboard first.' });
       }
       const dealData = dealRecord;
 
@@ -22289,10 +22274,11 @@ RULES:
   // Bulk operations endpoint
   app.post("/api/analyst/deals/bulk", isAuthenticated, async (req, res) => {
     try {
-      // Check if user is a Catalyst analyst or super admin
+      // Reuse the internal analytics authorization policy for analyst actions.
       const user = req.user as any;
       const userEmail = user?.email || user?.claims?.email || '';
-      const isAnalyst = isPlatformAdminEmail(userEmail);
+      const userRole = user?.role || user?.claims?.role || '';
+      const isAnalyst = isAnalyticsAuthorized(userEmail, userRole);
       
       if (!isAnalyst) {
         return res.status(403).json({ message: "Access denied. Admin/analyst privileges required." });

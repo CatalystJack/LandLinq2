@@ -17,6 +17,7 @@ type ResetIdentity = {
   firstName: string | null;
   lastName: string | null;
   companyName: string | null;
+  logoUrl: string | null;
 };
 
 type AuthenticatedUserResponse = {
@@ -96,6 +97,7 @@ function PasswordResetContent() {
             firstName: typeof data.firstName === "string" ? data.firstName : null,
             lastName: typeof data.lastName === "string" ? data.lastName : null,
             companyName: typeof data.companyName === "string" ? data.companyName : null,
+            logoUrl: typeof data.logoUrl === "string" ? data.logoUrl : null,
           });
           setTokenStatus("valid");
         } else {
@@ -249,23 +251,18 @@ function PasswordResetContent() {
     .filter((name): name is string => Boolean(name?.trim()))
     .join(" ");
   const companyName = resetIdentity?.companyName?.trim();
+  const companyLogoUrl = resetIdentity?.logoUrl?.trim();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#f7f9fc] px-4 py-8">
       <div className="w-full max-w-[460px]">
         <Card className="max-w-full overflow-hidden rounded-xl border border-[#dce3ec] bg-white shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
           <CardHeader className="px-6 pb-2 pt-6 sm:px-8 sm:pt-7">
-            {companyName ? (
-              <div className="mx-auto mb-6 flex min-h-8 max-w-full items-center justify-center break-words text-center text-xl font-bold leading-tight text-[#0A2B4A] sm:text-2xl">
-                {companyName}
-              </div>
-            ) : (
-              <img
-                src="/assets/landlinq-color-logo.png"
-                alt="LandLinq"
-                className="mx-auto mb-6 h-8 w-auto max-w-[170px] object-contain object-center"
-              />
-            )}
+            <img
+              src={companyLogoUrl || "/assets/landlinq-color-logo.png"}
+              alt={companyLogoUrl ? `${companyName || "Company"} logo` : "LandLinq"}
+              className="mx-auto mb-6 h-8 w-auto max-w-[170px] object-contain object-center"
+            />
             <CardTitle className="text-2xl font-semibold text-[#0A2B4A]">
               {isCheckingToken
                 ? "Checking Reset Link"
