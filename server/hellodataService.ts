@@ -623,6 +623,59 @@ function haversineDistanceMiles(lat1: number, lon1: number, lat2: number, lon2: 
   return earthRadiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function getComparableCoordinates(comparable: any): { latitude: number; longitude: number } | null {
+  const latitudeValue = comparable?.latitude ?? comparable?.lat;
+  const longitudeValue = comparable?.longitude ?? comparable?.lng ?? comparable?.lon;
+  if (
+    latitudeValue === undefined ||
+    latitudeValue === null ||
+    String(latitudeValue).trim() === "" ||
+    longitudeValue === undefined ||
+    longitudeValue === null ||
+    String(longitudeValue).trim() === ""
+  ) return null;
+
+  const latitude = Number(latitudeValue);
+  const longitude = Number(longitudeValue);
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) return null;
+  return { latitude, longitude };
+}
+
+function getSubjectDistanceWithinRadius(
+  comparable: any,
+  subjectLatitude: number,
+  subjectLongitude: number,
+  radiusMiles: number,
+): number | null {
+  const coordinates = getComparableCoordinates(comparable);
+  if (!coordinates) return null;
+  const distance = haversineDistanceMiles(
+    subjectLatitude,
+    subjectLongitude,
+    coordinates.latitude,
+    coordinates.longitude,
+  );
+  return distance <= radiusMiles ? distance : null;
+}
+
+function countCoordinateComparablesWithinRadius(
+  comparables: any[],
+  subjectLatitude: number,
+  subjectLongitude: number,
+  radiusMiles: number,
+): number {
+  return comparables.filter((comparable) =>
+    getSubjectDistanceWithinRadius(comparable, subjectLatitude, subjectLongitude, radiusMiles) !== null,
+  ).length;
+}
+
 export async function checkCompWarehouse(
   latitude: number,
   longitude: number,
@@ -695,11 +748,28 @@ export async function checkCompWarehouse(
         payload.criteria?.radiusMiles !== criteria.radiusMiles ||
         payload.criteria?.productType !== criteria.productType
       ) continue;
+
+      const cachedComparables = payload.result?.comparables;
+      if (!Array.isArray(cachedComparables)) continue;
+      const validatedComparables: any[] = [];
+      let cacheWithinRadius = true;
+      for (const comparable of cachedComparables) {
+        const distance = getSubjectDistanceWithinRadius(comparable, latitude, longitude, radiusMiles);
+        if (distance === null) {
+          cacheWithinRadius = false;
+          break;
+        }
+        validatedComparables.push({ ...comparable, distance });
+      }
+      // Reject the entire cache row rather than partially filtering it: its
+      // qualifying count, summaries, and rent metrics describe the full list.
+      if (!cacheWithinRadius) continue;
+
       console.log(
         `📦 [HELLODATA-WAREHOUSE] HIT ${COMP_WAREHOUSE_CACHE_KIND}: cached center ${centerDistance.toFixed(2)} miles away, radius ${cachedRadius} miles${minimumFetchedAt ? `, newer than ${minimumFetchedAt.toISOString()}` : ''}`,
       );
       await recordCompWarehouseLookup('hit');
-      return payload.result;
+      return { ...payload.result, comparables: validatedComparables };
     }
   } catch (error) {
     console.warn(`⚠️ [HELLODATA-WAREHOUSE] Lookup unavailable; using live API: ${error}`);
@@ -1749,16 +1819,12 @@ export class HelloDataService {
             try {
               const details = await this.getPropertyDetails(comp.id);
               if (details) {
-                // Get coordinates
-                if (details.lat || details.latitude) {
-                  lat = parseFloat(details.lat || details.latitude || 0);
-                  lng = parseFloat(details.lon || details.lng || details.longitude || 0);
-                  if (lat && lng && lat !== 0 && lng !== 0) {
-                    console.log(`      ✅ Got coordinates: ${lat}, ${lng}`);
-                  } else {
-                    lat = undefined;
-                    lng = undefined;
-                  }
+                // Get coordinates from details first, then the raw search result.
+                const detailsCoordinates = getComparableCoordinates(details) || getComparableCoordinates(comp);
+                if (detailsCoordinates) {
+                  lat = detailsCoordinates.latitude;
+                  lng = detailsCoordinates.longitude;
+                  console.log(`      ✅ Got coordinates: ${lat}, ${lng}`);
                 }
                 
                 // Get unit count from property details (more reliable than comparables API response)
@@ -1903,6 +1969,15 @@ export class HelloDataService {
             }
           }
           
+          const coordinates = getComparableCoordinates({ latitude: lat, longitude: lng }) || getComparableCoordinates(comp);
+          const subjectDistance = coordinates
+            ? getSubjectDistanceWithinRadius(coordinates, geocoded.lat!, geocoded.lng!, searchRadius)
+            : null;
+          if (!coordinates || subjectDistance === null) {
+            console.log(`      ⚠️ Skipping ${comp.street_address || comp.address || "property"}: coordinates are missing or outside ${searchRadius} miles`);
+            continue;
+          }
+
           allRawForMap.push({
             address: comp.street_address || comp.address || '',
             city: comp.city || '',
@@ -1914,9 +1989,9 @@ export class HelloDataService {
             saleDate: '',
             yearBuilt: parseInt(comp.year_built || comp.vintage || comp.yearBuilt || 0),
             pricePerSqFt: rentPsf,
-            distance: parseFloat(comp.distance_miles || comp.distance || 0),
-            latitude: lat as any,
-            longitude: lng as any,
+            distance: subjectDistance,
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
             unitCount: fetchedUnitCount || parseInt(comp.number_units || comp.units || comp.unit_count || 0),
             propertyName: propertyName || comp.building_name || comp.property_name || comp.name,
             avgRent: avgRentPerUnit,
@@ -1958,7 +2033,11 @@ export class HelloDataService {
         }
         
         // Build detailed summary in consistent format for frontend parsing
-        let detailedSummary = `Found ${multifamilyComps.length} total comparables within ${searchRadius} miles\n`;
+        const totalWithinRadius = Math.max(
+          countCoordinateComparablesWithinRadius(multifamilyComps, geocoded.lat!, geocoded.lng!, searchRadius),
+          allRawForMap.length,
+        );
+        let detailedSummary = `Found ${totalWithinRadius} total comparables within ${searchRadius} miles\n`;
         detailedSummary += `0 met vintage/units criteria (>=${filterCriteria.minVintage}, >=${filterCriteria.minUnits} units)\n`;
         const rentCriteriaMsg = filterCriteria.minGrossRent 
           ? `rent >= $${filterCriteria.minGrossRent.toLocaleString()}/unit`
@@ -2000,7 +2079,7 @@ export class HelloDataService {
           qualifyingCount: 0,
           comparables: allRawForMap,
           summary: detailedSummary,
-          totalComparables: multifamilyComps.length,
+          totalComparables: totalWithinRadius,
           candidateCount: 0,
           candidatesWithPricing: propsWithRent.length,
           topRentPSF,
@@ -2037,7 +2116,16 @@ export class HelloDataService {
           
           if (!propertyDetails) {
             console.warn(`      ⚠️ [DATA GAP] Property details unavailable for ID ${comp.id} — including comparable with basic data so nothing is dropped`);
-            // Never drop a comparable just because details failed — push with raw comp data
+            const coordinates = getComparableCoordinates(comp);
+            const subjectDistance = coordinates
+              ? getSubjectDistanceWithinRadius(coordinates, geocoded.lat!, geocoded.lng!, searchRadius)
+              : null;
+            if (!coordinates || subjectDistance === null) {
+              console.warn(`      ⚠️ [RADIUS] Skipping comparable without valid in-radius coordinates`);
+              continue;
+            }
+            // Keep basic data when details fail, but only after independently
+            // confirming the property's coordinates are inside the requested radius.
             allComparables.push({
               address: comp.street_address || '',
               city: comp.city || '',
@@ -2049,9 +2137,9 @@ export class HelloDataService {
               saleDate: new Date().toISOString(),
               yearBuilt: parseInt(comp.year_built || comp.vintage || 0),
               pricePerSqFt: 0,
-              distance: parseFloat(comp.distance_miles || comp.distance || 0),
-              latitude: parseFloat(comp.lat || 0) || undefined,
-              longitude: parseFloat(comp.lon || 0) || undefined,
+              distance: subjectDistance,
+              latitude: coordinates.latitude,
+              longitude: coordinates.longitude,
               unitCount: parseInt(comp.number_units || comp.units || comp.unit_count || 0),
               propertyName: comp.building_name || comp.property_name || comp.name || null,
               avgRent: undefined,
@@ -2169,8 +2257,25 @@ export class HelloDataService {
           
           // 🆕 Create comparable object (used for BOTH qualifying and all lists)
           // CRITICAL: Extract coordinates from propertyDetails, not from comp (API response doesn't always include them)
-          const latitude = parseFloat(propertyDetails.lat || propertyDetails.latitude || comp.lat || 0);
-          const longitude = parseFloat(propertyDetails.lon || propertyDetails.lng || propertyDetails.longitude || comp.lon || 0);
+          const coordinates = getComparableCoordinates({
+            latitude: propertyDetails.lat ?? propertyDetails.latitude ?? comp.lat ?? comp.latitude,
+            longitude: propertyDetails.lon ?? propertyDetails.lng ?? propertyDetails.longitude ?? comp.lon ?? comp.lng ?? comp.longitude,
+          });
+          if (!coordinates) {
+            console.log(`      ⚠️ [RADIUS] Skipping comparable without valid coordinates`);
+            continue;
+          }
+          const { latitude, longitude } = coordinates;
+          const subjectDistance = getSubjectDistanceWithinRadius(
+            coordinates,
+            geocoded.lat!,
+            geocoded.lng!,
+            searchRadius,
+          );
+          if (subjectDistance === null) {
+            console.log(`      ⚠️ [RADIUS] Skipping comparable outside ${searchRadius} miles or missing valid coordinates`);
+            continue;
+          }
           
           if (latitude === 0 || longitude === 0) {
             console.log(`      ⚠️ No valid coordinates found - skipping from map display`);
@@ -2233,7 +2338,7 @@ export class HelloDataService {
             saleDate: new Date().toISOString(),
             yearBuilt: parseInt(comp.year_built || 0),
             pricePerSqFt: weightedRentPsf,
-            distance: parseFloat(comp.distance_miles || 0),
+            distance: subjectDistance,
             latitude,
             longitude,
             unitCount: parseInt(propertyDetails.number_units || propertyDetails.units || propertyDetails.unit_count || comp.number_units || 0),
@@ -2294,8 +2399,11 @@ export class HelloDataService {
           }
         } catch (error) {
           console.warn(`      ⚠️ [DATA GAP] Unexpected error processing comparable ID ${comp.id}: ${error} — including with basic data so nothing is dropped`);
-          // Never silently drop a comparable due to an unexpected error — push basic data
-          allComparables.push({
+          const coordinates = getComparableCoordinates(comp);
+          const subjectDistance = coordinates
+            ? getSubjectDistanceWithinRadius(coordinates, geocoded.lat!, geocoded.lng!, searchRadius)
+            : null;
+          if (coordinates && subjectDistance !== null) allComparables.push({
             address: comp.street_address || '',
             city: comp.city || '',
             state: comp.state || '',
@@ -2306,9 +2414,9 @@ export class HelloDataService {
             saleDate: new Date().toISOString(),
             yearBuilt: parseInt(comp.year_built || comp.vintage || 0),
             pricePerSqFt: 0,
-            distance: parseFloat(comp.distance_miles || comp.distance || 0),
-            latitude: parseFloat(comp.lat || 0) || undefined,
-            longitude: parseFloat(comp.lon || 0) || undefined,
+            distance: subjectDistance,
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
             unitCount: parseInt(comp.number_units || comp.units || comp.unit_count || 0),
             propertyName: comp.building_name || comp.property_name || comp.name || null,
             avgRent: undefined,
@@ -2325,10 +2433,18 @@ export class HelloDataService {
             unitMix: null,
             websiteUrl: null,
           } as any);
+          else console.warn(`      ⚠️ [RADIUS] Skipping error fallback outside ${searchRadius} miles or without valid coordinates`);
         }
       }
 
       const qualifyingCount = qualifyingComparables.length;
+      const totalWithinRadius = Math.max(
+        countCoordinateComparablesWithinRadius(rawComparables, geocoded.lat!, geocoded.lng!, searchRadius),
+        allComparables.length,
+      );
+      const candidatesWithPricing = allComparables.filter((comparable) =>
+        Number(comparable.pricePerSqFt) > 0 || Number(comparable.avgRent) > 0,
+      ).length;
 
       // Calculate rent metrics from ALL candidates (not just qualifying)
       const allCandidatesTopRentPSF = allComparables.length > 0
@@ -2510,9 +2626,9 @@ export class HelloDataService {
         topRentPerUnit: allCandidatesTopRentPerUnit, // Use ALL candidates top rent/unit
         avgRentPerUnit: allCandidatesAvgRentPerUnit, // Use ALL candidates avg rent/unit
         // ENHANCEMENT (Dec 9, 2025): Return raw counts for educational rejection reasons
-        totalComparables: rawComparables.length,     // All properties within the configured radius
-        candidateCount: candidates.length,           // Properties meeting vintage/units criteria
-        candidatesWithPricing: allComparables.length // Candidates that had valid pricing data
+        totalComparables: totalWithinRadius,
+        candidateCount: allComparables.length,
+        candidatesWithPricing
       };
       await storeCompWarehouse(
         geocoded.lat!,

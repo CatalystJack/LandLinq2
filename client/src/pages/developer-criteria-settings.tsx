@@ -533,7 +533,8 @@ export default function DeveloperCriteriaSettings() {
     if (form.compMinVintageYear === "") {
       toast({ title: "Minimum comp vintage year is required", variant: "destructive" });
       return;
-    } else {
+    }
+    if (form.compMinVintageYear !== "") {
       const year = Number(form.compMinVintageYear);
       if (!Number.isInteger(year) || year < 1900 || year > 2100) {
         toast({ title: "Minimum comp vintage year must be a year between 1900 and 2100", variant: "destructive" });
@@ -544,7 +545,7 @@ export default function DeveloperCriteriaSettings() {
       toast({ title: "Minimum comp units are required", variant: "destructive" });
       return;
     }
-    if (!Number.isInteger(Number(form.compMinUnits)) || Number(form.compMinUnits) < 0) {
+    if (form.compMinUnits !== "" && (!Number.isInteger(Number(form.compMinUnits)) || Number(form.compMinUnits) < 0)) {
       toast({ title: "Minimum comp units must be a non-negative whole number", variant: "destructive" });
       return;
     }

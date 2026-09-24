@@ -39,6 +39,7 @@
 - [Intake volume alert durability](email-intake-volume-alert-durability.md) — count distinct source emails; use spike-scoped durable jobs so retries and restarts cannot duplicate or suppress alerts.
 - [Express SPA fallback asset guard](express-spa-fallback-asset-guard.md) — wildcard middleware paths are mount-relative; inspect originalUrl before deciding whether to return index.html for missing assets.
 - [HelloData metrics smoke tests](hellodata-metrics-smoke.md) — direct tsx service imports can keep the database pool open; close the process or pool after one-off assertions.
+- [HelloData radius validation](hellodata-radius-validation.md) — recompute each comparable's distance from current subject coordinates; provider distances and cached centers do not enforce radius.
 - [USFWS NWI query behavior](usfws-nwi-query.md) — public wetlands ArcGIS queries can time out; keep them bounded and never let failure block intake.
 - [Public marketing route allowlist](public-marketing-route-allowlist.md) — new unauthenticated pages need both client routing and server document access or direct visits redirect home.
 - [Development Passport sessions](development-passport-sessions.md) — development login must use Passport req.login and save the session; hand-written passport user objects cannot be deserialized.

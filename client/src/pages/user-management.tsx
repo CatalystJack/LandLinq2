@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +28,7 @@ interface User {
   states?: string[];
   lastLogin?: string;
   isActive?: boolean;
+  mustResetPassword?: boolean;
   phone?: string;
   marketsCovered?: string[];
   brokerage?: string;
@@ -50,6 +51,7 @@ export default function UserManagement() {
   const [selectedRole, setSelectedRole] = useState("all");
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [resendingUser, setResendingUser] = useState<User | null>(null);
   const [newUser, setNewUser] = useState<NewUser>({
     email: "",
     firstName: "",
@@ -109,6 +111,35 @@ export default function UserManagement() {
     onError: (error: Error) => {
       toast({
         title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resendInitialLoginMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch(`/api/users/${userId}/resend-initial-login`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to resend initial login email");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setResendingUser(null);
+      toast({
+        title: "Initial login sent",
+        description: "A new temporary password was emailed. The recipient must set a new password after signing in.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Could not resend initial login",
         description: error.message,
         variant: "destructive",
       });
@@ -496,6 +527,11 @@ export default function UserManagement() {
                               <Calendar className="h-3 w-3" />
                               Joined {formatDateEST.date(user.createdAt)}
                             </div>
+                            {user.mustResetPassword && (
+                              <Badge variant="outline" className="mt-1 border-amber-300 text-amber-800">
+                                Initial login pending
+                              </Badge>
+                            )}
                             {user.dealRole && (
                               <div className="flex items-center gap-2 text-sm text-blue-600">
                                 <Settings className="h-3 w-3" />
@@ -529,6 +565,18 @@ export default function UserManagement() {
                             Active
                           </Badge>
                           <div className="flex gap-2">
+                            {isCurrentUserSuperAdmin && user.mustResetPassword && user.id !== currentUser?.id && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => setResendingUser(user)}
+                                data-testid={`resend-initial-login-${user.id}`}
+                              >
+                                <Mail className="h-3 w-3" />
+                                Resend login
+                              </Button>
+                            )}
                             {isCurrentUserSuperAdmin && (
                               <Button
                                 variant="outline"
@@ -672,6 +720,37 @@ export default function UserManagement() {
                   </div>
                 </div>
               )}
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={resendingUser !== null}
+            onOpenChange={(open) => {
+              if (!open && !resendInitialLoginMutation.isPending) setResendingUser(null);
+            }}
+          >
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Resend initial login?</DialogTitle>
+                <DialogDescription>
+                  A new temporary password will be emailed to {resendingUser?.email}. This replaces the previous temporary password, and the recipient will still need to choose a new password at sign-in.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setResendingUser(null)}
+                  disabled={resendInitialLoginMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => resendingUser && resendInitialLoginMutation.mutate(resendingUser.id)}
+                  disabled={!resendingUser || resendInitialLoginMutation.isPending}
+                >
+                  {resendInitialLoginMutation.isPending ? "Sending..." : "Send login email"}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
 

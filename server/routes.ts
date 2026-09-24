@@ -3313,7 +3313,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         return u;
       }));
       
-      res.json({ users: enrichedUsers });
+      // The people page needs account status, not password hashes.
+      const safeUsers = enrichedUsers.map(({ password: _password, ...safeUser }) => safeUser);
+      res.json({ users: safeUsers });
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
@@ -3364,44 +3366,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       });
 
       try {
-        const loginUrl = `${LANDLINQ_PUBLIC_ORIGIN}/login`;
-        const safeFirstName = escapeEmailHtml(String(firstName));
-        const safeEmail = escapeEmailHtml(normalizedEmail);
-        const safeTemporaryPassword = escapeEmailHtml(temporaryPassword);
-        const roleLabel = normalizedRole === "BROKER" ? "Partner Broker" : "LandLinq team";
-        const welcomeHtml = renderBrandedEmail({
-          title: "Your LandLinq account is ready",
-          preheader: "Your LandLinq account access is ready.",
-          companyName: "LandLinq",
-          supportEmail: "help@landlinq.ai",
-          bodyHtml: `
-            <p style="margin:0 0 16px;">Hi ${safeFirstName},</p>
-            <p style="margin:0 0 20px;">
-              Your ${roleLabel} account has been created. Use the temporary credentials below to sign in.
-            </p>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f7faff;border:1px solid #cfe0f2;">
-              <tr>
-                <td style="padding:20px 22px;color:#334E68;font-size:14px;line-height:22px;">
-                  <div style="margin-bottom:8px;"><strong>Email:</strong> ${safeEmail}</div>
-                  <div><strong>Temporary password:</strong></div>
-                  <div style="margin-top:8px;padding:12px 14px;background-color:#ffffff;border:1px solid #b8cee5;color:#0A2B4A;font-family:'Courier New',Courier,monospace;font-size:18px;line-height:24px;letter-spacing:.04em;word-break:break-all;">${safeTemporaryPassword}</div>
-                </td>
-              </tr>
-            </table>
-            <p style="margin:22px 0 0;color:#52677D;font-size:14px;line-height:22px;">
-              For your security, you will be required to set a new password after signing in.
-            </p>`,
-          button: { label: "Open LandLinq", url: loginUrl },
-        });
-        const emailSent = await sendNotificationEmail({
-          to: normalizedEmail,
-          subject: "Your LandLinq account is ready",
-          html: welcomeHtml,
-          text: `Hi ${firstName},\n\nYour LandLinq account is ready.\nEmail: ${normalizedEmail}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be required to set a new password after signing in.`,
-          type: "user-account-invite",
-          priority: "high",
-          transactional: true,
-        });
+        const emailSent = await sendNotificationEmail(buildPlatformUserInitialLoginEmail({
+          firstName: String(firstName),
+          email: normalizedEmail,
+          temporaryPassword,
+          role: normalizedRole,
+        }));
         if (!emailSent) {
           throw new Error("The welcome email could not be sent");
         }
@@ -3426,6 +3396,120 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     } catch (error) {
       console.error("Error creating user:", error);
       res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Resend initial access only for accounts that have not completed their first password reset.
+  app.post('/api/users/:userId/resend-initial-login', isAuthenticated, async (req: any, res) => {
+    const userEmail = String(req.user?.email || req.user?.claims?.email || '').toLowerCase().trim();
+    if (!isSuperAdminEmail(userEmail)) {
+      return res.status(403).json({ message: "Unauthorized - Super admin access required" });
+    }
+
+    try {
+      const [target] = await db.select().from(users)
+        .where(eq(users.id, req.params.userId))
+        .limit(1);
+      if (!target) return res.status(404).json({ message: "User not found" });
+      if (target.id === req.user?.id) {
+        return res.status(400).json({ message: "You cannot resend initial login credentials to your own account" });
+      }
+      if (!target.mustResetPassword) {
+        return res.status(409).json({
+          message: "This account has completed its initial password reset. Use the password reset flow instead.",
+        });
+      }
+
+      const role = String(target.role || '').toUpperCase();
+      const temporaryPassword = randomBytes(12).toString("base64url");
+      const newPasswordHash = await hashPassword(temporaryPassword);
+      let emailMessage: Parameters<typeof sendNotificationEmail>[0];
+
+      if (role === "DEVELOPER") {
+        if (!target.developerProfileId) {
+          return res.status(409).json({ message: "This account is not linked to an Investment Company profile" });
+        }
+        const [profile] = await db.select().from(developerProfiles)
+          .where(eq(developerProfiles.id, target.developerProfileId))
+          .limit(1);
+        if (!profile || !profile.isActive) {
+          return res.status(409).json({ message: "Reactivate the Investment Company before resending its login" });
+        }
+
+        const baseUrl = LANDLINQ_PUBLIC_ORIGIN;
+        const loginUrl = `${baseUrl}/developer/${encodeURIComponent(profile.slug)}/login`;
+        const logoUrl = `${baseUrl}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
+        const firstName = target.firstName || "there";
+        emailMessage = {
+          to: target.email,
+          subject: `Your ${profile.companyName} Investment Company portal access`,
+          type: "developer-team-invite",
+          priority: "high",
+          transactional: true,
+          text: `Hi ${firstName},\n\nYour ${profile.companyName} Investment Company portal is ready.\nEmail: ${target.email}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be required to set a new password after signing in.`,
+          html: buildDeveloperInvitationEmail({
+            firstName,
+            companyName: profile.companyName,
+            email: target.email,
+            temporaryPassword,
+            loginUrl,
+            logoUrl,
+          }),
+        };
+      } else if (role === "ADMIN" || role === "BROKER") {
+        emailMessage = buildPlatformUserInitialLoginEmail({
+          firstName: target.firstName || "there",
+          email: target.email,
+          temporaryPassword,
+          role,
+        });
+      } else {
+        return res.status(409).json({ message: "Initial login resend is not available for this account type" });
+      }
+
+      // Rotate the temporary credential only if the account is still in the
+      // same initial-login state observed above. This prevents concurrent
+      // resends from silently invalidating a newer email.
+      const [rotated] = await db.update(users).set({
+        password: newPasswordHash,
+        mustResetPassword: true,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(users.id, target.id),
+        eq(users.password, target.password),
+        eq(users.mustResetPassword, true),
+      )).returning({ id: users.id });
+      if (!rotated) {
+        return res.status(409).json({ message: "The account changed. Refresh the page and try again." });
+      }
+
+      try {
+        const emailSent = await sendNotificationEmail(emailMessage);
+        if (!emailSent) throw new Error("The initial login email could not be sent");
+      } catch (emailError) {
+        const [restored] = await db.update(users).set({
+          password: target.password,
+          mustResetPassword: true,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(users.id, target.id),
+          eq(users.password, newPasswordHash),
+          eq(users.mustResetPassword, true),
+        )).returning({ id: users.id });
+        if (!restored) {
+          console.error("[resend initial login] Email failed after the account changed; could not restore prior credential:", emailError);
+          return res.status(502).json({
+            message: "The email could not be sent and the account changed during the attempt. Verify the account before retrying.",
+          });
+        }
+        console.error("[resend initial login] Email delivery failed; previous temporary credential restored:", emailError);
+        return res.status(502).json({ message: "The email could not be sent. The previous temporary password remains valid." });
+      }
+
+      return res.json({ message: "Initial login email sent" });
+    } catch (error) {
+      console.error("[resend initial login] Error:", error);
+      return res.status(500).json({ message: "Failed to resend initial login email" });
     }
   });
 
@@ -14691,6 +14775,56 @@ RULES:
     }[character] || character));
   }
 
+  function buildPlatformUserInitialLoginEmail({
+    firstName,
+    email,
+    temporaryPassword,
+    role,
+  }: {
+    firstName: string;
+    email: string;
+    temporaryPassword: string;
+    role: string;
+  }): Parameters<typeof sendNotificationEmail>[0] {
+    const loginUrl = `${LANDLINQ_PUBLIC_ORIGIN}/login`;
+    const safeFirstName = escapeEmailHtml(firstName);
+    const safeEmail = escapeEmailHtml(email);
+    const safeTemporaryPassword = escapeEmailHtml(temporaryPassword);
+    const roleLabel = role === "BROKER" ? "Partner Broker" : "LandLinq team";
+    return {
+      to: email,
+      subject: "Your LandLinq account is ready",
+      html: renderBrandedEmail({
+        title: "Your LandLinq account is ready",
+        preheader: "Your LandLinq account access is ready.",
+        companyName: "LandLinq",
+        supportEmail: "help@landlinq.ai",
+        bodyHtml: `
+          <p style="margin:0 0 16px;">Hi ${safeFirstName},</p>
+          <p style="margin:0 0 20px;">
+            Your ${roleLabel} account has been created. Use the temporary credentials below to sign in.
+          </p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f7faff;border:1px solid #cfe0f2;">
+            <tr>
+              <td style="padding:20px 22px;color:#334E68;font-size:14px;line-height:22px;">
+                <div style="margin-bottom:8px;"><strong>Email:</strong> ${safeEmail}</div>
+                <div><strong>Temporary password:</strong></div>
+                <div style="margin-top:8px;padding:12px 14px;background-color:#ffffff;border:1px solid #b8cee5;color:#0A2B4A;font-family:'Courier New',Courier,monospace;font-size:18px;line-height:24px;letter-spacing:.04em;word-break:break-all;">${safeTemporaryPassword}</div>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:22px 0 0;color:#52677D;font-size:14px;line-height:22px;">
+            For your security, you will be required to set a new password after signing in.
+          </p>`,
+        button: { label: "Open LandLinq", url: loginUrl },
+      }),
+      text: `Hi ${firstName},\n\nYour LandLinq account is ready.\nEmail: ${email}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be required to set a new password after signing in.`,
+      type: "user-account-invite",
+      priority: "high",
+      transactional: true,
+    };
+  }
+
   function buildDeveloperInvitationEmail({
     firstName,
     companyName,
@@ -17988,20 +18122,20 @@ RULES:
 
       const { developerProfiles, developerProductTypes, partnerDeveloperSends, partnerDevelopers } = await import("@shared/schema");
       const { classifyDealForProfile } = await import("./developerClassificationService");
-      const [profile] = await db.select().from(developerProfiles).where(and(
-        eq(developerProfiles.id, developerProfileId),
-        eq(developerProfiles.isActive, true),
-      )).limit(1);
-      if (!profile) return res.status(403).json({ error: "Investment Company profile is inactive or unavailable" });
-      if (profile.profileType !== "real_estate") {
-        return res.status(400).json({ error: "Manual deal entry is only available for real-estate Investment Companies" });
-      }
-      const industrial = profile.assetClass === "industrial";
-      if (!industrial && (rent === null || !Number.isFinite(rent) || rent < 0)) {
-        return res.status(400).json({ error: "Rent must be a valid non-negative number" });
-      }
-
       const result = await db.transaction(async (tx) => {
+        const [profile] = await tx.select().from(developerProfiles).where(and(
+          eq(developerProfiles.id, developerProfileId),
+          eq(developerProfiles.isActive, true),
+        )).limit(1);
+        if (!profile) throw adminRequestError(403, "Investment Company profile is inactive or unavailable");
+        if (profile.profileType !== "real_estate") {
+          throw adminRequestError(400, "Manual deal entry is only available for real-estate Investment Companies");
+        }
+        const industrial = profile.assetClass === "industrial";
+        if (!industrial && (rent === null || !Number.isFinite(rent) || rent < 0)) {
+          throw adminRequestError(400, "Rent must be a valid non-negative number");
+        }
+
         const activeProductTypes = await tx.select().from(developerProductTypes).where(and(
           eq(developerProductTypes.developerProfileId, developerProfileId),
           eq(developerProductTypes.isActive, true),
