@@ -4556,13 +4556,19 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const limit = parseInt(req.query.limit as string) || 50;
       const search = (req.query.search as string || '').trim();
       const tag = req.query.tag as string;
+      const rawTagFilters = req.query.tags;
+      const tagFilters = (Array.isArray(rawTagFilters) ? rawTagFilters : rawTagFilters ? [rawTagFilters] : [])
+        .map((value) => String(value).trim())
+        .filter(Boolean);
       const market = req.query.market as string;
       const smsFilter = req.query.sms as string; // 'opted_in' | 'opted_out' | 'all'
       const stateFilter = (req.query.state as string || '').trim().toUpperCase();
+      const crmStateFilter = (req.query.crmState as string || '').trim().toLowerCase();
       const msaFilter = (req.query.msa as string || '').trim();
       const countyFilter = (req.query.county as string || '').trim();
       const assignedToFilter = (req.query.assignedTo as string || '').trim();
       const brokerageFilter = (req.query.brokerage as string || '').trim();
+      const sourceTagFilter = (req.query.sourceTag as string || '').trim();
       const multiCampaignTagFilter = req.query.multiCampaignTag === 'true';
       const offset = (page - 1) * limit;
       const requestedProfileId = String(req.query.developerProfileId || '').trim();
@@ -4642,7 +4648,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         developerProfileId
           ? (allBrokersQuery as any).where(isNonDemoBroker())
           : allBrokersQuery
-      ).orderBy(desc(brokers.createdAt));
+      ).orderBy(desc(brokers.createdAt), desc(brokers.id));
 
       if (developerProfileId) {
         const privateCrmRows = await db.select({
@@ -4674,6 +4680,24 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         if (key) counts[key] = (counts[key] || 0) + 1;
         return counts;
       }, {});
+      const companyNames = new Map<string, string>();
+      for (const broker of allBrokers) {
+        const name = String(broker.brokerage || "").trim();
+        const key = name.toLowerCase();
+        if (key && !companyNames.has(key)) companyNames.set(key, name);
+      }
+      const uniqueSortedValues = (values: unknown[]) => Array.from(new Set(
+        values.map((value) => String(value || "").trim()).filter(Boolean),
+      )).sort((a, b) => a.localeCompare(b));
+      const filterOptions = {
+        companies: Array.from(companyNames.entries())
+          .map(([key, name]) => ({ name, people: companyMemberCounts[key] || 0 }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        tags: uniqueSortedValues(allBrokers.flatMap((broker: any) => Array.isArray(broker.crmTags) ? broker.crmTags : [])),
+        sourceTags: uniqueSortedValues(allBrokers.flatMap((broker: any) => Array.isArray(broker.sourceTags) ? broker.sourceTags : [])),
+        states: uniqueSortedValues(allBrokers.map((broker: any) => broker.stateRegion)),
+        assignedTo: uniqueSortedValues(allBrokers.map((broker: any) => broker.assignedTo)),
+      };
 
       // Apply filters
       let filtered = allBrokers;
@@ -4684,11 +4708,27 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
           (b.email || '').toLowerCase().includes(q) ||
           (b.phone || '').includes(q) ||
           (b.brokerage || '').toLowerCase().includes(q) ||
-          (b.assignedTo || '').toLowerCase().includes(q)
+          (b.assignedTo || '').toLowerCase().includes(q) ||
+          (b.stateRegion || '').toLowerCase().includes(q)
         );
       }
       if (tag) {
         filtered = filtered.filter(b => Array.isArray(b.crmTags) && b.crmTags.includes(tag));
+      }
+      if (tagFilters.length > 0) {
+        filtered = filtered.filter((broker) =>
+          Array.isArray(broker.crmTags) && tagFilters.some((filterTag) => broker.crmTags.includes(filterTag)),
+        );
+      }
+      if (sourceTagFilter) {
+        filtered = filtered.filter((broker) =>
+          Array.isArray(broker.sourceTags) && broker.sourceTags.includes(sourceTagFilter),
+        );
+      }
+      if (crmStateFilter) {
+        filtered = filtered.filter((broker) =>
+          String(broker.stateRegion || "").trim().toLowerCase() === crmStateFilter,
+        );
       }
       if (market) {
         filtered = filtered.filter(b => Array.isArray(b.marketsCovered) && b.marketsCovered.some((m: string) => m.toLowerCase().includes(market.toLowerCase())));
@@ -4735,18 +4775,23 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         });
       }
 
-      // Enrich with deal counts
-      const brokerIds = filtered.map(b => b.id);
+      const total = filtered.length;
+      const pageBrokers = filtered.slice(offset, offset + limit);
+
+      // Enrich only the page being returned rather than scanning every deal
+      // whenever a company opens its CRM.
+      const brokerIds = pageBrokers.map((b) => b.id);
       let dealCounts: Record<string, number> = {};
       if (brokerIds.length > 0) {
-        const rawDeals = await db.select({ brokerId: deals.brokerId }).from(deals);
+        const rawDeals = await db.select({ brokerId: deals.brokerId })
+          .from(deals)
+          .where(inArray(deals.brokerId, brokerIds));
         rawDeals.forEach((d: any) => {
           if (d.brokerId) dealCounts[d.brokerId] = (dealCounts[d.brokerId] || 0) + 1;
         });
       }
 
-      const total = filtered.length;
-      const paginated = filtered.slice(offset, offset + limit).map(b => ({
+      const paginated = pageBrokers.map(b => ({
         ...b,
         dealCount: dealCounts[b.id] || 0,
         companyMemberCount: companyMemberCounts[String(b.brokerage || "").trim().toLowerCase()] || 0,
@@ -4754,6 +4799,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
       res.json({
         contacts: paginated,
+        filterOptions,
         pagination: {
           page,
           limit,
@@ -18426,7 +18472,21 @@ RULES:
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
-      const { partnerDeveloperSends, partnerDevelopers } = await import('@shared/schema');
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const page = Math.max(1, parseInt(String(req.query.page || "1"), 10) || 1);
+      const requestedLimit = Math.max(1, parseInt(String(req.query.limit || "25"), 10) || 25);
+      const limit = Math.min(requestedLimit, 100);
+      const includeAll = req.query.all === "true";
+      const search = String(req.query.search || "").trim().toLowerCase();
+      const statusFilter = String(req.query.status || "all").trim().toLowerCase();
+      const productTypeFilter = String(req.query.productType || "all").trim();
+      const programFilter = String(req.query.program || "all").trim().toUpperCase();
+      const { partnerDeveloperSends, partnerDevelopers, developerProfiles: developerProfilesTable } = await import('@shared/schema');
+      const [profile] = await db.select({ assetClass: developerProfilesTable.assetClass })
+        .from(developerProfilesTable)
+        .where(eq(developerProfilesTable.id, developerProfileId))
+        .limit(1);
+      const isIndustrial = profile?.assetClass === "industrial";
 
       const rows = await db
         .select({
@@ -18440,9 +18500,59 @@ RULES:
           eq(partnerDeveloperSends.developerProfileId, developerProfileId),
           eq(partnerDevelopers.developerProfileId, developerProfileId),
         ))
-        .orderBy(desc(partnerDeveloperSends.matchedAt), desc(deals.createdAt));
+        .orderBy(desc(partnerDeveloperSends.matchedAt), desc(deals.createdAt), desc(partnerDeveloperSends.id));
 
-      const enrichedDeals = await Promise.all(rows.map(async ({ send, deal }) => ({
+      const includesProgram = (value: unknown) =>
+        ["yes", "true", "mdda", "nmdda", "qct", "oz"].includes(String(value || "").trim().toLowerCase());
+      const programsForDeal = (deal: typeof rows[number]["deal"]) => [
+        ...(includesProgram(deal.qctStatus) ? ["QCT"] : []),
+        ...(includesProgram(deal.ddaStatus) ? ["DDA"] : []),
+        ...(includesProgram(deal.ozStatus) ? ["OZ"] : []),
+      ];
+      const matchingRows = rows.filter(({ send, deal }) => {
+        const matchesSearch = !search || [deal.address, deal.city, deal.county, deal.state]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(search));
+        const pursuing = Boolean(send.greenFlaggedByDeveloper);
+        const matchesStatus = statusFilter === "all"
+          || (statusFilter === "pursuing" && pursuing)
+          || (isIndustrial
+            ? ((statusFilter === "red" && send.classification === "red")
+              || (statusFilter === "yellow" && send.classification !== "red")) && !pursuing
+            : (statusFilter === "review" && send.classification === "review" && !pursuing)
+              || (statusFilter === "passed" && send.classification !== "review" && !pursuing));
+        const allProductTypes = [
+          ...(Array.isArray(send.matchedProductTypes) ? send.matchedProductTypes : []),
+          ...(Array.isArray(deal.productTypes) ? deal.productTypes : []),
+        ];
+        const matchesProductType = productTypeFilter === "all" || allProductTypes.includes(productTypeFilter);
+        const programs = programsForDeal(deal);
+        const matchesProgram = programFilter === "all"
+          || (programFilter === "NONE" && programs.length === 0)
+          || programs.includes(programFilter);
+        return matchesSearch && matchesStatus && matchesProductType && matchesProgram;
+      });
+
+      const summary = {
+        total: rows.length,
+        review: rows.filter(({ send }) => send.classification === "review" && !send.greenFlaggedByDeveloper).length,
+        passed: rows.filter(({ send }) => send.classification !== "review" && !send.greenFlaggedByDeveloper).length,
+        pursuing: rows.filter(({ send }) => Boolean(send.greenFlaggedByDeveloper)).length,
+        red: rows.filter(({ send }) => send.classification === "red" && !send.greenFlaggedByDeveloper).length,
+        yellow: rows.filter(({ send }) => send.classification !== "red" && !send.greenFlaggedByDeveloper).length,
+      };
+      const productTypes = Array.from(new Set(rows.flatMap(({ send, deal }) => [
+        ...(Array.isArray(send.matchedProductTypes) ? send.matchedProductTypes : []),
+        ...(Array.isArray(deal.productTypes) ? deal.productTypes : []),
+      ]))).sort((a, b) => a.localeCompare(b));
+      const markets = Array.from(new Set(matchingRows
+        .map(({ deal }) => [deal.city, deal.state].filter(Boolean).join(", "))
+        .filter(Boolean))).slice(0, 100);
+      const total = matchingRows.length;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const selectedRows = includeAll ? matchingRows : matchingRows.slice((page - 1) * limit, page * limit);
+
+      const enrichedDeals = await Promise.all(selectedRows.map(async ({ send, deal }) => ({
         ...send,
         deal: {
           ...deal,
@@ -18454,7 +18564,19 @@ RULES:
         },
       })));
 
-      return res.json({ deals: enrichedDeals });
+      return res.json({
+        deals: enrichedDeals,
+        pagination: {
+          page: includeAll ? 1 : page,
+          limit: includeAll ? total : limit,
+          total,
+          totalPages: includeAll ? 1 : totalPages,
+          hasNextPage: includeAll ? false : page < totalPages,
+          hasPrevPage: includeAll ? false : page > 1,
+        },
+        summary,
+        filterOptions: { productTypes, markets },
+      });
     } catch (error: any) {
       console.error('[developer-profile/me/deals] Error:', error);
       return res.status(500).json({ error: 'Failed to load deals' });

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
 import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, Pencil, Plus, X, Trash2 } from "lucide-react";
@@ -139,6 +139,25 @@ type AdminCompanyProfile = {
   isActive: boolean;
 };
 
+type ContactCrmResponse = {
+  contacts: Contact[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+  filterOptions: {
+    companies: Array<{ name: string; people: number }>;
+    tags: string[];
+    sourceTags: string[];
+    states: string[];
+    assignedTo: string[];
+  };
+};
+
 export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -155,18 +174,12 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   });
   const selectedAdminProfile = (adminProfilesQuery.data?.profiles || [])
     .find((company) => company.id === selectedAdminProfileId);
-  const contactsQueryKey = adminMode
-    ? `/api/crm/contacts?developerProfileId=${encodeURIComponent(selectedAdminProfileId)}`
-    : "/api/developer-profile/me/contacts";
-  const contactsEndpoint = adminMode
-    ? selectedAdminProfileId
-      ? `/api/crm/contacts?page=1&limit=9999&developerProfileId=${encodeURIComponent(selectedAdminProfileId)}`
-      : ""
-    : "/api/developer-profile/me/contacts";
   const importEndpoint = adminMode
     ? "/api/crm/import-contacts"
     : "/api/developer-profile/me/import-contacts";
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [companyFilter, setCompanyFilter] = useState("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sourceTagFilter, setSourceTagFilter] = useState("all");
@@ -189,9 +202,31 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [parsing, setParsing] = useState(false);
   const [result, setResult] = useState<{ inserted: number; updated: number } | null>(null);
 
-  const contactsQuery = useQuery<{ contacts: Contact[] }>({
-    queryKey: [contactsQueryKey],
-    queryFn: () => requestJson(contactsEndpoint),
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, companyFilter, selectedTags, sourceTagFilter, stateFilter, assignedToFilter, selectedAdminProfileId]);
+
+  const contactsQueryKey = adminMode
+    ? `/api/crm/contacts?developerProfileId=${encodeURIComponent(selectedAdminProfileId)}`
+    : "/api/crm/contacts";
+  const contactsQuery = useQuery<ContactCrmResponse>({
+    queryKey: [contactsQueryKey, page, debouncedSearch, companyFilter, selectedTags, sourceTagFilter, stateFilter, assignedToFilter],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page), limit: "25" });
+      if (adminMode) params.set("developerProfileId", selectedAdminProfileId);
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      if (companyFilter !== "all") params.set("brokerage", companyFilter);
+      selectedTags.forEach((tag) => params.append("tags", tag));
+      if (sourceTagFilter !== "all") params.set("sourceTag", sourceTagFilter);
+      if (stateFilter !== "all") params.set("crmState", stateFilter);
+      if (assignedToFilter !== "all") params.set("assignedTo", assignedToFilter);
+      return requestJson(`/api/crm/contacts?${params.toString()}`);
+    },
     enabled: !adminMode || Boolean(selectedAdminProfileId),
   });
 
@@ -321,47 +356,14 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     onError: (error: Error) => toast({ title: "Tag creation failed", description: error.message, variant: "destructive" }),
   });
 
-  const filteredContacts = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const contacts = contactsQuery.data?.contacts || [];
-    return contacts.filter((contact) => {
-      const matchesCompany = companyFilter === "all" || contact.brokerage?.trim().toLowerCase() === companyFilter;
-      const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => contact.crmTags?.includes(tag));
-      const matchesSourceTag = sourceTagFilter === "all" || contact.sourceTags?.includes(sourceTagFilter);
-      const matchesState = stateFilter === "all" || contact.stateRegion?.trim() === stateFilter;
-      const matchesAssignedTo = assignedToFilter === "all" || contact.assignedTo?.trim() === assignedToFilter;
-      if (!matchesCompany) return false;
-      if (!matchesTags || !matchesSourceTag || !matchesState || !matchesAssignedTo) return false;
-      if (!term) return true;
-      return [contact.firstName, contact.lastName, contact.email, contact.phone, contact.brokerage, contact.stateRegion]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(term));
-    });
-  }, [contactsQuery.data?.contacts, search, companyFilter, selectedTags, sourceTagFilter, stateFilter, assignedToFilter]);
-
-  const availableTags = useMemo(() => {
-    if (!adminMode) return (tagsQuery.data || []).map((tag) => tag.trim()).filter(Boolean);
-    return Array.from(new Set((contactsQuery.data?.contacts || []).flatMap((contact) => contact.crmTags || []).map((tag) => tag.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-  }, [adminMode, tagsQuery.data, contactsQuery.data?.contacts]);
-
-  const availableSourceTags = useMemo(() => Array.from(new Set(
-    (contactsQuery.data?.contacts || [])
-      .flatMap((contact) => contact.sourceTags || [])
-      .map((tag) => tag.trim())
-      .filter(Boolean),
-  )).sort((a, b) => a.localeCompare(b)), [contactsQuery.data?.contacts]);
-
-  const availableStates = useMemo(() => Array.from(new Set(
-    (contactsQuery.data?.contacts || [])
-      .map((contact) => contact.stateRegion?.trim())
-      .filter((value): value is string => Boolean(value)),
-  )).sort((a, b) => a.localeCompare(b)), [contactsQuery.data?.contacts]);
-
-  const availableAssignedTo = useMemo(() => Array.from(new Set(
-    (contactsQuery.data?.contacts || [])
-      .map((contact) => contact.assignedTo?.trim())
-      .filter((value): value is string => Boolean(value)),
-  )).sort((a, b) => a.localeCompare(b)), [contactsQuery.data?.contacts]);
+  const filteredContacts = contactsQuery.data?.contacts || [];
+  const filterOptions = contactsQuery.data?.filterOptions;
+  const availableTags = adminMode
+    ? filterOptions?.tags || []
+    : (tagsQuery.data || []).map((tag) => tag.trim()).filter(Boolean);
+  const availableSourceTags = filterOptions?.sourceTags || [];
+  const availableStates = filterOptions?.states || [];
+  const availableAssignedTo = filterOptions?.assignedTo || [];
 
   const visibleContactIds = filteredContacts.map((contact) => contact.id);
   const allVisibleSelected = visibleContactIds.length > 0 && visibleContactIds.every((id) => selectedContactIds.includes(id));
@@ -390,19 +392,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     setAssignedToFilter("all");
   };
 
-  const companyProfiles = useMemo(() => {
-    const profiles = new Map<string, { name: string; people: number }>();
-    for (const contact of contactsQuery.data?.contacts || []) {
-      const company = contact.brokerage?.trim();
-      if (company) {
-        const key = company.toLowerCase();
-        const existing = profiles.get(key);
-        profiles.set(key, { name: existing?.name || company, people: (existing?.people || 0) + 1 });
-      }
-    }
-    return Array.from(profiles.values())
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [contactsQuery.data?.contacts]);
+  const companyProfiles = filterOptions?.companies || [];
 
   const readFile = (selected: File) => {
     setParsing(true);
@@ -465,9 +455,9 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                 <p className="text-xs text-[#7b8d9b]">
                   {adminMode
                     ? selectedAdminProfile
-                      ? `${contactsQuery.data?.contacts.length || 0} contacts in ${selectedAdminProfile.companyName}'s CRM`
+                      ? `${contactsQuery.data?.pagination.total || 0} contacts in ${selectedAdminProfile.companyName}'s CRM`
                       : "Select a company to view its CRM"
-                    : `${contactsQuery.data?.contacts.length || 0} available contacts`}
+                    : `${contactsQuery.data?.pagination.total || 0} available contacts`}
                 </p>
               </div>
             </div>
@@ -626,7 +616,9 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                   )}
                 </>
               )}
-             <span className="ml-auto hidden sm:inline">{filteredContacts.length} shown · search updates as you type</span>
+              <span className="ml-auto hidden sm:inline">
+                Showing {filteredContacts.length} of {contactsQuery.data?.pagination.total ?? 0} · search updates as you type
+              </span>
           </div>
             {adminMode && !selectedAdminProfileId ? (
               <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
@@ -758,6 +750,36 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                   </TableRow>
                 ))}</TableBody>
               </Table>
+            </div>
+          )}
+          {contactsQuery.data && contactsQuery.data.pagination.total > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e6edf1] bg-white px-5 py-3">
+              <span className="text-xs text-[#718493]">
+                Showing {((page - 1) * 25 + 1).toLocaleString()}–{Math.min(page * 25, contactsQuery.data.pagination.total).toLocaleString()} of {contactsQuery.data.pagination.total.toLocaleString()} contacts
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="mr-1 text-xs text-[#718493]">
+                  Page {page.toLocaleString()} of {Math.max(contactsQuery.data.pagination.totalPages, 1).toLocaleString()}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  disabled={!contactsQuery.data.pagination.hasPrevPage || contactsQuery.isFetching}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  disabled={!contactsQuery.data.pagination.hasNextPage || contactsQuery.isFetching}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </Card>

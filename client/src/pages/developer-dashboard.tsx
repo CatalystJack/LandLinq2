@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { useLocation } from "wouter";
@@ -185,6 +185,30 @@ function DealStatus({ row, industrial }: { row: DeveloperDeal; industrial: boole
   return <Badge className="border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-100">Passed</Badge>;
 }
 
+type DeveloperDealsResponse = {
+  deals: DeveloperDeal[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+  summary: {
+    total: number;
+    review: number;
+    passed: number;
+    pursuing: number;
+    red: number;
+    yellow: number;
+  };
+  filterOptions: {
+    productTypes: string[];
+    markets: string[];
+  };
+};
+
 export default function DeveloperDashboard() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -203,6 +227,9 @@ export default function DeveloperDashboard() {
   }, [isGeneralSales, setLocation]);
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -221,11 +248,35 @@ export default function DeveloperDashboard() {
   const [rerunningDealId, setRerunningDealId] = useState<string | null>(null);
   const [manualDealOpen, setManualDealOpen] = useState(false);
 
-  const dealsQuery = useQuery<{ deals: DeveloperDeal[] }>({
-    queryKey: ["/api/developer-profile/me/deals"],
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, productTypeFilter, programFilter]);
+
+  const buildDealsUrl = (includeAll = false) => {
+    const params = new URLSearchParams();
+    if (includeAll) {
+      params.set("all", "true");
+    } else {
+      params.set("page", String(page));
+      params.set("limit", "25");
+    }
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (productTypeFilter !== "all") params.set("productType", productTypeFilter);
+    if (programFilter !== "all") params.set("program", programFilter);
+    return `/api/developer-profile/me/deals?${params.toString()}`;
+  };
+
+  const dealsQuery = useQuery<DeveloperDealsResponse>({
+    queryKey: ["/api/developer-profile/me/deals", page, debouncedSearch, statusFilter, productTypeFilter, programFilter],
     enabled: !isGeneralSales,
     queryFn: async () => {
-      const response = await fetch("/api/developer-profile/me/deals", { credentials: "include" });
+      const response = await fetch(buildDealsUrl(), { credentials: "include" });
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: "Failed to load deals" }));
         throw new Error(error.error || "Failed to load deals");
@@ -396,61 +447,33 @@ export default function DeveloperDashboard() {
   };
 
   const rows = dealsQuery.data?.deals || [];
-  const productTypeOptions = useMemo(() => {
-    const values = new Set<string>();
-    rows.forEach((row) => {
-      (row.matchedProductTypes || []).forEach((value) => values.add(value));
-      (row.deal.productTypes || []).forEach((value) => values.add(value));
-    });
-    return Array.from(values).sort();
-  }, [rows]);
-
-  const filteredRows = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return rows.filter((row) => {
-      const matchesSearch = !term || [row.deal.address, row.deal.city, row.deal.county, row.deal.state]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term));
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "pursuing" && row.greenFlaggedByDeveloper) ||
-        (isIndustrial
-          ? ((statusFilter === "red" && row.classification === "red") ||
-             (statusFilter === "yellow" && row.classification !== "red")) &&
-            !row.greenFlaggedByDeveloper
-          : (statusFilter === "review" && row.classification === "review" && !row.greenFlaggedByDeveloper) ||
-            (statusFilter === "passed" && row.classification !== "review" && !row.greenFlaggedByDeveloper));
-      const productTypes = [...(row.matchedProductTypes || []), ...(row.deal.productTypes || [])];
-      const matchesProductType = productTypeFilter === "all" || productTypes.includes(productTypeFilter);
-      const programs = dealPrograms(row.deal);
-      const matchesProgram =
-        programFilter === "all"
-        || (programFilter === "none" && programs.length === 0)
-        || programs.includes(programFilter);
-      return matchesSearch && matchesStatus && matchesProductType && matchesProgram;
-    });
-  }, [rows, search, statusFilter, productTypeFilter, programFilter, isIndustrial]);
-
-  const counts = useMemo(() => isIndustrial ? ({
-    total: rows.length,
-    red: rows.filter((row) => row.classification === "red" && !row.greenFlaggedByDeveloper).length,
-    yellow: rows.filter((row) => row.classification !== "red" && !row.greenFlaggedByDeveloper).length,
-    pursuing: rows.filter((row) => row.greenFlaggedByDeveloper).length,
-  }) : ({
-    total: rows.length,
-    review: rows.filter((row) => row.classification === "review" && !row.greenFlaggedByDeveloper).length,
-    passed: rows.filter((row) => row.classification !== "review" && !row.greenFlaggedByDeveloper).length,
-    pursuing: rows.filter((row) => row.greenFlaggedByDeveloper).length,
-  }), [rows, isIndustrial]);
+  const filteredRows = rows;
+  const productTypeOptions = dealsQuery.data?.filterOptions.productTypes || [];
+  const counts = dealsQuery.data?.summary || {
+    total: 0,
+    review: 0,
+    passed: 0,
+    pursuing: 0,
+    red: 0,
+    yellow: 0,
+  };
 
   const canImport = Boolean(file && mapping.address && mapping.acreage && rowCount > 0 && !parsing);
 
-  const exportDeals = () => {
+  const exportDeals = async () => {
+    setExporting(true);
+    try {
+      const response = await fetch(buildDealsUrl(true), { credentials: "include" });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Failed to export deals" }));
+        throw new Error(error.error || "Failed to export deals");
+      }
+      const exportRows = (await response.json() as DeveloperDealsResponse).deals || [];
     const escapeCsv = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
     const header = isIndustrial
       ? ["Property", "City", "County", "State", "Acreage", "Asking Price", "Parcel ID", "Zoning", "Entitlements", "Sewer", "Screen", "Screen Reasons"]
       : ["Property", "City", "County", "State", "Acreage", "Rent", "Status", "Product Type", "HUD FMR (2BR)", "HUD 4-Person Income Limit", "Programs"];
-    const body = filteredRows.map((row) => isIndustrial
+    const body = exportRows.map((row) => isIndustrial
       ? [
           row.deal.address,
           row.deal.city,
@@ -485,6 +508,15 @@ export default function DeveloperDashboard() {
     anchor.download = "landlinq-deals.csv";
     anchor.click();
     URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "Could not load all matching deals.",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const refreshDeals = async () => {
@@ -526,9 +558,9 @@ export default function DeveloperDashboard() {
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
                 Import Deals
               </Button>
-              <Button size="sm" variant="outline" onClick={exportDeals}>
+              <Button size="sm" variant="outline" onClick={exportDeals} disabled={exporting}>
                 <Download className="mr-1.5 h-3.5 w-3.5" />
-                Export CSV
+                {exporting ? "Exporting…" : "Export CSV"}
               </Button>
               <Button size="sm" variant="outline" onClick={refreshDeals} disabled={refreshing}>
                 <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
@@ -670,7 +702,7 @@ export default function DeveloperDashboard() {
                 Deal locations are shown below by market. Map coordinates are not available for every Investment Company deal yet.
               </p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
-                {Array.from(new Set(filteredRows.map((row) => [row.deal.city, row.deal.state].filter(Boolean).join(", ")).filter(Boolean))).slice(0, 12).map((market) => (
+                {(dealsQuery.data?.filterOptions.markets || []).slice(0, 12).map((market) => (
                   <span key={market} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">{market}</span>
                 ))}
               </div>
@@ -786,6 +818,38 @@ export default function DeveloperDashboard() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+          {dealsQuery.data && dealsQuery.data.pagination.total > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3">
+              <span className="text-xs text-slate-500">
+                Showing {((page - 1) * 25 + 1).toLocaleString()}–{Math.min(page * 25, dealsQuery.data.pagination.total).toLocaleString()} of {dealsQuery.data.pagination.total.toLocaleString()} deals
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="mr-1 text-xs text-slate-500">
+                  Page {page.toLocaleString()} of {Math.max(dealsQuery.data.pagination.totalPages, 1).toLocaleString()}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  disabled={!dealsQuery.data.pagination.hasPrevPage || dealsQuery.isFetching}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  disabled={!dealsQuery.data.pagination.hasNextPage || dealsQuery.isFetching}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </Card>

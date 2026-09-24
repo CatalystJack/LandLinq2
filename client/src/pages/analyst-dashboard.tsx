@@ -610,7 +610,7 @@ export default function AnalystDashboard() {
   const [autoYocMax, setAutoYocMax] = useState<string>('');
   const [downloadingExcelDealId, setDownloadingExcelDealId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(9999);
+  const [pageSize, setPageSize] = useState<number>(25);
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editData, setEditData] = useState<{[key: string]: any}>({});
   const [editingCell, setEditingCell] = useState<{dealId: string, field: string} | null>(null);
@@ -973,72 +973,6 @@ export default function AnalystDashboard() {
   const totalDeals = dealsData?.pagination?.total || 0;
   const hasNextPage = dealsData?.pagination?.hasNextPage || false;
   const hasPrevPage = dealsData?.pagination?.hasPrevPage || false;
-
-  
-  // Prefetch adjacent pages for instant navigation
-  useEffect(() => {
-    if (!dealsData) return; // Don't prefetch until we have initial data
-    
-    const baseQueryKey = ['/api/deals', pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), filterApex.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection];
-    
-    // Prefetch next page if it exists
-    if (currentPage < totalPages) {
-      const nextPageKey = ['/api/deals', currentPage + 1, ...baseQueryKey.slice(1)];
-      queryClient.prefetchQuery({
-        queryKey: nextPageKey,
-        queryFn: async ({ signal }) => {
-          const endpoint = showOnlyFlagged ? '/api/deals/flagged' : '/api/deals';
-          const params = new URLSearchParams({
-            page: (currentPage + 1).toString(),
-            limit: pageSize.toString(),
-            ...(filterClassifications.length > 0 && { classifications: filterClassifications.join(',') }),
-            ...(filterPriorities.length > 0 && { priorities: filterPriorities.join(',') }),
-            ...(filterDealTypes.length > 0 && { dealTypes: filterDealTypes.join(',') }),
-            ...(filterApex.length > 0 && { apex: filterApex.join(',') }),
-            ...(searchQuery && { search: searchQuery }),
-            ...(filterRiskLevel !== 'all' && { riskLevel: filterRiskLevel }),
-            ...(showOnlyFlagged && { sortBy: 'flaggedAt', sortOrder: 'desc' })
-          });
-          const response = await fetch(`${endpoint}?${params}`, {
-            credentials: 'include',
-            signal: signal
-          });
-          if (!response.ok) throw new Error('Failed to fetch deals');
-          return await response.json();
-        },
-        staleTime: 30 * 1000,
-      });
-    }
-
-    // Prefetch previous page if it exists
-    if (currentPage > 1) {
-      const prevPageKey = ['/api/deals', currentPage - 1, ...baseQueryKey.slice(1)];
-      queryClient.prefetchQuery({
-        queryKey: prevPageKey,
-        queryFn: async ({ signal }) => {
-          const endpoint = showOnlyFlagged ? '/api/deals/flagged' : '/api/deals';
-          const params = new URLSearchParams({
-            page: (currentPage - 1).toString(),
-            limit: pageSize.toString(),
-            ...(filterClassifications.length > 0 && { classifications: filterClassifications.join(',') }),
-            ...(filterPriorities.length > 0 && { priorities: filterPriorities.join(',') }),
-            ...(filterDealTypes.length > 0 && { dealTypes: filterDealTypes.join(',') }),
-            ...(filterApex.length > 0 && { apex: filterApex.join(',') }),
-            ...(searchQuery && { search: searchQuery }),
-            ...(filterRiskLevel !== 'all' && { riskLevel: filterRiskLevel }),
-            ...(showOnlyFlagged && { sortBy: 'flaggedAt', sortOrder: 'desc' })
-          });
-          const response = await fetch(`${endpoint}?${params}`, {
-            credentials: 'include',
-            signal: signal
-          });
-          if (!response.ok) throw new Error('Failed to fetch deals');
-          return await response.json();
-        },
-        staleTime: 30 * 1000,
-      });
-    }
-  }, [currentPage, totalPages, queryClient, pageSize, filterClassifications, filterDealTypes, filterApex, searchQuery, filterRiskLevel, showOnlyFlagged, dealsData]);
 
   // Handle scrolling to a deal when switching from map view
   useEffect(() => {
