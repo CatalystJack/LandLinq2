@@ -14684,7 +14684,7 @@ RULES:
         loginUrl,
         logoUrl,
       });
-      const emailSent = await sendNotificationEmail({
+      const emailResult = await sendNotificationEmail({
         to: normalizedEmail,
         subject: `Your ${profile.companyName} Investment Company portal access`,
         type: "developer-team-invite",
@@ -14692,9 +14692,9 @@ RULES:
         transactional: true,
         text: `Hi ${firstName},\n\nYour ${profile.companyName} Investment Company portal is ready.\nEmail: ${normalizedEmail}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be required to set a new password after signing in.`,
         html: invitationHtml,
-      });
-      if (!emailSent) {
-        throw new Error("The invitation email could not be sent; no login was created");
+      }, true, { includeError: true });
+      if (!emailResult.success) {
+        throw new Error(`The invitation email could not be sent; no login was created: ${emailResult.error}`);
       }
     } catch (error) {
       await db.delete(users).where(eq(users.id, newUser.id)).catch(() => undefined);

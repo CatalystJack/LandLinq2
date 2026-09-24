@@ -110,14 +110,16 @@ async function sendGoDaddyEmail(
   senderEmail: string,
   senderName: string,
   htmlBody: string,
-): Promise<boolean> {
+): Promise<EmailSendResult> {
   const mailbox = getGoDaddyMailbox(senderEmail);
-  if (!mailbox) return false;
+  if (!mailbox) {
+    return { success: false, error: `No SMTP mailbox is configured for ${senderEmail}` };
+  }
 
   const password = process.env[mailbox.passwordEnv];
   if (!password) {
     console.error(`❌ [GODADDY-SMTP] Missing ${mailbox.passwordEnv}; refusing to use another transport for ${senderEmail}`);
-    return false;
+    return { success: false, error: `Missing ${mailbox.passwordEnv} for ${senderEmail}` };
   }
 
   const startTime = Date.now();
@@ -165,15 +167,24 @@ async function sendGoDaddyEmail(
 
     apiCallTracker.logCall('GoDaddy SMTP', 'send', true, Date.now() - startTime);
     console.log(`✅ [GODADDY-SMTP] Email sent from ${senderEmail} to ${notification.to} (${result.messageId})`);
-    return true;
+    return { success: true };
   } catch (error: any) {
+    const errorMessage = error?.message || String(error);
     apiCallTracker.logCall('GoDaddy SMTP', 'send', false, Date.now() - startTime, {
-      errorMessage: error?.message || String(error),
+      errorMessage,
     });
-    console.error(`❌ [GODADDY-SMTP] Failed to send from ${senderEmail} to ${notification.to}:`, error?.message || error);
-    return false;
+    console.error(`❌ [GODADDY-SMTP] Failed to send from ${senderEmail} to ${notification.to}:`, errorMessage);
+    return { success: false, error: errorMessage };
   }
 }
+
+export type EmailSendResult =
+  | { success: true }
+  | { success: false; error: string };
+
+type DetailedEmailSendOptions = {
+  includeError?: boolean;
+};
 
 export async function sendSystemEmail(
   to: string,
@@ -181,7 +192,7 @@ export async function sendSystemEmail(
   htmlBody: string,
   attachments: EmailNotification['attachments'] = [],
   fromMailbox = PUBLIC_TRANSACTIONAL_EMAIL,
-): Promise<boolean> {
+): Promise<EmailSendResult> {
   const startTime = Date.now();
   const mailbox = fromMailbox.trim().toLowerCase();
    const cleanSubject = stripLegacyCatalystBranding(stripCompanyPhone(stripEmailEmojis(subject)));
@@ -226,19 +237,36 @@ export async function sendSystemEmail(
     }
     apiCallTracker.logCall('Other', 'Microsoft Graph sendMail', true, Date.now() - startTime);
     console.log(`✅ [GRAPH-SYSTEM] Email sent from ${mailbox} to ${to}`);
-    return true;
+    return { success: true };
   } catch (error: any) {
+    const errorMessage = error?.message || String(error);
     apiCallTracker.logCall('Other', 'Microsoft Graph sendMail', false, Date.now() - startTime, {
-      errorMessage: error?.message || String(error),
+      errorMessage,
     });
-    console.error(`❌ [GRAPH-SYSTEM] Failed to send from ${mailbox} to ${to}:`, error?.message || error);
-    return false;
+    console.error(`❌ [GRAPH-SYSTEM] Failed to send from ${mailbox} to ${to}:`, errorMessage);
+    return { success: false, error: errorMessage };
   }
 }
 
 // Email sending function
-export async function sendNotificationEmail(notification: EmailNotification, disableClickTracking: boolean = true): Promise<boolean> {
+export function sendNotificationEmail(
+  notification: EmailNotification,
+  disableClickTracking?: boolean,
+): Promise<boolean>;
+export function sendNotificationEmail(
+  notification: EmailNotification,
+  disableClickTracking: boolean,
+  options: DetailedEmailSendOptions & { includeError: true },
+): Promise<EmailSendResult>;
+export async function sendNotificationEmail(
+  notification: EmailNotification,
+  disableClickTracking: boolean = true,
+  options: DetailedEmailSendOptions = {},
+): Promise<boolean | EmailSendResult> {
   const startTime = Date.now();
+  const includeError = options.includeError === true;
+  const failure = (error: string): false | EmailSendResult =>
+    includeError ? { success: false, error } : false;
   notification = {
     ...notification,
     subject: stripLegacyCatalystBranding(stripCompanyPhone(stripEmailEmojis(notification.subject))),
@@ -265,7 +293,7 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
           console.log('🚫 [EMAIL-BLOCKED] Master Messaging is OFF - email not sent');
           console.log(`   To: ${notification.to}`);
           console.log(`   Subject: ${notification.subject}`);
-          return false;
+          return failure('Email sending is disabled by the master messaging setting');
         }
       }
     } catch (toggleError) {
@@ -287,33 +315,36 @@ export async function sendNotificationEmail(notification: EmailNotification, dis
     if (isGoDaddySender) {
       if (!notification.subject || !cleanGraphHtml) {
         console.error(`❌ [GODADDY-SMTP] Message has no rendered subject/body; refusing to send from ${senderEmail}`);
-        return false;
+        return failure('The email has no rendered subject or body');
       }
-      return await sendGoDaddyEmail(
+      const smtpResult = await sendGoDaddyEmail(
         notification,
         senderEmail,
         stripLegacyCatalystBranding(senderName),
         cleanGraphHtml,
       );
+      return includeError ? smtpResult : smtpResult.success;
     }
 
     if (notification.subject && cleanGraphHtml) {
       console.log(`📧 [GRAPH-SYSTEM] Attempting platform email to ${notification.to}`);
-      const graphSent = await sendSystemEmail(
+      const graphResult = await sendSystemEmail(
         notification.to,
         notification.subject,
         cleanGraphHtml,
         notification.attachments,
         senderEmail,
       );
-      if (graphSent) return true;
+      if (graphResult.success) return includeError ? graphResult : true;
+      return includeError ? graphResult : false;
     }
 
     console.error(`❌ [EMAIL] No configured transport delivered message from ${senderEmail} to ${notification.to}`);
-    return false;
+    return failure('No configured transport delivered the message');
   } catch (error: any) {
-    console.error('❌ [EMAIL] Failed to send notification:', error?.message || error);
-    return false;
+    const errorMessage = error?.message || String(error);
+    console.error('❌ [EMAIL] Failed to send notification:', errorMessage);
+    return failure(errorMessage);
   }
 }
 
