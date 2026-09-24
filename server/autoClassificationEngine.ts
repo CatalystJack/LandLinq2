@@ -61,6 +61,8 @@ export class AutoClassificationEngine {
   static async classifyDeal(deal: Deal, options?: {
     forceHelloData?: boolean; // If true, always populate HelloData results even for early-rejection paths
     bypassMSARejection?: boolean; // If true, don't reject for being outside MSA (for manual re-runs)
+    companyMinVintage?: number | null;
+    companyMinUnits?: number | null;
     preloadedHelloData?: {  // Pre-fetched HelloData to avoid duplicate API calls
       success: boolean;
       qualifyingCount: number;
@@ -367,9 +369,18 @@ export class AutoClassificationEngine {
         // Dec 17, 2025: Pass coordinates if available to avoid geocoding issues
         // Jan 12, 2026: Pass product type for custom filter criteria (BTR/Lot/Townhome/SF vs Conventional/AA)
         // Note: primaryProductType is now hoisted and defined before this if-else block
-        const helloDataOptions: { latitude?: number; longitude?: number; productType?: string; radiusMiles?: number } = {
+        const helloDataOptions: {
+          latitude?: number;
+          longitude?: number;
+          productType?: string;
+          radiusMiles?: number;
+          companyMinVintage?: number | null;
+          companyMinUnits?: number | null;
+        } = {
           productType: primaryProductType,
           radiusMiles: 3,
+          companyMinVintage: options?.companyMinVintage,
+          companyMinUnits: options?.companyMinUnits,
         };
         
         // Jan 13, 2026: Use stored coordinates to avoid geocoding "Coordinates: X, Y" address strings

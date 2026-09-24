@@ -9367,10 +9367,28 @@ Provide your analysis in this exact JSON format:
         console.error(`❌ [RERUN-ANALYSIS] Deal ${id} not found in database`);
         return res.status(404).json({ message: "Deal not found" });
       }
+      let rerunDeveloperProfileId: string | undefined;
+      let rerunProfileCriteria: {
+        compSearchRadiusMiles: string | null;
+        compMinVintageYear: number | null;
+        compMinUnits: number | null;
+      } | undefined;
       if (isDeveloperRole) {
         const developerProfileId = getDeveloperProfileId(req, res);
         if (!developerProfileId) return;
         if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+        const { developerProfiles } = await import("@shared/schema");
+        const [profileCriteria] = await db.select({
+          compSearchRadiusMiles: developerProfiles.compSearchRadiusMiles,
+          compMinVintageYear: developerProfiles.compMinVintageYear,
+          compMinUnits: developerProfiles.compMinUnits,
+        }).from(developerProfiles).where(and(
+          eq(developerProfiles.id, developerProfileId),
+          eq(developerProfiles.isActive, true),
+        )).limit(1);
+        if (!profileCriteria) return res.status(404).json({ message: "Investment Company profile not found" });
+        rerunDeveloperProfileId = developerProfileId;
+        rerunProfileCriteria = profileCriteria;
         const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
         if (!visibleDealIds.has(id)) {
           return res.status(404).json({ message: "Deal not found" });
@@ -9413,10 +9431,19 @@ Provide your analysis in this exact JSON format:
           longitude?: number;
           radiusMiles: number;
           productType?: string;
+          sourceDeveloperProfileId?: string;
+          companyMinVintage?: number;
+          companyMinUnits?: number;
           minimumWarehouseFetchedAt?: Date | null;
         } = {
-          radiusMiles: 3,
+          radiusMiles: Number.isFinite(Number(rerunProfileCriteria?.compSearchRadiusMiles)) &&
+            Number(rerunProfileCriteria?.compSearchRadiusMiles) > 0
+            ? Number(rerunProfileCriteria?.compSearchRadiusMiles)
+            : 3,
           productType: deal.productTypes?.[0] || (deal as any).dealType || undefined,
+          sourceDeveloperProfileId: rerunDeveloperProfileId,
+          companyMinVintage: rerunProfileCriteria?.compMinVintageYear ?? undefined,
+          companyMinUnits: rerunProfileCriteria?.compMinUnits ?? undefined,
           minimumWarehouseFetchedAt: deal.comparablesFetchedAt || null,
         };
         if (deal.latitude && deal.longitude) {
@@ -9467,7 +9494,9 @@ Provide your analysis in this exact JSON format:
         comparableResult = await UnifiedDealPipeline.runComparableSearchAndClassify(deal, {
           forceHelloData: true,
           bypassMSARejection: true, // Don't reject for MSA - add note instead
-          preloadedHelloData: preloadedHelloData
+          preloadedHelloData: preloadedHelloData,
+          companyMinVintage: rerunProfileCriteria?.compMinVintageYear,
+          companyMinUnits: rerunProfileCriteria?.compMinUnits,
         });
         console.log(`\n📊 [RERUN-ANALYSIS] CLASSIFICATION RESULT:`);
         console.log(`   New Classification: ${comparableResult.classification}`);
@@ -15199,6 +15228,25 @@ RULES:
           throw new Error(field === 'compSearchRadiusMiles' ? 'Comparable search radius must be greater than zero' : `${field} must be a non-negative number`);
         }
         updates[field] = String(value);
+      }
+
+      for (const field of ['compMinVintageYear', 'compMinUnits']) {
+        if (body[field] === undefined) continue;
+        if (body[field] === null || (typeof body[field] === 'string' && body[field].trim() === '')) {
+          updates[field] = null;
+          continue;
+        }
+        if (typeof body[field] !== 'number' && typeof body[field] !== 'string') {
+          throw new Error(`${field} must be a non-negative integer`);
+        }
+        const value = Number(body[field]);
+        if (!Number.isInteger(value) || value < 0) {
+          throw new Error(`${field} must be a non-negative integer`);
+        }
+        if (field === 'compMinVintageYear' && (value < 1900 || value > 2100)) {
+          throw new Error('Minimum comp vintage year must be between 1900 and 2100');
+        }
+        updates[field] = value;
       }
 
       const productTypes = isGeneralSales || isIndustrial ? [] : body.productTypes.map((raw: any, index: number) => {
@@ -21284,16 +21332,22 @@ RULES:
       const { hellodataService } = await import('./hellodataService');
       const developerProfileId = (req.user as any)?.developerProfileId as string | undefined;
       let searchRadius = 3;
+      let companyMinVintage: number | undefined;
+      let companyMinUnits: number | undefined;
       if (developerProfileId) {
         const { developerProfiles } = await import('@shared/schema');
         const [profile] = await db.select({
           compSearchRadiusMiles: developerProfiles.compSearchRadiusMiles,
+          compMinVintageYear: developerProfiles.compMinVintageYear,
+          compMinUnits: developerProfiles.compMinUnits,
         }).from(developerProfiles).where(and(
           eq(developerProfiles.id, developerProfileId),
           eq(developerProfiles.isActive, true),
         )).limit(1);
         const configuredRadius = Number(profile?.compSearchRadiusMiles);
         if (Number.isFinite(configuredRadius) && configuredRadius > 0) searchRadius = configuredRadius;
+        companyMinVintage = profile?.compMinVintageYear ?? undefined;
+        companyMinUnits = profile?.compMinUnits ?? undefined;
       }
       // Dec 17, 2025: Pass coordinates to skip geocoding
       // Jan 21, 2026: Also pass productType for dynamic filter criteria
@@ -21305,6 +21359,8 @@ RULES:
           productType: (deal as any).productType,
           radiusMiles: searchRadius,
           sourceDeveloperProfileId: developerProfileId,
+          companyMinVintage,
+          companyMinUnits,
         }
       );
 

@@ -398,7 +398,10 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
   // HelloData's qualifying-comparable method checks its warehouse before making a live request.
   const comps = await new HelloDataService().searchQualifyingComparables(deal.address, {
     latitude: location.latitude || undefined, longitude: location.longitude || undefined,
-    radiusMiles: Number((profile as DeveloperProfile).compSearchRadiusMiles || 3), sourceDeveloperProfileId: profile.id,
+    radiusMiles: Number((profile as DeveloperProfile).compSearchRadiusMiles || 3),
+    sourceDeveloperProfileId: profile.id,
+    companyMinVintage: (profile as DeveloperProfile).compMinVintageYear,
+    companyMinUnits: (profile as DeveloperProfile).compMinUnits,
   });
   await db.update(deals).set({
     topRentPSF: comps.topRentPSF === undefined ? null : String(comps.topRentPSF), avgRentPSF: comps.avgRentPSF === undefined ? null : String(comps.avgRentPSF),

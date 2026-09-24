@@ -64,6 +64,8 @@ type Profile = {
   targetCounties: string[];
   rentMetric: "psf" | "per_unit";
   compSearchRadiusMiles: string;
+  compMinVintageYear: string;
+  compMinUnits: string;
   productTypes: ProductType[];
   countyMarketLabels: Record<string, string>;
   qctOverridesRentMinimum: boolean;
@@ -74,6 +76,11 @@ type Profile = {
   crmContactCounties: string[];
   crmContactProductTypes: string[];
   crmContactSourceTags: string[];
+};
+
+type ProfileUpdate = Omit<Partial<Profile>, "compMinVintageYear" | "compMinUnits"> & {
+  compMinVintageYear?: string | null;
+  compMinUnits?: string | null;
 };
 
 type ContactFilterOptions = {
@@ -253,25 +260,35 @@ function NumberField({
   onChange,
   placeholder,
   required,
+  step = 0.01,
+  min = 0,
+  max,
+  helperText,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   required?: boolean;
+  step?: number;
+  min?: number;
+  max?: number;
+  helperText?: string;
 }) {
   return (
     <div>
       <Label>{label} {required && <span className="text-red-500">*</span>}</Label>
       <Input
         type="number"
-        min="0"
-        step="0.01"
+        min={min}
+        max={max}
+        step={step}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         className="mt-2 bg-white"
       />
+      {helperText && <p className="mt-1 text-xs text-slate-500">{helperText}</p>}
     </div>
   );
 }
@@ -454,6 +471,8 @@ export default function DeveloperCriteriaSettings() {
         crmContactProductTypes: profile.crmContactProductTypes || [],
         crmContactSourceTags: profile.crmContactSourceTags || [],
         compSearchRadiusMiles: profile.compSearchRadiusMiles || "3",
+        compMinVintageYear: profile.compMinVintageYear == null ? "" : String(profile.compMinVintageYear),
+        compMinUnits: profile.compMinUnits == null ? "" : String(profile.compMinUnits),
          emailUnsubscribeEnabled: Boolean(profile.emailUnsubscribeEnabled),
       });
       setAssumptionsOpenIndex(null);
@@ -461,7 +480,7 @@ export default function DeveloperCriteriaSettings() {
   }, [profileQuery.data]);
 
   const saveMutation = useMutation({
-    mutationFn: (payload: Partial<Profile>) =>
+    mutationFn: (payload: ProfileUpdate) =>
       jsonRequest("/api/developer-profile/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -469,7 +488,11 @@ export default function DeveloperCriteriaSettings() {
       }),
     onSuccess: (data) => {
       queryClient.setQueryData(["/api/developer-profile/me"], data);
-      setForm(data.profile);
+      setForm({
+        ...data.profile,
+        compMinVintageYear: data.profile.compMinVintageYear == null ? "" : String(data.profile.compMinVintageYear),
+        compMinUnits: data.profile.compMinUnits == null ? "" : String(data.profile.compMinUnits),
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({ title: "Settings saved", description: "Your company criteria are up to date." });
     },
@@ -630,6 +653,17 @@ export default function DeveloperCriteriaSettings() {
       toast({ title: "Comparable search radius must be greater than zero", variant: "destructive" });
       return;
     }
+    if (form.compMinVintageYear !== "") {
+      const year = Number(form.compMinVintageYear);
+      if (!Number.isInteger(year) || year < 1900 || year > 2100) {
+        toast({ title: "Minimum comp vintage year must be a year between 1900 and 2100", variant: "destructive" });
+        return;
+      }
+    }
+    if (form.compMinUnits !== "" && (!Number.isInteger(Number(form.compMinUnits)) || Number(form.compMinUnits) < 0)) {
+      toast({ title: "Minimum comp units must be a non-negative whole number", variant: "destructive" });
+      return;
+    }
     for (let index = 0; index < form.productTypes.length; index++) {
       const productType = form.productTypes[index];
       if (!productType.name.trim()) {
@@ -655,6 +689,8 @@ export default function DeveloperCriteriaSettings() {
       targetCounties: form.targetCounties,
       rentMetric: form.rentMetric,
       compSearchRadiusMiles: form.compSearchRadiusMiles,
+      compMinVintageYear: form.compMinVintageYear === "" ? null : form.compMinVintageYear,
+      compMinUnits: form.compMinUnits === "" ? null : form.compMinUnits,
       productTypes: form.productTypes.map(({ id: _id, ...productType }) => ({
         ...productType,
         name: productType.name.trim(),
@@ -1005,13 +1041,31 @@ export default function DeveloperCriteriaSettings() {
                 </div>
               </div>
 
-              <div className="grid gap-5 md:grid-cols-2">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 <NumberField
                   label="Comparable search radius (miles)"
                   value={form.compSearchRadiusMiles}
                   onChange={(value) => update("compSearchRadiusMiles", value)}
                   placeholder="3"
                   required
+                />
+                <NumberField
+                  label="Minimum comp vintage year"
+                  value={form.compMinVintageYear}
+                  onChange={(value) => update("compMinVintageYear", value)}
+                  placeholder="Use product-type default"
+                  step={1}
+                  min={1900}
+                  max={2100}
+                  helperText="Leave blank to use the platform default for that product type."
+                />
+                <NumberField
+                  label="Minimum comp units"
+                  value={form.compMinUnits}
+                  onChange={(value) => update("compMinUnits", value)}
+                  placeholder="Use product-type default"
+                  step={1}
+                  helperText="Leave blank to use the platform default for that product type."
                 />
               </div>
 

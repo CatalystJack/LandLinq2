@@ -2829,6 +2829,8 @@ export class UnifiedDealPipeline {
   static async runComparableSearchAndClassify(deal: any, options?: {
     forceHelloData?: boolean; // If true, always populate HelloData results even for early-rejection paths
     bypassMSARejection?: boolean; // If true, don't reject for being outside MSA (for manual re-runs)
+    companyMinVintage?: number | null;
+    companyMinUnits?: number | null;
     preloadedHelloData?: {  // Pre-fetched HelloData to avoid duplicate API calls
       success: boolean;
       qualifyingCount: number;

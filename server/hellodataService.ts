@@ -97,7 +97,11 @@ interface ComparableFilterCriteria {
  * BTR, Lot Development, Townhome, Single Family: 2015+, 25+ units, $2,000+ gross rent
  * Conventional Apartments, Active Adult: 2020+, 150+ units, $1.75+/sqft (original criteria)
  */
-function getFilterCriteria(productType?: string): ComparableFilterCriteria {
+function getFilterCriteria(
+  productType?: string,
+  companyMinVintage?: number | null,
+  companyMinUnits?: number | null,
+): ComparableFilterCriteria {
   const normalizedType = (productType || '').toLowerCase().trim();
   
   // BTR, Lot Development, Townhome, Single Family get relaxed criteria with gross rent filter
@@ -105,24 +109,35 @@ function getFilterCriteria(productType?: string): ComparableFilterCriteria {
   
   const isRelaxedType = relaxedCriteriaTypes.some(t => normalizedType.includes(t));
   
-  if (isRelaxedType) {
-    console.log(`📊 [HELLODATA-FILTER] Using BTR/Lot/Townhome/SF criteria for "${productType}": 2015+, 25+ units, $2,000+ gross rent`);
-    return {
+  const defaultCriteria: ComparableFilterCriteria = isRelaxedType
+    ? {
       minVintage: 2015,
       minUnits: 25,
-      minGrossRent: 2000,  // $2,000 minimum gross rent per unit
-      minRentPSF: undefined // Don't use PSF for these types
+      minGrossRent: 2000,
+      minRentPSF: undefined,
+    }
+    : {
+      minVintage: 2020,
+      minUnits: 150,
+      minGrossRent: undefined,
+      minRentPSF: 1.75,
     };
-  }
-  
-  // Default: Conventional Apartments, Active Adult - original strict criteria
-  console.log(`📊 [HELLODATA-FILTER] Using standard criteria for "${productType || 'default'}": 2020+, 150+ units, $1.75+/sqft`);
-  return {
-    minVintage: 2020,
-    minUnits: 150,
-    minGrossRent: undefined,
-    minRentPSF: 1.75  // $1.75/sqft minimum
+
+  const criteria = {
+    ...defaultCriteria,
+    minVintage: companyMinVintage ?? defaultCriteria.minVintage,
+    minUnits: companyMinUnits ?? defaultCriteria.minUnits,
   };
+
+  if (isRelaxedType) {
+    console.log(`📊 [HELLODATA-FILTER] Using BTR/Lot/Townhome/SF criteria for "${productType}": 2015+, 25+ units, $2,000+ gross rent`);
+  } else {
+    console.log(`📊 [HELLODATA-FILTER] Using standard criteria for "${productType || 'default'}": 2020+, 150+ units, $1.75+/sqft`);
+  }
+  if (companyMinVintage != null || companyMinUnits != null) {
+    console.log(`📊 [HELLODATA-FILTER] Company overrides applied: ${criteria.minVintage}+ vintage, ${criteria.minUnits}+ units`);
+  }
+  return criteria;
 }
 
 /**
@@ -570,10 +585,13 @@ interface HelloDataProperty {
   stories?: number;
 }
 
-const COMP_WAREHOUSE_CACHE_KIND = 'searchQualifyingComparables' as const;
+// Cached results are already filtered; version and persist the cutoffs so one
+// company's thresholds cannot be reused for a different company's search.
+const COMP_WAREHOUSE_CACHE_KIND = 'searchQualifyingComparables:criteria-v2' as const;
 
 interface CompWarehouseEnvelope {
   cacheKind: typeof COMP_WAREHOUSE_CACHE_KIND;
+  criteria: Pick<ComparableFilterCriteria, 'minVintage' | 'minUnits'>;
   result: any;
 }
 
@@ -595,6 +613,7 @@ export async function checkCompWarehouse(
   radiusMiles: number,
   productType?: string,
   minimumFetchedAt?: Date | null,
+  criteria?: Pick<ComparableFilterCriteria, 'minVintage' | 'minUnits'>,
 ): Promise<any | null> {
   if (![latitude, longitude, radiusMiles].every(Number.isFinite) || radiusMiles <= 0) {
     return null;
@@ -646,7 +665,13 @@ export async function checkCompWarehouse(
 
       // Only qualifying-comparable envelopes are valid. This deliberately
       // excludes entries written by the removed searchComparables workflow.
-      if (!payload || payload.cacheKind !== COMP_WAREHOUSE_CACHE_KIND) continue;
+      if (
+        !payload ||
+        payload.cacheKind !== COMP_WAREHOUSE_CACHE_KIND ||
+        !criteria ||
+        payload.criteria?.minVintage !== criteria.minVintage ||
+        payload.criteria?.minUnits !== criteria.minUnits
+      ) continue;
       console.log(
         `📦 [HELLODATA-WAREHOUSE] HIT ${COMP_WAREHOUSE_CACHE_KIND}: cached center ${centerDistance.toFixed(2)} miles away, radius ${cachedRadius} miles${minimumFetchedAt ? `, newer than ${minimumFetchedAt.toISOString()}` : ''}`,
       );
@@ -685,8 +710,10 @@ async function storeCompWarehouse(
   productType: string | undefined,
   result: any,
   sourceDeveloperProfileId?: string,
+  criteria?: Pick<ComparableFilterCriteria, 'minVintage' | 'minUnits'>,
 ): Promise<void> {
-  const envelope: CompWarehouseEnvelope = { cacheKind: COMP_WAREHOUSE_CACHE_KIND, result };
+  if (!criteria) return;
+  const envelope: CompWarehouseEnvelope = { cacheKind: COMP_WAREHOUSE_CACHE_KIND, criteria, result };
   const avgRentPsf = Number(result.avgRentPSF ?? result.averagePricePerSqFt);
   const avgRentPerUnit = Number(result.avgRentPerUnit);
 
@@ -1291,6 +1318,8 @@ export class HelloDataService {
     productType?: string;  // Jan 12, 2026: Product type for custom filter criteria
     radiusMiles?: number;
     sourceDeveloperProfileId?: string;
+    companyMinVintage?: number | null;
+    companyMinUnits?: number | null;
     forceFresh?: boolean;
     minimumWarehouseFetchedAt?: Date | null;
   }): Promise<{
@@ -1327,6 +1356,11 @@ export class HelloDataService {
         console.error(`❌ [HELLODATA] API key not configured!`);
         throw new Error('HelloData API key not configured');
       }
+      const filterCriteria = getFilterCriteria(
+        options?.productType,
+        options?.companyMinVintage,
+        options?.companyMinUnits,
+      );
 
       // Dec 17, 2025: If coordinates are provided directly, skip geocoding entirely
       let geocoded: {
@@ -1461,6 +1495,7 @@ export class HelloDataService {
           searchRadius,
           options?.productType,
           options?.minimumWarehouseFetchedAt,
+          filterCriteria,
         );
         if (warehouseResult) return warehouseResult;
       } else {
@@ -1499,7 +1534,6 @@ export class HelloDataService {
           };
         }
         // Get the correct criteria for this product type
-        const filterCriteria = getFilterCriteria(options?.productType);
         const criteriaText = filterCriteria.minGrossRent 
           ? `${filterCriteria.minVintage}+ vintage, ${filterCriteria.minUnits}+ units, $${filterCriteria.minGrossRent.toLocaleString()}+ gross rent`
           : `${filterCriteria.minVintage}+ vintage, ${filterCriteria.minUnits}+ units, $${filterCriteria.minRentPSF?.toFixed(2)}/sqft+`;
@@ -1556,8 +1590,6 @@ export class HelloDataService {
       }
 
       // Jan 12, 2026: Get product-type-specific filter criteria
-      const filterCriteria = getFilterCriteria(options?.productType);
-      
       // Step 3: SMART FILTERING - First filter by vintage and units (no API calls needed)
       console.log(`\n🎯 [HELLODATA] Step 3: Pre-filtering by vintage >= ${filterCriteria.minVintage} and units >= ${filterCriteria.minUnits}`);
       
@@ -1946,6 +1978,7 @@ export class HelloDataService {
           options?.productType,
           result,
           options?.sourceDeveloperProfileId,
+          filterCriteria,
         );
         return result;
       }
@@ -2453,6 +2486,7 @@ export class HelloDataService {
         options?.productType,
         result,
         options?.sourceDeveloperProfileId,
+        filterCriteria,
       );
       return result;
 

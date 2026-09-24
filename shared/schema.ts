@@ -59,6 +59,8 @@ export const developerProfiles = pgTable("developer_profiles", {
   minRentPsf: decimal("min_rent_psf"),
   minRentPerUnit: decimal("min_rent_per_unit"),
   compSearchRadiusMiles: decimal("comp_search_radius_miles").default("3"),
+  compMinVintageYear: integer("comp_min_vintage_year"),
+  compMinUnits: integer("comp_min_units"),
 
   // Legacy flat defaults retained for older integrations; classification reads
   // the product-type criteria below.
