@@ -9388,6 +9388,8 @@ Provide your analysis in this exact JSON format:
         compMinVintageYear: number | null;
         compMinUnits: number | null;
         rentMetric: string;
+        profileType: string;
+        assetClass: string;
       } | undefined;
       let rerunComparableCriteria: any = {};
       if (isDeveloperRole) {
@@ -9396,12 +9398,12 @@ Provide your analysis in this exact JSON format:
         if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
         const { developerProfiles } = await import("@shared/schema");
         const [profileCriteria] = await db.select({
+          profileType: developerProfiles.profileType,
+          assetClass: developerProfiles.assetClass,
           compSearchRadiusMiles: developerProfiles.compSearchRadiusMiles,
           compMinVintageYear: developerProfiles.compMinVintageYear,
           compMinUnits: developerProfiles.compMinUnits,
           rentMetric: developerProfiles.rentMetric,
-         compMinVintageYear: developerProfiles.compMinVintageYear,
-         compMinUnits: developerProfiles.compMinUnits,
         }).from(developerProfiles).where(and(
           eq(developerProfiles.id, developerProfileId),
           eq(developerProfiles.isActive, true),
@@ -9409,14 +9411,12 @@ Provide your analysis in this exact JSON format:
         if (!profileCriteria) return res.status(404).json({ message: "Investment Company profile not found" });
         rerunDeveloperProfileId = developerProfileId;
         rerunProfileCriteria = profileCriteria;
-        const { resolveDeveloperComparableCriteria } = await import("./developerClassificationService");
-        const rerunProductTypes = await db.select().from(developerProductTypes)
-          .where(and(eq(developerProductTypes.developerProfileId, developerProfileId), eq(developerProductTypes.isActive, true)));
-        rerunComparableCriteria = resolveDeveloperComparableCriteria(
-          deal,
-          { ...profileCriteria, profileType: "real_estate", assetClass: "multifamily" } as any,
-          rerunProductTypes,
-        );
+        if (profileCriteria.profileType === "real_estate" && profileCriteria.assetClass === "multifamily") {
+          const { resolveDeveloperComparableCriteria } = await import("./developerClassificationService");
+          const rerunProductTypes = await db.select().from(developerProductTypes)
+            .where(and(eq(developerProductTypes.developerProfileId, developerProfileId), eq(developerProductTypes.isActive, true)));
+          rerunComparableCriteria = resolveDeveloperComparableCriteria(deal, profileCriteria as any, rerunProductTypes);
+        }
         const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
         if (!visibleDealIds.has(id)) {
           return res.status(404).json({ message: "Deal not found" });
@@ -15216,7 +15216,9 @@ RULES:
         assetClass: developerProfiles.assetClass,
         industrialCriteria: developerProfiles.industrialCriteria,
         rentMetric: developerProfiles.rentMetric,
-         targetStates: developerProfiles.targetStates,
+        targetStates: developerProfiles.targetStates,
+        compMinVintageYear: developerProfiles.compMinVintageYear,
+        compMinUnits: developerProfiles.compMinUnits,
       }).from(developerProfiles).where(and(
         eq(developerProfiles.id, developerProfileId),
         eq(developerProfiles.isActive, true),
@@ -21412,6 +21414,8 @@ RULES:
       if (developerProfileId) {
         const { developerProfiles } = await import('@shared/schema');
         const [profile] = await db.select({
+          profileType: developerProfiles.profileType,
+          assetClass: developerProfiles.assetClass,
           compSearchRadiusMiles: developerProfiles.compSearchRadiusMiles,
           compMinVintageYear: developerProfiles.compMinVintageYear,
           compMinUnits: developerProfiles.compMinUnits,
@@ -21424,11 +21428,13 @@ RULES:
         if (Number.isFinite(configuredRadius) && configuredRadius > 0) searchRadius = configuredRadius;
         companyMinVintage = profile?.compMinVintageYear ?? undefined;
         companyMinUnits = profile?.compMinUnits ?? undefined;
-        const { developerProductTypes } = await import("@shared/schema");
-        const productTypes = await db.select().from(developerProductTypes)
-          .where(and(eq(developerProductTypes.developerProfileId, developerProfileId), eq(developerProductTypes.isActive, true)));
-        const { resolveDeveloperComparableCriteria } = await import("./developerClassificationService");
-        comparableCriteria = resolveDeveloperComparableCriteria(deal, profile as any, productTypes);
+        if (profile?.profileType === "real_estate" && profile.assetClass === "multifamily") {
+          const { developerProductTypes } = await import("@shared/schema");
+          const productTypes = await db.select().from(developerProductTypes)
+            .where(and(eq(developerProductTypes.developerProfileId, developerProfileId), eq(developerProductTypes.isActive, true)));
+          const { resolveDeveloperComparableCriteria } = await import("./developerClassificationService");
+          comparableCriteria = resolveDeveloperComparableCriteria(deal, profile as any, productTypes);
+        }
       }
       // Dec 17, 2025: Pass coordinates to skip geocoding
       // Jan 21, 2026: Also pass productType for dynamic filter criteria
