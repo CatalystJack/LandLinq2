@@ -112,6 +112,8 @@ import {
   getRecentBuildingPermits,
 } from "./censusDataService";
 
+const LANDLINQ_PUBLIC_ORIGIN = "https://landlinq.ai";
+
 const DEFAULT_PIPELINE_STAGES = [
   { name: "New Lead", sortOrder: 1 },
   { name: "Contacted", sortOrder: 2 },
@@ -3362,12 +3364,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       });
 
       try {
-        const baseUrl = (
-          process.env.BASE_URL ||
-          (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "") ||
-          "https://landlinq.ai"
-        ).replace(/\/$/, "");
-        const loginUrl = `${baseUrl}/login`;
+        const loginUrl = `${LANDLINQ_PUBLIC_ORIGIN}/login`;
         const safeFirstName = escapeEmailHtml(String(firstName));
         const safeEmail = escapeEmailHtml(normalizedEmail);
         const safeTemporaryPassword = escapeEmailHtml(temporaryPassword);
@@ -12645,8 +12642,7 @@ RULES:
 
       // Send approval email with login link
       try {
-        const baseUrl = process.env.BASE_URL || 'https://landlinq.ai';
-        const loginUrl = `${baseUrl}/broker-portal`;
+        const loginUrl = `${LANDLINQ_PUBLIC_ORIGIN}/broker-portal`;
         const html = `
           <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;color:#1e293b">
             <div style="margin-bottom:28px">
@@ -14742,11 +14738,7 @@ RULES:
     } as any);
 
     try {
-      const baseUrl = (
-        process.env.BASE_URL ||
-        (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "") ||
-        "https://landlinq.ai"
-      ).replace(/\/$/, "");
+      const baseUrl = LANDLINQ_PUBLIC_ORIGIN;
       const loginUrl = `${baseUrl}/developer/${encodeURIComponent(profile.slug)}/login`;
       const logoUrl = `${baseUrl}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
       const invitationHtml = buildDeveloperInvitationEmail({
