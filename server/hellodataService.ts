@@ -9,6 +9,13 @@ import { apiSafetyGuards } from './apiSafetyGuards.js';
 import { db } from './db.js';
 import { helloDataPropertyCache, helloDataRawResponses } from '@shared/schema';
 import { and, desc, eq, gt, sql } from 'drizzle-orm';
+import {
+  countCoordinateComparablesWithinRadius,
+  getComparableCoordinates,
+  haversineDistanceMiles,
+  resolveComparableWithinRadius,
+  validateCachedComparablesWithinRadius,
+} from './hellodataRadius.js';
 
 const HELLODATA_PROPERTY_CACHE_TTL_MS = 21 * 24 * 60 * 60 * 1000;
 
@@ -611,71 +618,6 @@ interface CompWarehouseEnvelope {
   result: any;
 }
 
-function haversineDistanceMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const earthRadiusMiles = 3959;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) *
-      Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return earthRadiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function getComparableCoordinates(comparable: any): { latitude: number; longitude: number } | null {
-  const latitudeValue = comparable?.latitude ?? comparable?.lat;
-  const longitudeValue = comparable?.longitude ?? comparable?.lng ?? comparable?.lon;
-  if (
-    latitudeValue === undefined ||
-    latitudeValue === null ||
-    String(latitudeValue).trim() === "" ||
-    longitudeValue === undefined ||
-    longitudeValue === null ||
-    String(longitudeValue).trim() === ""
-  ) return null;
-
-  const latitude = Number(latitudeValue);
-  const longitude = Number(longitudeValue);
-  if (
-    !Number.isFinite(latitude) ||
-    !Number.isFinite(longitude) ||
-    latitude < -90 ||
-    latitude > 90 ||
-    longitude < -180 ||
-    longitude > 180
-  ) return null;
-  return { latitude, longitude };
-}
-
-function getSubjectDistanceWithinRadius(
-  comparable: any,
-  subjectLatitude: number,
-  subjectLongitude: number,
-  radiusMiles: number,
-): number | null {
-  const coordinates = getComparableCoordinates(comparable);
-  if (!coordinates) return null;
-  const distance = haversineDistanceMiles(
-    subjectLatitude,
-    subjectLongitude,
-    coordinates.latitude,
-    coordinates.longitude,
-  );
-  return distance <= radiusMiles ? distance : null;
-}
-
-function countCoordinateComparablesWithinRadius(
-  comparables: any[],
-  subjectLatitude: number,
-  subjectLongitude: number,
-  radiusMiles: number,
-): number {
-  return comparables.filter((comparable) =>
-    getSubjectDistanceWithinRadius(comparable, subjectLatitude, subjectLongitude, radiusMiles) !== null,
-  ).length;
-}
-
 export async function checkCompWarehouse(
   latitude: number,
   longitude: number,
@@ -750,20 +692,15 @@ export async function checkCompWarehouse(
       ) continue;
 
       const cachedComparables = payload.result?.comparables;
-      if (!Array.isArray(cachedComparables)) continue;
-      const validatedComparables: any[] = [];
-      let cacheWithinRadius = true;
-      for (const comparable of cachedComparables) {
-        const distance = getSubjectDistanceWithinRadius(comparable, latitude, longitude, radiusMiles);
-        if (distance === null) {
-          cacheWithinRadius = false;
-          break;
-        }
-        validatedComparables.push({ ...comparable, distance });
-      }
+      const validatedComparables = validateCachedComparablesWithinRadius(
+        cachedComparables,
+        latitude,
+        longitude,
+        radiusMiles,
+      );
       // Reject the entire cache row rather than partially filtering it: its
       // qualifying count, summaries, and rent metrics describe the full list.
-      if (!cacheWithinRadius) continue;
+      if (!validatedComparables) continue;
 
       console.log(
         `📦 [HELLODATA-WAREHOUSE] HIT ${COMP_WAREHOUSE_CACHE_KIND}: cached center ${centerDistance.toFixed(2)} miles away, radius ${cachedRadius} miles${minimumFetchedAt ? `, newer than ${minimumFetchedAt.toISOString()}` : ''}`,
@@ -1718,9 +1655,9 @@ export class HelloDataService {
         const yearBuilt = parseInt(comp.year_built || comp.vintage || comp.yearBuilt || comp.year || 0);
         // Try multiple possible field names for units (robust parsing)
         const units = parseInt(comp.number_units || comp.units || comp.unitCount || comp.unit_count || comp.num_units || 0);
-        const distance = Number(comp.distance_miles ?? comp.distance ?? comp.distanceMiles);
-        const withinRadius = !Number.isFinite(distance) || distance <= searchRadius;
-        return withinRadius && yearBuilt >= filterCriteria.minVintage && units >= filterCriteria.minUnits;
+        // Provider distance is informational only. The requested radius is
+        // enforced later from the current subject and comparable coordinates.
+        return yearBuilt >= filterCriteria.minVintage && units >= filterCriteria.minUnits;
       });
 
       console.log(`\n   Total comparables: ${rawComparables.length}`);
@@ -1969,14 +1906,20 @@ export class HelloDataService {
             }
           }
           
-          const coordinates = getComparableCoordinates({ latitude: lat, longitude: lng }) || getComparableCoordinates(comp);
-          const subjectDistance = coordinates
-            ? getSubjectDistanceWithinRadius(coordinates, geocoded.lat!, geocoded.lng!, searchRadius)
-            : null;
-          if (!coordinates || subjectDistance === null) {
+          const radiusCheck = resolveComparableWithinRadius(
+            { latitude: lat, longitude: lng },
+            comp,
+            geocoded.lat!,
+            geocoded.lng!,
+            searchRadius,
+          );
+          if (!radiusCheck) {
             console.log(`      ⚠️ Skipping ${comp.street_address || comp.address || "property"}: coordinates are missing or outside ${searchRadius} miles`);
             continue;
           }
+          lat = radiusCheck.latitude;
+          lng = radiusCheck.longitude;
+          const subjectDistance = radiusCheck.distance;
 
           allRawForMap.push({
             address: comp.street_address || comp.address || '',
@@ -1990,8 +1933,8 @@ export class HelloDataService {
             yearBuilt: parseInt(comp.year_built || comp.vintage || comp.yearBuilt || 0),
             pricePerSqFt: rentPsf,
             distance: subjectDistance,
-            latitude: coordinates.latitude,
-            longitude: coordinates.longitude,
+            latitude: radiusCheck.latitude,
+            longitude: radiusCheck.longitude,
             unitCount: fetchedUnitCount || parseInt(comp.number_units || comp.units || comp.unit_count || 0),
             propertyName: propertyName || comp.building_name || comp.property_name || comp.name,
             avgRent: avgRentPerUnit,
@@ -2116,11 +2059,14 @@ export class HelloDataService {
           
           if (!propertyDetails) {
             console.warn(`      ⚠️ [DATA GAP] Property details unavailable for ID ${comp.id} — including comparable with basic data so nothing is dropped`);
-            const coordinates = getComparableCoordinates(comp);
-            const subjectDistance = coordinates
-              ? getSubjectDistanceWithinRadius(coordinates, geocoded.lat!, geocoded.lng!, searchRadius)
-              : null;
-            if (!coordinates || subjectDistance === null) {
+            const radiusCheck = resolveComparableWithinRadius(
+              null,
+              comp,
+              geocoded.lat!,
+              geocoded.lng!,
+              searchRadius,
+            );
+            if (!radiusCheck) {
               console.warn(`      ⚠️ [RADIUS] Skipping comparable without valid in-radius coordinates`);
               continue;
             }
@@ -2137,9 +2083,9 @@ export class HelloDataService {
               saleDate: new Date().toISOString(),
               yearBuilt: parseInt(comp.year_built || comp.vintage || 0),
               pricePerSqFt: 0,
-              distance: subjectDistance,
-              latitude: coordinates.latitude,
-              longitude: coordinates.longitude,
+              distance: radiusCheck.distance,
+              latitude: radiusCheck.latitude,
+              longitude: radiusCheck.longitude,
               unitCount: parseInt(comp.number_units || comp.units || comp.unit_count || 0),
               propertyName: comp.building_name || comp.property_name || comp.name || null,
               avgRent: undefined,
@@ -2257,31 +2203,24 @@ export class HelloDataService {
           
           // 🆕 Create comparable object (used for BOTH qualifying and all lists)
           // CRITICAL: Extract coordinates from propertyDetails, not from comp (API response doesn't always include them)
-          const coordinates = getComparableCoordinates({
-            latitude: propertyDetails.lat ?? propertyDetails.latitude ?? comp.lat ?? comp.latitude,
-            longitude: propertyDetails.lon ?? propertyDetails.lng ?? propertyDetails.longitude ?? comp.lon ?? comp.lng ?? comp.longitude,
-          });
-          if (!coordinates) {
-            console.log(`      ⚠️ [RADIUS] Skipping comparable without valid coordinates`);
-            continue;
-          }
-          const { latitude, longitude } = coordinates;
-          const subjectDistance = getSubjectDistanceWithinRadius(
-            coordinates,
+          const radiusCheck = resolveComparableWithinRadius(
+            {
+              latitude: propertyDetails.lat ?? propertyDetails.latitude,
+              longitude: propertyDetails.lon ?? propertyDetails.lng ?? propertyDetails.longitude,
+            },
+            {
+              latitude: comp.lat ?? comp.latitude,
+              longitude: comp.lon ?? comp.lng ?? comp.longitude,
+            },
             geocoded.lat!,
             geocoded.lng!,
             searchRadius,
           );
-          if (subjectDistance === null) {
+          if (!radiusCheck) {
             console.log(`      ⚠️ [RADIUS] Skipping comparable outside ${searchRadius} miles or missing valid coordinates`);
             continue;
           }
-          
-          if (latitude === 0 || longitude === 0) {
-            console.log(`      ⚠️ No valid coordinates found - skipping from map display`);
-            console.log(`         propertyDetails: lat=${propertyDetails.lat}, lon=${propertyDetails.lon}`);
-            console.log(`         comp: lat=${comp.lat}, lon=${comp.lon}`);
-          }
+          const { latitude, longitude, distance: subjectDistance } = radiusCheck;
           
           // PRIMARY: Extract vacancy, leased, stories, unit mix from building_availability (per API docs)
           const bldgAvail2 = extractFromBuildingAvailability(propertyDetails);
@@ -2399,11 +2338,14 @@ export class HelloDataService {
           }
         } catch (error) {
           console.warn(`      ⚠️ [DATA GAP] Unexpected error processing comparable ID ${comp.id}: ${error} — including with basic data so nothing is dropped`);
-          const coordinates = getComparableCoordinates(comp);
-          const subjectDistance = coordinates
-            ? getSubjectDistanceWithinRadius(coordinates, geocoded.lat!, geocoded.lng!, searchRadius)
-            : null;
-          if (coordinates && subjectDistance !== null) allComparables.push({
+          const radiusCheck = resolveComparableWithinRadius(
+            null,
+            comp,
+            geocoded.lat!,
+            geocoded.lng!,
+            searchRadius,
+          );
+          if (radiusCheck) allComparables.push({
             address: comp.street_address || '',
             city: comp.city || '',
             state: comp.state || '',
@@ -2414,9 +2356,9 @@ export class HelloDataService {
             saleDate: new Date().toISOString(),
             yearBuilt: parseInt(comp.year_built || comp.vintage || 0),
             pricePerSqFt: 0,
-            distance: subjectDistance,
-            latitude: coordinates.latitude,
-            longitude: coordinates.longitude,
+            distance: radiusCheck.distance,
+            latitude: radiusCheck.latitude,
+            longitude: radiusCheck.longitude,
             unitCount: parseInt(comp.number_units || comp.units || comp.unit_count || 0),
             propertyName: comp.building_name || comp.property_name || comp.name || null,
             avgRent: undefined,
@@ -3051,7 +2993,6 @@ export class HelloDataService {
         const comp = vintageFiltered[i];
         const yearBuilt = parseInt(comp.year_built || comp.vintage || comp.yearBuilt || 0);
         const units = parseInt(comp.number_units || comp.units || comp.unitCount || 0);
-        const distance = parseFloat(comp.distance_miles || comp.distance || 0);
 
         let propertyName = comp.building_name || comp.property_name || comp.name || null;
         let rentPSF = 0;
@@ -3071,6 +3012,7 @@ export class HelloDataService {
         let unitsExposed3: number | null = null;
         let unitMix3: UnitMixEntry[] | null = null;
         let websiteUrl3: string | null = null;
+        let detailsForRadius: any = null;
         let propertyType3 = comp.property_type || comp.propertyType || 'Multifamily';
         let zipCode3 = comp.zip_code || comp.zipCode || comp.zip || '';
 
@@ -3092,6 +3034,7 @@ export class HelloDataService {
           try {
             const details = await this.getPropertyDetails(comp.id);
             if (details) {
+              detailsForRadius = details;
               propertyName = propertyName || details.building_name || details.property_name || details.name || details.community_name;
               lat2 = parseFloat(details.lat || details.latitude || 0) || undefined;
               lng2 = parseFloat(details.lon || details.longitude || 0) || undefined;
@@ -3209,6 +3152,21 @@ export class HelloDataService {
             console.warn(`⚠️ [HELLODATA] Detail call failed for comp ${comp.id} (${propertyName ?? comp.building_name ?? 'unknown'}) — using search-result data only. Error: ${detailErr?.message ?? detailErr}`);
           }
         }
+
+        const radiusCheck = resolveComparableWithinRadius(
+          detailsForRadius,
+          comp,
+          lat,
+          lng,
+          radiusMiles,
+        );
+        if (!radiusCheck) {
+          console.warn(`⚠️ [RADIUS] Skipping acquisition comparable ${comp.id ?? comp.street_address ?? ''}: missing coordinates or outside ${radiusMiles} miles`);
+          continue;
+        }
+        lat2 = radiusCheck.latitude;
+        lng2 = radiusCheck.longitude;
+        const distance = radiusCheck.distance;
 
         results.push({
           address: comp.street_address || comp.address || '',

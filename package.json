@@ -8,6 +8,7 @@
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
+    "test:hellodata-radius": "node --import tsx --test server/hellodataRadius.test.ts",
     "import:brokers": "tsx scripts/import-broker-workbook.ts",
     "db:push": "drizzle-kit push"
   },
