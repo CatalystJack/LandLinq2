@@ -1,10 +1,10 @@
 ---
 name: Broker import promotion
-description: The production CRM database is separate from development and needs explicit publish-time data initialization after bulk broker imports.
+description: Replit's publish-time development-data initialization replaces the whole production database and cannot safely promote only broker rows.
 ---
 
-Bulk broker imports run against the development database unless they are intentionally executed against the production target. The published CRM can therefore return empty source tags and sectors even when development contains the imported directory. During publishing, use the production database option to initialize production with the current development data, then verify the live options endpoint.
+Bulk broker imports run against the development database unless they are intentionally executed against the production target. The Publish option to initialize production from current development data copies the whole database and overwrites existing production records; it is not a targeted broker promotion.
 
-**Why:** A post-import endpoint check showed the deployed app querying an older production snapshot while the development database contained the new broker directory.
+**Why:** Replit's publishing guidance confirms that initialization overwrites existing production data. Using it for a broker-only update could replace tenant CRM data and violate the shared-broker-only boundary.
 
-**How to apply:** After any live-directory import, compare development and production broker counts/timestamps before changing endpoint or UI code. If production is stale, promote the current development data through the supported publishing flow and confirm the published endpoint afterward.
+**How to apply:** After a development import, inspect production read-only counts and source-option data. If production has existing data, do not use the whole-database initialization option. Promote only through an explicitly targeted path that preserves the importer’s matching logic and restricts writes to shared rows (`owner_developer_profile_id IS NULL`), then verify `/api/crm/source-tags` with authentication. If no such path exists, leave production unchanged and ask before adding one.
