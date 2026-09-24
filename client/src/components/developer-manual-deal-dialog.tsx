@@ -109,6 +109,11 @@ export default function DeveloperManualDealDialog({ open, onOpenChange, onSucces
                 Matched product types: <span className="font-semibold">{result.matchedProductTypes.join(", ")}</span>
               </p>
             )}
+            {result.canonicalDealUpdated === false && (
+              <p className="text-sm text-amber-800">
+                An existing shared deal was linked to your company. Its shared details were left unchanged.
+              </p>
+            )}
             <DialogFooter><Button onClick={() => onOpenChange(false)}>Done</Button></DialogFooter>
           </div>
         ) : optionsQuery.isLoading ? (
@@ -156,7 +161,7 @@ export default function DeveloperManualDealDialog({ open, onOpenChange, onSucces
               ))}
             </div>
             {createMutation.isError && <p className="text-sm text-red-600">{(createMutation.error as Error).message}</p>}
-            <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit" disabled={!canSubmit || createMutation.isPending}>{createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Deal</Button></DialogFooter>
+            <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit" disabled={!canSubmit || createMutation.isPending} className="border border-catalyst-blue bg-catalyst-navy text-white transition-colors hover:bg-white hover:text-catalyst-blue">{createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Deal</Button></DialogFooter>
           </form>
         )}
       </DialogContent>

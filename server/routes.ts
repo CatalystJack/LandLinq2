@@ -17908,6 +17908,211 @@ RULES:
     }
   });
 
+  // Developers can enter acquisition deals without choosing a tenant ID;
+  // profile identity is always resolved from the authenticated session.
+  app.get("/api/developer-profile/me/deal-entry-options", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const { developerProfiles, developerProductTypes } = await import("@shared/schema");
+      const [profile] = await db.select({
+        profileType: developerProfiles.profileType,
+        assetClass: developerProfiles.assetClass,
+        rentMetric: developerProfiles.rentMetric,
+      }).from(developerProfiles).where(and(
+        eq(developerProfiles.id, developerProfileId),
+        eq(developerProfiles.isActive, true),
+      )).limit(1);
+      if (!profile) return res.status(404).json({ error: "Investment Company profile not found" });
+      if (profile.profileType !== "real_estate") {
+        return res.status(400).json({ error: "Manual deal entry is only available for real-estate Investment Companies" });
+      }
+
+      const productTypes = profile.assetClass === "industrial"
+        ? []
+        : await db.select({
+            id: developerProductTypes.id,
+            name: developerProductTypes.name,
+            isActive: developerProductTypes.isActive,
+          }).from(developerProductTypes).where(and(
+            eq(developerProductTypes.developerProfileId, developerProfileId),
+            eq(developerProductTypes.isActive, true),
+          )).orderBy(developerProductTypes.createdAt);
+
+      return res.json({ profile, productTypes });
+    } catch (error: any) {
+      console.error("[developer-profile/me/deal-entry-options] Error:", error);
+      return res.status(500).json({ error: "Failed to load manual deal entry options" });
+    }
+  });
+
+  app.post("/api/developer-profile/me/deals", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+
+      const body = req.body || {};
+      const address = String(body.address || "").trim();
+      const city = String(body.city || "").trim();
+      const state = normalizeUsStateCode(body.state);
+      const county = String(body.county || "").trim();
+      const acreageInput = body.acreage;
+      const sizeAcres = acreageInput === undefined || acreageInput === null || acreageInput === ""
+        ? NaN
+        : Number(acreageInput);
+      const askingPrice = body.askingPrice === undefined || body.askingPrice === null || body.askingPrice === ""
+        ? null
+        : Number(body.askingPrice);
+      const rent = body.rent === undefined || body.rent === null || body.rent === ""
+        ? null
+        : Number(body.rent);
+      const productTypeId = String(body.productTypeId || "").trim();
+
+      if (!address || !city || !state || !isUsStateCode(state) || !county) {
+        return res.status(400).json({ error: "Address, city, valid state, and county are required" });
+      }
+      if (!Number.isFinite(sizeAcres) || sizeAcres < 0) {
+        return res.status(400).json({ error: "Acreage must be a valid non-negative number" });
+      }
+      if (askingPrice !== null && (!Number.isFinite(askingPrice) || askingPrice < 0)) {
+        return res.status(400).json({ error: "Asking price must be a valid non-negative number" });
+      }
+      for (const field of ["qct", "dda", "oz"]) {
+        if (body[field] !== undefined && typeof body[field] !== "boolean") {
+          return res.status(400).json({ error: `${field} must be a boolean` });
+        }
+      }
+
+      const { developerProfiles, developerProductTypes, partnerDeveloperSends, partnerDevelopers } = await import("@shared/schema");
+      const { classifyDealForProfile } = await import("./developerClassificationService");
+      const [profile] = await db.select().from(developerProfiles).where(and(
+        eq(developerProfiles.id, developerProfileId),
+        eq(developerProfiles.isActive, true),
+      )).limit(1);
+      if (!profile) return res.status(403).json({ error: "Investment Company profile is inactive or unavailable" });
+      if (profile.profileType !== "real_estate") {
+        return res.status(400).json({ error: "Manual deal entry is only available for real-estate Investment Companies" });
+      }
+      const industrial = profile.assetClass === "industrial";
+      if (!industrial && (rent === null || !Number.isFinite(rent) || rent < 0)) {
+        return res.status(400).json({ error: "Rent must be a valid non-negative number" });
+      }
+
+      const result = await db.transaction(async (tx) => {
+        const activeProductTypes = await tx.select().from(developerProductTypes).where(and(
+          eq(developerProductTypes.developerProfileId, developerProfileId),
+          eq(developerProductTypes.isActive, true),
+        ));
+        const selectedProductType = activeProductTypes.find((productType) => productType.id === productTypeId);
+        if (!industrial && !selectedProductType) {
+          throw adminRequestError(400, "Select an active product type for this Investment Company");
+        }
+
+        const dealValues: Record<string, any> = {
+          address,
+          city,
+          state,
+          county,
+          sizeAcres: String(sizeAcres),
+          askingPrice: askingPrice === null ? null : String(askingPrice),
+          productTypes: [industrial ? "Industrial site" : selectedProductType!.name],
+          submissionMethod: "form",
+          source: "developer_manual_entry",
+          status: "pending_review",
+          isQct: body.qct === true,
+          isDda: body.dda === true,
+          isOz: body.oz === true,
+          updatedAt: new Date(),
+        };
+        if (!industrial) {
+          if (profile.rentMetric === "per_unit") dealValues.avgRentPerUnit = String(rent);
+          else dealValues.topRentPSF = String(rent);
+        }
+
+        const [existingDeal] = await tx.select().from(deals)
+          .where(sql`lower(trim(${deals.address})) = lower(trim(${address}))`)
+          .limit(1);
+
+        let deal: any;
+        let existingSend: { id: string } | undefined;
+        let canonicalDealUpdated = true;
+        if (existingDeal) {
+          [existingSend] = await tx.select({ id: partnerDeveloperSends.id })
+            .from(partnerDeveloperSends)
+            .where(and(
+              eq(partnerDeveloperSends.developerProfileId, developerProfileId),
+              eq(partnerDeveloperSends.dealId, existingDeal.id),
+            ))
+            .limit(1);
+
+          // Shared canonical data is reused as-is. Only a company that already
+          // owns the deal relationship may update the shared deal fields.
+          if (existingSend) {
+            [deal] = await tx.update(deals).set(dealValues)
+              .where(eq(deals.id, existingDeal.id)).returning();
+          } else {
+            deal = existingDeal;
+            canonicalDealUpdated = false;
+          }
+        } else {
+          [deal] = await tx.insert(deals).values(dealValues as any).returning();
+        }
+
+        const classificationResult = classifyDealForProfile(deal, profile, activeProductTypes);
+        const [recipient] = await tx.select({ id: partnerDevelopers.id })
+          .from(partnerDevelopers)
+          .where(eq(partnerDevelopers.developerProfileId, developerProfileId))
+          .limit(1);
+        const sendValues = {
+          developerId: recipient?.id || profile.id,
+          developerProfileId,
+          dealId: deal.id,
+          classification: classificationResult.classification,
+          matchedProductTypes: classificationResult.matchedProductTypes,
+          address: deal.address,
+          status: "sent",
+          matchedAt: new Date(),
+        };
+        const [send] = await tx.insert(partnerDeveloperSends).values(sendValues).onConflictDoUpdate({
+          target: [partnerDeveloperSends.developerProfileId, partnerDeveloperSends.dealId],
+          set: {
+            classification: classificationResult.classification,
+            matchedProductTypes: classificationResult.matchedProductTypes,
+            address: deal.address,
+            matchedAt: new Date(),
+          },
+        }).returning();
+
+        return { deal, send, classificationResult, reusedExistingDeal: Boolean(existingDeal), canonicalDealUpdated };
+      });
+
+      if (result.canonicalDealUpdated) {
+        try {
+          const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
+          const recomputed = await recomputeDealYoc(result.deal.id);
+          if (recomputed) result.deal = recomputed;
+        } catch (yocError) {
+          console.error("[developer-profile/me/deals POST] YOC recompute failed:", yocError);
+        }
+      }
+
+      return res.status(result.reusedExistingDeal ? 200 : 201).json({
+        deal: result.deal,
+        send: result.send,
+        classification: result.classificationResult.classification,
+        matchedProductTypes: result.classificationResult.matchedProductTypes,
+        reusedExistingDeal: result.reusedExistingDeal,
+        canonicalDealUpdated: result.canonicalDealUpdated,
+      });
+    } catch (error: any) {
+      console.error("[developer-profile/me/deals POST] Error:", error);
+      return res.status(error.status || 500).json({ error: error.message || "Failed to add deal" });
+    }
+  });
+
   // Investment Company deal inbox. Tenant scope always comes from the session.
   app.get("/api/developer-profile/me/deals", isAuthenticated, async (req: any, res) => {
     try {
