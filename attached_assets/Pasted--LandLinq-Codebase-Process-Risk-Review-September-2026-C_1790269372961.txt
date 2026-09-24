@@ -1,0 +1,53 @@
+# LandLinq Codebase & Process Risk Review — September 2026
+
+Compiled from a direct audit of the repo (CatalystJack/LandLinq2) after several rounds of the "write a Replit prompt → Replit implements → Claude verifies via git diff" cycle. This documents concrete, evidence-based findings, not speculation — each one is backed by something found in the code, git history, or the repo's own `.agents/memory/` notes.
+
+## 1. No automated verification runs before code ships
+
+`package.json` has no `test` script. 11 `.test.ts` files exist in the repo (`shared/county-targets.test.ts`, `server/passwordReset.test.ts`, `server/automatedDealEmailPipeline.test.ts`, and 8 others), several written by Replit's own agent — but nothing invokes them automatically. Worse, `.replitignore` explicitly excludes `*.test.ts` and `*.test.tsx` from what gets deployed. There is also no `.github/workflows` — no CI at all. The only automated check is `npm run check` (a bare `tsc` type-check), and nothing forces that to run either.
+
+This is very likely a root cause of the pattern we've hit repeatedly this session: Replit pushing a change that misses the actual ask, or introduces an unrelated regression (e.g. the Sept 24 commit that left the Sign In button icon in place but replaced company logos with plain text in `developer-login.tsx` and `password-reset.tsx`). Nothing catches this before it ships except a human (or Claude) manually diffing the commit after the fact.
+
+**Recommendation:** add a real `test` script (even just `tsx --test` over the existing `.test.ts` files), and make "run `npm run check` and the test files, paste the output" a standing line in every Replit prompt. This is cheap insurance against exactly the kind of regression we've had to catch by hand.
+
+## 2. Two files are carrying most of the app's complexity
+
+- `server/routes.ts` — **37,549 lines**. Every API route in the app lives in one file.
+- `client/src/pages/analyst-dashboard.tsx` — **10,990 lines**. The entire analyst deal-review UI is one component file.
+
+This matters practically: it's why dead code accumulates invisibly (the whole Apex UI graveyard — an orphaned checkbox, an unreachable "Apex Notes" modal, a filter dropdown wired to nothing — sat in `analyst-dashboard.tsx` for months across three add/remove/re-add cycles before anyone noticed), and it's a real contributor to Replit's agent occasionally missing existing logic or duplicating something that already exists elsewhere in the same file, simply because no single context window holds the whole thing.
+
+**Recommendation:** not urgent, but worth planning — splitting `routes.ts` into per-domain route modules (deals, brokers, developers, auth, outreach, partner-developers) would meaningfully reduce this risk over time. Lower priority than items 1 and 3.
+
+## 3. Deploy ("Publish") is a separate, documented point of silent failure
+
+Per the repo's own `.agents/memory/` notes (a real, useful practice already in place — see §5):
+
+- `migration-runner-disabled.md`: the general schema-migration runner is **intentionally disabled** at startup to avoid warnings. New tables need an idempotent runtime creation path instead of relying on migrations.
+- `drizzle-kit-db-push-broken.md`: `drizzle-kit push` fails outright in this repo ("Please provide required params") due to an extension-filter config issue, and even after that's fixed it can hang on interactive prompts that don't work in automation.
+- `publishing-schema-drift.md`: **a successful build does not guarantee a successful publish** — Replit separately checks dev/production schema drift at publish time, and this can fail even when the build and runtime code are fine.
+- `authenticated-runtime-smoke-tests.md`: this project has already had a production incident where a build succeeded but an authenticated, data-driven page crashed at runtime (undefined JSX icon) — their own prescribed fix ("pair the build with a browser runtime smoke test") does not appear to be actually wired up anywhere.
+
+**Recommendation:** worth confirming with Jack whether "Published your App" commits (which show up in nearly every batch and have so far been treated as no-ops during review) are ever silently failing the schema-drift check without anyone noticing. If Jack isn't manually checking deployment/publish history after each batch, that's a gap.
+
+## 4. The broker shared-contact-pool gap has a concrete, actionable fix already sitting in the repo
+
+Earlier in this session, the diagnosis was "no existing tool populates State/County/Sector on the shared broker pool, and the tagged NC/TN broker data hasn't been imported." Deeper investigation this pass found more:
+
+- `scripts/import-broker-workbook.ts` (419 lines, last touched by commit `9eab3ae`) **already does exactly this** — it's a real, working, idempotent importer keyed on state + source license number, with email-based dedupe, that writes `contact_county`, `contact_sector`, and `state_region` via raw SQL directly onto the shared broker pool (`owner_developer_profile_id IS NULL`). This contradicts my earlier (incomplete) conclusion that county/sector are never written anywhere — they are, just via raw SQL in this script rather than the Drizzle ORM, which is why the first grep pass missed it.
+- Its default input path is hardcoded to `attached_assets/NC_Active_Brokers_Tagged_Sep2026_(1)_1790108883653.xlsx` — and that exact file, plus several other versions of it and a TN equivalent (`TN_Active_Brokers_Tagged_Sep2026_*.xlsx`), **are already sitting in `attached_assets/`**. The tool and the data are both ready.
+- `broker-import-production-promotion.md` (another `.agents/memory` note) flags the likely reason it hasn't shown up for developers yet even if it has been run: **bulk broker imports run against the development database by default.** The published/production CRM needs an explicit promotion step during publishing to pick up newly imported data — a post-import check once found the live app still querying a stale production snapshot while development had the new directory.
+
+**Recommendation:** before building anything new, run `npm run import:brokers` against the current tagged NC and TN workbooks (or confirm it's already been run), then explicitly verify — and if needed promote — that production has the resulting data, per the publish-promotion note above. This is very likely a same-day fix rather than a new-tool build.
+
+## 5. `.agents/memory/` is a real asset — use it before re-diagnosing from scratch
+
+Replit's own agent maintains `.agents/memory/` — ~55 short markdown files documenting hard-won gotchas (tenant-boundary rules, known-broken tooling, data-shape quirks), indexed in `MEMORY.md`. Several of these directly answer questions I spent real investigation time reconstructing manually this session — e.g. `shared-broker-crm-boundary.md` describes the exact visibility-filter behavior behind the "no states available for developers" issue. Going forward, checking this directory first during a "check code" recheck (especially for anything touching tenancy, brokers, deal classification, or auth) should save real time and avoid re-deriving things that are already documented.
+
+## 6. Accumulated clutter worth an occasional cleanup pass
+
+`attached_assets/` has **2,162 files** — largely pasted screenshots and prompt-text dumps accumulated over the project's life (a literal, large-scale instance of the "notes file instead of code" pattern we've flagged before). There are also 10 stray top-level report/guide/debug `.md` files (`UPWORK_DEVELOPER_WORKFLOW.md`, `PERFORMANCE_OPTIMIZATION_REPORT.md`, `DUPLICATE_DEAL_DEBUG.md`, `SETTINGS_UI_TEST_REPORT.md`, etc., ~3,100 lines total) whose accuracy as of today is unverified — any of them could be stale and actively mislead a future reader (human or AI) into thinking something is still true. None of this is urgent, but it's worth treating anything in `attached_assets/` or these root-level report files as unverified history, not current documentation, until checked.
+
+---
+
+*Compiled by Claude during a LandLinq codebase session, Sep 24, 2026.*
