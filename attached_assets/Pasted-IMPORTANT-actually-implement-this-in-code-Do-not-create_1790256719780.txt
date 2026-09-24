@@ -1,0 +1,18 @@
+IMPORTANT: actually implement this in code. Do not create a documentation file, notes file, or summary file — make the actual code changes described below.
+
+1. Backend — return the person's name and company with token validation. In server/auth.ts, the POST /api/password-reset/validate handler (~line 583) currently returns just { message, email }. Extend it: after validating the token and getting the email, look up the user with storage.getUserByEmail(email) to get firstName and lastName. If that user has a developerProfileId, also query the developerProfiles table (there are existing examples of this exact pattern earlier in this same file, e.g. around line 505-530) for companyName and logoUrl. Return all of it: { message, email, firstName, lastName, companyName, logoUrl } (companyName/logoUrl can be null/omitted if the user isn't tied to a company).
+
+2. Frontend — restyle client/src/pages/password-reset.tsx to exactly match client/src/pages/auth.tsx's login page, not the generic shadcn defaults it uses now:
+
+Page wrapper: flex min-h-screen items-center justify-center bg-[#f7f9fc] px-4 py-8, content capped at w-full max-w-[460px].
+Card: max-w-full overflow-hidden rounded-xl border border-[#dce3ec] bg-white shadow-[0_8px_30px_rgba(15,23,42,0.08)], with CardHeader at px-6 pb-2 pt-6 sm:px-8 sm:pt-7 and CardContent at max-w-full overflow-hidden px-6 pb-7 pt-4 sm:px-8.
+Logo at the top of the card, centered, same size as the regular login page: h-8 w-auto max-w-[170px] object-contain object-center. Use the company's logoUrl from the validate response when we have one (this is the "reset" step with a valid token); otherwise fall back to /assets/landlinq-color-logo.png, same fallback pattern as developer-login.tsx.
+Inputs: h-12 rounded-lg border-[#bac9dc] bg-[#eaf2ff] px-3 text-base shadow-none placeholder:text-slate-400 focus:border-[#4A90E2] focus:ring-2 focus:ring-[#4A90E2]/20 (add pr-11 on the password field, same as the login page, to make room for the show/hide icon).
+Buttons ("Send Reset Link" and "Reset Password"): h-12 w-full rounded-lg border border-transparent bg-[#4A90E2] text-sm font-bold uppercase tracking-wide text-white shadow-sm transition-colors hover:border-[#4A90E2] hover:bg-white hover:text-[#4A90E2] — same size, color, and hover behavior as the "SIGN IN" button.
+Labels: text-sm font-semibold text-slate-800, matching the login page.
+"Back to Login" link: style it like the "Forgot password?" link on the login page — text-sm font-medium text-[#4A90E2] hover:underline — instead of the current default button-link style.
+
+3. Personalize the "reset" step (valid token, setting a new password). When the validate call returns a firstName and/or companyName, change the CardTitle/CardDescription for that step from the generic "Set New Password" / "Enter your new password below" to:
+
+CardTitle: Welcome, {firstName} {lastName} (fall back to "Set New Password" if no name came back).
+CardDescription: Set your password for {companyName} when a company name is present, otherwise keep "Enter your new password below".
