@@ -1,6 +1,7 @@
 import type { DeveloperProductType, DeveloperProfile } from "@shared/schema";
 import { normalizeIndustrialCriteria } from "@shared/industrial-criteria";
 import { resolveStateAwareCriteria } from "@shared/criteria-overrides";
+import { countyTargetMatchesDeal } from "@shared/county-targets";
 import { normalizeUsStateCode } from "@shared/us-states";
 
 export type DealClassification = "passed" | "review" | "red" | "yellow";
@@ -16,11 +17,11 @@ function numericValue(value: unknown): number | null {
 }
 
 export function isDealInProfileMarket(deal: any, profile: DeveloperProfile): boolean {
-  const normalizeCounty = (value: unknown) => String(value ?? "").trim().toLowerCase();
-  const county = normalizeCounty(deal?.county);
-  const state = normalizeUsStateCode(deal?.state);
-  return (profile.targetCounties || []).some((target) => normalizeCounty(target) === county) ||
-    (profile.targetStates || []).some((target) => normalizeUsStateCode(target) === state);
+  return (profile.targetCounties || []).some((target) =>
+    countyTargetMatchesDeal(target, deal?.county, deal?.state),
+  ) || (profile.targetStates || []).some((target) =>
+    normalizeUsStateCode(target) === normalizeUsStateCode(deal?.state),
+  );
 }
 
 function hasDesignation(

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Navigation from "@/components/navigation";
+import { CountyMarketEditor, StateMultiSelect } from "@/components/target-market-editors";
 import YocAssumptionsPanel, {
   createEmptyYocAssumptions,
   getNationalYocDefaults,
@@ -272,55 +273,6 @@ function TagsField({ label, values, onChange, placeholder }: { label: string; va
     setEntry("");
   };
   return <div className="space-y-2"><Label>{label}</Label><div className="rounded-md border bg-white p-2"><div className="mb-2 flex flex-wrap gap-1.5">{values.map((value) => <Badge key={value} variant="secondary" className="gap-1">{value}<Button type="button" variant="ghost" size="iconSm" onClick={() => onChange(values.filter((item) => item !== value))} aria-label={`Remove ${value}`} className="h-4 w-4 text-slate-500">×</Button></Badge>)}</div><Input value={entry} onChange={(event) => setEntry(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); commit(); } }} onBlur={commit} placeholder={placeholder} className="border-0 px-1 shadow-none focus-visible:ring-0" /></div><p className="text-xs text-slate-500">Press Enter or comma after each entry.</p></div>;
-}
-
-function CountyMarketEditor({ values, labels, onCountiesChange, onLabelsChange }: {
-  values: string[];
-  labels: Record<string, string>;
-  onCountiesChange: (values: string[]) => void;
-  onLabelsChange: (labels: Record<string, string>) => void;
-}) {
-  const groups = values.reduce<Record<string, string[]>>((result, county) => {
-    const market = labels[county]?.trim() || "Other markets";
-    (result[market] ||= []).push(county);
-    return result;
-  }, {});
-  const removeCounty = (county: string) => {
-    onCountiesChange(values.filter((value) => value !== county));
-    const next = { ...labels };
-    delete next[county];
-    onLabelsChange(next);
-  };
-  return <div className="space-y-3">
-    <TagsField
-      label="Target counties"
-      values={values}
-      onChange={(next) => {
-        onCountiesChange(next);
-        onLabelsChange(Object.fromEntries(Object.entries(labels).filter(([county]) => next.includes(county))));
-      }}
-      placeholder="Wake, Mecklenburg"
-    />
-    {values.length > 0 && <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">County groups</p>
-      <div className="space-y-4">
-        {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([market, counties]) => (
-          <div key={market}>
-            <p className="mb-2 text-xs font-semibold text-slate-700">{market}</p>
-            <div className="space-y-2">
-              {counties.map((county) => (
-                <div key={county} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
-                  <span className="text-sm font-medium text-slate-800">{county}</span>
-                  <Input value={labels[county] || ""} onChange={(event) => onLabelsChange({ ...labels, [county]: event.target.value })} placeholder="Market label, e.g. CLT" aria-label={`${county} market label`} className="h-8 bg-white" />
-                  <Button type="button" variant="ghost" size="icon" onClick={() => removeCounty(county)} aria-label={`Remove ${county}`}><Trash2 className="h-4 w-4 text-slate-400" /></Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>}
-  </div>;
 }
 
 function NumberField({ label, value, onChange, placeholder, required }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; required?: boolean }) {
@@ -827,8 +779,8 @@ export default function AdminInvestmentCompanies() {
              )}
            </section>
          <section><h3 className="mb-3 font-semibold">Affordable housing overrides</h3><div className="grid gap-3 sm:grid-cols-3"><ToggleRow label="QCT override" description="QCT status may override the rent minimum." checked={form.qctOverridesRentMinimum} onChange={(value) => update("qctOverridesRentMinimum", value)} /><ToggleRow label="DDA override" description="DDA status may override the rent minimum." checked={form.ddaOverridesRentMinimum} onChange={(value) => update("ddaOverridesRentMinimum", value)} /><ToggleRow label="OZ override" description="Opportunity Zone status may override rent." checked={form.ozOverridesRentMinimum} onChange={(value) => update("ozOverridesRentMinimum", value)} /></div></section>
-         <section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><TagsField label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} placeholder="NC, SC, GA" /><CountyMarketEditor values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
-          {form.profileType === "real_estate" && form.assetClass === "industrial" && <><section className="rounded-lg border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Industrial site-screening criteria</h3><p className="mt-1 text-sm text-amber-900">These values drive the initial site search and manual review queue. Automated multifamily YOC and rent underwriting are intentionally disabled for this company.</p><div className="mt-5"><IndustrialCriteriaFields value={form.industrialCriteria} onChange={(value) => update("industrialCriteria", value)} targetStates={form.targetStates} compact /></div></section><section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><TagsField label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} placeholder="NC, SC, GA" /><CountyMarketEditor values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
+         <section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><StateMultiSelect label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} /><CountyMarketEditor states={form.targetStates} values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
+          {form.profileType === "real_estate" && form.assetClass === "industrial" && <><section className="rounded-lg border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Industrial site-screening criteria</h3><p className="mt-1 text-sm text-amber-900">These values drive the initial site search and manual review queue. Automated multifamily YOC and rent underwriting are intentionally disabled for this company.</p><div className="mt-5"><IndustrialCriteriaFields value={form.industrialCriteria} onChange={(value) => update("industrialCriteria", value)} targetStates={form.targetStates} compact /></div></section><section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><StateMultiSelect label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} /><CountyMarketEditor states={form.targetStates} values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
           <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <h3 className="font-semibold text-slate-900">Shared broker contact access</h3>
             <p className="mt-1 text-sm text-slate-600">Choose which shared LandLinq contacts this company can see.</p>

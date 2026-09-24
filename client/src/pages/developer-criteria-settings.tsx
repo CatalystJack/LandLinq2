@@ -15,6 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
+import { CountyMarketEditor, StateMultiSelect } from "@/components/target-market-editors";
 import Footer from "@/components/footer";
 import YocAssumptionsPanel, {
   getNationalYocDefaults,
@@ -49,7 +50,7 @@ import {
   type DeveloperAssetClass,
   type IndustrialCriteria,
 } from "@shared/industrial-criteria";
-import { getUsStateLabel, normalizeUsStateCode, US_STATE_OPTIONS } from "@shared/us-states";
+import { normalizeUsStateCode } from "@shared/us-states";
 
 type Profile = {
   companyName: string;
@@ -160,100 +161,6 @@ async function jsonRequest(url: string, options?: RequestInit) {
   return data;
 }
 
-function StateMultiSelect({
-  label,
-  values,
-  onChange,
-}: {
-  label: string;
-  values: string[];
-  onChange: (values: string[]) => void;
-}) {
-  const selectedCodes = Array.from(new Set(values.map(normalizeUsStateCode).filter(Boolean)));
-  return (
-    <div>
-      <Label>{label}</Label>
-      <select
-        multiple
-        size={6}
-        value={selectedCodes}
-        onChange={(event) => onChange(Array.from(event.target.selectedOptions, (option) => option.value))}
-        className="mt-2 min-h-36 w-full rounded-md border border-slate-200 bg-white p-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
-        aria-label={label}
-      >
-        {US_STATE_OPTIONS.map((state) => (
-          <option key={state.code} value={state.code}>{state.name}</option>
-        ))}
-      </select>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {selectedCodes.length > 0 ? selectedCodes.map((code) => (
-          <Badge key={code} variant="outline" className="border-catalyst-blue/20 bg-catalyst-blue/10 text-catalyst-navy">
-            {getUsStateLabel(code)} ({code})
-          </Badge>
-        )) : <span className="text-xs text-slate-500">Select one or more states.</span>}
-      </div>
-      <p className="mt-1 text-xs text-slate-500">Use Ctrl/Cmd-click or Shift-click to select multiple states.</p>
-    </div>
-  );
-}
-
-function TagEditor({
-  label,
-  values,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  values: string[];
-  onChange: (values: string[]) => void;
-  placeholder: string;
-}) {
-  const [entry, setEntry] = useState("");
-  const addEntry = () => {
-    const next = entry.trim().replace(/,$/, "").trim();
-    if (next && !values.some((value) => value.toLowerCase() === next.toLowerCase())) {
-      onChange([...values, next]);
-    }
-    setEntry("");
-  };
-  return (
-    <div>
-      <Label>{label}</Label>
-      <div className="mt-2 min-h-10 rounded-md border border-slate-200 bg-white p-2 focus-within:ring-2 focus-within:ring-slate-300">
-        <div className="flex flex-wrap gap-1.5">
-          {values.map((value) => (
-            <Badge key={value} variant="outline" className="gap-1 border-catalyst-blue/20 bg-catalyst-blue/10 text-catalyst-navy">
-              {value}
-              <button
-                type="button"
-                onClick={() => onChange(values.filter((item) => item !== value))}
-                className="rounded-full text-slate-400 hover:text-slate-900"
-                aria-label={`Remove ${value}`}
-              >
-                ×
-              </button>
-            </Badge>
-          ))}
-          <input
-            value={entry}
-            onChange={(event) => setEntry(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === ",") {
-                event.preventDefault();
-                addEntry();
-              }
-            }}
-            onBlur={addEntry}
-            placeholder={values.length ? "Add another…" : placeholder}
-            className="min-w-32 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-slate-400"
-          />
-        </div>
-      </div>
-      <p className="mt-1 text-xs text-slate-500">Press Enter or comma after each entry.</p>
-    </div>
-  );
-}
-
 function NumberField({
   label,
   value,
@@ -289,74 +196,6 @@ function NumberField({
         className="mt-2 bg-white"
       />
       {helperText && <p className="mt-1 text-xs text-slate-500">{helperText}</p>}
-    </div>
-  );
-}
-
-function CountyMarketEditor({
-  values,
-  labels,
-  onCountiesChange,
-  onLabelsChange,
-}: {
-  values: string[];
-  labels: Record<string, string>;
-  onCountiesChange: (values: string[]) => void;
-  onLabelsChange: (labels: Record<string, string>) => void;
-}) {
-  const groups = values.reduce<Record<string, string[]>>((result, county) => {
-    const market = labels[county]?.trim() || "Other markets";
-    (result[market] ||= []).push(county);
-    return result;
-  }, {});
-
-  const removeCounty = (county: string) => {
-    onCountiesChange(values.filter((value) => value !== county));
-    const nextLabels = { ...labels };
-    delete nextLabels[county];
-    onLabelsChange(nextLabels);
-  };
-
-  return (
-    <div className="space-y-3">
-      <TagEditor
-        label="Target counties"
-        values={values}
-        onChange={(counties) => {
-          onCountiesChange(counties);
-          onLabelsChange(Object.fromEntries(Object.entries(labels).filter(([county]) => counties.includes(county))));
-        }}
-        placeholder="e.g. Mecklenburg"
-      />
-      {values.length > 0 && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">County groups</p>
-          <div className="space-y-4">
-            {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([market, counties]) => (
-              <div key={market}>
-                <p className="mb-2 text-xs font-semibold text-slate-700">{market}</p>
-                <div className="space-y-2">
-                  {counties.map((county) => (
-                    <div key={county} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
-                      <span className="text-sm font-medium text-slate-800">{county}</span>
-                      <Input
-                        value={labels[county] || ""}
-                        onChange={(event) => onLabelsChange({ ...labels, [county]: event.target.value })}
-                        placeholder="Market label, e.g. CLT"
-                        aria-label={`${county} market label`}
-                        className="h-8 bg-white"
-                      />
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeCounty(county)} aria-label={`Remove ${county}`}>
-                        <Trash2 className="h-4 w-4 text-slate-400" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1010,6 +849,7 @@ export default function DeveloperCriteriaSettings() {
               <div className="grid gap-5 md:grid-cols-2">
                 <StateMultiSelect label="Target states" values={form.targetStates} onChange={(value) => update("targetStates", value)} />
                 <CountyMarketEditor
+                  states={form.targetStates}
                   values={form.targetCounties}
                   labels={form.countyMarketLabels}
                   onCountiesChange={(value) => update("targetCounties", value)}
@@ -1195,6 +1035,7 @@ export default function DeveloperCriteriaSettings() {
               <div className="grid gap-5 border-t border-amber-200 pt-5 md:grid-cols-2">
                 <StateMultiSelect label="Target states" values={form.targetStates} onChange={(value) => update("targetStates", value)} />
                 <CountyMarketEditor
+                  states={form.targetStates}
                   values={form.targetCounties}
                   labels={form.countyMarketLabels}
                   onCountiesChange={(value) => update("targetCounties", value)}

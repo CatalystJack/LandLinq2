@@ -50,6 +50,19 @@ const profile = (id: string, county = 'Wake') => ({
 {
   assert.equal(routeProfile([profile('a'), profile('b')], { name: null, email: null }, 'Wake', 'NC').reason, 'ambiguous_geography');
 }
+// State-qualified targets only route in that state; legacy bare counties keep
+// their county-only fallback while targetStates still constrain the profile.
+{
+  const northCarolinaOnly = profile('nc-qualified', 'Mecklenburg, NC');
+  assert.equal(routeProfile([northCarolinaOnly], { name: null, email: null }, 'Mecklenburg', 'NC').profile?.id, 'nc-qualified');
+  assert.equal(routeProfile([northCarolinaOnly], { name: null, email: null }, 'Mecklenburg', 'SC').reason, 'no_profile_match');
+
+  const legacyMultiState = {
+    ...profile('legacy', 'Mecklenburg'),
+    targetStates: ['NC', 'SC'],
+  };
+  assert.equal(routeProfile([legacyMultiState], { name: null, email: null }, 'Mecklenburg', 'SC').profile?.id, 'legacy');
+}
 // Exact normalized address is preferred, with a coordinate fallback capped at 0.1 miles.
 {
   const duplicate = findDuplicateDeal([{ address: '100 Main Street', latitude: '35.0000', longitude: '-78.0000' }],

@@ -64,6 +64,7 @@ import {
   resolveStateAwareCriteria,
 } from "@shared/criteria-overrides";
 import { isUsStateCode, normalizeUsStateCode } from "@shared/us-states";
+import { countyTargetMatchesDeal, parseCountyTarget } from "@shared/county-targets";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
@@ -14122,13 +14123,18 @@ RULES:
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       throw new Error("County market labels must be an object");
     }
-    const counties = new Set(targetCounties.map((county) => county.toLowerCase()));
+    const targetCountyKeys = new Set(targetCounties.map((county) => county.trim().toLowerCase()));
+    const countyNames = new Set(targetCounties.map((county) =>
+      parseCountyTarget(county).county.toLowerCase(),
+    ));
     return Object.entries(value as Record<string, unknown>)
       .map(([county, marketLabel]) => ({
         county: county.trim(),
         marketLabel: String(marketLabel ?? "").trim(),
       }))
-      .filter(({ county, marketLabel }) => county && marketLabel && counties.has(county.toLowerCase()));
+      .filter(({ county, marketLabel }) => county && marketLabel && (
+        targetCountyKeys.has(county.toLowerCase()) || countyNames.has(county.toLowerCase())
+      ));
   }
 
   app.post("/api/admin/investment-companies/assistant/parse-criteria", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
@@ -15425,13 +15431,19 @@ RULES:
         if (countyMarketLabels !== undefined || isGeneralSales) {
           await tx.delete(developerCountyMarketLabels)
             .where(eq(developerCountyMarketLabels.developerProfileId, developerProfileId));
-          const counties = new Set((isGeneralSales ? [] : updates.targetCounties || []).map((county: string) => county.toLowerCase()));
+          const labelTargets = (isGeneralSales ? [] : updates.targetCounties || []) as string[];
+          const targetCountyKeys = new Set(labelTargets.map((county) => county.trim().toLowerCase()));
+          const countyNames = new Set(labelTargets.map((county) =>
+            parseCountyTarget(county).county.toLowerCase(),
+          ));
           const labels = Object.entries(countyMarketLabels as Record<string, unknown>)
             .map(([county, marketLabel]) => ({
               county: county.trim(),
               marketLabel: String(marketLabel ?? '').trim(),
             }))
-            .filter(({ county, marketLabel }) => county && marketLabel && counties.has(county.toLowerCase()))
+            .filter(({ county, marketLabel }) => county && marketLabel && (
+              targetCountyKeys.has(county.toLowerCase()) || countyNames.has(county.toLowerCase())
+            ))
             .map(({ county, marketLabel }) => ({
               developerProfileId,
               county,
@@ -16617,11 +16629,12 @@ RULES:
     const profile = profileResult.rows?.[0] as any;
     if (!profile) throw new Error('ACTIVE_DEVELOPER_PROFILE_REQUIRED');
     const targetStates = (profile.target_states || []).map((value: string) => normalizeUsStateCode(value)).filter(Boolean);
-    const targetCounties = (profile.target_counties || []).map((value: string) => value.toLowerCase());
+    const targetCounties = (profile.target_counties || []) as string[];
     const result = await db.execute(sql`
-      SELECT DISTINCT b.id, b.first_name as "firstName", b.last_name as "lastName",
+      SELECT b.id, b.first_name as "firstName", b.last_name as "lastName",
         b.email, b.phone, b.brokerage, b.state_region as "stateRegion",
-        b.owner_developer_profile_id as "ownerDeveloperProfileId"
+        b.owner_developer_profile_id as "ownerDeveloperProfileId",
+        d.county as "dealCounty", d.state as "dealState"
       FROM brokers b
       LEFT JOIN deals d ON d.broker_id = b.id
       WHERE b.is_active = true
@@ -16638,14 +16651,20 @@ RULES:
           OR UPPER(COALESCE(b.state_region, '')) = ANY(${targetStates}::text[])
           OR UPPER(COALESCE(d.state, '')) = ANY(${targetStates}::text[])
         )
-        AND (
-          ${targetCounties.length === 0}
-          OR LOWER(COALESCE(d.county, '')) = ANY(${targetCounties}::text[])
-        )
       ORDER BY b.last_name, b.first_name
     `);
+    const countyMatchedRows = ((result.rows || []) as any[]).filter((row) =>
+      targetCounties.length === 0 || targetCounties.some((target) =>
+        countyTargetMatchesDeal(target, row.dealCounty, row.dealState),
+      ),
+    );
+    const contactsById = new Map<string, any>();
+    for (const row of countyMatchedRows) {
+      const { dealCounty: _dealCounty, dealState: _dealState, ...contact } = row;
+      contactsById.set(contact.id, contact);
+    }
     return {
-      contacts: (result.rows || []) as any[],
+      contacts: Array.from(contactsById.values()),
       targetStates,
       targetCounties: profile.target_counties || [],
     };
@@ -18524,7 +18543,9 @@ RULES:
 
           // County match (market)
           if (dev.targetCounties && dev.targetCounties.length > 0) {
-            if (!deal.county || !dev.targetCounties.includes(deal.county)) continue;
+            if (!deal.county || !dev.targetCounties.some((target: string) =>
+              countyTargetMatchesDeal(target, deal.county, deal.state),
+            )) continue;
             matchReasons.push(`County: ${deal.county}`);
           }
 

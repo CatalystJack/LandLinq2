@@ -15,6 +15,7 @@ import {
 } from '../shared/schema.js';
 import { parseForwardedChainIdentities, type OriginalLeadSource, type RoutingSender } from './aiEmailParser.js';
 import { recordEmailIntakeOutcomeAndAlert } from './emailIntakeVolumeAlert.js';
+import { countyTargetMatchesDeal } from '../shared/county-targets.js';
 
 export const AUTOMATION_CONFIDENCE_THRESHOLD = 75;
 
@@ -80,10 +81,9 @@ export function routeProfile(
   const domainMatches = domain ? active.filter(p => normalizeKnownEmailDomains(p.knownEmailDomains).includes(domain)) : [];
   if (domainMatches.length === 1) return { profile: domainMatches[0], reason: 'sender_domain' };
   if (domainMatches.length > 1) return { profile: null, reason: 'ambiguous_sender_domain' };
-  const normalizedCounty = normalizeCounty(county);
   const normalizedState = normalizeState(state);
-  const geographicMatches = active.filter(p => normalizedCounty && normalizedState &&
-    (p.targetCounties || []).some(c => normalizeCounty(c) === normalizedCounty) &&
+  const geographicMatches = active.filter(p => normalizedState &&
+    (p.targetCounties || []).some(c => countyTargetMatchesDeal(c, county, state)) &&
     (p.targetStates || []).some(s => normalizeState(s) === normalizedState));
   return geographicMatches.length === 1
     ? { profile: geographicMatches[0], reason: 'county_state' }
