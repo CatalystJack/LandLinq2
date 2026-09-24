@@ -261,7 +261,12 @@ function companyFormFromAssistantDraft(draft: InvestmentCompanyAssistantDraft): 
 async function requestJson(url: string, init?: RequestInit) {
   const response = await fetch(url, { credentials: "include", ...init });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || body.message || "Request failed");
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Your sign-in is no longer valid on this page. Sign in again using this same app URL, then retry; your open edits will remain here.");
+    }
+    throw new Error(body.error || body.message || "Request failed");
+  }
   return body;
 }
 
