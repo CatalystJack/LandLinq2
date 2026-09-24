@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
   type IndustrialCriteria,
-  type IndustrialCriteriaDefaults,
 } from "@shared/industrial-criteria";
 import StateCriteriaOverrides from "@/components/state-criteria-overrides";
 
@@ -14,18 +15,13 @@ type Props = {
   compact?: boolean;
 };
 
-const numberFields: Array<{
-  key: keyof Pick<IndustrialCriteriaDefaults, "minSingleLoadAcres" | "minCrossDockAcres">;
-  label: string;
-  suffix?: string;
-  description?: string;
-  integer?: boolean;
-}> = [
-  { key: "minSingleLoadAcres", label: "Single-load minimum parcel", suffix: "acres" },
-  { key: "minCrossDockAcres", label: "Cross-dock minimum parcel", suffix: "acres" },
-];
+const INDUSTRIAL_PRODUCT_TYPES = [
+  { value: "single-load", label: "Single Load", minimumKey: "minSingleLoadAcres" },
+  { value: "cross-dock", label: "Cross-dock", minimumKey: "minCrossDockAcres" },
+] as const;
 
 export default function IndustrialCriteriaFields({ value, onChange, targetStates = [], compact = false }: Props) {
+  const [selectedProductType, setSelectedProductType] = useState<(typeof INDUSTRIAL_PRODUCT_TYPES)[number]["value"]>("single-load");
   const criteria: IndustrialCriteria = {
     ...DEFAULT_INDUSTRIAL_CRITERIA,
     ...(value || {}),
@@ -35,6 +31,8 @@ export default function IndustrialCriteriaFields({ value, onChange, targetStates
     },
     stateOverrides: (value as IndustrialCriteria | null)?.stateOverrides || {},
   };
+  const activeProductType = INDUSTRIAL_PRODUCT_TYPES.find((productType) => productType.value === selectedProductType)
+    || INDUSTRIAL_PRODUCT_TYPES[0];
 
   const update = (key: keyof IndustrialCriteria["default"], nextValue: unknown) => {
     onChange({ ...criteria, default: { ...criteria.default, [key]: nextValue } });
@@ -42,43 +40,62 @@ export default function IndustrialCriteriaFields({ value, onChange, targetStates
 
   return (
     <div className="space-y-6">
-      <div className={`grid gap-4 ${compact ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
-        {numberFields.map((field) => (
-          <div key={field.key}>
-            <Label htmlFor={`industrial-${String(field.key)}`}>{field.label}</Label>
-            <div className="relative mt-2">
+      <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-slate-900">Product types</h3>
+            <p className="mt-1 text-sm text-slate-500">Set the minimum parcel acreage for each industrial product type.</p>
+          </div>
+          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Normal (Default)</span>
+        </div>
+        <div className={`mt-4 grid gap-4 ${compact ? "sm:grid-cols-2" : "md:grid-cols-2"}`}>
+          <div>
+            <Label htmlFor="industrial-product-type">Product type <span className="text-red-500">*</span></Label>
+            <Select
+              value={selectedProductType}
+              onValueChange={(nextValue) => setSelectedProductType(nextValue as typeof selectedProductType)}
+            >
+              <SelectTrigger id="industrial-product-type" className="mt-1 bg-white">
+                <SelectValue placeholder="Choose product type" />
+              </SelectTrigger>
+              <SelectContent>
+                {INDUSTRIAL_PRODUCT_TYPES.map((productType) => (
+                  <SelectItem key={productType.value} value={productType.value}>{productType.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="industrial-minimum-acres">Min acres <span className="text-red-500">*</span></Label>
+            <div className="relative mt-1">
               <Input
-                id={`industrial-${String(field.key)}`}
+                id="industrial-minimum-acres"
                 type="number"
                 min="0"
-                step={field.integer ? "1" : "0.1"}
-                value={String(criteria.default[field.key] ?? "")}
+                step="0.1"
+                value={String(criteria.default[activeProductType.minimumKey] ?? "")}
                 onChange={(event) => {
                   const raw = event.target.value;
-                  if (raw === "") {
-                    return;
-                  }
-                  const parsed = field.integer ? Number.parseInt(raw, 10) : Number.parseFloat(raw);
+                  if (raw === "") return;
+                  const parsed = Number.parseFloat(raw);
                   if (!Number.isFinite(parsed) || parsed < 0) return;
-                  update(field.key, parsed);
+                  update(activeProductType.minimumKey, parsed);
                 }}
-                className={field.suffix ? "pr-16 bg-white" : "bg-white"}
+                className="bg-white pr-16"
               />
-              {field.suffix && <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-slate-400">{field.suffix}</span>}
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-slate-400">acres</span>
             </div>
           </div>
-        ))}
-      </div>
-
-      <StateCriteriaOverrides
-        targetStates={targetStates}
-        value={criteria.stateOverrides}
-        fields={[
-          { key: "minSingleLoadAcres", label: "Single-load minimum", suffix: "acres" },
-          { key: "minCrossDockAcres", label: "Cross-dock minimum", suffix: "acres" },
-        ]}
-        onChange={(stateOverrides) => onChange({ ...criteria, stateOverrides })}
-      />
+        </div>
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <StateCriteriaOverrides
+            targetStates={targetStates}
+            value={criteria.stateOverrides}
+            fields={[{ key: activeProductType.minimumKey, label: "Minimum acreage", suffix: "acres" }]}
+            onChange={(stateOverrides) => onChange({ ...criteria, stateOverrides })}
+          />
+        </div>
+      </section>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
