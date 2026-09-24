@@ -390,6 +390,7 @@ const municipalityPopCache: Record<string, { population: number | null; smallTow
 import { Buffer } from "buffer";
 import multer from "multer";
 import { startScrapeJob, getJob, cancelJob } from "./taxScraper.js";
+import { registerBrokerStateImportRoutes } from "./brokerStateImportRoutes";
 
 // Message deduplication cache - stores message IDs for 24 hours
 const processedMessages = new Map<string, number>();
@@ -2844,6 +2845,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
   // Auth middleware - using our own user/password system
   setupAuth(app);
+  registerBrokerStateImportRoutes(app);
 
   // ── Demo-user server-side lockdown ────────────────────────────────────────
   // Must be AFTER setupAuth so req.user is populated by Passport session.

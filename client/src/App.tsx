@@ -42,6 +42,7 @@ const SMSOptIn = lazy(() => import("@/pages/sms-opt-in"));
 const AnalystDashboard = lazy(() => import("@/pages/analyst-dashboard"));
 const AnalystDashboardV2 = lazy(() => import("@/pages/analyst-dashboard-v2"));
 const AdminDashboard = lazy(() => import("@/pages/admin-dashboard"));
+const BrokerStateImport = lazy(() => import("@/pages/broker-state-import"));
 const UserManagement = lazy(() => import("@/pages/user-management"));
 const OutreachManagement = lazy(() => import("@/pages/outreach-management"));
 const OutreachOnboarding = lazy(() => import("@/pages/outreach-onboarding"));
@@ -211,14 +212,16 @@ function Router() {
   if (
     isAuthenticated &&
     user &&
+    (user as any).mustResetPassword !== true &&
     isPlatformAdminEmail(authenticatedEmail) &&
-    ["/admin/investment-companies", "/admin/master-pipeline"].includes(window.location.pathname)
+    ["/admin/investment-companies", "/admin/master-pipeline", "/admin/broker-state-import"].includes(window.location.pathname)
   ) {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <Switch>
           <Route path="/admin/investment-companies" component={AdminInvestmentCompanies} />
           <Route path="/admin/master-pipeline" component={MasterPipeline} />
+          <Route path="/admin/broker-state-import" component={BrokerStateImport} />
         </Switch>
       </Suspense>
     );
@@ -332,6 +335,7 @@ function Router() {
           <Route path="/underwriting" component={Underwriting} />
           <Route path="/email-intake" component={EmailIntakePage} />
           <Route path="/admin/intake-audit" component={IntakeAudit} />
+          <Route path="/admin/broker-state-import" component={BrokerStateImport} />
           <Route path="/deals/:id" component={DealDetails} />
           <Route path="/dashboard" component={() => {
             const userEmail = String((user as any)?.claims?.email || (user as any)?.email || '').toLowerCase();

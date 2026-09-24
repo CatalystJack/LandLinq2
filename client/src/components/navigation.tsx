@@ -197,6 +197,7 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
                 { name: "Platform Overview", href: "/dashboard", description: "Parent view across all Investment Companies and developers" },
                 { name: "Master Pipeline", href: "/admin/master-pipeline", description: "View deal activity across every Investment Company" },
                 { name: "Investment Companies", href: "/admin/investment-companies", description: "Create company portals, criteria, and initial logins" },
+                { name: "Broker State Import", href: "/admin/broker-state-import", description: "Safely preview and promote the approved NC and TN broker workbooks" },
                 { section: "Data & Insights" },
                 { name: "Data Warehouse", href: "/data-hub", description: "Market intelligence, deal data, and broker analytics" },
                 { name: "Platform Analytics", href: "/analytics", description: "Platform performance metrics and operational charts" },
