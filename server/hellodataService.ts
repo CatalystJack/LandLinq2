@@ -101,6 +101,8 @@ function getFilterCriteria(
   productType?: string,
   companyMinVintage?: number | null,
   companyMinUnits?: number | null,
+  companyMinGrossRent?: number | null,
+  companyMinRentPSF?: number | null,
 ): ComparableFilterCriteria {
   const normalizedType = (productType || '').toLowerCase().trim();
   
@@ -130,9 +132,20 @@ function getFilterCriteria(
   };
 
   if (isRelaxedType) {
+    if (companyMinGrossRent != null) criteria.minGrossRent = companyMinGrossRent;
     console.log(`📊 [HELLODATA-FILTER] Using BTR/Lot/Townhome/SF criteria for "${productType}": 2015+, 25+ units, $2,000+ gross rent`);
   } else {
+    if (companyMinRentPSF != null) criteria.minRentPSF = companyMinRentPSF;
     console.log(`📊 [HELLODATA-FILTER] Using standard criteria for "${productType || 'default'}": 2020+, 150+ units, $1.75+/sqft`);
+  }
+  // Explicit developer rent criteria takes precedence over platform defaults,
+  // even when the product name does not match one of the legacy relaxed types.
+  if (companyMinGrossRent != null) {
+    criteria.minGrossRent = companyMinGrossRent;
+    criteria.minRentPSF = undefined;
+  } else if (companyMinRentPSF != null) {
+    criteria.minRentPSF = companyMinRentPSF;
+    criteria.minGrossRent = undefined;
   }
   if (companyMinVintage != null || companyMinUnits != null) {
     console.log(`📊 [HELLODATA-FILTER] Company overrides applied: ${criteria.minVintage}+ vintage, ${criteria.minUnits}+ units`);
@@ -587,11 +600,14 @@ interface HelloDataProperty {
 
 // Cached results are already filtered; version and persist the cutoffs so one
 // company's thresholds cannot be reused for a different company's search.
-const COMP_WAREHOUSE_CACHE_KIND = 'searchQualifyingComparables:criteria-v2' as const;
+const COMP_WAREHOUSE_CACHE_KIND = 'searchQualifyingComparables:criteria-v3' as const;
 
 interface CompWarehouseEnvelope {
   cacheKind: typeof COMP_WAREHOUSE_CACHE_KIND;
-  criteria: Pick<ComparableFilterCriteria, 'minVintage' | 'minUnits'>;
+  criteria: Pick<ComparableFilterCriteria, 'minVintage' | 'minUnits' | 'minGrossRent' | 'minRentPSF'> & {
+    radiusMiles: number;
+    productType: string | null;
+  };
   result: any;
 }
 
@@ -613,7 +629,10 @@ export async function checkCompWarehouse(
   radiusMiles: number,
   productType?: string,
   minimumFetchedAt?: Date | null,
-  criteria?: Pick<ComparableFilterCriteria, 'minVintage' | 'minUnits'>,
+  criteria?: Pick<ComparableFilterCriteria, 'minVintage' | 'minUnits' | 'minGrossRent' | 'minRentPSF'> & {
+    radiusMiles: number;
+    productType: string | null;
+  },
 ): Promise<any | null> {
   if (![latitude, longitude, radiusMiles].every(Number.isFinite) || radiusMiles <= 0) {
     return null;
@@ -670,7 +689,11 @@ export async function checkCompWarehouse(
         payload.cacheKind !== COMP_WAREHOUSE_CACHE_KIND ||
         !criteria ||
         payload.criteria?.minVintage !== criteria.minVintage ||
-        payload.criteria?.minUnits !== criteria.minUnits
+        payload.criteria?.minUnits !== criteria.minUnits ||
+        payload.criteria?.minGrossRent !== criteria.minGrossRent ||
+        payload.criteria?.minRentPSF !== criteria.minRentPSF ||
+        payload.criteria?.radiusMiles !== criteria.radiusMiles ||
+        payload.criteria?.productType !== criteria.productType
       ) continue;
       console.log(
         `📦 [HELLODATA-WAREHOUSE] HIT ${COMP_WAREHOUSE_CACHE_KIND}: cached center ${centerDistance.toFixed(2)} miles away, radius ${cachedRadius} miles${minimumFetchedAt ? `, newer than ${minimumFetchedAt.toISOString()}` : ''}`,
@@ -710,7 +733,10 @@ async function storeCompWarehouse(
   productType: string | undefined,
   result: any,
   sourceDeveloperProfileId?: string,
-  criteria?: Pick<ComparableFilterCriteria, 'minVintage' | 'minUnits'>,
+  criteria?: Pick<ComparableFilterCriteria, 'minVintage' | 'minUnits' | 'minGrossRent' | 'minRentPSF'> & {
+    radiusMiles: number;
+    productType: string | null;
+  },
 ): Promise<void> {
   if (!criteria) return;
   const envelope: CompWarehouseEnvelope = { cacheKind: COMP_WAREHOUSE_CACHE_KIND, criteria, result };
@@ -1320,6 +1346,8 @@ export class HelloDataService {
     sourceDeveloperProfileId?: string;
     companyMinVintage?: number | null;
     companyMinUnits?: number | null;
+    companyMinGrossRent?: number | null;
+    companyMinRentPSF?: number | null;
     forceFresh?: boolean;
     minimumWarehouseFetchedAt?: Date | null;
   }): Promise<{
@@ -1360,7 +1388,14 @@ export class HelloDataService {
         options?.productType,
         options?.companyMinVintage,
         options?.companyMinUnits,
+        options?.companyMinGrossRent,
+        options?.companyMinRentPSF,
       );
+      const warehouseCriteria = {
+        ...filterCriteria,
+        radiusMiles: searchRadius,
+        productType: options?.productType?.trim() || null,
+      };
 
       // Dec 17, 2025: If coordinates are provided directly, skip geocoding entirely
       let geocoded: {
@@ -1495,7 +1530,7 @@ export class HelloDataService {
           searchRadius,
           options?.productType,
           options?.minimumWarehouseFetchedAt,
-          filterCriteria,
+          warehouseCriteria,
         );
         if (warehouseResult) return warehouseResult;
       } else {
@@ -1613,7 +1648,9 @@ export class HelloDataService {
         const yearBuilt = parseInt(comp.year_built || comp.vintage || comp.yearBuilt || comp.year || 0);
         // Try multiple possible field names for units (robust parsing)
         const units = parseInt(comp.number_units || comp.units || comp.unitCount || comp.unit_count || comp.num_units || 0);
-        return yearBuilt >= filterCriteria.minVintage && units >= filterCriteria.minUnits;
+        const distance = Number(comp.distance_miles ?? comp.distance ?? comp.distanceMiles);
+        const withinRadius = !Number.isFinite(distance) || distance <= searchRadius;
+        return withinRadius && yearBuilt >= filterCriteria.minVintage && units >= filterCriteria.minUnits;
       });
 
       console.log(`\n   Total comparables: ${rawComparables.length}`);
@@ -1978,7 +2015,7 @@ export class HelloDataService {
           options?.productType,
           result,
           options?.sourceDeveloperProfileId,
-          filterCriteria,
+          warehouseCriteria,
         );
         return result;
       }
@@ -2235,9 +2272,8 @@ export class HelloDataService {
                 ? `✅ QUALIFIES (rent $${avgRentPerUnit.toFixed(0)}/unit >= $${filterCriteria.minGrossRent}/unit)`
                 : `❌ Does not qualify (rent $${avgRentPerUnit.toFixed(0)}/unit < $${filterCriteria.minGrossRent}/unit)`;
             } else {
-              // NO rent data available - still qualifies for manual review
-              qualifies = true;
-              qualificationMessage = `✅ QUALIFIES [NO RENT DATA - needs manual review] (vintage/units met criteria)`;
+              qualifies = false;
+              qualificationMessage = `❌ Does not qualify (missing rent data)`;
             }
           } else if (filterCriteria.minRentPSF) {
             // Use rent per sqft for Conventional/Active Adult
@@ -2247,9 +2283,8 @@ export class HelloDataService {
                 ? `✅ QUALIFIES (rent >= $${filterCriteria.minRentPSF}/sqft)`
                 : `❌ Does not qualify (rent $${weightedRentPsf.toFixed(2)} < $${filterCriteria.minRentPSF}/sqft)`;
             } else {
-              // NO rent data available - still qualifies for manual review
-              qualifies = true;
-              qualificationMessage = `✅ QUALIFIES [NO RENT DATA - needs manual review] (vintage/units met criteria)`;
+              qualifies = false;
+              qualificationMessage = `❌ Does not qualify (missing rent data)`;
             }
           }
           
@@ -2486,7 +2521,7 @@ export class HelloDataService {
         options?.productType,
         result,
         options?.sourceDeveloperProfileId,
-        filterCriteria,
+        warehouseCriteria,
       );
       return result;
 

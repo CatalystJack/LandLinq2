@@ -50,6 +50,7 @@ import {
   type DeveloperAssetClass,
   type IndustrialCriteria,
 } from "@shared/industrial-criteria";
+import { parseCountyTarget } from "@shared/county-targets";
 import { normalizeUsStateCode } from "@shared/us-states";
 
 type Profile = {
@@ -455,6 +456,43 @@ export default function DeveloperCriteriaSettings() {
   const update = <K extends keyof Profile>(key: K, value: Profile[K]) =>
     setForm((current) => current ? { ...current, [key]: value } : current);
 
+  const updateTargetStates = (nextStates: string[]) => {
+    if (!form) return;
+    const normalizedNextStates = Array.from(new Set(nextStates.map(normalizeUsStateCode).filter(Boolean)));
+    const previousStates = new Set(form.targetStates.map(normalizeUsStateCode));
+    const removedStates = new Set(Array.from(previousStates).filter((state) => !normalizedNextStates.includes(state)));
+    const nextCounties = form.targetCounties.filter((target) => {
+      const state = parseCountyTarget(target).state;
+      return !state || !removedStates.has(normalizeUsStateCode(state));
+    });
+    const matchingLabelKeys = new Set<string>();
+    nextCounties.forEach((target) => {
+      const parsed = parseCountyTarget(target);
+      matchingLabelKeys.add(target);
+      matchingLabelKeys.add(parsed.county);
+    });
+    const nextLabels = Object.fromEntries(
+      Object.entries(form.countyMarketLabels).filter(([key]) => matchingLabelKeys.has(key)),
+    );
+    const removeStateOverrides = (overrides: CriteriaOverrideValue) => Object.fromEntries(
+      Object.entries(overrides || {}).filter(([state]) => !removedStates.has(normalizeUsStateCode(state))),
+    );
+    setForm({
+      ...form,
+      targetStates: normalizedNextStates,
+      targetCounties: nextCounties,
+      countyMarketLabels: nextLabels,
+      productTypes: form.productTypes.map((productType) => ({
+        ...productType,
+        stateOverrides: removeStateOverrides(productType.stateOverrides),
+      })),
+      industrialCriteria: {
+        ...form.industrialCriteria,
+        stateOverrides: removeStateOverrides(form.industrialCriteria.stateOverrides),
+      },
+    });
+  };
+
   const save = () => {
     if (!form) return;
     if (form.profileType === "general_sales") {
@@ -492,14 +530,21 @@ export default function DeveloperCriteriaSettings() {
       toast({ title: "Comparable search radius must be greater than zero", variant: "destructive" });
       return;
     }
-    if (form.compMinVintageYear !== "") {
+    if (form.compMinVintageYear === "") {
+      toast({ title: "Minimum comp vintage year is required", variant: "destructive" });
+      return;
+    } else {
       const year = Number(form.compMinVintageYear);
       if (!Number.isInteger(year) || year < 1900 || year > 2100) {
         toast({ title: "Minimum comp vintage year must be a year between 1900 and 2100", variant: "destructive" });
         return;
       }
     }
-    if (form.compMinUnits !== "" && (!Number.isInteger(Number(form.compMinUnits)) || Number(form.compMinUnits) < 0)) {
+    if (form.compMinUnits === "") {
+      toast({ title: "Minimum comp units are required", variant: "destructive" });
+      return;
+    }
+    if (!Number.isInteger(Number(form.compMinUnits)) || Number(form.compMinUnits) < 0) {
       toast({ title: "Minimum comp units must be a non-negative whole number", variant: "destructive" });
       return;
     }
@@ -847,7 +892,7 @@ export default function DeveloperCriteriaSettings() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-5 md:grid-cols-2">
-                <StateMultiSelect label="Target states" values={form.targetStates} onChange={(value) => update("targetStates", value)} />
+                <StateMultiSelect label="Target states" values={form.targetStates} onChange={updateTargetStates} />
                 <CountyMarketEditor
                   states={form.targetStates}
                   values={form.targetCounties}
@@ -893,19 +938,21 @@ export default function DeveloperCriteriaSettings() {
                   label="Minimum comp vintage year"
                   value={form.compMinVintageYear}
                   onChange={(value) => update("compMinVintageYear", value)}
-                  placeholder="Use product-type default"
+                  placeholder="Enter a year, e.g. 2020"
+                  required
                   step={1}
                   min={1900}
                   max={2100}
-                  helperText="Leave blank to use the platform default for that product type."
+                  helperText="Required company criterion for comparable properties."
                 />
                 <NumberField
                   label="Minimum comp units"
                   value={form.compMinUnits}
                   onChange={(value) => update("compMinUnits", value)}
-                  placeholder="Use product-type default"
+                  placeholder="Enter minimum units"
+                  required
                   step={1}
-                  helperText="Leave blank to use the platform default for that product type."
+                  helperText="Required company criterion for comparable properties."
                 />
               </div>
 
@@ -1033,7 +1080,7 @@ export default function DeveloperCriteriaSettings() {
                  targetStates={form.targetStates}
               />
               <div className="grid gap-5 border-t border-amber-200 pt-5 md:grid-cols-2">
-                <StateMultiSelect label="Target states" values={form.targetStates} onChange={(value) => update("targetStates", value)} />
+                <StateMultiSelect label="Target states" values={form.targetStates} onChange={updateTargetStates} />
                 <CountyMarketEditor
                   states={form.targetStates}
                   values={form.targetCounties}

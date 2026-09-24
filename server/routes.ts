@@ -9387,7 +9387,9 @@ Provide your analysis in this exact JSON format:
         compSearchRadiusMiles: string | null;
         compMinVintageYear: number | null;
         compMinUnits: number | null;
+        rentMetric: string;
       } | undefined;
+      let rerunComparableCriteria: any = {};
       if (isDeveloperRole) {
         const developerProfileId = getDeveloperProfileId(req, res);
         if (!developerProfileId) return;
@@ -9397,6 +9399,9 @@ Provide your analysis in this exact JSON format:
           compSearchRadiusMiles: developerProfiles.compSearchRadiusMiles,
           compMinVintageYear: developerProfiles.compMinVintageYear,
           compMinUnits: developerProfiles.compMinUnits,
+          rentMetric: developerProfiles.rentMetric,
+         compMinVintageYear: developerProfiles.compMinVintageYear,
+         compMinUnits: developerProfiles.compMinUnits,
         }).from(developerProfiles).where(and(
           eq(developerProfiles.id, developerProfileId),
           eq(developerProfiles.isActive, true),
@@ -9404,6 +9409,14 @@ Provide your analysis in this exact JSON format:
         if (!profileCriteria) return res.status(404).json({ message: "Investment Company profile not found" });
         rerunDeveloperProfileId = developerProfileId;
         rerunProfileCriteria = profileCriteria;
+        const { resolveDeveloperComparableCriteria } = await import("./developerClassificationService");
+        const rerunProductTypes = await db.select().from(developerProductTypes)
+          .where(and(eq(developerProductTypes.developerProfileId, developerProfileId), eq(developerProductTypes.isActive, true)));
+        rerunComparableCriteria = resolveDeveloperComparableCriteria(
+          deal,
+          { ...profileCriteria, profileType: "real_estate", assetClass: "multifamily" } as any,
+          rerunProductTypes,
+        );
         const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
         if (!visibleDealIds.has(id)) {
           return res.status(404).json({ message: "Deal not found" });
@@ -9449,16 +9462,20 @@ Provide your analysis in this exact JSON format:
           sourceDeveloperProfileId?: string;
           companyMinVintage?: number;
           companyMinUnits?: number;
+          companyMinGrossRent?: number;
+          companyMinRentPSF?: number;
           minimumWarehouseFetchedAt?: Date | null;
         } = {
           radiusMiles: Number.isFinite(Number(rerunProfileCriteria?.compSearchRadiusMiles)) &&
             Number(rerunProfileCriteria?.compSearchRadiusMiles) > 0
             ? Number(rerunProfileCriteria?.compSearchRadiusMiles)
             : 3,
-          productType: deal.productTypes?.[0] || (deal as any).dealType || undefined,
+          productType: rerunComparableCriteria.productType || deal.productTypes?.[0] || (deal as any).dealType || undefined,
           sourceDeveloperProfileId: rerunDeveloperProfileId,
           companyMinVintage: rerunProfileCriteria?.compMinVintageYear ?? undefined,
           companyMinUnits: rerunProfileCriteria?.compMinUnits ?? undefined,
+          companyMinGrossRent: rerunComparableCriteria.companyMinGrossRent,
+          companyMinRentPSF: rerunComparableCriteria.companyMinRentPSF,
           minimumWarehouseFetchedAt: deal.comparablesFetchedAt || null,
         };
         if (deal.latitude && deal.longitude) {
@@ -15283,6 +15300,18 @@ RULES:
           throw new Error('Minimum comp vintage year must be between 1900 and 2100');
         }
         updates[field] = value;
+      }
+      if (!isGeneralSales && !isIndustrial) {
+        const effectiveVintage = body.compMinVintageYear !== undefined
+          ? body.compMinVintageYear
+          : currentProfile.compMinVintageYear;
+        const effectiveUnits = body.compMinUnits !== undefined
+          ? body.compMinUnits
+          : currentProfile.compMinUnits;
+        if (effectiveVintage === null || effectiveVintage === undefined || effectiveVintage === '' ||
+            effectiveUnits === null || effectiveUnits === undefined || effectiveUnits === '') {
+          throw new Error('Minimum comp vintage year and minimum comp units are required for multifamily profiles');
+        }
       }
 
       const productTypes = isGeneralSales || isIndustrial ? [] : body.productTypes.map((raw: any, index: number) => {
@@ -21379,12 +21408,14 @@ RULES:
       let searchRadius = 3;
       let companyMinVintage: number | undefined;
       let companyMinUnits: number | undefined;
+      let comparableCriteria: any = {};
       if (developerProfileId) {
         const { developerProfiles } = await import('@shared/schema');
         const [profile] = await db.select({
           compSearchRadiusMiles: developerProfiles.compSearchRadiusMiles,
           compMinVintageYear: developerProfiles.compMinVintageYear,
           compMinUnits: developerProfiles.compMinUnits,
+          rentMetric: developerProfiles.rentMetric,
         }).from(developerProfiles).where(and(
           eq(developerProfiles.id, developerProfileId),
           eq(developerProfiles.isActive, true),
@@ -21393,6 +21424,11 @@ RULES:
         if (Number.isFinite(configuredRadius) && configuredRadius > 0) searchRadius = configuredRadius;
         companyMinVintage = profile?.compMinVintageYear ?? undefined;
         companyMinUnits = profile?.compMinUnits ?? undefined;
+        const { developerProductTypes } = await import("@shared/schema");
+        const productTypes = await db.select().from(developerProductTypes)
+          .where(and(eq(developerProductTypes.developerProfileId, developerProfileId), eq(developerProductTypes.isActive, true)));
+        const { resolveDeveloperComparableCriteria } = await import("./developerClassificationService");
+        comparableCriteria = resolveDeveloperComparableCriteria(deal, profile as any, productTypes);
       }
       // Dec 17, 2025: Pass coordinates to skip geocoding
       // Jan 21, 2026: Also pass productType for dynamic filter criteria
@@ -21401,11 +21437,13 @@ RULES:
         {
           latitude: lat!,
           longitude: lng!,
-          productType: (deal as any).productType,
+          productType: comparableCriteria.productType || (deal as any).productType || deal.productTypes?.[0],
           radiusMiles: searchRadius,
           sourceDeveloperProfileId: developerProfileId,
           companyMinVintage,
           companyMinUnits,
+          companyMinGrossRent: comparableCriteria.companyMinGrossRent,
+          companyMinRentPSF: comparableCriteria.companyMinRentPSF,
         }
       );
 

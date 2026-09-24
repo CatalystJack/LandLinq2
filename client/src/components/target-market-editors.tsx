@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,8 +42,16 @@ export function StateMultiSelect({
       </select>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {selectedCodes.length > 0 ? selectedCodes.map((code) => (
-          <Badge key={code} variant="outline" className="border-catalyst-blue/20 bg-catalyst-blue/10 text-catalyst-navy">
+          <Badge key={code} variant="outline" className="gap-1 border-catalyst-blue/20 bg-catalyst-blue/10 pr-1 text-catalyst-navy">
             {getUsStateLabel(code)} ({code})
+            <button
+              type="button"
+              onClick={() => onChange(selectedCodes.filter((selectedCode) => selectedCode !== code))}
+              aria-label={`Remove ${getUsStateLabel(code)} from ${label}`}
+              className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-catalyst-navy/70 hover:bg-catalyst-blue/15 hover:text-catalyst-navy focus:outline-none focus:ring-2 focus:ring-catalyst-blue/50"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
           </Badge>
         )) : <span className="text-xs text-slate-500">Select one or more states.</span>}
       </div>

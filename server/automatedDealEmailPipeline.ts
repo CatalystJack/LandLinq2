@@ -7,7 +7,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { db } from './db.js';
 import { GeocodioService } from './geocodioService.js';
 import { HelloDataService } from './hellodataService.js';
-import { classifyDealForProfile } from './developerClassificationService.js';
+import { classifyDealForProfile, resolveDeveloperComparableCriteria } from './developerClassificationService.js';
 import { enrichDealWithGovernmentData } from './governmentDataEnrichment.js';
 import {
   brokers, deals, developerProductTypes, developerProfiles, emailIntakeQueue, partnerDeveloperSends,
@@ -395,13 +395,17 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
     await db.update(emailIntakeQueue).set({ dealId: deal.id }).where(eq(emailIntakeQueue.id, intake.id));
   }
   const activeTypes = await db.select().from(developerProductTypes).where(and(eq(developerProductTypes.developerProfileId, profile.id), eq(developerProductTypes.isActive, true)));
+  const comparableCriteria = resolveDeveloperComparableCriteria(deal, profile as DeveloperProfile, activeTypes);
   // HelloData's qualifying-comparable method checks its warehouse before making a live request.
   const comps = await new HelloDataService().searchQualifyingComparables(deal.address, {
     latitude: location.latitude || undefined, longitude: location.longitude || undefined,
     radiusMiles: Number((profile as DeveloperProfile).compSearchRadiusMiles || 3),
+    productType: comparableCriteria.productType,
     sourceDeveloperProfileId: profile.id,
     companyMinVintage: (profile as DeveloperProfile).compMinVintageYear,
     companyMinUnits: (profile as DeveloperProfile).compMinUnits,
+    companyMinGrossRent: comparableCriteria.companyMinGrossRent,
+    companyMinRentPSF: comparableCriteria.companyMinRentPSF,
   });
   await db.update(deals).set({
     topRentPSF: comps.topRentPSF === undefined ? null : String(comps.topRentPSF), avgRentPSF: comps.avgRentPSF === undefined ? null : String(comps.avgRentPSF),

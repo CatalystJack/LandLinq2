@@ -10,6 +10,53 @@ export interface DeveloperClassificationResult {
   matchedProductTypes: string[];
 }
 
+export interface DeveloperComparableCriteria {
+  productType?: string;
+  companyMinVintage?: number | null;
+  companyMinUnits?: number | null;
+  companyMinGrossRent?: number | null;
+  companyMinRentPSF?: number | null;
+}
+
+/** Resolve one deterministic, conservative comparable profile. When a deal has
+ * several matching product types, the highest applicable rent floor wins. */
+export function resolveDeveloperComparableCriteria(
+  deal: any,
+  profile: DeveloperProfile,
+  productTypes: DeveloperProductType[],
+): DeveloperComparableCriteria {
+  const requested = (Array.isArray(deal?.productTypes) ? deal.productTypes : [])
+    .map((value: unknown) => String(value).trim().toLowerCase()).filter(Boolean);
+  const active = productTypes.filter(type => type.isActive);
+  const matching = active.filter(type => requested.some((name: string) =>
+    name === String(type.name).trim().toLowerCase() ||
+    name.includes(String(type.name).trim().toLowerCase()) ||
+    String(type.name).trim().toLowerCase().includes(name),
+  ));
+  const candidates = (matching.length ? matching : active).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const selected = candidates[0];
+  const state = deal?.state;
+  const resolved = selected ? resolveStateAwareCriteria({
+    minRentPsf: numericValue(selected.minRentPsf),
+    minRentPerUnit: numericValue(selected.minRentPerUnit),
+  }, selected.stateOverrides as any, state) : {};
+  const rentValues = candidates.map(type => {
+    const criteria = resolveStateAwareCriteria({
+      minRentPsf: numericValue(type.minRentPsf),
+      minRentPerUnit: numericValue(type.minRentPerUnit),
+    }, type.stateOverrides as any, state);
+    return profile.rentMetric === "psf" ? criteria.minRentPsf : criteria.minRentPerUnit;
+  }).filter((value): value is number => value !== null && value !== undefined);
+  return {
+    productType: selected?.name,
+    companyMinVintage: profile.compMinVintageYear,
+    companyMinUnits: profile.compMinUnits,
+    ...(profile.rentMetric === "psf"
+      ? { companyMinRentPSF: rentValues.length ? Math.max(...rentValues) : (resolved as any).minRentPsf }
+      : { companyMinGrossRent: rentValues.length ? Math.max(...rentValues) : (resolved as any).minRentPerUnit }),
+  };
+}
+
 function numericValue(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const parsed = typeof value === "number" ? value : parseFloat(String(value));
