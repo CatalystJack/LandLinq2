@@ -13,7 +13,6 @@ import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 type DeveloperBranding = {
   companyName: string;
-  logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
 };
@@ -197,16 +196,18 @@ export default function DeveloperLogin() {
         <div className="w-full max-w-[460px]">
           <Card className="max-w-full overflow-hidden rounded-xl border border-[#dce3ec] bg-white shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
             <CardHeader className="px-6 pb-2 pt-6 sm:px-8 sm:pt-7">
-              <Link href="/" className="mx-auto mb-5 flex w-fit" aria-label={`${branding.companyName} home`}>
-                <img
-                  src={branding.logoUrl || "/assets/landlinq-color-logo.png"}
-                  alt={branding.logoUrl ? `${branding.companyName} logo` : "LandLinq"}
-                  className="h-8 w-auto max-w-[170px] object-contain object-center"
-                />
+              <Link
+                href="/"
+                className="mx-auto mb-5 flex min-h-8 max-w-full items-center justify-center text-center"
+                aria-label={`${branding.companyName} home`}
+              >
+                <span className="max-w-full break-words text-xl font-bold leading-tight text-[#0A2B4A] sm:text-2xl">
+                  {branding.companyName}
+                </span>
               </Link>
               <CardTitle className="text-xl font-bold text-slate-900">Sign In</CardTitle>
               <CardDescription className="mt-1 text-[15px] leading-6 text-slate-500">
-                {branding.companyName}
+                Use your company credentials to sign in.
               </CardDescription>
             </CardHeader>
             <CardContent className="max-w-full overflow-hidden px-6 pb-7 pt-4 sm:px-8">
