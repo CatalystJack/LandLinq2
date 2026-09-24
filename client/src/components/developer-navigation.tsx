@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { preloadRoute } from "@/lib/route-preload";
 import {
   BarChart3,
+  BriefcaseBusiness,
   CircleDot,
   Home,
   LayoutDashboard,
@@ -22,6 +23,7 @@ import DeveloperAssistantChat from "@/components/developer-assistant-chat";
 const realEstateTabs = [
   { label: "Home", href: "/developer/home" },
   { label: "Deal Dashboard", href: "/developer/dashboard" },
+  { label: "Pipeline", href: "/developer/pipeline" },
   { label: "CRM", href: "/developer/crm" },
   { label: "Outreach", href: "/developer/outreach" },
   { label: "Analytics", href: "/developer/analytics" },
@@ -31,6 +33,7 @@ const realEstateTabs = [
 const iconForTab = (label: string) => {
   if (label === "Home") return Home;
   if (label === "Deal Dashboard") return LayoutDashboard;
+  if (label === "Pipeline") return BriefcaseBusiness;
   if (label === "CRM") return Users;
   if (label === "Outreach") return Send;
   if (label === "Analytics") return BarChart3;

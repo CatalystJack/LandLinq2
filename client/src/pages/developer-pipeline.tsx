@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowDown, ArrowUp, BriefcaseBusiness, Edit3, Loader2, Plus, Settings2, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, BriefcaseBusiness, Edit3, GripVertical, Loader2, Plus, Settings2, Trash2 } from "lucide-react";
 
 type Stage = {
   id: string;
@@ -70,6 +70,7 @@ export default function DeveloperPipeline() {
   const [sort, setSort] = useState("createdAt");
   const [newOpen, setNewOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [draggingOpportunityId, setDraggingOpportunityId] = useState<string | null>(null);
   const [contactSearch, setContactSearch] = useState("");
   const [newStageName, setNewStageName] = useState("");
   const [form, setForm] = useState({ contactId: "", stageId: "", title: "", value: "", notes: "" });
@@ -90,6 +91,14 @@ export default function DeveloperPipeline() {
   const stages = stagesQuery.data?.stages || [];
   const activeStages = stages.filter((stage) => stage.isActive);
   const allOpportunities = opportunitiesQuery.data?.opportunities || [];
+  const boardStages = useMemo(() => {
+    const ordered = [...stages].sort((a, b) => a.sortOrder - b.sortOrder);
+    const stagesWithInactiveOpportunities = new Set(
+      allOpportunities.filter((opportunity) => !opportunity.stageIsActive).map((opportunity) => opportunity.stageId),
+    );
+    return ordered.filter((stage) => stage.isActive || stagesWithInactiveOpportunities.has(stage.id))
+      .filter((stage) => stageFilter === "all" || stage.id === stageFilter);
+  }, [stages, allOpportunities, stageFilter]);
   const opportunities = useMemo(
     () => stageFilter === "all"
       ? allOpportunities
@@ -199,8 +208,8 @@ export default function DeveloperPipeline() {
     onError: (error: Error) => toast({ title: "Stage could not be deleted", description: error.message, variant: "destructive" }),
   });
 
-  const openNewOpportunity = () => {
-    setForm({ contactId: "", stageId: activeStages[0]?.id || "", title: "", value: "", notes: "" });
+  const openNewOpportunity = (stageId?: string) => {
+    setForm({ contactId: "", stageId: stageId || activeStages[0]?.id || "", title: "", value: "", notes: "" });
     setContactSearch("");
     setNewOpen(true);
   };
@@ -224,6 +233,16 @@ export default function DeveloperPipeline() {
     reorderStageMutation.mutate(reordered.map((item) => item.id));
   };
 
+  const handleStageDrop = (event: React.DragEvent<HTMLElement>, stage: Stage) => {
+    event.preventDefault();
+    setDraggingOpportunityId(null);
+    if (!stage.isActive) return;
+    const opportunityId = event.dataTransfer.getData("text/plain");
+    const opportunity = allOpportunities.find((item) => item.id === opportunityId);
+    if (!opportunity || opportunity.stageId === stage.id) return;
+    updateOpportunityMutation.mutate({ id: opportunity.id, payload: { stageId: stage.id } });
+  };
+
   return (
     <div className="min-h-screen bg-warm">
       <DeveloperNavigation />
@@ -235,7 +254,7 @@ export default function DeveloperPipeline() {
           actions={
             <>
               <Button variant="outline" size="sm" onClick={() => setManageOpen(true)}>
-                <Settings2 className="mr-2 h-4 w-4" />Manage Stages
+                <Settings2 className="mr-2 h-4 w-4" />{activeStages.length ? "Manage Stages" : "Configure Stages"}
               </Button>
               <Button variant="outline" size="sm" onClick={openNewOpportunity} disabled={!activeStages.length}>
                 <Plus className="mr-2 h-4 w-4" />New Opportunity
@@ -272,19 +291,144 @@ export default function DeveloperPipeline() {
             </div>
           </CardHeader>
           <CardContent>
-            {opportunitiesQuery.isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-[#4A90E2]" /></div> : opportunities.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-300 px-6 py-16 text-center"><BriefcaseBusiness className="mx-auto h-10 w-10 text-slate-300" /><h2 className="mt-3 font-semibold text-slate-800">No opportunities yet</h2><p className="mt-1 text-sm text-slate-500">Create your first opportunity to start tracking sales activity.</p></div>
+            {opportunitiesQuery.isLoading || stagesQuery.isLoading ? (
+              <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-[#4A90E2]" /></div>
+            ) : boardStages.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 px-6 py-16 text-center">
+                <Settings2 className="mx-auto h-10 w-10 text-slate-300" />
+                <h2 className="mt-3 font-semibold text-slate-800">Set up your pipeline stages</h2>
+                <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">Add the stages your team uses to track opportunities. They will become the columns on this board.</p>
+                <Button
+                  className="mt-4 border border-[#4A90E2] bg-[#4A90E2] text-white hover:border-[#4A90E2] hover:bg-white hover:text-[#4A90E2]"
+                  onClick={() => setManageOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />Configure stages
+                </Button>
+              </div>
             ) : (
-              <div className="table-scroll-container"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="px-3 py-3">Contact</th><th className="px-3 py-3">Title</th><th className="px-3 py-3">Stage</th><th className="px-3 py-3 text-right">Value</th><th className="px-3 py-3">Last updated</th><th className="px-3 py-3 text-right">Actions</th></tr></thead><tbody>
-                {opportunities.map((opportunity) => <tr key={opportunity.id} className="border-b border-slate-100 last:border-0">
-                  <td className="px-3 py-4"><p className="font-medium text-slate-800">{contactName(opportunity)}</p><p className="text-xs text-slate-500">{opportunity.contactEmail || "No email"}</p></td>
-                  <td className="px-3 py-4 text-slate-700">{opportunity.title || "Untitled opportunity"}</td>
-                  <td className="px-3 py-4"><Select value={opportunity.stageId} onValueChange={(stageId) => updateOpportunityMutation.mutate({ id: opportunity.id, payload: { stageId } })}><SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger><SelectContent>{activeStages.map((stage) => <SelectItem key={stage.id} value={stage.id}>{stage.name}</SelectItem>)}{!opportunity.stageIsActive && <SelectItem value={opportunity.stageId}>{opportunity.stageName} (inactive)</SelectItem>}</SelectContent></Select></td>
-                  <td className="px-3 py-4 text-right font-medium text-slate-800">{money(opportunity.value)}</td>
-                  <td className="px-3 py-4 text-slate-500">{opportunity.updatedAt ? new Date(opportunity.updatedAt).toLocaleDateString() : "—"}</td>
-                   <td className="px-3 py-4 text-right"><Button variant="ghost" size="icon" disabled={deleteOpportunityMutation.isPending} onClick={() => window.confirm(`Delete ${opportunity.title || "this opportunity"}? This cannot be undone.`) && deleteOpportunityMutation.mutate(opportunity.id)} aria-label={`Delete ${opportunity.title || "opportunity"}`}><Trash2 className="h-4 w-4 text-slate-400" /></Button></td>
-                </tr>)}
-              </tbody></table></div>
+              <div className="overflow-x-auto pb-3">
+                <div className="flex min-h-72 items-start gap-4">
+                  {boardStages.map((stage) => {
+                    const stageOpportunities = opportunities.filter((opportunity) => opportunity.stageId === stage.id);
+                    return (
+                      <section
+                        key={stage.id}
+                        aria-label={`${stage.name} stage`}
+                        className={`w-[290px] shrink-0 rounded-xl border p-3 transition-colors ${
+                          stage.isActive ? "border-slate-200 bg-slate-50/80" : "border-amber-200 bg-amber-50/50"
+                        }`}
+                        onDragOver={stage.isActive ? (event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                        } : undefined}
+                        onDrop={stage.isActive ? (event) => handleStageDrop(event, stage) : undefined}
+                      >
+                        <header className="mb-3 flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <h2 className="truncate text-sm font-semibold text-slate-900">{stage.name}</h2>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {stageOpportunities.length} {stageOpportunities.length === 1 ? "opportunity" : "opportunities"}
+                            </p>
+                          </div>
+                          {!stage.isActive && <Badge variant="secondary" className="shrink-0">Inactive</Badge>}
+                        </header>
+
+                        <div className="space-y-3">
+                          {stageOpportunities.map((opportunity) => (
+                            <article
+                              key={opportunity.id}
+                              className={`rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-opacity ${
+                                draggingOpportunityId === opportunity.id ? "opacity-40" : ""
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <h3 className="break-words text-sm font-semibold text-slate-900">
+                                    {opportunity.title || "Untitled opportunity"}
+                                  </h3>
+                                  <p className="mt-1 text-sm text-slate-700">{contactName(opportunity)}</p>
+                                  <p className="break-all text-xs text-slate-500">{opportunity.contactEmail || "No email"}</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  draggable
+                                  className="h-8 w-8 shrink-0 cursor-grab text-slate-400 active:cursor-grabbing"
+                                  aria-label={`Drag ${opportunity.title || "opportunity"} to another stage`}
+                                  title="Drag to another stage"
+                                  onDragStart={(event) => {
+                                    event.dataTransfer.setData("text/plain", opportunity.id);
+                                    event.dataTransfer.effectAllowed = "move";
+                                    setDraggingOpportunityId(opportunity.id);
+                                  }}
+                                  onDragEnd={() => setDraggingOpportunityId(null)}
+                                >
+                                  <GripVertical className="h-4 w-4" />
+                                </Button>
+                              </div>
+
+                              <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                                <span className="text-sm font-semibold text-[#0A2B4A]">{money(opportunity.value)}</span>
+                                <span className="text-xs text-slate-500">
+                                  {opportunity.updatedAt ? new Date(opportunity.updatedAt).toLocaleDateString() : "—"}
+                                </span>
+                              </div>
+
+                              <div className="mt-3 flex items-center gap-2">
+                                <Select
+                                  value={opportunity.stageId}
+                                  onValueChange={(stageId) => updateOpportunityMutation.mutate({ id: opportunity.id, payload: { stageId } })}
+                                >
+                                  <SelectTrigger className="h-8 min-w-0 flex-1 text-xs" aria-label={`Move ${opportunity.title || "opportunity"} to stage`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {activeStages.map((activeStage) => (
+                                      <SelectItem key={activeStage.id} value={activeStage.id}>{activeStage.name}</SelectItem>
+                                    ))}
+                                    {!opportunity.stageIsActive && (
+                                      <SelectItem value={opportunity.stageId}>{opportunity.stageName} (inactive)</SelectItem>
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  disabled={deleteOpportunityMutation.isPending}
+                                  onClick={() => window.confirm(`Delete ${opportunity.title || "this opportunity"}? This cannot be undone.`) && deleteOpportunityMutation.mutate(opportunity.id)}
+                                  aria-label={`Delete ${opportunity.title || "opportunity"}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-slate-400" />
+                                </Button>
+                              </div>
+                            </article>
+                          ))}
+                          {stageOpportunities.length === 0 && (
+                            <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 px-3 py-7 text-center text-xs text-slate-500">
+                              Drop an opportunity here or add one to this stage.
+                            </div>
+                          )}
+                        </div>
+
+                        {stage.isActive && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="mt-3 w-full justify-start text-slate-600"
+                            onClick={() => openNewOpportunity(stage.id)}
+                          >
+                            <Plus className="mr-1.5 h-4 w-4" />Add opportunity
+                          </Button>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
