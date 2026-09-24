@@ -39,6 +39,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import DeveloperManualDealDialog from "@/components/developer-manual-deal-dialog";
 
 type DealRecord = {
   id: string;
@@ -218,6 +219,7 @@ export default function DeveloperDashboard() {
   const [showColumns, setShowColumns] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [rerunningDealId, setRerunningDealId] = useState<string | null>(null);
+  const [manualDealOpen, setManualDealOpen] = useState(false);
 
   const dealsQuery = useQuery<{ deals: DeveloperDeal[] }>({
     queryKey: ["/api/developer-profile/me/deals"],
@@ -516,6 +518,10 @@ export default function DeveloperDashboard() {
           eyebrow="Investment Company Portal"
           actions={
             <>
+              <Button size="sm" variant="outline" onClick={() => setManualDealOpen(true)} className="border-slate-300 bg-white text-slate-700 hover:border-sky-300 hover:bg-white hover:text-sky-600">
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Add Deal
+              </Button>
               <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
                 Import Deals
@@ -570,6 +576,11 @@ export default function DeveloperDashboard() {
             </button>
           ))}
         </div>
+        <DeveloperManualDealDialog
+          open={manualDealOpen}
+          onOpenChange={setManualDealOpen}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/deals"] })}
+        />
 
         <Card className="overflow-hidden border-slate-300 shadow-sm">
           <div className="border-b border-slate-300 bg-white p-2">
