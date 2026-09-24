@@ -4,6 +4,7 @@ import { createServer } from "http";
 import { setupVite, serveStatic, log } from "./vite";
 import { EmailTestEndpoint } from "./emailTestEndpoint";
 import { getEmailConfigurationStatus } from "./productionSafety";
+import { formatCountyTarget } from "@shared/county-targets";
 import { isUsStateCode, normalizeUsStateCode } from "@shared/us-states";
 
 if (!process.env.SESSION_SECRET) {
@@ -499,6 +500,35 @@ setTimeout(() => {
             [normalizedStates, profile.id],
           );
         }
+      }
+      const legacyCountyProfiles = await migrationPool.query<{
+        id: string;
+        target_states: string[] | null;
+        target_counties: Array<string | null> | null;
+      }>(`SELECT id, target_states, target_counties FROM developer_profiles`);
+      let migratedCountyTargetCount = 0;
+      for (const profile of legacyCountyProfiles.rows) {
+        const targetStates = profile.target_states || [];
+        if (targetStates.length !== 1) continue;
+
+        const originalCounties = profile.target_counties || [];
+        const migratedCounties = originalCounties.map((county) => {
+          if (typeof county !== "string" || county.includes(",") || !county.trim()) {
+            return county;
+          }
+          migratedCountyTargetCount++;
+          return formatCountyTarget(county, targetStates[0]);
+        });
+
+        if (JSON.stringify(migratedCounties) !== JSON.stringify(originalCounties)) {
+          await migrationPool.query(
+            `UPDATE developer_profiles SET target_counties = $1::text[], updated_at = NOW() WHERE id = $2`,
+            [migratedCounties, profile.id],
+          );
+        }
+      }
+      if (migratedCountyTargetCount > 0) {
+        log(`✅ Qualified ${migratedCountyTargetCount} legacy county targets using their single profile state`);
       }
       log("✅ Email intake reliability schema ready");
     
