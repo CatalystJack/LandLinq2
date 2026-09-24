@@ -5362,73 +5362,135 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
   });
 
-  // GET /api/crm/contacts/:id/activity — timeline of deals + communications
+  // GET /api/crm/contacts/:id/activity — profile-scoped contact timeline.
   app.get("/api/crm/contacts/:id/activity", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const developerProfileId = String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER'
-        ? getDeveloperProfileId(req, res)
-        : null;
+      const user = req.user as any;
+      const userEmail = user?.email || user?.claims?.email || "";
+      const isAdmin = isPlatformAdminEmail(userEmail) || isSuperAdminEmail(userEmail);
+      const isDeveloper = String(user?.role || "").toUpperCase() === "DEVELOPER";
+      if (!isAdmin && !isDeveloper) return res.status(403).json({ message: "Access denied" });
+
+      const developerProfileId = isDeveloper ? getDeveloperProfileId(req, res) : null;
+      if (isDeveloper && !developerProfileId) return;
+      if (developerProfileId && !await requireActiveDeveloperProfile(developerProfileId, res)) return;
       if (developerProfileId && !await canDeveloperAccessBroker(id, developerProfileId)) {
         return res.status(404).json({ message: "Contact not found" });
       }
 
-      // Broker info
-      const [broker] = await db.select().from(brokers).where(eq(brokers.id, id));
+      const [broker] = await db.select().from(brokers)
+        .where(and(eq(brokers.id, id), isNonDemoBroker()))
+        .limit(1);
       if (!broker) return res.status(404).json({ message: "Contact not found" });
 
-      // Deals
-      const brokerDeals = await db.select({
-        id: deals.id,
-        dealNumber: deals.dealNumber,
-        address: deals.address,
-        city: deals.city,
-        state: deals.state,
-        classification: deals.classification,
-        status: deals.status,
-        createdAt: deals.createdAt,
-      }).from(deals).where(eq(deals.brokerId, id)).orderBy(desc(deals.createdAt));
+      let crmState = {
+        crmTags: (broker as any).crmTags || [],
+        crmNotes: (broker as any).crmNotes || null,
+        lastContactedAt: (broker as any).lastContactedAt || null,
+        assignedTo: (broker as any).assignedTo || null,
+      };
+      if (developerProfileId && !broker.ownerDeveloperProfileId) {
+        const [privateCrm] = await db.select({
+          crmTags: developerBrokerCrm.crmTags,
+          crmNotes: developerBrokerCrm.crmNotes,
+          lastContactedAt: developerBrokerCrm.lastContactedAt,
+          assignedTo: developerBrokerCrm.assignedTo,
+        }).from(developerBrokerCrm).where(and(
+          eq(developerBrokerCrm.developerProfileId, developerProfileId),
+          eq(developerBrokerCrm.brokerId, id),
+          eq(developerBrokerCrm.isRemoved, false),
+        )).limit(1);
+        crmState = {
+          crmTags: privateCrm?.crmTags || [],
+          crmNotes: privateCrm?.crmNotes || null,
+          lastContactedAt: privateCrm?.lastContactedAt || null,
+          assignedTo: privateCrm?.assignedTo || null,
+        };
+      }
 
-      // Communications (last 50)
-      const comms = await db.select({
-        id: communications.id,
-        type: communications.channel,
-        subject: communications.subject,
-        body: communications.rawText,
-        direction: communications.direction,
-        status: communications.status,
-        createdAt: communications.createdAt,
-      }).from(communications).where(eq(communications.brokerId, id)).orderBy(desc(communications.createdAt)).limit(50);
+      const visibleDealIds = developerProfileId
+        ? await getDeveloperVisibleDealIds(developerProfileId)
+        : null;
+      const brokerDeals = !visibleDealIds || visibleDealIds.size > 0
+        ? await db.select({
+            id: deals.id,
+            dealNumber: deals.dealNumber,
+            address: deals.address,
+            city: deals.city,
+            state: deals.state,
+            classification: deals.classification,
+            status: deals.status,
+            createdAt: deals.createdAt,
+          }).from(deals).where(and(
+            eq(deals.brokerId, id),
+            ...(visibleDealIds ? [inArray(deals.id, Array.from(visibleDealIds))] : []),
+          )).orderBy(desc(deals.createdAt))
+        : [];
+      const visibleDealIdList = visibleDealIds ? Array.from(visibleDealIds) : null;
+      const comms = !visibleDealIdList || visibleDealIdList.length > 0
+        ? await db.select({
+            id: communications.id,
+            type: communications.channel,
+            subject: communications.subject,
+            body: communications.rawText,
+            direction: communications.direction,
+            status: communications.status,
+            createdAt: communications.createdAt,
+          }).from(communications).where(and(
+            eq(communications.brokerId, id),
+            ...(visibleDealIdList ? [inArray(communications.relatedDealId, visibleDealIdList)] : []),
+          )).orderBy(desc(communications.createdAt)).limit(50)
+        : [];
 
-      // Campaign enrollments — match by broker_id OR contact_email (only add email condition when non-null)
-      const enrollments = broker.email
+      const enrollments = developerProfileId
         ? await db.execute(sql`
             SELECT DISTINCT ON (e.template_id) e.id, e.status, e.current_step_index,
                    e.next_send_at, e.total_steps_sent, e.created_at, e.template_id,
                    t.name as template_name
             FROM drip_campaign_enrollments e
+            INNER JOIN outreach_senders s ON s.id = e.sender_id
             LEFT JOIN outreach_campaign_templates t ON e.template_id = t.id
-            WHERE e.broker_id = ${id} OR e.contact_email = ${broker.email}
+            WHERE s.developer_profile_id = ${developerProfileId}
+              AND (e.broker_id = ${id} OR (${broker.email} IS NOT NULL AND e.contact_email = ${broker.email}))
             ORDER BY e.template_id, e.created_at DESC
             LIMIT 20
           `)
-        : await db.execute(sql`
-            SELECT DISTINCT ON (e.template_id) e.id, e.status, e.current_step_index,
-                   e.next_send_at, e.total_steps_sent, e.created_at, e.template_id,
-                   t.name as template_name
-            FROM drip_campaign_enrollments e
-            LEFT JOIN outreach_campaign_templates t ON e.template_id = t.id
-            WHERE e.broker_id = ${id}
-            ORDER BY e.template_id, e.created_at DESC
-            LIMIT 20
-          `);
+        : broker.email
+          ? await db.execute(sql`
+              SELECT DISTINCT ON (e.template_id) e.id, e.status, e.current_step_index,
+                     e.next_send_at, e.total_steps_sent, e.created_at, e.template_id,
+                     t.name as template_name
+              FROM drip_campaign_enrollments e
+              LEFT JOIN outreach_campaign_templates t ON e.template_id = t.id
+              WHERE e.broker_id = ${id} OR e.contact_email = ${broker.email}
+              ORDER BY e.template_id, e.created_at DESC
+              LIMIT 20
+            `)
+          : await db.execute(sql`
+              SELECT DISTINCT ON (e.template_id) e.id, e.status, e.current_step_index,
+                     e.next_send_at, e.total_steps_sent, e.created_at, e.template_id,
+                     t.name as template_name
+              FROM drip_campaign_enrollments e
+              LEFT JOIN outreach_campaign_templates t ON e.template_id = t.id
+              WHERE e.broker_id = ${id}
+              ORDER BY e.template_id, e.created_at DESC
+              LIMIT 20
+            `);
 
       res.json({
         broker: {
-          ...broker,
-          crmTags: (broker as any).crmTags,
-          crmNotes: (broker as any).crmNotes,
-          lastContactedAt: (broker as any).lastContactedAt,
+          id: broker.id,
+          firstName: broker.firstName,
+          lastName: broker.lastName,
+          email: broker.email,
+          phone: broker.phone,
+          brokerage: broker.brokerage,
+          stateRegion: (broker as any).stateRegion,
+          createdAt: broker.createdAt,
+          ownerDeveloperProfileId: broker.ownerDeveloperProfileId,
+          sourceTags: broker.sourceTags || [],
+          ...crmState,
         },
         deals: brokerDeals,
         communications: comms,

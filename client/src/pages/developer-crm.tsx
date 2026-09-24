@@ -6,6 +6,7 @@ import DeveloperNavigation from "@/components/developer-navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
+import ContactDetailDialog, { type Contact } from "@/components/contact-detail-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,22 +20,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-
-type Contact = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string | null;
-  phone: string | null;
-  brokerage: string | null;
-  stateRegion: string | null;
-  assignedTo: string | null;
-  crmTags: string[] | null;
-  sourceTags: string[] | null;
-  smsOptIn: boolean | null;
-  ownerDeveloperProfileId: string | null;
-  createdAt: string | null;
-};
 
 type ContactAvatarPerson = {
   label: string;
@@ -187,12 +172,6 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const contactsQuery = useQuery<{ contacts: Contact[] }>({
     queryKey: [contactsQueryKey],
     queryFn: () => requestJson(contactsEndpoint),
-  });
-
-  const activityQuery = useQuery<any>({
-    queryKey: ["/api/crm/contacts", selectedContact?.id, "activity"],
-    queryFn: () => requestJson(`/api/crm/contacts/${selectedContact?.id}/activity`),
-    enabled: Boolean(selectedContact?.id),
   });
 
   const tagsQuery = useQuery<string[]>({
@@ -680,87 +659,16 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
         </Card>
       </main>
 
-      <Dialog open={Boolean(selectedContact)} onOpenChange={(open) => { if (!open) setSelectedContact(null); }}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-          {selectedContact && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="text-xl text-[#21394c]">
-                  {[selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(" ") || "Contact profile"}
-                </DialogTitle>
-                <DialogDescription>
-                  {selectedContact.brokerage || "Broker contact"} · {selectedContact.stateRegion || "Region not provided"}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-2 sm:grid-cols-2">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Email</p>
-                  {selectedContact.email ? (
-                    <a className="mt-1 block break-all text-sm font-medium text-catalyst-blue hover:underline" href={`mailto:${selectedContact.email}`}>{selectedContact.email}</a>
-                  ) : <p className="mt-1 text-sm text-slate-400">Not provided</p>}
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Phone</p>
-                  {selectedContact.phone ? (
-                    <a className="mt-1 block text-sm font-medium text-catalyst-blue hover:underline" href={`tel:${selectedContact.phone}`}>{selectedContact.phone}</a>
-                  ) : <p className="mt-1 text-sm text-slate-400">Not provided</p>}
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned to</p>
-                  <p className="mt-1 text-sm font-medium text-slate-800">{selectedContact.assignedTo || "Unassigned"}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Relationship</p>
-                  <p className="mt-1 text-sm font-medium text-slate-800">{selectedContact.ownerDeveloperProfileId ? "Your company contact" : "Shared network contact"}</p>
-                </div>
-              </div>
-              {(selectedContact.crmTags?.length || selectedContact.sourceTags?.length) ? (
-                <div className="space-y-3">
-                  {selectedContact.crmTags?.length ? (
-                    <div>
-                      <p className="mb-1.5 text-xs font-semibold text-slate-600">Your CRM tags</p>
-                      <div className="flex flex-wrap gap-1.5">{selectedContact.crmTags.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}</div>
-                    </div>
-                  ) : null}
-                  {selectedContact.sourceTags?.length ? (
-                    <div>
-                      <p className="mb-1.5 text-xs font-semibold text-slate-600">Shared source tags</p>
-                      <div className="flex flex-wrap gap-1.5">{selectedContact.sourceTags.map((tag) => <Badge key={tag} variant="secondary" className="bg-[#f2f8f1] text-[#4d7351]">{tag}</Badge>)}</div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              <div className="border-t border-slate-200 pt-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Activity</p>
-                {activityQuery.isLoading ? (
-                  <p className="text-sm text-slate-500">Loading activity…</p>
-                ) : activityQuery.isError ? (
-                  <p className="text-sm text-slate-500">Activity is unavailable for this contact.</p>
-                ) : (
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <div className="rounded-lg border border-slate-200 p-3"><p className="text-xs text-slate-500">Deals</p><p className="mt-1 text-lg font-semibold text-slate-800">{activityQuery.data?.deals?.length || 0}</p></div>
-                    <div className="rounded-lg border border-slate-200 p-3"><p className="text-xs text-slate-500">Communications</p><p className="mt-1 text-lg font-semibold text-slate-800">{activityQuery.data?.communications?.length || 0}</p></div>
-                    <div className="rounded-lg border border-slate-200 p-3"><p className="text-xs text-slate-500">Campaigns</p><p className="mt-1 text-lg font-semibold text-slate-800">{activityQuery.data?.enrollments?.length || 0}</p></div>
-                  </div>
-                )}
-              </div>
-              {!adminMode && (
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                    disabled={removeContactsMutation.isPending}
-                    onClick={() => setRemoveConfirmationIds([selectedContact.id])}
-                  >
-                    <UserRound className="mr-2 h-4 w-4" />Remove from my CRM
-                  </Button>
-                </DialogFooter>
-              )}
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ContactDetailDialog
+        contact={selectedContact}
+        adminMode={adminMode}
+        onOpenChange={(open) => { if (!open) setSelectedContact(null); }}
+        onRemove={(contactId) => setRemoveConfirmationIds([contactId])}
+        onContactUpdated={(contactId, changes) => {
+          setSelectedContact((current) => current?.id === contactId ? { ...current, ...changes } : current);
+        }}
+        isRemoving={removeContactsMutation.isPending}
+      />
 
       <Dialog open={Boolean(removeConfirmationIds)} onOpenChange={(open) => { if (!open) setRemoveConfirmationIds(null); }}>
         <DialogContent className="max-w-md">
