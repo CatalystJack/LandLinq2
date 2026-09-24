@@ -358,7 +358,7 @@ function ProductTypeEditorRow({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <Label>Product type <span className="text-red-500">*</span></Label>
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Normal (default)</span>
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Normal (Default)</span>
           </div>
           <ProductTypeNameField
             id={`admin-product-type-${index}`}
