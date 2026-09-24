@@ -1,0 +1,17 @@
+IMPORTANT: actually implement this in code. Do not create a documentation file, notes file, or summary — make the actual code changes described below.
+
+The per-company branded login page at client/src/pages/developer-login.tsx (used at /developer/:slug/login) looks visually inconsistent with the regular platform login page at client/src/pages/auth.tsx — it currently uses a full-page color gradient background built from the company's primaryColor/secondaryColor, a large 80x80px rounded logo box, a colored accent bar across the top of the card, custom (non-matching) input styling, and a "Secure access powered by LandLinq" footer line that the regular login doesn't have.
+
+Restyle developer-login.tsx to visually match auth.tsx's login card as closely as possible:
+- Same page background: flat #f7f9fc, no gradient, no company-color theming of the page background.
+- Same card treatment: use the same Card/CardHeader/CardContent components and classes auth.tsx uses (rounded-xl border border-[#dce3ec] bg-white shadow-[0_8px_30px_rgba(15,23,42,0.08)]) instead of the current rounded-2xl shadow-2xl card with the colored top accent strip. Remove the accent bar entirely.
+- Same logo treatment: a small logo image (h-8, matching auth.tsx's sizing), not the large 80x80 rounded box. Keep showing the company's own logoUrl when the profile has one set, falling back to the LandLinq logo when it doesn't — just render it at the same size/position auth.tsx uses, not in a boxed container.
+- Same heading style: "Sign In" as the CardTitle in the same size/weight, with the company name (e.g. "Catalyst") shown as the CardDescription subtitle instead of "Sign in to access your investment dashboard" — so the page still clearly indicates whose portal this is, just presented in the same layout auth.tsx uses for its subtitle.
+- Same input styling: match auth.tsx's Input classes exactly (h-12 rounded-lg border-[#bac9dc] bg-[#eaf2ff] with the #4A90E2 focus ring), replacing the current default-styled inputs.
+- Sign-in button: keep it using the company's primaryColor as the background (this is the one piece of per-company theming worth preserving), but match auth.tsx's button sizing/shape otherwise.
+- Remove the "Secure access powered by LandLinq" footer line entirely, since auth.tsx has no equivalent.
+- Keep the "Forgot your password?" link, styled to match how auth.tsx presents equivalent secondary links (check auth.tsx for its color/weight convention there instead of using the company's secondaryColor).
+
+Do not change any of the actual logic in developer-login.tsx — the branding fetch, the logout-on-mount behavior, the login mutation, the redirect logic, and the loading/error states should all work exactly as they do today. This is a visual-only change.
+
+Verify it builds and confirm via git log that the commit contains a real diff to client/src/pages/developer-login.tsx, not a text file.
