@@ -4565,10 +4565,24 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const brokerageFilter = (req.query.brokerage as string || '').trim();
       const multiCampaignTagFilter = req.query.multiCampaignTag === 'true';
       const offset = (page - 1) * limit;
-      const isDeveloper = String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER';
-      const developerProfileId = isDeveloper ? getDeveloperProfileId(req, res) : null;
+      const requestedProfileId = String(req.query.developerProfileId || '').trim();
+      const userRole = String((req as any).user?.role || '').toUpperCase();
+      const isDeveloper = userRole === 'DEVELOPER';
+      if (requestedProfileId) {
+        const email = String((req as any).user?.email || (req as any).user?.claims?.email || '').trim().toLowerCase();
+        if (isDeveloper || !isPlatformAdminEmail(email)) {
+          return res.status(403).json({ error: "Apex Resi administrator access required" });
+        }
+        const { developerProfiles } = await import("@shared/schema");
+        const [profile] = await db.select({ id: developerProfiles.id })
+          .from(developerProfiles)
+          .where(eq(developerProfiles.id, requestedProfileId))
+          .limit(1);
+        if (!profile) return res.status(404).json({ error: "Company profile not found" });
+      }
+      const developerProfileId = isDeveloper ? getDeveloperProfileId(req, res) : requestedProfileId || null;
       if (isDeveloper && !developerProfileId) return;
-      if (developerProfileId && !await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      if (isDeveloper && developerProfileId && !await requireActiveDeveloperProfile(developerProfileId, res)) return;
       const contactVisibility = developerProfileId
         ? await getDeveloperContactVisibility(developerProfileId)
         : { sectors: [], counties: [], sourceTags: [] };
@@ -4601,7 +4615,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       }
 
       // Fetch all brokers then filter — brokers table is typically < 10k rows
-      let allBrokers: any[] = await db.select({
+      const allBrokersQuery = db.select({
         id: brokers.id,
         firstName: brokers.firstName,
         lastName: brokers.lastName,
@@ -4623,7 +4637,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         contactSpecialty: (brokers as any).contactSpecialty,
         userId: brokers.userId,
         createdAt: brokers.createdAt,
-      }).from(brokers).orderBy(desc(brokers.createdAt));
+      }).from(brokers);
+      let allBrokers: any[] = await (
+        developerProfileId
+          ? (allBrokersQuery as any).where(isNonDemoBroker())
+          : allBrokersQuery
+      ).orderBy(desc(brokers.createdAt));
 
       if (developerProfileId) {
         const privateCrmRows = await db.select({
@@ -4646,7 +4665,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
               return { ...broker, crmTags: [], crmNotes: null, lastContactedAt: null, assignedTo: null };
             }
             return broker;
-          });
+          })
+          .filter((broker) => !broker.isRemoved);
       }
 
       const companyMemberCounts = allBrokers.reduce((counts: Record<string, number>, broker: any) => {
@@ -13988,6 +14008,96 @@ RULES:
     } catch (error: any) {
       console.error("[admin investment companies GET] Error:", error);
       return res.status(500).json({ error: "Failed to load Investment Company profiles" });
+    }
+  });
+
+  app.post("/api/admin/investment-companies/:profileId/clear-crm", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    const profileId = String(req.params.profileId || "").trim();
+    if (!profileId) return res.status(400).json({ error: "Company profile ID is required" });
+
+    try {
+      const { developerProfiles } = await import("@shared/schema");
+      const [profile] = await db.select({ id: developerProfiles.id })
+        .from(developerProfiles)
+        .where(eq(developerProfiles.id, profileId))
+        .limit(1);
+      if (!profile) return res.status(404).json({ error: "Company profile not found" });
+
+      const visibility = await getDeveloperContactVisibility(profileId);
+      const clearedCount = await db.transaction(async (tx) => {
+        const visibleBrokers = await tx.select({
+          id: brokers.id,
+          ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
+          contactSector: brokers.contactSector,
+          contactCounty: brokers.contactCounty,
+          stateRegion: brokers.stateRegion,
+          sourceTags: brokers.sourceTags,
+          userId: brokers.userId,
+        })
+          .from(brokers)
+          .where(isNonDemoBroker());
+        const visibleBrokerIds = visibleBrokers
+          .filter((broker) => isSharedBrokerVisible(broker, profileId, visibility))
+          .map(({ id }) => id);
+        const now = new Date();
+
+        for (let start = 0; start < visibleBrokerIds.length; start += 500) {
+          const batch = visibleBrokerIds.slice(start, start + 500);
+          await tx.insert(developerBrokerCrm).values(batch.map((brokerId) => ({
+            developerProfileId: profileId,
+            brokerId,
+            crmTags: [],
+            isRemoved: true,
+            crmNotes: null,
+            lastContactedAt: null,
+            assignedTo: null,
+            updatedAt: now,
+          }) as any)).onConflictDoUpdate({
+            target: [developerBrokerCrm.developerProfileId, developerBrokerCrm.brokerId],
+            set: {
+              crmTags: [],
+              isRemoved: true,
+              crmNotes: null,
+              lastContactedAt: null,
+              assignedTo: null,
+              updatedAt: now,
+            },
+          });
+        }
+
+        const removedRelationships = await tx.update(developerBrokerCrm)
+          .set({
+            crmTags: [],
+            isRemoved: true,
+            crmNotes: null,
+            lastContactedAt: null,
+            assignedTo: null,
+            updatedAt: now,
+          })
+          .where(eq(developerBrokerCrm.developerProfileId, profileId))
+          .returning({ brokerId: developerBrokerCrm.brokerId });
+
+        const clearedOwnedBrokers = await tx.update(brokers)
+          .set({
+            crmTags: [],
+            crmNotes: null,
+            lastContactedAt: null,
+            assignedTo: null,
+            updatedAt: now,
+          })
+          .where(eq(brokers.ownerDeveloperProfileId, profileId))
+          .returning({ id: brokers.id });
+
+        return new Set([
+          ...removedRelationships.map(({ brokerId }) => brokerId),
+          ...clearedOwnedBrokers.map(({ id }) => id),
+        ]).size;
+      });
+
+      return res.json({ success: true, clearedCount });
+    } catch (error: any) {
+      console.error("[admin investment company clear CRM] Error:", error);
+      return res.status(500).json({ error: "Failed to clear this company's CRM" });
     }
   });
 

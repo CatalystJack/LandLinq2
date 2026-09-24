@@ -58,3 +58,4 @@
 - [Broker workbook import](broker-workbook-import.md) — import by source license with shared-email dedupe; never overwrite company-private CRM state.
 - [Publishing schema drift](publishing-schema-drift.md) — successful builds can still fail at publish-time schema sync; inspect additive diffs before changing app code.
 - [Broker import promotion](broker-import-production-promotion.md) — publish-time initialization overwrites all production data; never use it for a broker-only promotion.
+- [Admin CRM cleanup scope](admin-crm-cleanup-scope.md) — clear only one profile’s current CRM visibility and private state; preserve shared identities, deals, and other companies.

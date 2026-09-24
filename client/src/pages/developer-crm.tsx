@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
-import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, Pencil, Plus, X } from "lucide-react";
+import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, Pencil, Plus, X, Trash2 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import Navigation from "@/components/navigation";
@@ -132,6 +132,13 @@ type DeveloperCrmProps = {
   adminMode?: boolean;
 };
 
+type AdminCompanyProfile = {
+  id: string;
+  companyName: string;
+  profileType: string;
+  isActive: boolean;
+};
+
 export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -139,9 +146,22 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const profile = (user as any)?.developerProfile;
   const primaryColor = "#081729";
   const secondaryColor = "#498EDE";
-  const contactsQueryKey = adminMode ? "/api/crm/contacts" : "/api/developer-profile/me/contacts";
+  const [selectedAdminProfileId, setSelectedAdminProfileId] = useState("");
+  const [clearCompanyCrmOpen, setClearCompanyCrmOpen] = useState(false);
+  const adminProfilesQuery = useQuery<{ profiles: AdminCompanyProfile[] }>({
+    queryKey: ["/api/admin/investment-companies"],
+    queryFn: () => requestJson("/api/admin/investment-companies"),
+    enabled: adminMode,
+  });
+  const selectedAdminProfile = (adminProfilesQuery.data?.profiles || [])
+    .find((company) => company.id === selectedAdminProfileId);
+  const contactsQueryKey = adminMode
+    ? `/api/crm/contacts?developerProfileId=${encodeURIComponent(selectedAdminProfileId)}`
+    : "/api/developer-profile/me/contacts";
   const contactsEndpoint = adminMode
-    ? "/api/crm/contacts?page=1&limit=9999"
+    ? selectedAdminProfileId
+      ? `/api/crm/contacts?page=1&limit=9999&developerProfileId=${encodeURIComponent(selectedAdminProfileId)}`
+      : ""
     : "/api/developer-profile/me/contacts";
   const importEndpoint = adminMode
     ? "/api/crm/import-contacts"
@@ -172,6 +192,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const contactsQuery = useQuery<{ contacts: Contact[] }>({
     queryKey: [contactsQueryKey],
     queryFn: () => requestJson(contactsEndpoint),
+    enabled: !adminMode || Boolean(selectedAdminProfileId),
   });
 
   const tagsQuery = useQuery<string[]>({
@@ -265,6 +286,25 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       toast({ title: "Contacts removed", description: `Removed ${data.removedCount} ${data.removedCount === 1 ? "contact" : "contacts"} from your CRM. Other companies can still see shared contacts.` });
     },
     onError: (error: Error) => toast({ title: "Contact removal failed", description: error.message, variant: "destructive" }),
+  });
+
+  const clearCompanyCrmMutation = useMutation({
+    mutationFn: (profileId: string) => requestJson(`/api/admin/investment-companies/${encodeURIComponent(profileId)}/clear-crm`, {
+      method: "POST",
+    }),
+    onSuccess: (data, profileId) => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/crm/contacts?developerProfileId=${encodeURIComponent(profileId)}`],
+      });
+      setClearCompanyCrmOpen(false);
+      setSelectedContact(null);
+      setSelectedContactIds([]);
+      toast({
+        title: "Company CRM cleared",
+        description: `Removed ${data.clearedCount} ${data.clearedCount === 1 ? "contact" : "contacts"} from ${selectedAdminProfile?.companyName || "the selected company's"} CRM. Shared records and other companies' CRM were preserved.`,
+      });
+    },
+    onError: (error: Error) => toast({ title: "Company CRM cleanup failed", description: error.message, variant: "destructive" }),
   });
 
   const createTagMutation = useMutation({
@@ -420,13 +460,71 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           <div className="flex flex-col gap-4 border-b border-[#e3e9ee] bg-[#f8fafb] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg text-white" style={{ backgroundColor: primaryColor }}><Users className="h-5 w-5" /></div>
-              <div><h2 className="font-semibold text-[#1d3448]">Contacts</h2><p className="text-xs text-[#7b8d9b]">{contactsQuery.data?.contacts.length || 0} available contacts</p></div>
+              <div>
+                <h2 className="font-semibold text-[#1d3448]">Contacts</h2>
+                <p className="text-xs text-[#7b8d9b]">
+                  {adminMode
+                    ? selectedAdminProfile
+                      ? `${contactsQuery.data?.contacts.length || 0} contacts in ${selectedAdminProfile.companyName}'s CRM`
+                      : "Select a company to view its CRM"
+                    : `${contactsQuery.data?.contacts.length || 0} available contacts`}
+                </p>
+              </div>
             </div>
             <div className="relative w-full sm:w-[360px]">
               <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#91a2af]" />
               <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email, company…" className="h-10 rounded-lg border-[#d7e2e9] bg-white pl-10 text-sm shadow-none focus-visible:ring-1" style={{ "--tw-ring-color": secondaryColor } as CSSProperties} />
             </div>
           </div>
+          {adminMode && (
+            <div className="flex flex-col gap-3 border-b border-[#e3e9ee] bg-white px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="w-full max-w-xl">
+                <label htmlFor="admin-crm-company" className="mb-1.5 block text-xs font-semibold text-[#405a70]">
+                  Organization, developer, or sales company
+                </label>
+                <select
+                  id="admin-crm-company"
+                  value={selectedAdminProfileId}
+                  disabled={adminProfilesQuery.isLoading}
+                  onChange={(event) => {
+                    setSelectedAdminProfileId(event.target.value);
+                    setSelectedContact(null);
+                    setSelectedContactIds([]);
+                    setSearch("");
+                    setCompanyFilter("all");
+                    setSelectedTags([]);
+                    setSourceTagFilter("all");
+                    setStateFilter("all");
+                    setAssignedToFilter("all");
+                  }}
+                  className="h-10 w-full rounded-md border border-[#d7e2e9] bg-white px-3 text-sm font-medium text-[#405a70] outline-none focus-visible:ring-1 focus-visible:ring-[#498EDE] disabled:opacity-60"
+                >
+                  <option value="">Select a company</option>
+                  {(adminProfilesQuery.data?.profiles || []).map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.companyName} · {company.profileType.replace(/[_-]+/g, " ")}{company.isActive ? "" : " · inactive"}
+                    </option>
+                  ))}
+                </select>
+                {adminProfilesQuery.isError && (
+                  <p role="alert" className="mt-1.5 text-xs text-red-600">
+                    {(adminProfilesQuery.error as Error).message}
+                    <button type="button" className="ml-2 font-semibold underline" onClick={() => adminProfilesQuery.refetch()}>Try again</button>
+                  </p>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!selectedAdminProfile || clearCompanyCrmMutation.isPending}
+                onClick={() => setClearCompanyCrmOpen(true)}
+                className="h-10 shrink-0 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Clear company CRM
+              </Button>
+            </div>
+          )}
            <div className="flex flex-wrap items-center gap-2 border-b border-[#e6edf1] px-5 py-3 text-xs text-[#718493]">
              <span className="mr-1 font-medium">Filters</span>
              <div className="flex items-center gap-2">
@@ -530,12 +628,18 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               )}
              <span className="ml-auto hidden sm:inline">{filteredContacts.length} shown · search updates as you type</span>
           </div>
-           {contactsQuery.isLoading ? (
+            {adminMode && !selectedAdminProfileId ? (
+              <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Building2 className="h-5 w-5" /></div>
+                <h3 className="font-semibold text-[#243b4e]">Select a company CRM</h3>
+                <p className="mt-1 max-w-md text-sm text-[#7b8d9b]">Choose an organization above to review only that company’s contacts and CRM details.</p>
+              </div>
+            ) : contactsQuery.isLoading ? (
              <ContactTableSkeleton adminMode={adminMode} />
           ) : contactsQuery.isError ? (
             <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center"><p className="text-sm font-medium text-[#9b4545]">{(contactsQuery.error as Error).message}</p><Button variant="outline" className="mt-4 h-9" onClick={() => contactsQuery.refetch()}><RefreshCw className="mr-2 h-3.5 w-3.5" />Try again</Button></div>
            ) : filteredContacts.length === 0 ? (
-             <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search.trim() || hasActiveFilters ? "No matching contacts" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search.trim() || hasActiveFilters ? "Try clearing a filter or broadening your search." : "Import a contact list to get started."}</p>{(search.trim() || hasActiveFilters) && <Button variant="outline" onClick={() => { setSearch(""); clearFilters(); }} className="mt-4 h-9">Clear search and filters</Button>}</div>
+              <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search.trim() || hasActiveFilters ? "No matching contacts" : adminMode ? "No contacts in this company CRM" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search.trim() || hasActiveFilters ? "Try clearing a filter or broadening your search." : adminMode ? "This company has no visible CRM contacts. Shared directory additions can still appear based on its access settings." : "Import a contact list to get started."}</p>{(search.trim() || hasActiveFilters) && <Button variant="outline" onClick={() => { setSearch(""); clearFilters(); }} className="mt-4 h-9">Clear search and filters</Button>}</div>
           ) : (
             <div className="table-scroll-container">
                <Table className="min-w-[1280px]">
@@ -695,6 +799,33 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               }}
             >
               {removeContactsMutation.isPending ? "Removing…" : "Remove contact"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={clearCompanyCrmOpen} onOpenChange={(open) => {
+        if (!clearCompanyCrmMutation.isPending) setClearCompanyCrmOpen(open);
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Clear {selectedAdminProfile?.companyName || "company"} CRM?</DialogTitle>
+            <DialogDescription>
+              This removes all contacts currently visible in this company’s CRM and clears its private tags, notes, assignments, and last-contacted dates. Shared broker identities, deal records, and other companies’ CRM remain unchanged. Future shared-directory additions can still appear according to this company’s access settings.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setClearCompanyCrmOpen(false)} disabled={clearCompanyCrmMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              disabled={!selectedAdminProfileId || clearCompanyCrmMutation.isPending}
+              onClick={() => selectedAdminProfileId && clearCompanyCrmMutation.mutate(selectedAdminProfileId)}
+            >
+              {clearCompanyCrmMutation.isPending ? "Clearing…" : "Clear company CRM"}
             </Button>
           </DialogFooter>
         </DialogContent>
