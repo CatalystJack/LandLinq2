@@ -1082,9 +1082,12 @@ export default function DeveloperCriteriaSettings() {
                   <div className="space-y-3">
                     {form.productTypes.map((productType, index) => (
                       <div key={productType.id || index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_auto] lg:items-end">
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.6fr)_minmax(0,0.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_auto] lg:items-end">
                           <div>
-                            <Label>Product type <span className="text-red-500">*</span></Label>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Label>Product type <span className="text-red-500">*</span></Label>
+                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Normal (default)</span>
+                            </div>
                             <ProductTypeNameField
                               id={`developer-product-type-${index}`}
                               value={productType.name}
@@ -1105,10 +1108,16 @@ export default function DeveloperCriteriaSettings() {
                             placeholder="No maximum"
                           />
                           <NumberField
-                            label={isPsf ? "Min rent $/SF" : "Min rent $/Unit"}
-                            value={isPsf ? productType.minRentPsf || "" : productType.minRentPerUnit || ""}
-                            onChange={(value) => updateProductType(index, isPsf ? { minRentPsf: value } : { minRentPerUnit: value })}
-                            required
+                            label="Min rent $/SF"
+                            value={productType.minRentPsf || ""}
+                            onChange={(value) => updateProductType(index, { minRentPsf: value })}
+                            required={isPsf}
+                          />
+                          <NumberField
+                            label="Min rent $/Unit"
+                            value={productType.minRentPerUnit || ""}
+                            onChange={(value) => updateProductType(index, { minRentPerUnit: value })}
+                            required={!isPsf}
                           />
                           <Button
                             type="button"

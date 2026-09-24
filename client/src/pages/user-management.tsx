@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Users, Shield, Settings, Edit, Trash2, Mail, Calendar, UserCheck, UserX, Crown, Building, MapPin, Clock, CheckCircle2, Loader2 } from "lucide-react";
+import { Search, Plus, Users, Shield, Settings, Edit, Trash2, Mail, Calendar, UserCheck, Crown, Building, MapPin } from "lucide-react";
 import { formatDateEST } from "@/utils/timezone";
 import Footer from "@/components/footer";
 import Navigation from "@/components/navigation";
@@ -32,6 +31,7 @@ interface User {
   phone?: string;
   marketsCovered?: string[];
   brokerage?: string;
+  companyName?: string;
 }
 
 
@@ -191,35 +191,6 @@ export default function UserManagement() {
     },
   });
 
-  // Fetch pending partner broker portal accounts
-  const { data: pendingBrokers, isLoading: pendingLoading, refetch: refetchPending } = useQuery({
-    queryKey: ["/api/admin/pending-approvals"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/pending-approvals", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch pending approvals");
-      return res.json() as Promise<Array<{
-        id: string; email: string; firstName: string; lastName: string;
-        brokerage: string; phone: string; createdAt: string;
-      }>>;
-    },
-    refetchInterval: 30000,
-  });
-
-  const approveBrokerMutation = useMutation({
-    mutationFn: async (brokerId: string) => {
-      const res = await fetch(`/api/admin/approve-broker/${brokerId}`, {
-        method: "POST", credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to approve broker");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-approvals"] });
-      toast({ title: "Broker approved", description: "They will receive an email with access." });
-    },
-    onError: (e: Error) => toast({ title: "Approval failed", description: e.message, variant: "destructive" }),
-  });
-
   const users = usersData?.users || [];
 
   const getRoleKey = (user: User) => {
@@ -232,7 +203,7 @@ export default function UserManagement() {
   const getRoleLabel = (user: User) => {
     switch (getRoleKey(user)) {
       case "developer":
-        return "Investment Company Team";
+        return user.companyName || "Investment Company Team";
       case "admin":
         return "Admin Team";
       default:
@@ -356,13 +327,7 @@ export default function UserManagement() {
           description="Manage user accounts, broker profiles, roles, and permissions"
         />
 
-        <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2" data-testid="user-management-tabs">
-            <TabsTrigger value="users">Users ({filteredUsers.length})</TabsTrigger>
-            <TabsTrigger value="approvals">Broker Approvals</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="users" className="space-y-6">
+        <div className="space-y-6">
             {/* Filters and Controls */}
             <Card>
               <CardContent className="pt-6">
@@ -600,8 +565,6 @@ export default function UserManagement() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-
           {/* Edit User Dialog */}
           <Dialog open={editingUser !== null} onOpenChange={(open) => !open && setEditingUser(null)}>
             <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -713,86 +676,7 @@ export default function UserManagement() {
           </Dialog>
 
 
-          <TabsContent value="approvals">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Partner Broker Approvals
-                  {(pendingBrokers?.length ?? 0) > 0 && (
-                    <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold">
-                      {pendingBrokers!.length}
-                    </span>
-                  )}
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Brokers who registered via the Partner Broker Portal and are waiting for access.
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-end">
-                    <Button onClick={() => refetchPending()} variant="ghost" size="xs" className="text-xs text-gray-400 hover:text-gray-600">
-                      Refresh
-                    </Button>
-                  </div>
-
-                  {pendingLoading ? (
-                    <div className="flex items-center gap-2 py-6 text-gray-400 text-sm">
-                      <Loader2 size={16} className="animate-spin" /> Loading pending approvals…
-                    </div>
-                  ) : !pendingBrokers?.length ? (
-                    <div className="flex items-center gap-3 py-6 px-4 rounded-lg bg-green-50 border border-green-100">
-                      <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-                      <p className="text-sm text-green-700">No pending broker approvals — you're all caught up.</p>
-                    </div>
-                  ) : (
-                    <div className="border rounded-lg divide-y">
-                      {pendingBrokers.map((broker) => (
-                        <div key={broker.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium text-sm text-gray-900">
-                              {broker.firstName} {broker.lastName}
-                            </div>
-                            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                              <span className="text-xs text-gray-500 flex items-center gap-1">
-                                <Mail size={11} /> {broker.email}
-                              </span>
-                              {broker.brokerage && (
-                                <span className="text-xs text-gray-500 flex items-center gap-1">
-                                  <Building size={11} /> {broker.brokerage}
-                                </span>
-                              )}
-                              {broker.phone && (
-                                <span className="text-xs text-gray-500">{broker.phone}</span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-gray-400 mt-0.5">
-                              Registered {new Date(broker.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            className="ml-4 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
-                            disabled={approveBrokerMutation.isPending}
-                            onClick={() => approveBrokerMutation.mutate(broker.id)}
-                          >
-                            {approveBrokerMutation.isPending ? (
-                              <Loader2 size={13} className="animate-spin mr-1" />
-                            ) : (
-                              <UserCheck size={13} className="mr-1" />
-                            )}
-                            Approve
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        </div>
         <Footer />
     </div>
     </div>

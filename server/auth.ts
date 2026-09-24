@@ -595,7 +595,28 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
       
-      res.json({ message: "Token is valid", email });
+      const user = await storage.getUserByEmail(email);
+      let companyName: string | null = null;
+      let logoUrl: string | null = null;
+      if (user?.developerProfileId) {
+        const [developerProfile] = await db.select({
+          companyName: developerProfiles.companyName,
+          logoUrl: developerProfiles.logoUrl,
+        })
+          .from(developerProfiles)
+          .where(eq(developerProfiles.id, user.developerProfileId))
+          .limit(1);
+        companyName = developerProfile?.companyName ?? null;
+        logoUrl = developerProfile?.logoUrl ?? null;
+      }
+      res.json({
+        message: "Token is valid",
+        email,
+        firstName: user?.firstName ?? null,
+        lastName: user?.lastName ?? null,
+        companyName,
+        logoUrl,
+      });
     } catch (error: any) {
       console.error("Token validation error:", error);
       res.status(500).json({ message: "Failed to validate reset token" });

@@ -59,7 +59,7 @@ export default function StateCriteriaOverrides({ targetStates, value, fields, on
         <div>
           <h4 className="font-semibold text-slate-900">State overrides</h4>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            Override only the values that differ by state. Blank fields use the flat default above.
+            States listed below use these numbers instead of the Normal criteria above — leave a field blank to keep the Normal value for that state.
           </p>
         </div>
         {availableStates.length > 0 && (

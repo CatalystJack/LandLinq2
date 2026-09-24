@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Navigation from "@/components/navigation";
 import YocAssumptionsPanel, {
@@ -25,6 +25,7 @@ import { isPlatformAdminEmail } from "@shared/admin-auth";
 import IndustrialCriteriaFields from "@/components/industrial-criteria-fields";
 import StateCriteriaOverrides, { type CriteriaOverrideValue } from "@/components/state-criteria-overrides";
 import ProductTypeNameField from "@/components/product-type-name-field";
+import AdminInvestmentCompanyAssistant from "@/components/admin-investment-company-assistant";
 import SharedContactAccessEditor, {
   type ContactCountyOption,
   type ContactFilterOption,
@@ -34,6 +35,7 @@ import {
   type DeveloperAssetClass,
   type IndustrialCriteria,
 } from "@shared/industrial-criteria";
+import type { InvestmentCompanyAssistantDraft } from "@shared/company-profile-assistant";
 
 type ProductType = YocAssumptionsValue & {
   id?: string;
@@ -193,6 +195,68 @@ const blankForm: CompanyForm = {
   isActive: true,
 };
 
+function slugifyCompanyName(value: string): string {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+}
+
+function companyFormFromAssistantDraft(draft: InvestmentCompanyAssistantDraft): CompanyForm {
+  const profileType = draft.profileType || "real_estate";
+  const assetClass: DeveloperAssetClass = profileType === "general_sales"
+    ? "multifamily"
+    : draft.assetClass || "multifamily";
+  const industrialDraft = draft.industrialCriteria as Partial<IndustrialCriteria> | undefined;
+  const industrialDefault = industrialDraft?.default && typeof industrialDraft.default === "object"
+    ? industrialDraft.default
+    : {};
+  const industrialOverrides = industrialDraft?.stateOverrides && typeof industrialDraft.stateOverrides === "object"
+    ? industrialDraft.stateOverrides
+    : {};
+  const industrialCriteria: IndustrialCriteria = {
+    ...DEFAULT_INDUSTRIAL_CRITERIA,
+    ...industrialDraft,
+    default: { ...DEFAULT_INDUSTRIAL_CRITERIA.default, ...industrialDefault },
+    stateOverrides: { ...DEFAULT_INDUSTRIAL_CRITERIA.stateOverrides, ...industrialOverrides },
+  };
+  const parsedProductTypes = profileType === "real_estate" && assetClass === "multifamily"
+    ? (draft.productTypes || []).map((productType) => ({
+        ...createEmptyYocAssumptions(),
+        name: productType.name || "",
+        minAcres: productType.minAcres === null || productType.minAcres === undefined ? "" : String(productType.minAcres),
+        maxAcres: productType.maxAcres === null || productType.maxAcres === undefined ? "" : String(productType.maxAcres),
+        minRentPsf: productType.minRentPsf === null || productType.minRentPsf === undefined ? "" : String(productType.minRentPsf),
+        minRentPerUnit: productType.minRentPerUnit === null || productType.minRentPerUnit === undefined ? "" : String(productType.minRentPerUnit),
+        stateOverrides: productType.stateOverrides || {},
+        isActive: productType.isActive !== false,
+      }))
+    : [];
+  const productTypes = parsedProductTypes.length
+    ? parsedProductTypes
+    : profileType === "real_estate" && assetClass === "multifamily"
+      ? [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", stateOverrides: {}, isActive: true }]
+      : [];
+  const firstActive = productTypes.find((productType) => productType.isActive);
+  const companyName = draft.companyName || "";
+
+  return {
+    ...blankForm,
+    companyName,
+    slug: draft.slug || (companyName ? slugifyCompanyName(companyName) : ""),
+    profileType,
+    assetClass,
+    industrialCriteria,
+    knownEmailDomains: draft.knownEmailDomains || [],
+    rentMetric: draft.rentMetric || "psf",
+    minAcres: firstActive?.minAcres || "",
+    maxAcres: firstActive?.maxAcres || "",
+    minRentPsf: firstActive?.minRentPsf || "",
+    minRentPerUnit: firstActive?.minRentPerUnit || "",
+    targetStates: draft.targetStates || [],
+    targetCounties: draft.targetCounties || [],
+    productTypes,
+    countyMarketLabels: {},
+  };
+}
+
 async function requestJson(url: string, init?: RequestInit) {
   const response = await fetch(url, { credentials: "include", ...init });
   const body = await response.json().catch(() => ({}));
@@ -290,9 +354,12 @@ function ProductTypeEditorRow({
 }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_auto] lg:items-end">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.6fr)_minmax(0,0.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_auto] lg:items-end">
         <div>
-          <Label>Product type <span className="text-red-500">*</span></Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label>Product type <span className="text-red-500">*</span></Label>
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Normal (default)</span>
+          </div>
           <ProductTypeNameField
             id={`admin-product-type-${index}`}
             value={productType.name}
@@ -303,10 +370,16 @@ function ProductTypeEditorRow({
         <NumberField label="Min acres" value={productType.minAcres} onChange={(value) => onChange({ minAcres: value })} required />
         <NumberField label="Max acres" value={productType.maxAcres || ""} onChange={(value) => onChange({ maxAcres: value })} placeholder="No maximum" />
         <NumberField
-          label={rentMetric === "psf" ? "Min rent $/SF" : "Min rent $/Unit"}
-          value={rentMetric === "psf" ? productType.minRentPsf || "" : productType.minRentPerUnit || ""}
-          onChange={(value) => onChange(rentMetric === "psf" ? { minRentPsf: value } : { minRentPerUnit: value })}
-          required
+          label="Min rent $/SF"
+          value={productType.minRentPsf || ""}
+          onChange={(value) => onChange({ minRentPsf: value })}
+          required={rentMetric === "psf"}
+        />
+        <NumberField
+          label="Min rent $/Unit"
+          value={productType.minRentPerUnit || ""}
+          onChange={(value) => onChange({ minRentPerUnit: value })}
+          required={rentMetric === "per_unit"}
         />
         <Button type="button" size="icon" variant="ghost" onClick={onRemove} aria-label={`Remove ${productType.name || "product type"}`}>
           <Trash2 className="h-4 w-4 text-slate-400" />
@@ -439,6 +512,7 @@ export default function AdminInvestmentCompanies() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<InvestmentCompany | null>(null);
   const [form, setForm] = useState<CompanyForm>(blankForm);
+  const pendingAssistantDraftRef = useRef<CompanyForm | null>(null);
   const [loginCompany, setLoginCompany] = useState<InvestmentCompany | null>(null);
   const [deactivatingCompany, setDeactivatingCompany] = useState<InvestmentCompany | null>(null);
   const [deactivationConfirmation, setDeactivationConfirmation] = useState("");
@@ -514,7 +588,7 @@ export default function AdminInvestmentCompanies() {
       })),
       countyMarketLabels: editing.countyMarketLabels || {},
       isActive: editing.isActive,
-    } : {
+    } : pendingAssistantDraftRef.current || {
       ...blankForm,
       knownEmailDomains: [],
       targetStates: [],
@@ -527,6 +601,7 @@ export default function AdminInvestmentCompanies() {
        productTypes: [{ ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", stateOverrides: {}, isActive: true }],
       countyMarketLabels: {},
     });
+    pendingAssistantDraftRef.current = null;
     setAssumptionsOpenIndex(null);
   }, [editing, formOpen]);
 
@@ -668,6 +743,16 @@ export default function AdminInvestmentCompanies() {
      update("productTypes", [...form.productTypes, { ...createEmptyYocAssumptions(), name: "", minAcres: "", maxAcres: "", minRentPsf: "", minRentPerUnit: "", stateOverrides: {}, isActive: true }]);
   const openCreate = () => { setEditing(null); setFormOpen(true); };
   const openEdit = (profile: InvestmentCompany) => { setEditing(profile); setFormOpen(true); };
+  const openAssistantDraft = (draft: InvestmentCompanyAssistantDraft) => {
+    const initialForm = companyFormFromAssistantDraft(draft);
+    if (formOpen && !editing) {
+      setForm(initialForm);
+      return;
+    }
+    pendingAssistantDraftRef.current = initialForm;
+    setEditing(null);
+    setFormOpen(true);
+  };
   const openInvite = (profile: InvestmentCompany) => {
     setLoginCompany(profile);
     setInviteRows([{ id: crypto.randomUUID(), name: "", email: "" }]);
@@ -704,6 +789,7 @@ export default function AdminInvestmentCompanies() {
          description="Create Investment Company portals, configure acquisition criteria, and invite partner contacts by email."
          actions={<Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Create New Development Partner</Button>}
        />
+      <AdminInvestmentCompanyAssistant onUseDraft={openAssistantDraft} />
       {companiesQuery.isLoading ? <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[#4A90E2]" /></div> : companiesQuery.isError ? <Card><CardContent className="py-12 text-center text-red-600">Unable to load Investment Company profiles.</CardContent></Card> : !sortedProfiles.length ? <Card className="border-dashed"><CardContent className="flex flex-col items-center py-16 text-center"><Building2 className="mb-4 h-12 w-12 text-slate-300" /><h2 className="text-xl font-semibold text-[#0A2B4A]">No Investment Companies yet</h2><p className="mt-2 max-w-md text-slate-500">Create the first profile when your team is ready. No company records are created automatically.</p><Button className="mt-6" onClick={openCreate} style={{ backgroundColor: "#0A2B4A" }}><Plus className="mr-2 h-4 w-4" />Create profile</Button></CardContent></Card> :
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{sortedProfiles.map((profile) => { const activeProductTypeCount = (profile.productTypes || []).filter((productType) => productType.isActive).length; const isGeneralSales = profile.profileType === "general_sales"; const logoBackground = darkestBrandColor(profile.primaryColor, profile.secondaryColor); return <Card key={profile.id} className={`overflow-hidden ${profile.isActive ? "" : "opacity-75"}`}><div className="h-2" style={{ background: `linear-gradient(90deg, ${profile.primaryColor || "#0A2B4A"}, ${profile.secondaryColor || "#4A90E2"})` }} /><CardHeader><div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-center gap-3">{profile.logoUrl ? <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border p-1" style={{ backgroundColor: logoBackground }}><img src={profile.logoUrl} alt="" className="h-full w-full object-contain" /></div> : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border" style={{ backgroundColor: logoBackground }}><Building2 className="h-6 w-6 text-white" /></div>}<div className="min-w-0"><CardTitle className="truncate">{profile.companyName}</CardTitle><p className="truncate text-sm text-slate-500">/developer/{profile.slug}/login</p><Badge variant="outline" className="mt-2">{isGeneralSales ? "General Sales" : "Real Estate"}</Badge></div></div><Badge variant={profile.isActive ? "default" : "secondary"}>{profile.isActive ? "Active" : "Inactive"}</Badge></div></CardHeader><CardContent><div className="mb-5 grid grid-cols-2 gap-3 text-sm"><div className="rounded-lg bg-slate-50 p-3"><p className="text-slate-500">Team members</p><p className="mt-1 flex items-center gap-1 font-semibold"><Users className="h-4 w-4" />{profile.teamMemberCount}</p></div><div className="rounded-lg bg-slate-50 p-3"><p className="text-slate-500">{isGeneralSales ? "Capabilities" : "Product types"}</p><p className="mt-1 font-semibold">{isGeneralSales ? "CRM & Outreach" : `${activeProductTypeCount} active ${activeProductTypeCount === 1 ? "type" : "types"}`}</p></div></div><div className="mb-2"><Button disabled={!profile.isActive} onClick={() => setEntryCompany(profile)} className="w-full border border-[#4A90E2] bg-[#0A2B4A] text-white hover:bg-white hover:text-[#4A90E2]"><Plus className="mr-2 h-4 w-4" />Add {isGeneralSales ? "Opportunity" : "Deal / Opportunity"}</Button></div><div className="flex gap-2"><Button variant="outline" className="flex-1" onClick={() => openEdit(profile)}><Edit3 className="mr-2 h-4 w-4" />Manage</Button>{profile.isActive ? <><Button className="flex-1" onClick={() => openInvite(profile)}><KeyRound className="mr-2 h-4 w-4" />Initial Login</Button><Button variant="outline" size="icon" className="shrink-0 border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700" onClick={() => { setDeactivatingCompany(profile); setDeactivationConfirmation(""); }} aria-label={`Deactivate ${profile.companyName}`} title="Deactivate company"><Trash2 className="h-4 w-4" /></Button></> : <><Button className="flex-1" onClick={() => companyStatusMutation.mutate({ profile, isActive: true })} disabled={companyStatusMutation.isPending}><RotateCcw className="mr-2 h-4 w-4" />Reactivate</Button><Button variant="outline" className="border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700" onClick={() => { setPermanentlyDeletingCompany(profile); setPermanentDeletionConfirmation(""); }}><Trash2 className="mr-2 h-4 w-4" />Delete permanently</Button></>}</div></CardContent></Card>; })}</div>}
     </main>

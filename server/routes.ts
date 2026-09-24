@@ -87,6 +87,7 @@ import {
   answerDeveloperAssistantQuestion,
   draftOutreachEmailWithAI,
   generateOutreachSequenceWithAI,
+  parseInvestmentCompanyCriteriaText,
   planDeveloperAssistantQuestion,
 } from "./aiEmailParser";
 import {
@@ -3267,9 +3268,34 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       }
 
       const users = await storage.getAllUsers();
+
+      const developerProfileIds = Array.from(new Set(
+        users
+          .filter((candidate) => String(candidate.role || "").toUpperCase() === "DEVELOPER")
+          .map((candidate) => candidate.developerProfileId)
+          .filter((profileId): profileId is string => typeof profileId === "string" && profileId.length > 0),
+      ));
+      const developerProfilesById = new Map<string, { companyName: string }>();
+      if (developerProfileIds.length) {
+        const profiles = await db.select({
+          id: developerProfiles.id,
+          companyName: developerProfiles.companyName,
+        })
+          .from(developerProfiles)
+          .where(inArray(developerProfiles.id, developerProfileIds));
+        for (const profile of profiles) {
+          developerProfilesById.set(profile.id, { companyName: profile.companyName });
+        }
+      }
       
       // Enrich users with broker-specific fields if they have broker profiles
       const enrichedUsers = await Promise.all(users.map(async (u) => {
+        if (String(u.role || "").toUpperCase() === "DEVELOPER" && u.developerProfileId) {
+          const developerProfile = developerProfilesById.get(u.developerProfileId);
+          if (developerProfile) {
+            return { ...u, companyName: developerProfile.companyName };
+          }
+        }
         if (u.role === 'BROKER') {
           const broker = await storage.getBrokerByUserId(u.id);
           if (broker) {
@@ -14104,6 +14130,27 @@ RULES:
       }))
       .filter(({ county, marketLabel }) => county && marketLabel && counties.has(county.toLowerCase()));
   }
+
+  app.post("/api/admin/investment-companies/assistant/parse-criteria", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    const criteriaText = typeof req.body?.criteriaText === "string" ? req.body.criteriaText.trim() : "";
+    if (!criteriaText) return res.status(400).json({ error: "Paste or upload criteria text first." });
+    if (criteriaText.length > 30000) {
+      return res.status(413).json({ error: "Criteria text must be 30,000 characters or fewer." });
+    }
+
+    try {
+      const draft = await parseInvestmentCompanyCriteriaText(criteriaText);
+      return res.json({
+        draft,
+        answer: "I prepared a draft from the criteria. Review the fields in the profile form before saving.",
+      });
+    } catch (error: any) {
+      console.error("[admin investment company assistant] Parse failed:", error);
+      return res.status(422).json({
+        error: "I could not turn that text into a profile draft. Check the criteria and try again.",
+      });
+    }
+  });
 
   app.post("/api/admin/investment-companies", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
     try {
