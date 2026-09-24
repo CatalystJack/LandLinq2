@@ -6046,63 +6046,74 @@ export default function AnalystDashboard() {
                     {selectedDeals.length} selected:
                   </span>
                   <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleBulkOperation('approve-all')}
                     disabled={bulkOperationMutation.isPending}
-                    className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-green-600 text-white hover:bg-white hover:text-green-600 border border-green-600 hover:border-green-600 rounded transition-all duration-200 flex items-center space-x-1"
+                    className="gap-1.5 bg-white text-green-700 border-green-300 hover:bg-green-600 hover:text-white hover:border-green-600"
                     data-testid="button-bulk-approve"
                   >
-                    <CheckCircle className="h-3 w-3" />
+                    <CheckCircle className="h-3.5 w-3.5" />
                     <span>Approve</span>
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleBulkOperation('review-all')}
                     disabled={bulkOperationMutation.isPending}
-                    className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-yellow-600 text-white hover:bg-white hover:text-yellow-600 hover:border hover:border-yellow-600 rounded transition-all duration-200 flex items-center space-x-1"
+                    className="gap-1.5 bg-white text-amber-700 border-amber-300 hover:bg-amber-500 hover:text-white hover:border-amber-500"
                     data-testid="button-bulk-review"
                   >
-                    <Eye className="h-3 w-3" />
+                    <Eye className="h-3.5 w-3.5" />
                     <span>Review</span>
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleBulkOperation('reject-all')}
                     disabled={bulkOperationMutation.isPending}
-                    className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-red-600 text-white hover:bg-white hover:text-red-600 hover:border hover:border-red-600 rounded transition-all duration-200 flex items-center space-x-1"
+                    className="gap-1.5 bg-white text-red-700 border-red-300 hover:bg-red-600 hover:text-white hover:border-red-600"
                     data-testid="button-bulk-reject"
                   >
-                    <XCircle className="h-3 w-3" />
+                    <XCircle className="h-3.5 w-3.5" />
                     <span>Reject</span>
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleBulkOperation('delete-all')}
                     disabled={bulkOperationMutation.isPending || !isAuthenticated}
-                    className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-white text-red-700 border border-red-300 hover:bg-red-50 hover:text-red-800 hover:border-red-400 rounded transition-all duration-200 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="gap-1.5 bg-white text-red-700 border-red-300 hover:bg-red-50 hover:text-red-800 hover:border-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
                     data-testid="button-bulk-delete"
                     title={!isAuthenticated ? "Login required to delete deals" : "Delete selected deals"}
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Trash2 className="h-3.5 w-3.5" />
                     <span>Delete</span>
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
                     onClick={clearSelection}
-                    className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-gray-600 text-white hover:bg-white hover:text-gray-600 hover:border hover:border-gray-600 rounded transition-all duration-200"
+                    className="text-gray-700 border-gray-300 hover:bg-gray-100 hover:text-gray-900 hover:border-gray-400"
                     data-testid="button-clear-selection"
                   >
                     Clear
                   </Button>
                   <Button
+                    size="sm"
                     onClick={handleBatchScore}
                     disabled={batchScoreMutation.isPending || selectedDeals.length === 0}
-                    className="px-2 py-1 text-xs font-bold uppercase tracking-wider bg-[#07172A] text-white hover:bg-white hover:text-[#07172A] hover:border hover:border-[#07172A] rounded transition-all duration-200"
+                    className="gap-1.5 bg-[#07172A] text-white border-[#07172A] hover:bg-white hover:text-[#07172A] hover:border-[#07172A]"
                     data-testid="button-batch-score"
                   >
                     {batchScoreMutation.isPending ? (
                       <>
-                        <Activity className="animate-spin h-3 w-3 mr-1" />
+                        <Activity className="animate-spin h-3.5 w-3.5" />
                         Scoring...
                       </>
                     ) : (
                       <>
-                        <Calculator size={12} className="mr-1" />
+                        <Calculator className="h-3.5 w-3.5" />
                         Score {selectedDeals.length} Deals
                       </>
                     )}

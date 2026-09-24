@@ -1,0 +1,80 @@
+IMPORTANT: actually implement this in code. Do not create a documentation file, notes file, or summary file — edit the actual source file.
+
+In client/src/pages/analyst-dashboard.tsx, find the bulk-action button row that renders when deals are selected ({selectedDeals.length > 0 && (...)}, containing the Approve, Review, Reject, Delete, Clear, and "Score N Deals" buttons — look for data-testid="button-bulk-approve" through data-testid="button-batch-score"). These buttons currently override the shared Button component's styling with custom rounded (not rounded-full), uppercase tracking-wider text, and tiny manual padding — which is why they look like a different design system than the Table/Pipeline/Map toggle and the Status/Priority/Type filter dropdowns sitting right above them in the same toolbar. Replace that whole block with this, which uses the shared Button component's variant="outline"/size="sm" the same way the Status/Priority/Type filter buttons already do, keeping the same click handlers, disabled logic, icons, and data-testid attributes — just fixing the visual style:
+
+jsx
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkOperation('approve-all')}
+                    disabled={bulkOperationMutation.isPending}
+                    className="gap-1.5 bg-white text-green-700 border-green-300 hover:bg-green-600 hover:text-white hover:border-green-600"
+                    data-testid="button-bulk-approve"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    <span>Approve</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkOperation('review-all')}
+                    disabled={bulkOperationMutation.isPending}
+                    className="gap-1.5 bg-white text-amber-700 border-amber-300 hover:bg-amber-500 hover:text-white hover:border-amber-500"
+                    data-testid="button-bulk-review"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    <span>Review</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkOperation('reject-all')}
+                    disabled={bulkOperationMutation.isPending}
+                    className="gap-1.5 bg-white text-red-700 border-red-300 hover:bg-red-600 hover:text-white hover:border-red-600"
+                    data-testid="button-bulk-reject"
+                  >
+                    <XCircle className="h-3.5 w-3.5" />
+                    <span>Reject</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkOperation('delete-all')}
+                    disabled={bulkOperationMutation.isPending || !isAuthenticated}
+                    className="gap-1.5 bg-white text-red-700 border-red-300 hover:bg-red-50 hover:text-red-800 hover:border-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    data-testid="button-bulk-delete"
+                    title={!isAuthenticated ? "Login required to delete deals" : "Delete selected deals"}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearSelection}
+                    className="text-gray-700 border-gray-300 hover:bg-gray-100 hover:text-gray-900 hover:border-gray-400"
+                    data-testid="button-clear-selection"
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleBatchScore}
+                    disabled={batchScoreMutation.isPending || selectedDeals.length === 0}
+                    className="gap-1.5 bg-[#07172A] text-white border-[#07172A] hover:bg-white hover:text-[#07172A] hover:border-[#07172A]"
+                    data-testid="button-batch-score"
+                  >
+                    {batchScoreMutation.isPending ? (
+                      <>
+                        <Activity className="animate-spin h-3.5 w-3.5" />
+                        Scoring...
+                      </>
+                    ) : (
+                      <>
+                        <Calculator className="h-3.5 w-3.5" />
+                        Score {selectedDeals.length} Deals
+                      </>
+                    )}
+                  </Button>
+
+Don't change the "305 selected:" label text or the surrounding container. Don't touch any other button elsewhere in the file — only this bulk-action row.
