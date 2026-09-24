@@ -3,6 +3,7 @@ import { Link, useLocation, useRoute } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { Eye, EyeOff, Loader2, LogIn, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -168,11 +169,10 @@ export default function DeveloperLogin() {
   };
 
   const primaryColor = branding?.primaryColor || "#0A2B4A";
-  const secondaryColor = branding?.secondaryColor || "#4A90E2";
 
   if (loadingBranding) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50" style={{ color: primaryColor }}>
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f9fc]" style={{ color: primaryColor }}>
         <Loader2 className="h-8 w-8 animate-spin" aria-label="Loading login" />
       </div>
     );
@@ -180,7 +180,7 @@ export default function DeveloperLogin() {
 
   if (!branding) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f9fc] px-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-xl">
           <Building2 className="mx-auto mb-4 h-10 w-10 text-slate-400" />
           <h1 className="text-xl font-semibold text-slate-900">Login unavailable</h1>
@@ -192,71 +192,80 @@ export default function DeveloperLogin() {
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4 py-10"
-      style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}
-    >
-      <div className="w-full max-w-md">
-        <div className="overflow-hidden rounded-2xl bg-white shadow-2xl">
-          <div className="h-2" style={{ backgroundColor: secondaryColor }} />
-          <div className="p-8 sm:p-10">
-            <div className="mb-8 text-center">
-              <Link
-                href="/"
-                className="mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slate-200"
-                aria-label={`${branding.companyName} home`}
-              >
-                {branding.logoUrl ? (
-                  <img src={branding.logoUrl} alt={`${branding.companyName} logo`} className="h-full w-full object-contain p-2" />
-                ) : (
-                  <img src="/assets/landlinq-white-icon.png" alt="LandLinq" className="h-full w-full object-contain p-3" />
-                )}
+    <div className="flex min-h-screen items-center justify-center bg-[#f7f9fc] px-4 py-8">
+      <div className="flex w-full items-center justify-center">
+        <div className="w-full max-w-[460px]">
+          <Card className="max-w-full overflow-hidden rounded-xl border border-[#dce3ec] bg-white shadow-[0_8px_30px_rgba(15,23,42,0.08)]">
+            <CardHeader className="px-6 pb-2 pt-6 sm:px-8 sm:pt-7">
+              <Link href="/" className="mx-auto mb-5 flex w-fit" aria-label={`${branding.companyName} home`}>
+                <img
+                  src={branding.logoUrl || "/assets/landlinq-color-logo.png"}
+                  alt={branding.logoUrl ? `${branding.companyName} logo` : "LandLinq"}
+                  className="h-8 w-auto max-w-[170px] object-contain object-center"
+                />
               </Link>
-              <h1 className="text-2xl font-bold text-slate-900">{branding.companyName}</h1>
-              <p className="mt-2 text-sm text-slate-500">Sign in to access your investment dashboard</p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="developer-email">Email address</Label>
-                <Input id="developer-email" name="email" type="email" autoComplete="email" required disabled={loginMutation.isPending} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="developer-password">Password</Label>
-                <div className="relative">
+              <CardTitle className="text-xl font-bold text-slate-900">Sign In</CardTitle>
+              <CardDescription className="mt-1 text-[15px] leading-6 text-slate-500">
+                {branding.companyName}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="max-w-full overflow-hidden px-6 pb-7 pt-4 sm:px-8">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="developer-email" className="text-sm font-semibold text-slate-800">Email address</Label>
                   <Input
-                    id="developer-password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
+                    id="developer-email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
                     required
                     disabled={loginMutation.isPending}
-                    className="pr-10"
+                    className="h-12 rounded-lg border-[#bac9dc] bg-[#eaf2ff] px-3 text-base shadow-none placeholder:text-slate-400 focus:border-[#4A90E2] focus:ring-2 focus:ring-[#4A90E2]/20"
                   />
-                  <button
-                    type="button"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    onClick={() => setShowPassword((visible) => !visible)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
                 </div>
-              </div>
-              <Button type="submit" disabled={loginMutation.isPending} className="h-11 w-full text-white" style={{ backgroundColor: primaryColor }}>
-                {loginMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-                {loginMutation.isPending ? "Signing in..." : "Sign in"}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <a href={`/reset-password?developerSlug=${encodeURIComponent(slug)}`} className="text-sm font-medium hover:underline" style={{ color: secondaryColor }}>
-                Forgot your password?
-              </a>
-            </div>
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="developer-password" className="text-sm font-semibold text-slate-800">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="developer-password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      required
+                      disabled={loginMutation.isPending}
+                      className="h-12 rounded-lg border-[#bac9dc] bg-[#eaf2ff] px-3 pr-11 text-base shadow-none placeholder:text-slate-400 focus:border-[#4A90E2] focus:ring-2 focus:ring-[#4A90E2]/20"
+                    />
+                    <button
+                      type="button"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <a
+                    href={`/reset-password?developerSlug=${encodeURIComponent(slug)}`}
+                    className="text-sm font-medium text-[#4A90E2] hover:underline"
+                  >
+                    Forgot your password?
+                  </a>
+                </div>
+                <Button
+                  type="submit"
+                  disabled={loginMutation.isPending}
+                  className="h-12 w-full rounded-lg border border-transparent bg-[var(--company-primary-color)] text-sm font-bold uppercase tracking-wide text-white shadow-sm transition-colors hover:border-[#4A90E2] hover:bg-white hover:text-[#4A90E2]"
+                  style={{ "--company-primary-color": primaryColor } as React.CSSProperties}
+                >
+                  {loginMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
+                  {loginMutation.isPending ? "Signing in..." : "Sign In"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </div>
-        <p className="mt-6 text-center text-xs text-white/75">Secure access powered by LandLinq</p>
       </div>
     </div>
   );
