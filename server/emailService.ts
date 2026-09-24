@@ -72,6 +72,39 @@ function getGoDaddyMailbox(email: string) {
   return GODADDY_MAILBOXES[email.trim().toLowerCase()];
 }
 
+const GODADDY_SMTP_TRANSPORTERS = new Map<
+  string,
+  ReturnType<typeof nodemailer.createTransport>
+>();
+
+function getGoDaddySmtpTransporter(senderEmail: string, password: string) {
+  const mailboxKey = senderEmail.trim().toLowerCase();
+  const cachedTransporter = GODADDY_SMTP_TRANSPORTERS.get(mailboxKey);
+  if (cachedTransporter) {
+    return cachedTransporter;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: GODADDY_SMTP_HOST,
+    port: GODADDY_SMTP_PORT,
+    secure: GODADDY_SMTP_PORT === 465,
+    requireTLS: GODADDY_SMTP_PORT === 587,
+    auth: {
+      user: senderEmail,
+      pass: password,
+    },
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
+    connectionTimeout: 30_000,
+    greetingTimeout: 30_000,
+    socketTimeout: 30_000,
+  });
+
+  GODADDY_SMTP_TRANSPORTERS.set(mailboxKey, transporter);
+  return transporter;
+}
+
 function htmlToPlainText(html: string): string {
   return html
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -127,19 +160,7 @@ async function sendGoDaddyEmail(
     const logoBuffer = await getEmailLogoBuffer();
     const emailHtml = stripLegacyCatalystBranding(logoBuffer ? inlineEmailLogo(htmlBody) : htmlBody);
 
-    const transporter = nodemailer.createTransport({
-      host: GODADDY_SMTP_HOST,
-      port: GODADDY_SMTP_PORT,
-      secure: GODADDY_SMTP_PORT === 465,
-      requireTLS: GODADDY_SMTP_PORT === 587,
-      auth: {
-        user: senderEmail,
-        pass: password,
-      },
-      connectionTimeout: 30_000,
-      greetingTimeout: 30_000,
-      socketTimeout: 30_000,
-    });
+    const transporter = getGoDaddySmtpTransporter(senderEmail, password);
 
     const result = await transporter.sendMail({
       from: `${senderName || mailbox.defaultName} <${senderEmail}>`,
