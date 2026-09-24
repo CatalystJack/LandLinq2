@@ -71,7 +71,7 @@ export default function DeveloperNavigation() {
         aria-label="Developer navigation"
       >
       <aside
-        className={`pointer-events-auto fixed inset-y-0 left-0 z-50 hidden flex-col border-r border-slate-700/80 bg-[#081729] shadow-xl transition-[width] duration-200 md:flex ${
+        className={`pointer-events-auto fixed inset-y-0 left-0 z-50 hidden flex-col border-r border-slate-700/80 bg-[#081729] shadow-xl transition-[width] duration-300 md:flex ${
           isSidebarExpanded ? "w-64" : "w-[4.5rem]"
         }`}
         onMouseEnter={() => setIsSidebarHovering(true)}
