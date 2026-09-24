@@ -48,4 +48,35 @@ assert.notEqual(freshToken, validToken.token);
 assert.equal(generatedToken.email, user.email);
 assert.equal(generatedToken.token, freshToken);
 assert.ok(generatedToken.expiresAt > new Date());
-console.log('passwordReset token reuse assertions passed');
+
+let updatedPasswordHash: string | undefined;
+let deletedToken: string | undefined;
+const resetService = new PasswordResetService({
+  getUserByEmail: async (email: string) => email === user.email ? user : undefined,
+  getValidPasswordResetToken: async () => undefined,
+  createPasswordResetToken: async () => validToken,
+  getPasswordResetToken: async (token: string) => token === validToken.token ? validToken : undefined,
+  deletePasswordResetToken: async (token: string) => {
+    deletedToken = token;
+  },
+  updateUserPassword: async (userId: string, passwordHash: string) => {
+    assert.equal(userId, user.id);
+    updatedPasswordHash = passwordHash;
+  },
+} as any);
+
+assert.equal(
+  await resetService.resetPassword(validToken.token, 'NewSecurePassword!'),
+  user.email,
+);
+assert.ok(updatedPasswordHash);
+assert.notEqual(updatedPasswordHash, 'NewSecurePassword!');
+assert.equal(deletedToken, validToken.token);
+
+const invalidTokenService = new PasswordResetService({
+  getPasswordResetToken: async () => undefined,
+  deletePasswordResetToken: async () => {},
+} as any);
+assert.equal(await invalidTokenService.resetPassword('expired-token', 'NewSecurePassword!'), null);
+
+console.log('passwordReset assertions passed');

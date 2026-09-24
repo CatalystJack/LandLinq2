@@ -234,7 +234,7 @@ function PasswordResetContent() {
 
         window.location.replace("/dashboard");
       } else {
-        setError(data.message || "Failed to reset password");
+        setError(data?.message || "Failed to reset password");
       }
     } catch (err) {
       setError("Network error. Please try again.");
