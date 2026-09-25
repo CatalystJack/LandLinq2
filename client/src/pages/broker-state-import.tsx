@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, CheckCircle2, Database, FileSpreadsheet, Loader2, ShieldCheck } from "lucide-react";
+import AdminSharedBrokerImport from "@/components/admin-shared-broker-import";
 
 const confirmationText = "IMPORT NC AND TN BROKERS";
 
@@ -71,6 +72,7 @@ function Metric({ label, value }: { label: string; value: number | string }) {
 }
 
 export default function BrokerStateImportPage() {
+  const [activeTool, setActiveTool] = useState<"shared" | "approved">("shared");
   const [ncFile, setNcFile] = useState<File | null>(null);
   const [tnFile, setTnFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -137,10 +139,32 @@ export default function BrokerStateImportPage() {
       <main className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
         <PageHeader
           eyebrow="Platform admin"
-          title="NC and TN broker import"
-          description="A one-time, additive production import using the app’s existing database connection."
+          title="Shared broker directory imports"
+          description="Upload shared state broker lists or run the separate one-time approved NC/TN import."
         />
 
+        <div role="tablist" aria-label="Broker import tools" className="mb-6 flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTool === "shared"}
+            onClick={() => setActiveTool("shared")}
+            className={`rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${activeTool === "shared" ? "border-[#0A2B4A] bg-[#0A2B4A] text-white hover:border-[#498EDE] hover:bg-white hover:text-[#498EDE]" : "border-slate-300 bg-white text-slate-700 hover:border-[#498EDE] hover:text-[#498EDE]"}`}
+          >
+            Upload a shared state list
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTool === "approved"}
+            onClick={() => setActiveTool("approved")}
+            className={`rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors ${activeTool === "approved" ? "border-[#0A2B4A] bg-[#0A2B4A] text-white hover:border-[#498EDE] hover:bg-white hover:text-[#498EDE]" : "border-slate-300 bg-white text-slate-700 hover:border-[#498EDE] hover:text-[#498EDE]"}`}
+          >
+            Approved NC/TN one-time import
+          </button>
+        </div>
+
+        {activeTool === "shared" ? <AdminSharedBrokerImport /> : <>
         <div className="mb-6 flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
@@ -283,6 +307,7 @@ export default function BrokerStateImportPage() {
             </div>
           </div>
         )}
+        </>}
       </main>
     </div>
   );

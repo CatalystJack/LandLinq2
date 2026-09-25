@@ -393,6 +393,7 @@ import { Buffer } from "buffer";
 import multer from "multer";
 import { startScrapeJob, getJob, cancelJob } from "./taxScraper.js";
 import { registerBrokerStateImportRoutes } from "./brokerStateImportRoutes";
+import { registerSharedBrokerStateImportRoutes } from "./sharedBrokerStateImportRoutes";
 
 // Message deduplication cache - stores message IDs for 24 hours
 const processedMessages = new Map<string, number>();
@@ -2848,6 +2849,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // Auth middleware - using our own user/password system
   setupAuth(app);
   registerBrokerStateImportRoutes(app);
+  registerSharedBrokerStateImportRoutes(app);
 
   // ── Demo-user server-side lockdown ────────────────────────────────────────
   // Must be AFTER setupAuth so req.user is populated by Passport session.
@@ -14869,7 +14871,11 @@ RULES:
           });
         }
       }
-      return res.json({ invited: invited.length, failed });
+      return res.json({
+        invited: invited.length,
+        sent: invited.map(({ member }) => ({ email: member.email })),
+        failed,
+      });
     } catch (error: any) {
       console.error("[admin investment company bulk initial login] Error:", error);
       return res.status(500).json({ error: "Failed to process team invitations" });
@@ -15000,7 +15006,12 @@ RULES:
     if (broker.ownerDeveloperProfileId !== null && broker.ownerDeveloperProfileId !== undefined) return false;
     if (broker.userId === '20974d7b-e103-4fc7-b42f-7a13d41041fb') return false;
     const sector = String(broker.contactSector || '').trim().toLowerCase();
-    const county = String(broker.contactCounty || '').trim().toLowerCase();
+    const counties = new Set(
+      String(broker.contactCounty || '')
+        .split(/[,;|]/)
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean),
+    );
     const brokerStates = getBrokerStateCodes(broker.stateRegion, broker.contactCounty);
     const brokerSourceTags = Array.isArray(broker.sourceTags)
       ? broker.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
@@ -15008,7 +15019,7 @@ RULES:
     return (
       (visibility.sectors.length === 0 || visibility.sectors.includes(sector)) &&
       (visibility.states.length === 0 || brokerStates.some((state) => visibility.states.includes(state))) &&
-      (visibility.counties.length === 0 || visibility.counties.includes(county)) &&
+      (visibility.counties.length === 0 || visibility.counties.some((county) => counties.has(county))) &&
       (visibility.sourceTags.length === 0 || visibility.sourceTags.some((tag) => brokerSourceTags.includes(tag)))
     );
   }

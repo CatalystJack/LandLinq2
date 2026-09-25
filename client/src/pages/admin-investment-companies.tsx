@@ -128,6 +128,7 @@ interface InviteRow {
 
 interface InviteResult {
   invited: number;
+  sent: Array<{ email: string }>;
   failed: Array<{ email: string; reason: string }>;
 }
 
@@ -683,10 +684,10 @@ export default function AdminInvestmentCompanies() {
         setInviteRows([]);
       }
       toast({
-        title: result.failed.length ? "Some invitations need attention" : "Initial logins sent",
+        title: result.failed.length ? "Some invitations need attention" : "Initial login emails accepted",
         description: result.failed.length
-          ? `${result.invited} invited, ${result.failed.length} failed. Correct the failed rows and retry.`
-          : `${result.invited} team member${result.invited === 1 ? "" : "s"} invited successfully.`,
+          ? `${result.sent.length} email${result.sent.length === 1 ? "" : "s"} accepted by the mail service, ${result.failed.length} failed. Correct the failed rows and retry.`
+          : `${result.sent.length} email${result.sent.length === 1 ? "" : "s"} accepted by the mail service. This confirms handoff, not Inbox delivery.`,
       });
     },
     onError: (error: Error) => toast({ title: "Could not create login", description: error.message, variant: "destructive" }),
@@ -813,7 +814,48 @@ export default function AdminInvestmentCompanies() {
        </div><DialogFooter><Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button><Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || logoMutation.isPending}>{saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? "Save changes" : "Create Development Partner"}</Button></DialogFooter>
     </DialogContent></Dialog>
 
-      <Dialog open={!!loginCompany} onOpenChange={(open) => !open && closeInvite()}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Invite Development Partner Contact</DialogTitle><DialogDescription>Invite one or more team members to the {loginCompany?.companyName} portal. Each person will receive a temporary password and branded login link.</DialogDescription></DialogHeader><div className="space-y-4 py-3">{inviteResult && <div className={`rounded-lg border p-3 text-sm ${inviteResult.failed.length ? "border-amber-200 bg-amber-50 text-amber-950" : "border-green-200 bg-green-50 text-green-900"}`}><p className="font-semibold">{inviteResult.invited} invitation{inviteResult.invited === 1 ? "" : "s"} sent</p>{inviteResult.failed.length > 0 && <div className="mt-2 space-y-1"><p className="font-medium">{inviteResult.failed.length} failed:</p>{inviteResult.failed.map((failure, index) => <p key={`${failure.email}-${index}`} className="text-xs"><span className="font-medium">{failure.email || "Blank email"}:</span> {failure.reason}</p>)}</div>}</div>}<div className="space-y-3">{inviteRows.map((row, index) => <div key={row.id} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2"><div><Label>Name</Label><Input value={row.name} onChange={(e) => updateInviteRow(row.id, "name", e.target.value)} placeholder="First and last name" /></div><div><Label>Email</Label><Input type="email" value={row.email} onChange={(e) => updateInviteRow(row.id, "email", e.target.value)} placeholder="contact@company.com" /></div>{index > 0 ? <Button type="button" variant="ghost" size="icon" className="mb-0.5" onClick={() => removeInviteRow(row.id)} aria-label="Remove team member"><X className="h-4 w-4" /></Button> : <div className="w-10" />}</div>)}</div><Button type="button" variant="outline" onClick={addInviteRow}><Plus className="mr-2 h-4 w-4" />Add another team member</Button><div className="flex gap-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-900"><Mail className="mt-0.5 h-4 w-4 shrink-0" /><p>Each account will be assigned the DEVELOPER role and must choose a new password at first sign-in.</p></div></div><DialogFooter><Button variant="outline" onClick={closeInvite}>{inviteResult ? "Done" : "Cancel"}</Button><Button onClick={submitInvites} disabled={loginMutation.isPending || !inviteRows.some((row) => row.name.trim() || row.email.trim())}>{loginMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{inviteResult?.failed.length ? "Retry failed invitations" : "Create account and send invitation"}</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={!!loginCompany} onOpenChange={(open) => !open && closeInvite()}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Invite Development Partner Contact</DialogTitle>
+            <DialogDescription>
+              Invite team members to the {loginCompany?.companyName} portal. The result lists emails accepted by the mail service; acceptance does not confirm inbox delivery.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            {inviteResult && <div className={`rounded-lg border p-3 text-sm ${inviteResult.failed.length ? "border-amber-200 bg-amber-50 text-amber-950" : "border-green-200 bg-green-50 text-green-900"}`}>
+              <p className="font-semibold">{inviteResult.sent.length} initial login email{inviteResult.sent.length === 1 ? "" : "s"} accepted by the mail service</p>
+              {inviteResult.sent.length > 0 && <div className="mt-2 space-y-1">
+                {inviteResult.sent.map((entry) => <p key={entry.email} className="text-xs"><CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />{entry.email}</p>)}
+              </div>}
+              <p className="mt-2 text-xs">If a listed recipient cannot find the message, ask them to check spam or junk. Provider acceptance cannot confirm final Inbox delivery.</p>
+              {inviteResult.failed.length > 0 && <div className="mt-2 space-y-1">
+                <p className="font-medium">{inviteResult.failed.length} failed:</p>
+                {inviteResult.failed.map((failure, index) => <p key={`${failure.email}-${index}`} className="text-xs"><span className="font-medium">{failure.email || "Blank email"}:</span> {failure.reason}</p>)}
+              </div>}
+            </div>}
+            <div className="space-y-3">
+              {inviteRows.map((row, index) => <div key={row.id} className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                <div><Label>Name</Label><Input value={row.name} onChange={(e) => updateInviteRow(row.id, "name", e.target.value)} placeholder="First and last name" /></div>
+                <div><Label>Email</Label><Input type="email" value={row.email} onChange={(e) => updateInviteRow(row.id, "email", e.target.value)} placeholder="contact@company.com" /></div>
+                {index > 0 ? <Button type="button" variant="ghost" size="icon" className="mb-0.5" onClick={() => removeInviteRow(row.id)} aria-label="Remove team member"><X className="h-4 w-4" /></Button> : <div className="hidden w-10 sm:block" />}
+              </div>)}
+            </div>
+            <Button type="button" variant="outline" onClick={addInviteRow}><Plus className="mr-2 h-4 w-4" />Add another team member</Button>
+            <div className="flex gap-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
+              <Mail className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>Each account is assigned the DEVELOPER role and must choose a new password at first sign-in. Failed sends do not leave behind a login and remain available to retry.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeInvite}>{inviteResult ? "Done" : "Cancel"}</Button>
+            <Button onClick={submitInvites} disabled={loginMutation.isPending || !inviteRows.some((row) => row.name.trim() || row.email.trim())}>
+              {loginMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {inviteResult?.failed.length ? "Retry failed invitations" : "Create account and send invitation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!deactivatingCompany} onOpenChange={(open) => { if (!open && !companyStatusMutation.isPending) { setDeactivatingCompany(null); setDeactivationConfirmation(""); } }}><DialogContent><DialogHeader><DialogTitle>Deactivate {deactivatingCompany?.companyName}?</DialogTitle><DialogDescription>This immediately blocks every team member from signing in. CRM contacts, Pipeline opportunities, deals, campaigns, analytics, settings, and account history will be preserved. You can reactivate the company later.</DialogDescription></DialogHeader><div className="space-y-2 py-3"><Label htmlFor="deactivate-company-confirmation">Type <span className="font-semibold text-slate-900">{deactivatingCompany?.companyName}</span> to confirm</Label><Input id="deactivate-company-confirmation" value={deactivationConfirmation} onChange={(event) => setDeactivationConfirmation(event.target.value)} autoComplete="off" /></div><DialogFooter><Button variant="outline" onClick={() => { setDeactivatingCompany(null); setDeactivationConfirmation(""); }} disabled={companyStatusMutation.isPending}>Cancel</Button><Button variant="destructive" onClick={() => deactivatingCompany && companyStatusMutation.mutate({ profile: deactivatingCompany, isActive: false })} disabled={!deactivatingCompany || deactivationConfirmation !== deactivatingCompany.companyName || companyStatusMutation.isPending}>{companyStatusMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Deactivate company</Button></DialogFooter></DialogContent></Dialog>
        <Dialog open={!!permanentlyDeletingCompany} onOpenChange={(open) => { if (!open && !permanentDeleteMutation.isPending) { setPermanentlyDeletingCompany(null); setPermanentDeletionConfirmation(""); } }}><DialogContent><DialogHeader><DialogTitle>Permanently delete {permanentlyDeletingCompany?.companyName}?</DialogTitle><DialogDescription>This cannot be undone. The company profile, logins, tenant routing, campaigns, pipeline records, and settings will be removed. Canonical deals, shared contacts, and comparable cache records will be preserved.</DialogDescription></DialogHeader><div className="space-y-2 py-3"><Label htmlFor="permanent-delete-company-confirmation">Type <span className="font-semibold text-slate-900">{permanentlyDeletingCompany?.companyName}</span> to confirm</Label><Input id="permanent-delete-company-confirmation" value={permanentDeletionConfirmation} onChange={(event) => setPermanentDeletionConfirmation(event.target.value)} autoComplete="off" /></div><DialogFooter><Button variant="outline" onClick={() => { setPermanentlyDeletingCompany(null); setPermanentDeletionConfirmation(""); }} disabled={permanentDeleteMutation.isPending}>Cancel</Button><Button variant="destructive" onClick={() => permanentlyDeletingCompany && permanentDeleteMutation.mutate(permanentlyDeletingCompany)} disabled={!permanentlyDeletingCompany || permanentDeletionConfirmation !== permanentlyDeletingCompany.companyName || permanentDeleteMutation.isPending}>{permanentDeleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete permanently</Button></DialogFooter></DialogContent></Dialog>
