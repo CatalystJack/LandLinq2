@@ -35641,6 +35641,198 @@ RULES:
           endpoint: 'https://api.hellodata.ai',
           dataPoints: ['Comparable Properties', 'Rent Data', 'Unit Counts', 'Year Built'],
           usedIn: ['Deal Analysis', 'Comparables Search', 'Data Hub Cache']
+        },
+        {
+          id: 'nc-onemap-parcels',
+          name: 'NC OneMap Parcels',
+          description: 'Statewide cadastral data compiled from county and Eastern Band of Cherokee Indians submissions. County-level field availability and update dates vary.',
+          type: 'Property Records',
+          cost: 'Free',
+          endpoint: 'https://nconemap.gov/pages/parcels',
+          dataPoints: ['Parcel boundaries', 'Parcel identifiers', 'Site addresses', 'County-supplied assessment attributes'],
+          usedIn: ['Source catalog', 'Dated public-record enrichment'],
+          coverage: 'North Carolina: all 100 counties plus EBCI',
+          freshness: 'County vintages vary. Display only deal-level records with a verified source date within 90 days.'
+        },
+        {
+          id: 'tn-comptroller-parcels',
+          name: 'Tennessee Comptroller Parcel Data',
+          description: 'Official statewide parcel-data download assembled from county assessors; the state page documents county exceptions.',
+          type: 'Property Records',
+          cost: 'Free',
+          endpoint: 'https://comptroller.tn.gov/office-functions/pa/gisredistricting/redistricting-and-land-use-maps/parcel-data.html',
+          dataPoints: ['Parcel boundaries', 'Parcel identifiers', 'County assessor attributes'],
+          usedIn: ['Source catalog', 'Dated public-record enrichment'],
+          coverage: '86 of 95 counties; the remaining counties require county-level sources',
+          freshness: 'Download vintage must be checked per county; values older than 90 days are not current for dashboard display.'
+        },
+        {
+          id: 'florida-statewide-parcels',
+          name: 'Florida Statewide Parcels',
+          description: 'State GIS layer aggregating parcel data submitted by Florida county property appraisers. This is a statewide reference layer, not a live county tax-roll query.',
+          type: 'Property Records',
+          cost: 'Free',
+          endpoint: 'https://www.floridagio.gov/datasets/FGIO::florida-statewide-parcels/about',
+          dataPoints: ['Parcel identifiers', 'Parcel geometry', 'Owner and tax-roll attributes where published'],
+          usedIn: ['Source catalog', 'Dated public-record enrichment'],
+          coverage: 'Florida: all 67 counties',
+          freshness: 'The layer metadata identifies an August 2025 GIS export; that vintage is older than the 90-day display limit as of September 2026.'
+        },
+        {
+          id: 'sc-county-parcel-discovery',
+          name: 'South Carolina County Parcel GIS',
+          description: 'Official SCDNR GIS portal for state geospatial resources. Parcel and assessment records remain county-maintained; no complete statewide parcel feed was verified.',
+          type: 'Property Records',
+          cost: 'Free',
+          endpoint: 'https://www.dnr.sc.gov/gis.html',
+          dataPoints: ['County parcel-map discovery', 'County parcel identifiers and assessment fields where published'],
+          usedIn: ['Source catalog', 'County source discovery'],
+          coverage: 'South Carolina: 46 counties; parcel availability is county-specific',
+          freshness: 'Check the county dataset vintage before use; no statewide 90-day freshness guarantee.'
+        },
+        {
+          id: 'ky-open-gis-parcel-discovery',
+          name: 'Kentucky Open GIS Data',
+          description: 'Official geospatial data portal for discovering Kentucky GIS resources. Statewide parcel completeness and uniform assessment fields were not confirmed; county PVA records remain authoritative.',
+          type: 'Property Records',
+          cost: 'Free',
+          endpoint: 'https://opengisdata.ky.gov/',
+          dataPoints: ['GIS data catalog', 'County parcel resources where published'],
+          usedIn: ['Source catalog', 'County source discovery'],
+          coverage: 'Kentucky: 120 counties; statewide parcel coverage is unconfirmed',
+          freshness: 'Verify source date and county coverage for each dataset; do not infer current values from an undated layer.'
+        },
+        {
+          id: 'census-building-permits',
+          name: 'U.S. Census Building Permits Survey',
+          description: 'Official monthly counts of residential building permits by permit-issuing place and county. These are area-level totals, not property-level permit histories.',
+          type: 'Building Permits',
+          cost: 'Free',
+          endpoint: 'https://www.census.gov/construction/bps/',
+          dataPoints: ['Monthly permit counts', 'Permit-issuing place totals', 'County-level context'],
+          usedIn: ['Market context only; not individual property permit history'],
+          coverage: 'Nationwide, including NC, SC, TN, KY, and FL',
+          freshness: 'Monthly series; use the published reference month. Not a substitute for local permit records.'
+        },
+        {
+          id: 'nc-local-permits',
+          name: 'North Carolina Local Permit Portals',
+          description: 'Building permit records are issued by county and municipal departments. No single statewide property-level permit feed was verified.',
+          type: 'Building Permits',
+          cost: 'Free (portal viewing; copy fees vary)',
+          endpoint: 'County or municipality building-inspection / permit portal',
+          dataPoints: ['Permit type', 'Issue date', 'Status', 'Project description when published'],
+          usedIn: ['County-level permit source discovery'],
+          coverage: 'North Carolina: 100 counties and local jurisdictions; portal coverage varies',
+          freshness: 'Use each permit issue/updated date; do not display records older than 90 days as current.'
+        },
+        {
+          id: 'sc-local-permits',
+          name: 'South Carolina Local Permit Portals',
+          description: 'County and municipal building departments publish permit records through separate portals. No statewide parcel-level permit feed was verified.',
+          type: 'Building Permits',
+          cost: 'Free (portal viewing; copy fees vary)',
+          endpoint: 'County or municipality building / planning department portal',
+          dataPoints: ['Permit type', 'Issue date', 'Status', 'Project description when published'],
+          usedIn: ['County-level permit source discovery'],
+          coverage: 'South Carolina: 46 counties and local jurisdictions; portal coverage varies',
+          freshness: 'Use each permit issue/updated date; do not display records older than 90 days as current.'
+        },
+        {
+          id: 'tn-local-permits',
+          name: 'Tennessee Local Permit Portals',
+          description: 'Permit information is maintained by local building departments and jurisdictions; no unified statewide parcel-level history feed was verified.',
+          type: 'Building Permits',
+          cost: 'Free (portal viewing; copy fees vary)',
+          endpoint: 'County or municipality building / codes department portal',
+          dataPoints: ['Permit type', 'Issue date', 'Status', 'Project description when published'],
+          usedIn: ['County-level permit source discovery'],
+          coverage: 'Tennessee: 95 counties and local jurisdictions; portal coverage varies',
+          freshness: 'Use each permit issue/updated date; do not display records older than 90 days as current.'
+        },
+        {
+          id: 'ky-local-permits',
+          name: 'Kentucky Local Permit Portals',
+          description: 'Building permits are maintained by local governments and inspection departments. No statewide parcel-level permit history feed was verified.',
+          type: 'Building Permits',
+          cost: 'Free (portal viewing; copy fees vary)',
+          endpoint: 'County or municipality building-inspection / planning portal',
+          dataPoints: ['Permit type', 'Issue date', 'Status', 'Project description when published'],
+          usedIn: ['County-level permit source discovery'],
+          coverage: 'Kentucky: 120 counties and local jurisdictions; portal coverage varies',
+          freshness: 'Use each permit issue/updated date; do not display records older than 90 days as current.'
+        },
+        {
+          id: 'fl-local-permits',
+          name: 'Florida Local Permit Portals',
+          description: 'County and municipal building departments publish permit histories through separate portals. No unified statewide parcel-level permit feed was verified.',
+          type: 'Building Permits',
+          cost: 'Free (portal viewing; copy fees vary)',
+          endpoint: 'County or municipality building / permitting department portal',
+          dataPoints: ['Permit type', 'Issue date', 'Status', 'Project description when published'],
+          usedIn: ['County-level permit source discovery'],
+          coverage: 'Florida: 67 counties and local jurisdictions; portal coverage varies',
+          freshness: 'Use each permit issue/updated date; do not display records older than 90 days as current.'
+        },
+        {
+          id: 'nc-recorded-property-documents',
+          name: 'North Carolina Register of Deeds Records',
+          description: 'Recorded real-property documents are maintained by the county Register of Deeds. The association directory routes users to the correct county office; it is not a statewide bulk feed.',
+          type: 'Recorded Mortgages & Liens',
+          cost: 'Free (portal viewing; copy fees vary)',
+          endpoint: 'https://www.ncard.us/find-your-register-of-deeds',
+          dataPoints: ['Deeds of trust', 'Mortgages', 'Liens', 'Releases and recording dates'],
+          usedIn: ['County-level recorder source discovery'],
+          coverage: 'North Carolina: county offices; no single statewide property-document feed',
+          freshness: 'Recorded dates are historical events; only records retrieved/validated within 90 days are treated as current.'
+        },
+        {
+          id: 'sc-recorded-property-documents',
+          name: 'South Carolina Register of Deeds / Clerk Records',
+          description: 'The Judicial Branch identifies county Register of Deeds and Clerk of Court offices responsible for local records. Online access and fees vary by county.',
+          type: 'Recorded Mortgages & Liens',
+          cost: 'Free (portal viewing; copy fees vary)',
+          endpoint: 'https://www.sccourts.org/courts/court-officials/register-of-deeds',
+          dataPoints: ['Deeds', 'Mortgages', 'Liens', 'Releases and recording dates'],
+          usedIn: ['County-level recorder source discovery'],
+          coverage: 'South Carolina: county recording offices; no statewide bulk feed verified',
+          freshness: 'Only records retrieved/validated within 90 days are treated as current; historical recording dates remain visible as event dates.'
+        },
+        {
+          id: 'tn-recorded-property-documents',
+          name: 'Tennessee County Register of Deeds Records',
+          description: 'Recorded land instruments are maintained by county Register of Deeds offices. Public search, bulk access, and fees are county-specific.',
+          type: 'Recorded Mortgages & Liens',
+          cost: 'Free (portal viewing; copy fees vary)',
+          endpoint: 'County Register of Deeds portal (county-specific; no statewide bulk endpoint verified)',
+          dataPoints: ['Deeds', 'Mortgages', 'Liens', 'Releases and recording dates'],
+          usedIn: ['County-level recorder source discovery'],
+          coverage: 'Tennessee: 95 counties; local office access varies',
+          freshness: 'Only records retrieved/validated within 90 days are treated as current; historical recording dates remain visible as event dates.'
+        },
+        {
+          id: 'ky-recorded-property-documents',
+          name: 'Kentucky County Clerk Land Records',
+          description: 'County Clerks maintain land records, including deeds and recorded liens. The state Clerk Network and county clerk directory are discovery paths, not a statewide property-record feed.',
+          type: 'Recorded Mortgages & Liens',
+          cost: 'Free (portal viewing; copy fees vary)',
+          endpoint: 'https://revenue.ky.gov/ClerkNetwork/Pages/default.aspx',
+          dataPoints: ['Deeds', 'Mortgages', 'Liens', 'Releases and recording dates'],
+          usedIn: ['County-level recorder source discovery'],
+          coverage: 'Kentucky: 120 county clerk offices; portal and bulk access vary',
+          freshness: 'Only records retrieved/validated within 90 days are treated as current; historical recording dates remain visible as event dates.'
+        },
+        {
+          id: 'fl-recorded-property-documents',
+          name: 'Florida County Clerk Official Records',
+          description: 'County Clerks of Court and Comptrollers maintain official records, including deeds, mortgages, and liens. The state directory links to county offices; search and copy terms vary.',
+          type: 'Recorded Mortgages & Liens',
+          cost: 'Free (portal viewing; copy fees vary)',
+          endpoint: 'https://dos.fl.gov/library-archives/research/florida-information/government/local-resources/clerks-of-county-courts',
+          dataPoints: ['Deeds', 'Mortgages', 'Liens', 'Releases and recording dates'],
+          usedIn: ['County-level recorder source discovery'],
+          coverage: 'Florida: 67 county clerk offices; no single statewide bulk feed verified',
+          freshness: 'Only records retrieved/validated within 90 days are treated as current; historical recording dates remain visible as event dates.'
         }
       ];
 
@@ -35670,8 +35862,8 @@ RULES:
       res.json({
         totalSources: apiSources.length,
         sources: apiSources,
-        freeApis: apiSources.filter(s => s.cost === 'Free').length,
-        paidApis: apiSources.filter(s => s.cost !== 'Free').length,
+        freeApis: apiSources.filter(s => s.cost.toLowerCase().startsWith('free')).length,
+        paidApis: apiSources.filter(s => !s.cost.toLowerCase().startsWith('free')).length,
         apiUsageStats
       });
     } catch (error: any) {

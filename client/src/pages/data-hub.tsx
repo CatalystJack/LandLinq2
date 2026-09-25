@@ -72,6 +72,8 @@ interface ApiSource {
   endpoint: string;
   dataPoints: string[];
   usedIn: string[];
+  coverage?: string;
+  freshness?: string;
 }
 
 interface ApiSourcesData {
@@ -749,13 +751,25 @@ export default function DataHub() {
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                               <CardTitle className="text-lg">{source.name}</CardTitle>
-                              <Badge variant={source.cost === 'Free' ? 'default' : 'secondary'}>
+                              <Badge variant={source.cost.toLowerCase().startsWith('free') ? 'default' : 'secondary'}>
                                 {source.cost}
                               </Badge>
                             </div>
                             <CardDescription>{source.description}</CardDescription>
                           </CardHeader>
                           <CardContent className="space-y-3">
+                            {source.coverage && (
+                              <div>
+                                <p className="text-xs text-gray-500 mb-1">Coverage</p>
+                                <p className="text-sm text-gray-700">{source.coverage}</p>
+                              </div>
+                            )}
+                            {source.freshness && (
+                              <div>
+                                <p className="text-xs text-gray-500 mb-1">Freshness / limitations</p>
+                                <p className="text-sm text-gray-700">{source.freshness}</p>
+                              </div>
+                            )}
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Type</p>
                               <Badge variant="outline">{source.type}</Badge>
