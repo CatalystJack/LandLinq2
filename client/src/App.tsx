@@ -92,6 +92,7 @@ const DeveloperCriteriaSettings = lazy(() => import("@/pages/developer-criteria-
 const DeveloperHome = lazy(() => import("@/pages/developer-home"));
 const DeveloperLogin = lazy(() => import("@/pages/developer-login"));
 const DeveloperDashboardPage = lazy(() => import("@/pages/developer-dashboard"));
+const DeveloperPipeline = lazy(() => import("@/pages/developer-pipeline"));
 
 // Loading component for lazy-loaded routes
 const LoadingFallback = () => (
@@ -258,6 +259,7 @@ function Router() {
           <Route path="/dashboard" component={AnalystDashboard} />
           <Route path="/developer/home" component={DeveloperHome} />
           <Route path="/developer/dashboard" component={AnalystDashboard} />
+          <Route path="/developer/pipeline" component={DeveloperPipeline} />
           <Route path="/developer/crm" component={DeveloperCrm} />
           <Route path="/developer/outreach" component={DeveloperOutreach} />
           <Route path="/developer/analytics" component={DeveloperAnalytics} />

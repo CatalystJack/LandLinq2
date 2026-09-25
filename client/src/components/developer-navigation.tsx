@@ -51,7 +51,7 @@ export default function DeveloperNavigation() {
   const profile = (user as any)?.developerProfile;
   const tabs = profile?.profileType === "general_sales"
     ? realEstateTabs.filter((tab) => tab.href !== "/developer/dashboard")
-    : realEstateTabs;
+    : realEstateTabs.filter((tab) => tab.href !== "/developer/pipeline");
   const companyName = profile?.companyName || "LandLinq";
   const logoUrl = profile?.logoUrl || "/assets/landlinq-white-logo.png";
 
