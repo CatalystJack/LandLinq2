@@ -56,7 +56,8 @@ export default function DeveloperNavigation() {
     ? realEstateTabs.filter((tab) => tab.href !== "/developer/dashboard")
     : realEstateTabs.filter((tab) => tab.href !== "/developer/pipeline");
   const companyName = profile?.companyName || "LandLinq";
-  const logoUrl = profile?.logoUrl || "/assets/landlinq-white-logo.png";
+  const logoUrl = profile?.logoUrl || "/assets/landlinq-header-logo.png";
+  const compactLogoUrl = profile?.logoUrl || "/assets/landlinq-color-icon.png";
 
   useEffect(() => {
     document.body.dataset.appSidebar = "true";
@@ -87,12 +88,21 @@ export default function DeveloperNavigation() {
       >
         <div className={`relative flex h-20 items-center border-b border-white/10 ${isSidebarExpanded ? "justify-between px-4" : "justify-center px-2"}`}>
           <Link href="/" className="flex min-w-0 items-center gap-2" aria-label={`${companyName} home`} title={`${companyName} home`}>
-            <img
-              src={logoUrl}
-              alt={profile?.logoUrl ? `${companyName} logo` : "LandLinq"}
-              className={`h-10 w-auto object-contain transition-all ${isSidebarExpanded ? "max-w-[170px]" : "max-w-9"}`}
-              data-testid="developer-header-logo"
-            />
+            {isSidebarExpanded ? (
+              <img
+                src={logoUrl}
+                alt={profile?.logoUrl ? `${companyName} logo` : "LandLinq"}
+                className="h-10 w-auto max-w-[170px] object-contain transition-all"
+                data-testid="developer-header-logo"
+              />
+            ) : (
+              <img
+                src={compactLogoUrl}
+                alt={profile?.logoUrl ? `${companyName} logo` : "LandLinq"}
+                className="h-8 w-8 object-contain"
+                data-testid="developer-header-logo"
+              />
+            )}
           </Link>
           {isSidebarExpanded ? (
             <button

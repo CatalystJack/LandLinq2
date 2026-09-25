@@ -36,7 +36,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const landlinqWhiteLogo = "/assets/landlinq-white-logo.png";
+const landlinqWhiteLogo = "/assets/landlinq-header-logo.png";
+const landlinqColorIcon = "/assets/landlinq-color-icon.png";
 
 const navIconFor = (name: string): LucideIcon => {
   const normalized = name.toLowerCase();
@@ -347,12 +348,21 @@ function Navigation({ onOpenSlideForm, hideSubmitDeal = false }: NavigationProps
       >
         <div className={`relative flex h-20 items-center border-b border-white/10 ${isSidebarExpanded ? "justify-between px-4" : "justify-center px-2"}`}>
           <Link href="/" className="flex min-w-0 items-center gap-2" aria-label="LandLinq home" title="LandLinq home">
-            <img
-              src={landlinqWhiteLogo}
-              alt="LandLinq"
-              className={`h-10 w-auto object-contain transition-all ${isSidebarExpanded ? "max-w-[170px]" : "max-w-9"}`}
-              data-testid="logo-landlinq"
-            />
+            {isSidebarExpanded ? (
+              <img
+                src={landlinqWhiteLogo}
+                alt="LandLinq"
+                className="h-10 w-auto max-w-[170px] object-contain transition-all"
+                data-testid="logo-landlinq"
+              />
+            ) : (
+              <img
+                src={landlinqColorIcon}
+                alt="LandLinq"
+                className="h-8 w-8 object-contain"
+                data-testid="logo-landlinq"
+              />
+            )}
           </Link>
           {isSidebarExpanded && (
             <button
