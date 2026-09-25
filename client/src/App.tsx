@@ -266,6 +266,7 @@ function Router() {
            <Route path="/analytics" component={DeveloperAnalytics} />
            <Route path="/outreach-analytics" component={DeveloperAnalytics} />
           <Route path="/developer/user-management" component={DeveloperUserManagement} />
+          <Route path="/developer/criteria" component={() => <DeveloperCriteriaSettings criteriaOnly />} />
           <Route path="/developer/settings" component={DeveloperCriteriaSettings} />
           <Route path="/outreach-onboarding" component={OutreachOnboarding} />
           <Route path="/reset-password" component={PasswordResetPage} />

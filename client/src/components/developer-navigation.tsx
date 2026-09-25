@@ -13,6 +13,7 @@ import {
   PanelLeftOpen,
   Send,
   Settings,
+  Target,
   Users,
   X,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const realEstateTabs = [
   { label: "CRM", href: "/developer/crm" },
   { label: "Outreach", href: "/developer/outreach" },
   { label: "Analytics", href: "/developer/analytics" },
+  { label: "Criteria", href: "/developer/criteria" },
   { label: "Settings", href: "/developer/settings" },
 ];
 
@@ -37,6 +39,7 @@ const iconForTab = (label: string) => {
   if (label === "CRM") return Users;
   if (label === "Outreach") return Send;
   if (label === "Analytics") return BarChart3;
+  if (label === "Criteria") return Target;
   if (label === "Settings") return Settings;
   return CircleDot;
 };

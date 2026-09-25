@@ -201,7 +201,7 @@ function NumberField({
   );
 }
 
-export default function DeveloperCriteriaSettings() {
+export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { criteriaOnly?: boolean }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<Profile | null>(null);
@@ -221,10 +221,12 @@ export default function DeveloperCriteriaSettings() {
   const sourceTagsQuery = useQuery<ContactFilterOptions>({
     queryKey: ["/api/crm/source-tags"],
     queryFn: () => jsonRequest("/api/crm/source-tags"),
+    enabled: !criteriaOnly,
   });
   const teamQuery = useQuery<{ team: TeamMember[] }>({
     queryKey: ["/api/developer-profile/me/team"],
     queryFn: () => jsonRequest("/api/developer-profile/me/team"),
+    enabled: !criteriaOnly,
   });
   const senderQuery = useQuery<{
     sender: NotificationSender | null;
@@ -232,14 +234,17 @@ export default function DeveloperCriteriaSettings() {
   }>({
     queryKey: ["/api/developer-profile/me/outreach/sender"],
     queryFn: () => jsonRequest("/api/developer-profile/me/outreach/sender"),
+    enabled: !criteriaOnly,
   });
   const senderListQuery = useQuery<{ senders: NotificationSender[] }>({
     queryKey: ["/api/developer-profile/me/outreach/senders"],
     queryFn: () => jsonRequest("/api/developer-profile/me/outreach/senders"),
+    enabled: !criteriaOnly,
   });
   const quickLinksQuery = useQuery<{ links: DeveloperQuickLink[] }>({
     queryKey: ["/api/developer/quick-links"],
     queryFn: () => jsonRequest("/api/developer/quick-links"),
+    enabled: !criteriaOnly,
   });
   const notificationSenderMutation = useMutation({
     mutationFn: (senderId: string) =>
@@ -665,22 +670,26 @@ export default function DeveloperCriteriaSettings() {
   const primaryColor = form.primaryColor || "#0A2B4A";
   const secondaryColor = form.secondaryColor || "#4A90E2";
   const isPsf = form.rentMetric === "psf";
+  const supportsCriteria = form.profileType === "real_estate" &&
+    (form.assetClass === "multifamily" || form.assetClass === "industrial");
 
   return (
     <div className="min-h-screen bg-slate-50">
       <DeveloperNavigation />
       <main className="mx-auto max-w-[1680px] px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
-          title={form.profileType === "general_sales" ? "Company settings" : "Settings"}
-          actions={
+          title={criteriaOnly ? "Criteria" : form.profileType === "general_sales" ? "Company settings" : "Settings"}
+          actions={!criteriaOnly || supportsCriteria ? (
             <Button onClick={save} disabled={saveMutation.isPending} style={{ backgroundColor: primaryColor }} className="text-white">
               {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Save settings
+              {criteriaOnly ? "Save criteria" : "Save settings"}
             </Button>
-          }
+          ) : undefined}
         />
 
         <div className="space-y-6">
+          {criteriaOnly && <p className="text-sm text-slate-600">Manage the criteria used for this company’s opportunities. These settings are scoped to the signed-in developer profile.</p>}
+          <div className={criteriaOnly ? "hidden" : "space-y-6"}>
           <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <CardTitle>Shared broker contacts</CardTitle>
@@ -883,7 +892,23 @@ export default function DeveloperCriteriaSettings() {
           </Card>
 
           </div>
+          </div>
 
+          {criteriaOnly && form.profileType === "general_sales" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <CardHeader>
+              <CardTitle>Deal criteria do not apply to this profile</CardTitle>
+              <CardDescription>General Sales profiles use the separate opportunity pipeline and do not use real-estate deal-screening criteria.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline"><a href="/developer/pipeline">Open Pipeline</a></Button>
+            </CardContent>
+          </Card>}
+          {criteriaOnly && form.profileType === "real_estate" && !supportsCriteria && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <CardHeader>
+              <CardTitle>No criteria editor for this asset class</CardTitle>
+              <CardDescription>This company’s current asset class does not have an editable criteria set on this page.</CardDescription>
+            </CardHeader>
+          </Card>}
           {form.profileType === "real_estate" && form.assetClass === "multifamily" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <div className="flex items-start gap-3">
@@ -1115,6 +1140,7 @@ export default function DeveloperCriteriaSettings() {
             </CardContent>}
           </Card>}
 
+          <div className={criteriaOnly ? "hidden" : "space-y-6"}>
           <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <div className="flex items-start justify-between gap-3">
@@ -1290,6 +1316,7 @@ export default function DeveloperCriteriaSettings() {
               )}
             </CardContent>}
           </Card>
+          </div>
         </div>
       </main>
 

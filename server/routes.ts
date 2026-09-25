@@ -2892,6 +2892,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     '/developer/outreach',
     '/developer/analytics',
     '/developer/user-management',
+    '/developer/criteria',
     '/developer/settings',
     '/outreach-onboarding',
     '/reset-password',
