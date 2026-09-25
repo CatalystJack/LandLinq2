@@ -78,6 +78,7 @@ type Profile = {
   crmContactCounties: string[];
   crmContactProductTypes: string[];
   crmContactSourceTags: string[];
+  crmSharedContactsEnabled: boolean;
 };
 
 type ProfileUpdate = Omit<Partial<Profile>, "compMinVintageYear" | "compMinUnits"> & {
@@ -315,6 +316,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
         crmContactCounties: profile.crmContactCounties || [],
         crmContactProductTypes: profile.crmContactProductTypes || [],
         crmContactSourceTags: profile.crmContactSourceTags || [],
+        crmSharedContactsEnabled: profile.profileType === "real_estate" && profile.crmSharedContactsEnabled !== false,
         compSearchRadiusMiles: profile.compSearchRadiusMiles || "3",
         compMinVintageYear: profile.compMinVintageYear == null ? "" : String(profile.compMinVintageYear),
         compMinUnits: profile.compMinUnits == null ? "" : String(profile.compMinUnits),
@@ -508,6 +510,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
         crmContactCounties: form.crmContactCounties,
         crmContactProductTypes: form.crmContactProductTypes,
         crmContactSourceTags: form.crmContactSourceTags,
+        crmSharedContactsEnabled: false,
       });
       return;
     }
@@ -524,6 +527,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
         crmContactCounties: form.crmContactCounties,
         crmContactProductTypes: form.crmContactProductTypes,
         crmContactSourceTags: form.crmContactSourceTags,
+        crmSharedContactsEnabled: form.crmSharedContactsEnabled,
       });
       return;
     }
@@ -599,6 +603,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
       crmContactCounties: form.crmContactCounties,
       crmContactProductTypes: form.crmContactProductTypes,
       crmContactSourceTags: form.crmContactSourceTags,
+      crmSharedContactsEnabled: form.crmSharedContactsEnabled,
       countyMarketLabels: form.countyMarketLabels,
       qctOverridesRentMinimum: form.qctOverridesRentMinimum,
       ddaOverridesRentMinimum: form.ddaOverridesRentMinimum,
@@ -690,32 +695,60 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
         <div className="space-y-6">
           {criteriaOnly && <p className="text-sm text-slate-600">Manage the criteria used for this company’s opportunities. These settings are scoped to the signed-in developer profile.</p>}
           <div className={criteriaOnly ? "hidden" : "space-y-6"}>
-          <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
-            <CardHeader>
-              <CardTitle>Shared broker contacts</CardTitle>
-              <CardDescription>
-                LandLinq contacts are shared across Investment Companies. Choose which directory records this company can see. Your CRM tags, notes, assignments, and outreach history remain private.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5 border-t border-slate-100 pt-5">
-              <SharedContactAccessEditor
-                sectors={form.crmContactSectors}
-                states={form.crmContactStates}
-                counties={form.crmContactCounties}
-                sourceTags={form.crmContactSourceTags}
-                sectorOptions={sourceTagsQuery.data?.sectors || []}
-                stateOptions={sourceTagsQuery.data?.states || []}
-                countyOptions={sourceTagsQuery.data?.counties || []}
-                sourceTagOptions={sourceTagsQuery.data?.sourceTags || []}
-                optionsLoading={sourceTagsQuery.isLoading}
-                optionsError={sourceTagsQuery.isError}
-                onSectorsChange={(values) => update("crmContactSectors", values)}
-                onStatesChange={(values) => update("crmContactStates", values)}
-                onCountiesChange={(values) => update("crmContactCounties", values)}
-                onSourceTagsChange={(values) => update("crmContactSourceTags", values)}
-              />
-            </CardContent>
-          </Card>
+          {form.profileType === "real_estate" ? (
+            <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+              <CardHeader>
+                <CardTitle>Shared broker contacts</CardTitle>
+                <CardDescription>
+                  Browse the shared broker directory by state. Company-owned contacts, CRM tags, notes, assignments, and outreach history remain private.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5 border-t border-slate-100 pt-5">
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <Checkbox
+                    checked={form.crmSharedContactsEnabled}
+                    onCheckedChange={(checked) => update("crmSharedContactsEnabled", checked === true)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-slate-800">Show shared broker directory in this CRM</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">Turn this off to show only contacts owned by your company. Your selected state filters are saved.</span>
+                  </span>
+                </label>
+                {form.crmSharedContactsEnabled ? (
+                  <SharedContactAccessEditor
+                    sectors={form.crmContactSectors}
+                    states={form.crmContactStates}
+                    counties={form.crmContactCounties}
+                    sourceTags={form.crmContactSourceTags}
+                    sectorOptions={sourceTagsQuery.data?.sectors || []}
+                    stateOptions={sourceTagsQuery.data?.states || []}
+                    countyOptions={sourceTagsQuery.data?.counties || []}
+                    sourceTagOptions={sourceTagsQuery.data?.sourceTags || []}
+                    optionsLoading={sourceTagsQuery.isLoading}
+                    optionsError={sourceTagsQuery.isError}
+                    onSectorsChange={(values) => update("crmContactSectors", values)}
+                    onStatesChange={(values) => update("crmContactStates", values)}
+                    onCountiesChange={(values) => update("crmContactCounties", values)}
+                    onSourceTagsChange={(values) => update("crmContactSourceTags", values)}
+                  />
+                ) : (
+                  <p className="rounded-lg border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">
+                    Shared broker contacts are hidden. Your company-owned contacts remain available in the CRM.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ) : form.profileType === "general_sales" ? (
+            <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+              <CardHeader>
+                <CardTitle>Company-owned contacts</CardTitle>
+                <CardDescription>
+                  Add your company’s brokers, attorneys, contractors, and other contacts from the CRM. This profile does not browse the shared broker directory.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ) : null}
           <div className="grid gap-6 lg:grid-cols-2">
           <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>

@@ -123,6 +123,8 @@ export class DatabaseManager {
 
   async ensureApplicationSchemas(): Promise<void> {
     await db.execute(sql`ALTER TABLE developer_profiles
+      ADD COLUMN IF NOT EXISTS crm_shared_contacts_enabled BOOLEAN NOT NULL DEFAULT TRUE`);
+    await db.execute(sql`ALTER TABLE developer_profiles
       ADD COLUMN IF NOT EXISTS crm_contact_sectors TEXT[] NOT NULL DEFAULT ARRAY[]::text[]`);
     await db.execute(sql`ALTER TABLE developer_profiles
       ADD COLUMN IF NOT EXISTS crm_contact_counties TEXT[] NOT NULL DEFAULT ARRAY[]::text[]`);
@@ -135,6 +137,12 @@ export class DatabaseManager {
     await db.execute(sql`ALTER TABLE brokers ADD COLUMN IF NOT EXISTS contact_confidence VARCHAR`);
     await db.execute(sql`ALTER TABLE brokers ADD COLUMN IF NOT EXISTS contact_county VARCHAR`);
     await db.execute(sql`ALTER TABLE brokers ADD COLUMN IF NOT EXISTS source_license_number VARCHAR`);
+    await db.execute(sql`ALTER TABLE brokers ADD COLUMN IF NOT EXISTS contact_category VARCHAR`);
+    await db.execute(sql`ALTER TABLE brokers ADD COLUMN IF NOT EXISTS mailing_address TEXT`);
+    await db.execute(sql`ALTER TABLE brokers ADD COLUMN IF NOT EXISTS city VARCHAR`);
+    await db.execute(sql`ALTER TABLE brokers ADD COLUMN IF NOT EXISTS postal_code VARCHAR`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS brokers_owner_category_idx ON brokers(owner_developer_profile_id, contact_category)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS brokers_owner_state_idx ON brokers(owner_developer_profile_id, state_region)`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS developer_broker_crm (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),

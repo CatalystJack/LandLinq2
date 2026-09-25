@@ -39,6 +39,10 @@ export type Contact = {
   email: string | null;
   phone: string | null;
   brokerage: string | null;
+  contactCategory?: string | null;
+  mailingAddress?: string | null;
+  city?: string | null;
+  postalCode?: string | null;
   stateRegion: string | null;
   assignedTo: string | null;
   crmTags: string[] | null;
@@ -99,6 +103,11 @@ type ContactDraft = {
   email: string;
   phone: string;
   brokerage: string;
+  contactCategory: string;
+  mailingAddress: string;
+  city: string;
+  stateRegion: string;
+  postalCode: string;
   assignedTo: string;
   lastContactedAt: string;
 };
@@ -331,6 +340,11 @@ export default function ContactDetailDialog({
       email: details.email || "",
       phone: details.phone || "",
       brokerage: details.brokerage || "",
+      contactCategory: details.contactCategory || "other",
+      mailingAddress: details.mailingAddress || "",
+      city: details.city || "",
+      stateRegion: details.stateRegion || "",
+      postalCode: details.postalCode || "",
       assignedTo: details.assignedTo || "",
       lastContactedAt: dateInputValue(details.lastContactedAt),
     });
@@ -351,6 +365,11 @@ export default function ContactDetailDialog({
       changes.email = draft.email.trim() || null;
       changes.phone = draft.phone.trim() || null;
       changes.brokerage = draft.brokerage.trim() || null;
+      changes.contactCategory = draft.contactCategory;
+      changes.mailingAddress = draft.mailingAddress.trim() || null;
+      changes.city = draft.city.trim() || null;
+      changes.stateRegion = draft.stateRegion.trim() || null;
+      changes.postalCode = draft.postalCode.trim() || null;
     }
     saveContactMutation.mutate(changes);
   };
@@ -475,6 +494,19 @@ export default function ContactDetailDialog({
                       <div className="space-y-1.5"><Label htmlFor="contact-email">Email</Label><Input id="contact-email" type="email" value={draft.email} onChange={(event) => updateDraft("email", event.target.value)} /></div>
                       <div className="space-y-1.5"><Label htmlFor="contact-phone">Phone</Label><Input id="contact-phone" value={draft.phone} onChange={(event) => updateDraft("phone", event.target.value)} /></div>
                       <div className="space-y-1.5"><Label htmlFor="contact-company">Company</Label><Input id="contact-company" value={draft.brokerage} onChange={(event) => updateDraft("brokerage", event.target.value)} /></div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="contact-category">Contact category</Label>
+                        <select id="contact-category" value={draft.contactCategory} onChange={(event) => updateDraft("contactCategory", event.target.value)} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm">
+                          <option value="broker">Broker</option>
+                          <option value="attorney">Attorney / Lawyer</option>
+                          <option value="general_contractor">General Contractor</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5"><Label htmlFor="contact-address">Address</Label><Input id="contact-address" value={draft.mailingAddress} onChange={(event) => updateDraft("mailingAddress", event.target.value)} /></div>
+                      <div className="space-y-1.5"><Label htmlFor="contact-city">City</Label><Input id="contact-city" value={draft.city} onChange={(event) => updateDraft("city", event.target.value)} /></div>
+                      <div className="space-y-1.5"><Label htmlFor="contact-state-region">State / region</Label><Input id="contact-state-region" value={draft.stateRegion} onChange={(event) => updateDraft("stateRegion", event.target.value)} /></div>
+                      <div className="space-y-1.5"><Label htmlFor="contact-postal-code">Postal code</Label><Input id="contact-postal-code" value={draft.postalCode} onChange={(event) => updateDraft("postalCode", event.target.value)} /></div>
                     </>
                   ) : (
                     <DetailValue label="Contact identity">Managed by the shared network</DetailValue>
@@ -488,6 +520,9 @@ export default function ContactDetailDialog({
                   <DetailValue label="Email">{details.email || "Not provided"}</DetailValue>
                   <DetailValue label="Phone">{details.phone || "Not provided"}</DetailValue>
                   <DetailValue label="Account / company">{details.brokerage || "Not provided"}</DetailValue>
+                  <DetailValue label="Contact category">{(details.contactCategory || "other").replace(/[_-]+/g, " ")}</DetailValue>
+                  <DetailValue label="Address">{details.mailingAddress || "Not provided"}</DetailValue>
+                  <DetailValue label="City / state / postal">{[details.city, details.stateRegion, details.postalCode].filter(Boolean).join(", ") || "Not provided"}</DetailValue>
                   <DetailValue label="Assigned to">{details.assignedTo || "Unassigned"}</DetailValue>
                   <DetailValue label="Contact type">Broker contact</DetailValue>
                   <DetailValue label="Relationship">{relationship}</DetailValue>

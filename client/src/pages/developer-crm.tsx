@@ -65,10 +65,24 @@ const FIELDS = [
   { key: "email", label: "Email", patterns: [/e-?mail/] },
   { key: "phone", label: "Phone", patterns: [/phone/, /mobile/, /cell/] },
   { key: "brokerage", label: "Brokerage / Company", patterns: [/broker/, /company/, /firm/] },
+  { key: "contactCategory", label: "Contact Category", patterns: [/category/, /contact.*type/] },
+  { key: "mailingAddress", label: "Address", patterns: [/address/, /street/] },
+  { key: "city", label: "City", patterns: [/city/] },
   { key: "stateRegion", label: "State / Region", patterns: [/state/, /region/] },
+  { key: "postalCode", label: "Postal Code", patterns: [/postal/, /zip/] },
   { key: "assignedTo", label: "Assigned To", patterns: [/assign/, /owner/, /rep/] },
   { key: "tags", label: "Tags", patterns: [/tag/] },
 ];
+
+const MAX_CONTACT_IMPORT_ROWS = 2500;
+
+function normalizeContactCategory(value: unknown) {
+  const normalized = String(value || "").trim().toLowerCase().replace(/[\s/-]+/g, "_");
+  if (["attorney", "lawyer", "attorney_lawyer"].includes(normalized)) return "attorney";
+  if (["contractor", "general_contractor"].includes(normalized)) return "general_contractor";
+  if (["broker", "other"].includes(normalized)) return normalized;
+  return normalized ? null : "other";
+}
 
 async function requestJson(url: string, options?: RequestInit) {
   const response = await fetch(url, { credentials: "include", ...options });
@@ -77,9 +91,30 @@ async function requestJson(url: string, options?: RequestInit) {
   return data;
 }
 
+function downloadContactTemplate() {
+  const sheet = XLSX.utils.aoa_to_sheet([
+    FIELDS.map((field) => field.label),
+    FIELDS.map(() => ""),
+  ]);
+  sheet["!cols"] = FIELDS.map((field) => ({ wch: Math.max(14, field.label.length + 3) }));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Contacts");
+  XLSX.writeFile(workbook, "company-contacts-template.xlsx");
+}
+
 function ContactTableSkeleton({ adminMode }: { adminMode: boolean }) {
   return (
-    <div className="table-scroll-container">
+    <>
+    <div className="space-y-3 px-4 py-4 xl:hidden">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="space-y-2 rounded-xl border border-[#e8edf1] bg-white p-4">
+          <Skeleton className="h-4 w-40 bg-[#e4ebf0]" />
+          <Skeleton className="h-3 w-56 max-w-full bg-[#e4ebf0]" />
+          <Skeleton className="h-3 w-36 bg-[#e4ebf0]" />
+        </div>
+      ))}
+    </div>
+    <div className="hidden xl:block table-scroll-container">
       <Table className="min-w-[1120px]">
         <TableHeader>
           <TableRow className="border-[#e3e9ee] bg-[#f8fafb] hover:bg-[#f8fafb]">
@@ -125,6 +160,7 @@ function ContactTableSkeleton({ adminMode }: { adminMode: boolean }) {
         </TableBody>
       </Table>
     </div>
+    </>
   );
 }
 
@@ -155,6 +191,7 @@ type ContactCrmResponse = {
     sourceTags: string[];
     states: string[];
     assignedTo: string[];
+    categories: string[];
   };
 };
 
@@ -163,6 +200,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const profile = (user as any)?.developerProfile;
+  const isGeneralSales = profile?.profileType === "general_sales";
   const primaryColor = "#081729";
   const secondaryColor = "#498EDE";
   const [selectedAdminProfileId, setSelectedAdminProfileId] = useState("");
@@ -184,6 +222,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sourceTagFilter, setSourceTagFilter] = useState("all");
   const [stateFilter, setStateFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [assignedToFilter, setAssignedToFilter] = useState("all");
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -201,6 +240,25 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [parsing, setParsing] = useState(false);
   const [result, setResult] = useState<{ inserted: number; updated: number } | null>(null);
+  const stagedImportRows = rows
+    .map((row) => Object.fromEntries(FIELDS.map(({ key }) => [key, mapping[key] ? row[mapping[key]] : ""])))
+    .filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
+  const importValidationErrors: string[] = [];
+  if (stagedImportRows.length > MAX_CONTACT_IMPORT_ROWS) {
+    importValidationErrors.push(`The limit is ${MAX_CONTACT_IMPORT_ROWS.toLocaleString()} non-empty rows per import.`);
+  }
+  const seenImportEmails = new Set<string>();
+  stagedImportRows.forEach((row, index) => {
+    const line = index + 2;
+    const firstName = String(row.firstName || "").trim();
+    const lastName = String(row.lastName || "").trim();
+    const email = String(row.email || "").trim().toLowerCase();
+    if (!firstName && !lastName && !email) importValidationErrors.push(`Row ${line} needs a name or email.`);
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) importValidationErrors.push(`Row ${line} has an invalid email address.`);
+    if (email && seenImportEmails.has(email)) importValidationErrors.push(`Row ${line} repeats email ${email}.`);
+    if (email) seenImportEmails.add(email);
+    if (normalizeContactCategory(row.contactCategory) === null) importValidationErrors.push(`Row ${line} has an unsupported contact category.`);
+  });
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
@@ -209,13 +267,13 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, companyFilter, selectedTags, sourceTagFilter, stateFilter, assignedToFilter, selectedAdminProfileId]);
+  }, [debouncedSearch, companyFilter, selectedTags, sourceTagFilter, stateFilter, categoryFilter, assignedToFilter, selectedAdminProfileId]);
 
   const contactsQueryKey = adminMode
     ? `/api/crm/contacts?developerProfileId=${encodeURIComponent(selectedAdminProfileId)}`
     : "/api/crm/contacts";
   const contactsQuery = useQuery<ContactCrmResponse>({
-    queryKey: [contactsQueryKey, page, debouncedSearch, companyFilter, selectedTags, sourceTagFilter, stateFilter, assignedToFilter],
+    queryKey: [contactsQueryKey, page, debouncedSearch, companyFilter, selectedTags, sourceTagFilter, stateFilter, categoryFilter, assignedToFilter],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), limit: "25" });
       if (adminMode) params.set("developerProfileId", selectedAdminProfileId);
@@ -224,7 +282,19 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       selectedTags.forEach((tag) => params.append("tags", tag));
       if (sourceTagFilter !== "all") params.set("sourceTag", sourceTagFilter);
       if (stateFilter !== "all") params.set("crmState", stateFilter);
+      if (categoryFilter !== "all") params.set("contactCategory", categoryFilter);
       if (assignedToFilter !== "all") params.set("assignedTo", assignedToFilter);
+      params.set("includeFilterOptions", "false");
+      return requestJson(`/api/crm/contacts?${params.toString()}`);
+    },
+    enabled: !adminMode || Boolean(selectedAdminProfileId),
+  });
+
+  const filterOptionsQuery = useQuery<ContactCrmResponse>({
+    queryKey: [contactsQueryKey, "filter-options"],
+    queryFn: () => {
+      const params = new URLSearchParams({ optionsOnly: "true" });
+      if (adminMode) params.set("developerProfileId", selectedAdminProfileId);
       return requestJson(`/api/crm/contacts?${params.toString()}`);
     },
     enabled: !adminMode || Boolean(selectedAdminProfileId),
@@ -241,9 +311,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contacts: rows.map((row) => Object.fromEntries(
-          FIELDS.map(({ key }) => [key, mapping[key] ? row[mapping[key]] : ""]),
-        )),
+        contacts: stagedImportRows,
       }),
     }),
     onSuccess: (data) => {
@@ -357,13 +425,14 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   });
 
   const filteredContacts = contactsQuery.data?.contacts || [];
-  const filterOptions = contactsQuery.data?.filterOptions;
+  const filterOptions = filterOptionsQuery.data?.filterOptions || contactsQuery.data?.filterOptions;
   const availableTags = adminMode
     ? filterOptions?.tags || []
     : (tagsQuery.data || []).map((tag) => tag.trim()).filter(Boolean);
   const availableSourceTags = filterOptions?.sourceTags || [];
   const availableStates = filterOptions?.states || [];
   const availableAssignedTo = filterOptions?.assignedTo || [];
+  const availableCategories = filterOptions?.categories || [];
 
   const visibleContactIds = filteredContacts.map((contact) => contact.id);
   const allVisibleSelected = visibleContactIds.length > 0 && visibleContactIds.every((id) => selectedContactIds.includes(id));
@@ -383,18 +452,23 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       : current.filter((id) => id !== contactId));
   };
 
-  const hasActiveFilters = companyFilter !== "all" || selectedTags.length > 0 || sourceTagFilter !== "all" || stateFilter !== "all" || assignedToFilter !== "all";
+  const hasActiveFilters = companyFilter !== "all" || selectedTags.length > 0 || sourceTagFilter !== "all" || stateFilter !== "all" || categoryFilter !== "all" || assignedToFilter !== "all";
   const clearFilters = () => {
     setCompanyFilter("all");
     setSelectedTags([]);
     setSourceTagFilter("all");
     setStateFilter("all");
+    setCategoryFilter("all");
     setAssignedToFilter("all");
   };
 
   const companyProfiles = filterOptions?.companies || [];
 
   const readFile = (selected: File) => {
+    if (selected.size > 10 * 1024 * 1024) {
+      toast({ title: "File is too large", description: "Choose a spreadsheet smaller than 10 MB.", variant: "destructive" });
+      return;
+    }
     setParsing(true);
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -435,13 +509,13 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   return (
     <div className="min-h-[100dvh] bg-[#f3f6f9] text-[#172b3d]">
       {adminMode ? <Navigation /> : <DeveloperNavigation />}
-      <main className="mx-auto max-w-[1680px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
+      <main className="mx-auto max-w-none px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
         <PageHeader
           title="Company contacts"
           eyebrow={adminMode ? "Relationship management" : undefined}
           actions={
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" />Import Contacts
+              <Upload className="mr-2 h-4 w-4" />{isGeneralSales ? "Import company contacts" : "Import contacts"}
             </Button>
           }
         />
@@ -457,7 +531,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                     ? selectedAdminProfile
                       ? `${contactsQuery.data?.pagination.total || 0} contacts in ${selectedAdminProfile.companyName}'s CRM`
                       : "Select a company to view its CRM"
-                    : `${contactsQuery.data?.pagination.total || 0} available contacts`}
+                    : `${contactsQuery.data?.pagination.total || 0} ${isGeneralSales ? "company contacts" : "available contacts"}`}
                 </p>
               </div>
             </div>
@@ -485,6 +559,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                     setSelectedTags([]);
                     setSourceTagFilter("all");
                     setStateFilter("all");
+                    setCategoryFilter("all");
                     setAssignedToFilter("all");
                   }}
                   className="h-10 w-full rounded-md border border-[#d7e2e9] bg-white px-3 text-sm font-medium text-[#405a70] outline-none focus-visible:ring-1 focus-visible:ring-[#498EDE] disabled:opacity-60"
@@ -553,7 +628,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                  )}
                </DropdownMenuContent>
              </DropdownMenu>
-              <select
+              {!isGeneralSales && <select
                 value={sourceTagFilter}
                 onChange={(event) => setSourceTagFilter(event.target.value)}
                 aria-label="Source tag filter"
@@ -561,7 +636,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               >
                 <option value="all">Source tags: All</option>
                 {availableSourceTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
-              </select>
+              </select>}
              <select
                value={stateFilter}
                onChange={(event) => setStateFilter(event.target.value)}
@@ -571,6 +646,15 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                <option value="all">State: All</option>
                {availableStates.map((state) => <option key={state} value={state}>{state}</option>)}
              </select>
+              <select
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+                aria-label="Contact category filter"
+                className="h-8 max-w-[220px] rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] outline-none"
+              >
+                <option value="all">Category: All</option>
+                {availableCategories.map((category) => <option key={category} value={category}>{category.replace(/[_-]+/g, " ")}</option>)}
+              </select>
              <select
                value={assignedToFilter}
                onChange={(event) => setAssignedToFilter(event.target.value)}
@@ -633,8 +717,34 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
            ) : filteredContacts.length === 0 ? (
               <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search.trim() || hasActiveFilters ? "No matching contacts" : adminMode ? "No contacts in this company CRM" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search.trim() || hasActiveFilters ? "Try clearing a filter or broadening your search." : adminMode ? "This company has no visible CRM contacts. Shared directory additions can still appear based on its access settings." : "Import a contact list to get started."}</p>{(search.trim() || hasActiveFilters) && <Button variant="outline" onClick={() => { setSearch(""); clearFilters(); }} className="mt-4 h-9">Clear search and filters</Button>}</div>
           ) : (
-            <div className="table-scroll-container">
-               <Table className="min-w-[1280px]">
+            <>
+            <div className="divide-y divide-[#e8edf1] xl:hidden">
+              {filteredContacts.map((contact) => (
+                <div key={contact.id} className="flex items-start gap-3 px-4 py-4 sm:px-5">
+                  {!adminMode && (
+                    <Checkbox
+                      className="mt-1"
+                      aria-label={`Select ${[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "contact"}`}
+                      checked={selectedContactIds.includes(contact.id)}
+                      onCheckedChange={(checked) => toggleContact(contact.id, checked === true)}
+                    />
+                  )}
+                  <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedContact(contact)}>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-[#21394c]">{[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unknown"}</span>
+                      <Badge variant="outline" className="capitalize">{(contact.contactCategory || "other").replace(/[_-]+/g, " ")}</Badge>
+                    </span>
+                    <span className="mt-1 block break-words text-sm text-[#5f7382]">{contact.email || contact.phone || "No email or phone"}</span>
+                    <span className="mt-1 block truncate text-xs text-[#8195a5]">
+                      {[contact.brokerage, contact.city, contact.stateRegion].filter(Boolean).join(" · ") || "Company details not provided"}
+                    </span>
+                    <span className="mt-2 block text-xs font-medium text-[#498EDE]">Open contact details</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="hidden xl:block table-scroll-container">
+               <Table className="min-w-[1180px]">
                  <TableHeader>
                    <TableRow className="border-[#e3e9ee] bg-[#f8fafb] hover:bg-[#f8fafb]">
                      {!adminMode && <TableHead className="h-11 w-12 pl-5"><Checkbox aria-label="Select all visible contacts" checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false} onCheckedChange={(checked) => toggleAllVisible(checked === true)} /></TableHead>}
@@ -643,9 +753,10 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Phone</TableHead>
                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Brokerage</TableHead>
                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Region</TableHead>
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Category</TableHead>
                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Tags</TableHead>
-                     <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source tags</TableHead>
-                     <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source</TableHead>
+                    {!isGeneralSales && <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source tags</TableHead>}
+                    {!isGeneralSales && <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source</TableHead>}
                    </TableRow>
                  </TableHeader>
                 <TableBody>{filteredContacts.map((contact) => (
@@ -707,7 +818,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                       ) : "—"}
                     </TableCell>
                     <TableCell className="text-sm text-[#5f7382]">{contact.stateRegion || "—"}</TableCell>
-                     <TableCell className="max-w-[300px]">
+                    <TableCell className="text-sm capitalize text-[#5f7382]">{(contact.contactCategory || "other").replace(/[_-]+/g, " ")}</TableCell>
+                     {!isGeneralSales && <TableCell className="max-w-[300px]">
                        <div className="flex flex-wrap items-center gap-1.5">
                          {(contact.crmTags || []).filter(Boolean).map((tag, index) => adminMode ? (
                            <span key={`${tag}-${index}`} className="inline-flex max-w-[140px] items-center rounded-full border border-[#d8e6ee] bg-[#f4f8fb] px-2 py-1 text-[10px] font-medium text-[#405a70]">
@@ -731,8 +843,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                           {!adminMode && <button type="button" onClick={(event) => { event.stopPropagation(); openTagEditor([contact.id], "add"); }} className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-catalyst-blue hover:bg-[#edf4fa]"><Plus className="h-3 w-3" />Add</button>}
                          {!contact.crmTags?.length && adminMode && <span className="text-sm text-[#9aa9b4]">—</span>}
                        </div>
-                     </TableCell>
-                      <TableCell className="max-w-[300px]">
+                      </TableCell>}
+                    {!isGeneralSales && <TableCell className="max-w-[300px]">
                         <div className="flex flex-wrap items-center gap-1.5">
                           {(contact.sourceTags || []).filter(Boolean).map((tag, index) => (
                             <span
@@ -745,12 +857,13 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                           ))}
                           {!contact.sourceTags?.length && <span className="text-sm text-[#9aa9b4]">—</span>}
                         </div>
-                      </TableCell>
-                    <TableCell>{contact.ownerDeveloperProfileId ? <Badge variant="secondary" className="border px-2 py-0.5 text-[10px]" style={{ backgroundColor: `${secondaryColor}15`, color: primaryColor, borderColor: `${secondaryColor}35` }}><UserRound className="mr-1 h-3 w-3" />Your contact</Badge> : <Badge variant="outline" className="border-[#d7e1e7] bg-[#f8fafb] text-[10px] text-[#718493]">LandLinq</Badge>}</TableCell>
+                     </TableCell>}
+                    {!isGeneralSales && <TableCell>{contact.ownerDeveloperProfileId ? <Badge variant="secondary" className="border px-2 py-0.5 text-[10px]" style={{ backgroundColor: `${secondaryColor}15`, color: primaryColor, borderColor: `${secondaryColor}35` }}><UserRound className="mr-1 h-3 w-3" />Your contact</Badge> : <Badge variant="outline" className="border-[#d7e1e7] bg-[#f8fafb] text-[10px] text-[#718493]">LandLinq</Badge>}</TableCell>}
                   </TableRow>
                 ))}</TableBody>
               </Table>
             </div>
+            </>
           )}
           {contactsQuery.data && contactsQuery.data.pagination.total > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e6edf1] bg-white px-5 py-3">
@@ -855,9 +968,18 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
 
       <Dialog open={importOpen} onOpenChange={(open) => (open ? setImportOpen(true) : reset())}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-          <DialogHeader><DialogTitle>Import Contacts</DialogTitle><DialogDescription>Upload a CSV or Excel file and map its columns. Email matches update only contacts owned by your company.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{isGeneralSales ? "Import company contacts" : "Import contacts"}</DialogTitle><DialogDescription>Use the standard template or map a CSV/Excel file. Email matches update only contacts owned by your company.</DialogDescription></DialogHeader>
           {!file ? (
             <div className="space-y-4 py-4">
+              <div className="flex flex-col gap-3 rounded-xl border border-[#dce5eb] bg-[#f8fafb] p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#243b4e]">Standard contact template</p>
+                  <p className="mt-1 text-xs text-[#718493]">Includes contact category, address, city, state, postal code, assignment, and tags.</p>
+                </div>
+                <Button type="button" variant="outline" onClick={downloadContactTemplate} className="h-9 shrink-0">
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />Download Excel template
+                </Button>
+              </div>
               <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center"><FileSpreadsheet className="mx-auto mb-3 h-10 w-10 text-slate-400" /><Label htmlFor="developer-contact-file" className="cursor-pointer font-semibold text-slate-800">Choose a CSV or Excel file</Label><Input id="developer-contact-file" type="file" accept=".csv,.xlsx,.xls" className="mx-auto mt-4 max-w-sm bg-white" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} /><p className="mt-3 text-xs text-slate-500">First row should contain column headers.</p></div>
               {parsing && <div className="flex items-center justify-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Reading spreadsheet…</div>}
             </div>
@@ -865,14 +987,29 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
             <div className="py-8 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">✓</div><h3 className="font-semibold text-slate-900">Import complete</h3><p className="mt-2 text-sm text-slate-500">{result.inserted} inserted and {result.updated} updated.</p></div>
           ) : (
             <div className="space-y-5 py-2">
-              <p className="text-sm text-slate-600">{rows.length.toLocaleString()} rows detected. Map any available fields below.</p>
+              <p className="text-sm text-slate-600">{stagedImportRows.length.toLocaleString()} non-empty rows detected. Map available fields below; up to {MAX_CONTACT_IMPORT_ROWS.toLocaleString()} rows are allowed per import.</p>
               <div className="grid gap-3 sm:grid-cols-2">{FIELDS.map((field) => (
                 <div key={field.key}><Label className="text-xs">{field.label}</Label><select value={mapping[field.key] || ""} onChange={(event) => setMapping((current) => ({ ...current, [field.key]: event.target.value }))} className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700"><option value="">Not mapped</option>{headers.map((header) => <option key={header} value={header}>{header}</option>)}</select></div>
               ))}</div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600"><p className="mb-1 font-semibold text-slate-800">Preview</p><p>{mapping.firstName ? rows[0]?.[mapping.firstName] : ""} {mapping.lastName ? rows[0]?.[mapping.lastName] : ""}</p><p>{mapping.email ? rows[0]?.[mapping.email] || "No email" : "Email not mapped"}</p></div>
+              {importValidationErrors.length > 0 && (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                  <p className="mb-1 font-semibold">Fix these rows before importing</p>
+                  <ul className="list-inside list-disc space-y-1">{importValidationErrors.slice(0, 6).map((error, index) => <li key={`${error}-${index}`}>{error}</li>)}</ul>
+                  {importValidationErrors.length > 6 && <p className="mt-1">and {importValidationErrors.length - 6} more issue(s).</p>}
+                </div>
+              )}
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                <p className="mb-2 font-semibold text-slate-800">Preview</p>
+                <div className="space-y-2">{stagedImportRows.slice(0, 3).map((row, index) => (
+                  <div key={index} className="border-t border-slate-200 pt-2 first:border-0 first:pt-0">
+                    <p className="font-medium text-slate-800">{row.firstName || ""} {row.lastName || ""} · {row.contactCategory || "Other"}</p>
+                    <p>{row.email || "No email"} · {[row.city, row.stateRegion, row.postalCode].filter(Boolean).join(", ") || "No location"}</p>
+                  </div>
+                ))}</div>
+              </div>
             </div>
           )}
-          <DialogFooter>{result ? <Button onClick={reset} style={{ backgroundColor: primaryColor }} className="text-white">Done</Button> : <Button onClick={() => importMutation.mutate()} disabled={!file || !rows.length || importMutation.isPending} style={{ backgroundColor: primaryColor }} className="text-white">{importMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Import Contacts</Button>}</DialogFooter>
+          <DialogFooter>{result ? <Button onClick={reset} style={{ backgroundColor: primaryColor }} className="text-white">Done</Button> : <Button onClick={() => importMutation.mutate()} disabled={!file || !stagedImportRows.length || importValidationErrors.length > 0 || importMutation.isPending} style={{ backgroundColor: primaryColor }} className="text-white">{importMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isGeneralSales ? "Import company contacts" : "Import contacts"}</Button>}</DialogFooter>
         </DialogContent>
       </Dialog>
 

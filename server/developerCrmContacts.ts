@@ -9,6 +9,7 @@ type ContactVisibility = {
   states: string[];
   counties: string[];
   sourceTags: string[];
+  allowSharedDirectory?: boolean;
 };
 
 type DeveloperCrmContactQuery = {
@@ -29,6 +30,10 @@ type DeveloperCrmContactQuery = {
   assignedToFilter: string;
   brokerageFilter: string;
   multiCampaignTagFilter: boolean;
+  contactCategoryFilter?: string;
+  includeFilterOptions?: boolean;
+  filterOptionsOnly?: boolean;
+  includeContactEnrichment?: boolean;
 };
 
 const DEMO_USER_ID = "20974d7b-e103-4fc7-b42f-7a13d41041fb";
@@ -39,6 +44,38 @@ function textArray(values: string[]): SQL {
 
 function andSql(parts: SQL[]): SQL {
   return parts.length ? sql.join(parts, sql` AND `) : sql`TRUE`;
+}
+
+const EMPTY_FILTER_OPTIONS = {
+  companies: [],
+  tags: [],
+  sourceTags: [],
+  states: [],
+  assignedTo: [],
+  categories: [],
+};
+
+function parseFilterOptions(options: Record<string, unknown>) {
+  const jsonArray = (value: unknown): any[] => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+  return {
+    companies: jsonArray(options.companies),
+    tags: jsonArray(options.tags),
+    sourceTags: jsonArray(options.source_tags),
+    states: jsonArray(options.states).map((value) => String(value).trim()).filter(Boolean),
+    assignedTo: jsonArray(options.assigned_to).map((value) => String(value).trim()).filter(Boolean),
+    categories: jsonArray(options.categories).map((value) => String(value).trim()).filter(Boolean),
+  };
 }
 
 function stateMatch(alias: string, state: string): SQL {
@@ -90,11 +127,13 @@ function makeAccessibleCte(developerProfileId: string, visibility: ContactVisibi
     sharedVisibility.push(sql`COALESCE(brokers.source_tags, ARRAY[]::text[]) && ${textArray(visibility.sourceTags.map((value) => value.toLowerCase()))}`);
   }
 
-  const sharedContactConditions = [
-    sql`brokers.owner_developer_profile_id IS NULL`,
-    sql`brokers.user_id IS DISTINCT FROM ${DEMO_USER_ID}`,
-    ...sharedVisibility,
-  ];
+  const sharedContactConditions = visibility.allowSharedDirectory === false
+    ? [sql`FALSE`]
+    : [
+        sql`brokers.owner_developer_profile_id IS NULL`,
+        sql`brokers.user_id IS DISTINCT FROM ${DEMO_USER_ID}`,
+        ...sharedVisibility,
+      ];
 
   return sql`accessible_brokers AS (
     SELECT
@@ -129,6 +168,13 @@ function makeAccessibleCte(developerProfileId: string, visibility: ContactVisibi
         ELSE brokers.last_contacted_at
       END AS last_contacted_at,
       brokers.state_region,
+      COALESCE(
+        brokers.contact_category,
+        CASE WHEN brokers.owner_developer_profile_id IS NULL THEN 'broker' ELSE 'other' END
+      ) AS contact_category,
+      brokers.mailing_address,
+      brokers.city,
+      brokers.postal_code,
       brokers.owner_developer_profile_id,
       brokers.contact_sector,
       brokers.contact_county,
@@ -193,6 +239,9 @@ export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
   if (query.brokerageFilter) {
     filters.push(sql`LOWER(COALESCE(f.brokerage, '')) = LOWER(${query.brokerageFilter})`);
   }
+  if (query.contactCategoryFilter) {
+    filters.push(sql`LOWER(BTRIM(COALESCE(f.contact_category, 'other'))) = LOWER(BTRIM(${query.contactCategoryFilter}))`);
+  }
 
   let geoNames: string[] = [];
   if (query.stateFilter || query.msaFilter || query.countyFilter) {
@@ -256,17 +305,13 @@ export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
   const filteredCte = sql`filtered_brokers AS (
     SELECT f.* FROM accessible_brokers AS f WHERE ${andSql(filters)}
   )`;
-  const [countResult, pageResult, optionsResult] = await Promise.all([
-    db.execute(sql`
-      WITH ${accessibleCte}, ${filteredCte}
-      SELECT COUNT(*)::int AS total FROM filtered_brokers
-    `),
-    db.execute(sql`
-      WITH ${accessibleCte}, ${filteredCte}
-      SELECT
-        f.*,
-        COALESCE(company_counts.people, 0)::int AS company_member_count
-      FROM filtered_brokers AS f
+  const includeContactEnrichment = query.includeContactEnrichment !== false;
+  const pageEnrichmentProjection = includeContactEnrichment
+    ? sql`, COALESCE(company_counts.people, 0)::int AS company_member_count,
+        COALESCE(deal_counts.deal_count, 0)::int AS deal_count`
+    : sql``;
+  const pageEnrichmentJoins = includeContactEnrichment
+    ? sql`
       LEFT JOIN (
         SELECT LOWER(BTRIM(brokerage)) AS brokerage_key, COUNT(*)::int AS people
         FROM accessible_brokers
@@ -274,10 +319,33 @@ export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
         GROUP BY LOWER(BTRIM(brokerage))
       ) AS company_counts
         ON company_counts.brokerage_key = LOWER(BTRIM(f.brokerage))
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS deal_count
+        FROM deals
+        WHERE deals.broker_id = f.id
+      ) AS deal_counts ON TRUE
+    `
+    : sql``;
+  const [countResult, pageResult, optionsResult] = await Promise.all([
+    query.filterOptionsOnly
+      ? Promise.resolve({ rows: [{ total: 0 }] })
+      : db.execute(sql`
+      WITH ${accessibleCte}, ${filteredCte}
+      SELECT COUNT(*)::int AS total FROM filtered_brokers
+    `),
+    query.filterOptionsOnly
+      ? Promise.resolve({ rows: [] as any[] })
+      : db.execute(sql`
+      WITH ${accessibleCte}, ${filteredCte}
+      SELECT f.*${pageEnrichmentProjection}
+      FROM filtered_brokers AS f
+      ${pageEnrichmentJoins}
       ORDER BY f.created_at DESC NULLS LAST, f.id DESC
       LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
     `),
-    db.execute(sql`
+    query.includeFilterOptions === false && !query.filterOptionsOnly
+      ? Promise.resolve({ rows: [] as any[] })
+      : db.execute(sql`
       WITH ${accessibleCte},
       state_values AS (
         SELECT UPPER(BTRIM(state_value)) AS state
@@ -324,23 +392,20 @@ export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
             FROM accessible_brokers
             WHERE assigned_to IS NOT NULL AND BTRIM(assigned_to) <> ''
           ) AS assigned_options
-        ), '[]'::jsonb) AS assigned_to
+        ), '[]'::jsonb) AS assigned_to,
+        COALESCE((
+          SELECT jsonb_agg(category ORDER BY category)
+          FROM (
+            SELECT DISTINCT contact_category AS category
+            FROM accessible_brokers
+            WHERE BTRIM(COALESCE(contact_category, '')) <> ''
+          ) AS category_options
+        ), '[]'::jsonb) AS categories
     `),
   ]);
 
   const total = Number((countResult.rows[0] as any)?.total || 0);
   const pageRows = pageResult.rows as Array<Record<string, any>>;
-  const brokerIds = pageRows.map((row) => String(row.id));
-  const dealCounts: Record<string, number> = {};
-  if (brokerIds.length) {
-    const dealRows = await db.select({ brokerId: deals.brokerId })
-      .from(deals)
-      .where(sql`${deals.brokerId} = ANY(${textArray(brokerIds)})`);
-    for (const row of dealRows) {
-      if (row.brokerId) dealCounts[row.brokerId] = (dealCounts[row.brokerId] || 0) + 1;
-    }
-  }
-
   const contacts = pageRows.map((row) => ({
     id: row.id,
     firstName: row.first_name,
@@ -348,6 +413,10 @@ export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
     email: row.email,
     phone: row.phone,
     brokerage: row.brokerage,
+    contactCategory: row.contact_category || "other",
+    mailingAddress: row.mailing_address,
+    city: row.city,
+    postalCode: row.postal_code,
     marketsCovered: row.markets_covered,
     smsOptIn: row.sms_opt_in,
     isActive: row.is_active,
@@ -363,30 +432,13 @@ export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
     contactSpecialty: row.contact_specialty,
     userId: row.user_id,
     createdAt: row.created_at,
-    dealCount: dealCounts[String(row.id)] || 0,
+    dealCount: Number(row.deal_count || 0),
     companyMemberCount: Number(row.company_member_count || 0),
   }));
 
-  const options = (optionsResult.rows[0] || {}) as Record<string, unknown>;
-  const jsonArray = (value: unknown): any[] => {
-    if (Array.isArray(value)) return value;
-    if (typeof value === "string") {
-      try {
-        const parsed = JSON.parse(value);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  };
-  const filterOptions = {
-    companies: jsonArray(options.companies),
-    tags: jsonArray(options.tags),
-    sourceTags: jsonArray(options.source_tags),
-    states: jsonArray(options.states).map((value) => String(value).trim()).filter(Boolean),
-    assignedTo: jsonArray(options.assigned_to).map((value) => String(value).trim()).filter(Boolean),
-  };
+  const filterOptions = query.includeFilterOptions === false && !query.filterOptionsOnly
+    ? EMPTY_FILTER_OPTIONS
+    : parseFilterOptions((optionsResult.rows[0] || {}) as Record<string, unknown>);
 
   return {
     contacts,

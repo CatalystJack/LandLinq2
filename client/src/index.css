@@ -2914,6 +2914,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 }
 .ll-step-surface {
   min-width: 0;
+  height: clamp(24rem, 40vw, 32rem);
   overflow: hidden;
   border-radius: 1.25rem;
   padding: 1rem;
@@ -2934,6 +2935,22 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   box-shadow: 0 12px 28px rgba(8,23,41,.16);
 }
 .ll-step-surface .ll-app-frame { margin: 0; }
+.ll-step-surface > .ll-window,
+.ll-step-surface > .ll-app-frame,
+.ll-step-surface > .ll-ai-assistant {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.ll-step-surface > .ll-window,
+.ll-step-surface > .ll-app-frame {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.ll-step-surface > .ll-window::-webkit-scrollbar,
+.ll-step-surface > .ll-app-frame::-webkit-scrollbar { display: none; }
 .ll-step-surface .ll-window:hover { transform: translateY(-3px); }
 .ll-ai-assistant {
   display: flex;
@@ -3107,6 +3124,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 }
 
 @media (max-width: 900px) {
+  .ll-step-surface { height: 23rem; }
   .ll-journey-intro { align-items: start; flex-direction: column; padding-bottom: 4rem; }
   .ll-journey-route { gap: 4.5rem; }
   .ll-journey-step,
@@ -3119,7 +3137,12 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   .ll-step-surface { grid-column: 1; }
   .ll-journey-result { grid-template-columns: 1fr; gap: .8rem; margin: 4.5rem 0 0 5.25rem; }
 }
+@media (max-width: 768px) {
+  .ll-step-surface .ll-contact-directory,
+  .ll-step-surface .ll-contact-detail { height: 122%; margin-bottom: 0; }
+}
 @media (max-width: 560px) {
+  .ll-step-surface { height: 21rem; }
   .ll-journey { padding-top: 5rem; padding-bottom: 5rem; }
   .ll-journey-intro { padding-bottom: 3rem; }
   .ll-journey-route { gap: 3.5rem; }
@@ -3138,6 +3161,8 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   .ll-step-surface .ll-contact-directory,
   .ll-step-surface .ll-contact-detail,
   .ll-step-surface .ll-outreach-analytics { transform: scale(.73); width: 137%; margin-bottom: -76px; }
+  .ll-step-surface .ll-contact-directory,
+  .ll-step-surface .ll-contact-detail { height: 137%; margin-bottom: 0; }
   .ll-ai-assistant { min-height: 330px; }
   .ll-journey-result { margin-left: 3.25rem; }
 }

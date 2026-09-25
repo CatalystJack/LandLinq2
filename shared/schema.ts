@@ -46,6 +46,7 @@ export const developerProfiles = pgTable("developer_profiles", {
   outreachTestModeEnabled: boolean("outreach_test_mode_enabled").default(false).notNull(),
   emailUnsubscribeEnabled: boolean("email_unsubscribe_enabled").default(false).notNull(),
   knownEmailDomains: text("known_email_domains").array(),
+  crmSharedContactsEnabled: boolean("crm_shared_contacts_enabled").default(true).notNull(),
   // Shared LandLinq broker directory visibility. An empty filter means all
   // shared contacts; non-empty filters are applied together.
   crmContactSectors: text("crm_contact_sectors").array().default(sql`ARRAY[]::text[]`).notNull(),
@@ -292,11 +293,17 @@ export const brokers = pgTable("brokers", {
   contactConfidence: varchar("contact_confidence"),
   contactCounty: varchar("contact_county"),
   sourceLicenseNumber: varchar("source_license_number"),
+  contactCategory: varchar("contact_category"),
+  mailingAddress: text("mailing_address"),
+  city: varchar("city"),
+  postalCode: varchar("postal_code"),
   assignedTo: text("assigned_to"),   // Team member name/email responsible for outreach
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("brokers_owner_email_idx").on(table.ownerDeveloperProfileId, table.email),
+  index("brokers_owner_category_idx").on(table.ownerDeveloperProfileId, table.contactCategory),
+  index("brokers_owner_state_idx").on(table.ownerDeveloperProfileId, table.stateRegion),
   uniqueIndex("brokers_owner_email_unique").on(table.ownerDeveloperProfileId, table.email),
   uniqueIndex("brokers_shared_email_unique")
     .on(table.email)

@@ -4540,8 +4540,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // GET /api/crm/contacts — paginated list with search + tag/market/sms/geo filters
   app.get("/api/crm/contacts", isAuthenticated, async (req, res) => {
     try {
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 50;
+      const page = Math.max(parseInt(req.query.page as string) || 1, 1);
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
       const search = (req.query.search as string || '').trim();
       const tag = req.query.tag as string;
       const rawTagFilters = req.query.tags;
@@ -4557,6 +4557,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const assignedToFilter = (req.query.assignedTo as string || '').trim();
       const brokerageFilter = (req.query.brokerage as string || '').trim();
       const sourceTagFilter = (req.query.sourceTag as string || '').trim();
+      const contactCategoryFilter = (req.query.contactCategory as string || '').trim();
+      const filterOptionsOnly = req.query.optionsOnly === 'true';
+      const includeFilterOptions = req.query.includeFilterOptions !== 'false';
       const multiCampaignTagFilter = req.query.multiCampaignTag === 'true';
       const offset = (page - 1) * limit;
       const requestedProfileId = String(req.query.developerProfileId || '').trim();
@@ -4579,7 +4582,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       if (isDeveloper && developerProfileId && !await requireActiveDeveloperProfile(developerProfileId, res)) return;
       const contactVisibility = developerProfileId
         ? await getDeveloperContactVisibility(developerProfileId)
-        : { sectors: [], counties: [], sourceTags: [] };
+        : { sectors: [], states: [], counties: [], sourceTags: [], allowSharedDirectory: false };
 
       if (developerProfileId) {
         const result = await getDeveloperCrmContacts({
@@ -4600,6 +4603,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
           assignedToFilter,
           brokerageFilter,
           multiCampaignTagFilter,
+          contactCategoryFilter,
+          includeFilterOptions,
+          filterOptionsOnly,
         });
         return res.json(result);
       }
@@ -4821,7 +4827,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         }
       });
     } catch (error) {
-      console.error("CRM contacts error:", error);
+      console.error("CRM contacts query failed", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
       res.status(500).json({ message: "Failed to fetch contacts" });
     }
   });
@@ -5185,7 +5193,10 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.patch("/api/crm/contacts/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { crmTags, crmNotes, lastContactedAt, assignedTo, firstName, lastName, email, phone, brokerage, addTag, removeTag } = req.body;
+      const {
+        crmTags, crmNotes, lastContactedAt, assignedTo, firstName, lastName, email, phone, brokerage,
+        contactCategory, mailingAddress, city, stateRegion, postalCode, addTag, removeTag,
+      } = req.body;
       const isDeveloper = String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER';
       const developerProfileId = isDeveloper ? getDeveloperProfileId(req, res) : null;
       if (isDeveloper && !developerProfileId) return;
@@ -5199,7 +5210,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         return res.status(404).json({ message: "Contact not found" });
       }
       const isSharedContact = !!developerProfileId && targetBroker.ownerDeveloperProfileId !== developerProfileId;
-      if (isSharedContact && [firstName, lastName, email, phone, brokerage].some((value) => value !== undefined)) {
+      if (isSharedContact && [firstName, lastName, email, phone, brokerage, contactCategory, mailingAddress, city, stateRegion, postalCode].some((value) => value !== undefined)) {
         return res.status(403).json({ message: "Shared contact identity is managed by LandLinq" });
       }
       if (email !== undefined && email !== null && email !== "") {
@@ -5210,6 +5221,19 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       if (phone !== undefined && phone !== null && phone !== "") {
         if (typeof phone !== "string" || !/^\d{10,11}$/.test(phone.replace(/\D/g, ""))) {
           return res.status(400).json({ message: "Enter a valid phone number with 10 or 11 digits" });
+        }
+      }
+      if (contactCategory !== undefined && !["broker", "attorney", "general_contractor", "other"].includes(String(contactCategory))) {
+        return res.status(400).json({ message: "Choose a supported contact category" });
+      }
+      for (const [field, value, maxLength] of [
+        ["address", mailingAddress, 300],
+        ["city", city, 120],
+        ["state / region", stateRegion, 100],
+        ["postal code", postalCode, 24],
+      ] as Array<[string, unknown, number]>) {
+        if (value !== undefined && value !== null && (typeof value !== "string" || value.length > maxLength)) {
+          return res.status(400).json({ message: `Contact ${field} is too long` });
         }
       }
       if (addTag !== undefined && (typeof addTag !== "string" || !addTag.trim())) {
@@ -5237,6 +5261,11 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       if (email !== undefined) updates.email = email || null;
       if (phone !== undefined) updates.phone = phone || null;
       if (brokerage !== undefined) updates.brokerage = brokerage || null;
+      if (contactCategory !== undefined) updates.contactCategory = contactCategory;
+      if (mailingAddress !== undefined) updates.mailingAddress = mailingAddress || null;
+      if (city !== undefined) updates.city = city || null;
+      if (stateRegion !== undefined) updates.stateRegion = stateRegion || null;
+      if (postalCode !== undefined) updates.postalCode = postalCode || null;
 
       if (isSharedContact) {
         const [existingCrm] = await db.select().from(developerBrokerCrm).where(and(
@@ -8432,33 +8461,46 @@ Provide your analysis in this exact JSON format:
   // Get deals statistics (used by launchpad dashboard)
   app.get('/api/deals/stats', isAuthenticated, async (req, res) => {
     try {
-      let deals = await storage.getAllDeals();
-      let brokers = await storage.getAllBrokers();
-      if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
+      const isDeveloper = String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER';
+      let dealFilter = sql`TRUE`;
+      if (isDeveloper) {
         const developerProfileId = getDeveloperProfileId(req, res);
         if (!developerProfileId) return;
         if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
         const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
-        deals = deals.filter((deal) => visibleDealIds.has(deal.id));
-        const visibleBrokerIds = new Set(deals.map((deal) => deal.brokerId).filter(Boolean));
-        brokers = brokers.filter((broker) => visibleBrokerIds.has(broker.id));
+        dealFilter = visibleDealIds.size
+          ? inArray(deals.id, Array.from(visibleDealIds))
+          : sql`FALSE`;
       }
-      
-      const totalValue = deals.reduce((sum, deal) => sum + (parseFloat(deal.askingPrice?.toString() || '0') || 0), 0);
-      const highPriorityDeals = deals.filter(d => d.classification === 'high_priority' || d.status === 'approved').length;
-      const conversionRate = deals.length > 0 ? (highPriorityDeals / deals.length) * 100 : 0;
-      
+
+      const [aggregate] = await db.select({
+        totalDeals: sql<number>`COUNT(*)::int`,
+        pendingDeals: sql<number>`COUNT(*) FILTER (WHERE ${deals.status} = 'pending_review')::int`,
+        approvedDeals: sql<number>`COUNT(*) FILTER (WHERE ${deals.status} = 'approved')::int`,
+        highPriorityDeals: sql<number>`COUNT(*) FILTER (WHERE ${deals.classification} = 'high_priority' OR ${deals.status} = 'approved')::int`,
+        rejectedDeals: sql<number>`COUNT(*) FILTER (WHERE ${deals.status} = 'clear_no')::int`,
+        totalValue: sql<string>`COALESCE(SUM(${deals.askingPrice}), 0)::text`,
+        activeBrokers: sql<number>`COUNT(DISTINCT ${deals.brokerId}) FILTER (WHERE ${brokers.isActive} = TRUE)::int`,
+        totalBrokers: sql<number>`COUNT(DISTINCT ${deals.brokerId})::int`,
+      }).from(deals)
+        .leftJoin(brokers, eq(deals.brokerId, brokers.id))
+        .where(dealFilter);
+
+      const totalDeals = Number(aggregate?.totalDeals || 0);
+      const totalValue = Number(aggregate?.totalValue || 0);
+      const highPriorityDeals = Number(aggregate?.highPriorityDeals || 0);
+      const conversionRate = totalDeals > 0 ? (highPriorityDeals / totalDeals) * 100 : 0;
       const stats = {
-        totalDeals: deals.length,
-        pendingDeals: deals.filter(d => d.status === 'pending_review').length,
-        approvedDeals: deals.filter(d => d.status === 'approved').length,
+        totalDeals,
+        pendingDeals: Number(aggregate?.pendingDeals || 0),
+        approvedDeals: Number(aggregate?.approvedDeals || 0),
         highPriorityDeals,
-        rejectedDeals: deals.filter(d => d.status === 'clear_no').length,
+        rejectedDeals: Number(aggregate?.rejectedDeals || 0),
         totalValue,
-        avgDealSize: deals.length > 0 ? totalValue / deals.length : 0,
+        avgDealSize: totalDeals > 0 ? totalValue / totalDeals : 0,
         conversionRate: Math.round(conversionRate * 10) / 10,
-        activeBrokers: brokers.filter(b => b.isActive).length,
-        totalBrokers: brokers.length
+        activeBrokers: Number(aggregate?.activeBrokers || 0),
+        totalBrokers: Number(aggregate?.totalBrokers || 0),
       };
       
       res.json(stats);
@@ -15023,8 +15065,11 @@ RULES:
     states: string[];
     counties: string[];
     sourceTags: string[];
+    allowSharedDirectory: boolean;
   }> {
     const [profile] = await db.select({
+      profileType: developerProfiles.profileType,
+      sharedContactsEnabled: developerProfiles.crmSharedContactsEnabled,
       sectors: developerProfiles.crmContactSectors,
       states: developerProfiles.crmContactStates,
       counties: developerProfiles.crmContactCounties,
@@ -15054,6 +15099,7 @@ RULES:
       sourceTags: Array.isArray(profile?.sourceTags)
         ? profile.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
         : [],
+      allowSharedDirectory: profile?.profileType === "real_estate" && profile.sharedContactsEnabled !== false,
     };
   }
 
@@ -15072,10 +15118,12 @@ RULES:
       states: string[];
       counties: string[];
       sourceTags: string[];
+      allowSharedDirectory?: boolean;
     },
   ): boolean {
     if (broker.ownerDeveloperProfileId === developerProfileId) return true;
     if (broker.ownerDeveloperProfileId !== null && broker.ownerDeveloperProfileId !== undefined) return false;
+    if (visibility.allowSharedDirectory === false) return false;
     if (broker.userId === '20974d7b-e103-4fc7-b42f-7a13d41041fb') return false;
     const sector = String(broker.contactSector || '').trim().toLowerCase();
     const counties = new Set(
@@ -15999,6 +16047,13 @@ RULES:
         throw new Error('County market labels must be an object');
       }
 
+      if (body.crmSharedContactsEnabled !== undefined) {
+        if (typeof body.crmSharedContactsEnabled !== 'boolean') {
+          throw new Error('CRM shared contacts setting must be a boolean');
+        }
+        updates.crmSharedContactsEnabled = !isGeneralSales && body.crmSharedContactsEnabled;
+      }
+
       if (body.crmContactSectors !== undefined) {
         if (!Array.isArray(body.crmContactSectors) || body.crmContactSectors.some((value: unknown) => !['commercial', 'residential'].includes(String(value).trim().toLowerCase()))) {
           throw new Error('CRM contact sectors must contain only commercial or residential');
@@ -16222,50 +16277,34 @@ RULES:
       if (!developerProfileId) return;
       if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
       const visibility = await getDeveloperContactVisibility(developerProfileId);
-      const allContacts = await db.select({
-        id: brokers.id,
-        firstName: brokers.firstName,
-        lastName: brokers.lastName,
-        email: brokers.email,
-        phone: brokers.phone,
-        brokerage: brokers.brokerage,
-         smsOptIn: brokers.smsOptIn,
-        stateRegion: brokers.stateRegion,
-        assignedTo: brokers.assignedTo,
-        crmTags: brokers.crmTags,
-         sourceTags: brokers.sourceTags,
-        crmNotes: brokers.crmNotes,
-        lastContactedAt: brokers.lastContactedAt,
-        ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
-         contactSector: brokers.contactSector,
-         contactCounty: brokers.contactCounty,
-         contactSpecialty: brokers.contactSpecialty,
-         userId: brokers.userId,
-        createdAt: brokers.createdAt,
-       }).from(brokers).where(isNonDemoBroker()).orderBy(desc(brokers.createdAt));
-      const privateCrmRows = await db.select({
-        brokerId: developerBrokerCrm.brokerId,
-        crmTags: developerBrokerCrm.crmTags,
-         isRemoved: developerBrokerCrm.isRemoved,
-        crmNotes: developerBrokerCrm.crmNotes,
-        lastContactedAt: developerBrokerCrm.lastContactedAt,
-        assignedTo: developerBrokerCrm.assignedTo,
-      }).from(developerBrokerCrm).where(eq(developerBrokerCrm.developerProfileId, developerProfileId));
-      const privateCrmByBroker = new Map(privateCrmRows.map((row) => [row.brokerId, row]));
-      const contacts = allContacts
-        .filter((contact) => isSharedBrokerVisible(contact, developerProfileId, visibility))
-         .filter((contact) => !privateCrmByBroker.get(contact.id)?.isRemoved)
-        .map((contact) => {
-          const privateCrm = privateCrmByBroker.get(contact.id);
-          if (privateCrm) return { ...contact, ...privateCrm };
-          if (contact.ownerDeveloperProfileId === null) {
-            return { ...contact, crmTags: [], crmNotes: null, lastContactedAt: null, assignedTo: null };
-          }
-          return contact;
-        });
-      return res.json({ contacts });
+      const page = Math.max(parseInt(String(req.query.page || "1"), 10) || 1, 1);
+      const limit = Math.min(Math.max(parseInt(String(req.query.limit || "100"), 10) || 100, 1), 100);
+      const result = await getDeveloperCrmContacts({
+        developerProfileId,
+        visibility,
+        page,
+        limit,
+        search: String(req.query.search || "").trim().slice(0, 120),
+        tag: "",
+        tagFilters: [],
+        sourceTagFilter: "",
+        crmStateFilter: "",
+        stateFilter: "",
+        msaFilter: "",
+        countyFilter: "",
+        market: "",
+        smsFilter: "",
+        assignedToFilter: "",
+        brokerageFilter: "",
+        multiCampaignTagFilter: false,
+        includeFilterOptions: false,
+        includeContactEnrichment: false,
+      });
+      return res.json(result);
     } catch (error: any) {
-      console.error('[developer-profile/me/contacts] Error:', error);
+      console.error('[developer-profile/me/contacts] Contact search failed', {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
       return res.status(500).json({ error: 'Failed to load contacts' });
     }
   });
@@ -17216,18 +17255,98 @@ RULES:
     }
   });
 
+  const contactImportRateLimits = new Map<string, { count: number; resetAt: number }>();
   app.post("/api/developer-profile/me/import-contacts", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const contentLength = Number(req.headers["content-length"] || 0);
+      if (Number.isFinite(contentLength) && contentLength > 10 * 1024 * 1024) {
+        return res.status(413).json({ message: "Contact imports are limited to 10 MB" });
+      }
+      const now = Date.now();
+      const currentWindow = contactImportRateLimits.get(developerProfileId);
+      const activeWindow = currentWindow && currentWindow.resetAt > now ? currentWindow : null;
+      if (activeWindow && activeWindow.count >= 5) {
+        res.setHeader("Retry-After", String(Math.max(1, Math.ceil((activeWindow.resetAt - now) / 1000))));
+        return res.status(429).json({ message: "Import limit reached. Try again later." });
+      }
+      contactImportRateLimits.set(developerProfileId, activeWindow
+        ? { ...activeWindow, count: activeWindow.count + 1 }
+        : { count: 1, resetAt: now + 10 * 60 * 1000 });
       const { contacts: rows } = req.body || {};
       if (!Array.isArray(rows) || rows.length === 0) {
         return res.status(400).json({ message: 'contacts array required' });
       }
+      if (rows.length > 2500) {
+        return res.status(413).json({ message: 'A single import is limited to 2,500 contact rows' });
+      }
+
+      const validationErrors: string[] = [];
+      const seenEmails = new Set<string>();
+      const allowedCategories = new Set(["broker", "attorney", "general_contractor", "other"]);
+      const validatedRows = rows.map((row: any, index: number) => {
+        const rowNumber = index + 2;
+        if (!row || typeof row !== "object" || Array.isArray(row)) {
+          validationErrors.push(`Row ${rowNumber} is not a contact record.`);
+          return null;
+        }
+        const readField = (value: unknown, label: string, maxLength: number) => {
+          const text = String(value ?? "").trim();
+          if (text.length > maxLength) validationErrors.push(`Row ${rowNumber}: ${label} exceeds ${maxLength} characters.`);
+          return text;
+        };
+        const firstName = readField(row.firstName, "First name", 120);
+        const lastName = readField(row.lastName, "Last name", 120);
+        const email = readField(row.email, "Email", 254).toLowerCase();
+        const phone = readField(row.phone, "Phone", 40);
+        const brokerage = readField(row.brokerage, "Company", 200);
+        const mailingAddress = readField(row.mailingAddress, "Address", 300);
+        const city = readField(row.city, "City", 120);
+        const stateRegion = readField(row.stateRegion, "State / region", 100);
+        const postalCode = readField(row.postalCode, "Postal code", 24);
+        const assignedTo = readField(row.assignedTo, "Assigned to", 120);
+        const tags = readField(row.tags, "Tags", 1000);
+        const rawCategory = readField(row.contactCategory, "Contact category", 40).toLowerCase().replace(/[\s/-]+/g, "_");
+        const contactCategory = ["lawyer", "attorney_lawyer"].includes(rawCategory)
+          ? "attorney"
+          : ["contractor", "general_contractor"].includes(rawCategory)
+            ? "general_contractor"
+            : rawCategory;
+
+        if (!firstName && !lastName && !email) validationErrors.push(`Row ${rowNumber} needs a name or email.`);
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) validationErrors.push(`Row ${rowNumber} has an invalid email address.`);
+        if (email && seenEmails.has(email)) validationErrors.push(`Row ${rowNumber} repeats an email address.`);
+        if (email) seenEmails.add(email);
+        if (rawCategory && !allowedCategories.has(contactCategory)) validationErrors.push(`Row ${rowNumber} has an unsupported contact category.`);
+        return {
+          firstName,
+          lastName,
+          email,
+          phone,
+          brokerage,
+          mailingAddress,
+          city,
+          stateRegion,
+          postalCode,
+          assignedTo,
+          tags,
+          contactCategory: rawCategory ? contactCategory : null,
+        };
+      }).filter(Boolean) as Array<Record<string, any>>;
+
+      if (validationErrors.length) {
+        return res.status(400).json({
+          message: 'Fix the invalid rows and upload again.',
+          errors: validationErrors.slice(0, 20),
+          totalErrors: validationErrors.length,
+        });
+      }
 
       let inserted = 0;
       let updated = 0;
-      for (const row of rows) {
+      for (const row of validatedRows) {
         const firstName = toTitleCase(String(row.firstName || '').trim());
         const lastName = toTitleCase(String(row.lastName || '').trim());
         const email = String(row.email || '').trim().toLowerCase() || null;
@@ -17261,6 +17380,10 @@ RULES:
               phone: phone || undefined,
               brokerage: brokerage || undefined,
               stateRegion: stateRegion || undefined,
+              contactCategory: row.contactCategory || undefined,
+              mailingAddress: row.mailingAddress || undefined,
+              city: row.city || undefined,
+              postalCode: row.postalCode || undefined,
               assignedTo: assignedTo || undefined,
               crmTags: mergedTags,
               isActive: true,
@@ -17275,6 +17398,10 @@ RULES:
               phone,
               brokerage,
               stateRegion,
+              contactCategory: row.contactCategory || "other",
+              mailingAddress: row.mailingAddress || null,
+              city: row.city || null,
+              postalCode: row.postalCode || null,
               assignedTo,
               crmTags: rawTags.length ? rawTags : null,
               ownerDeveloperProfileId: developerProfileId,
@@ -17301,6 +17428,10 @@ RULES:
                   assignedTo: assignedTo || undefined,
                   brokerage: brokerage || undefined,
                   stateRegion: stateRegion || undefined,
+                  contactCategory: row.contactCategory || undefined,
+                  mailingAddress: row.mailingAddress || undefined,
+                  city: row.city || undefined,
+                  postalCode: row.postalCode || undefined,
                   crmTags: mergedTags,
                   isActive: true,
                   updatedAt: new Date(),
@@ -17317,6 +17448,10 @@ RULES:
             phone,
             brokerage,
             stateRegion,
+            contactCategory: row.contactCategory || "other",
+            mailingAddress: row.mailingAddress || null,
+            city: row.city || null,
+            postalCode: row.postalCode || null,
             assignedTo,
             crmTags: rawTags.length ? rawTags : null,
             ownerDeveloperProfileId: developerProfileId,
@@ -17327,7 +17462,9 @@ RULES:
       }
       return res.json({ inserted, updated });
     } catch (error: any) {
-      console.error('[developer-profile/me/import-contacts] Error:', error);
+      console.error('[developer-profile/me/import-contacts] Import failed', {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
       return res.status(500).json({ message: 'Failed to import contacts' });
     }
   });

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DeveloperNavigation from "@/components/developer-navigation";
 import { PageHeader } from "@/components/ui/page-header";
@@ -72,8 +72,14 @@ export default function DeveloperPipeline() {
   const [manageOpen, setManageOpen] = useState(false);
   const [draggingOpportunityId, setDraggingOpportunityId] = useState<string | null>(null);
   const [contactSearch, setContactSearch] = useState("");
+  const [debouncedContactSearch, setDebouncedContactSearch] = useState("");
   const [newStageName, setNewStageName] = useState("");
   const [form, setForm] = useState({ contactId: "", stageId: "", title: "", value: "", notes: "" });
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedContactSearch(contactSearch.trim()), 250);
+    return () => window.clearTimeout(timeout);
+  }, [contactSearch]);
 
   const stagesQuery = useQuery<{ stages: Stage[] }>({
     queryKey: ["/api/developer-profile/me/pipeline/stages"],
@@ -83,9 +89,16 @@ export default function DeveloperPipeline() {
     queryKey: ["/api/developer-profile/me/pipeline/opportunities", sort],
     queryFn: () => apiRequest(`/api/developer-profile/me/pipeline/opportunities?sort=${encodeURIComponent(sort)}`),
   });
-  const contactsQuery = useQuery<{ contacts: Contact[] }>({
-    queryKey: ["/api/developer-profile/me/contacts"],
-    queryFn: () => apiRequest("/api/developer-profile/me/contacts"),
+  const contactsQuery = useQuery<{
+    contacts: Contact[];
+    pagination: { total: number; limit: number; hasNextPage: boolean };
+  }>({
+    queryKey: ["/api/developer-profile/me/contacts", debouncedContactSearch],
+    queryFn: () => {
+      const params = new URLSearchParams({ search: debouncedContactSearch, limit: "100" });
+      return apiRequest(`/api/developer-profile/me/contacts?${params.toString()}`);
+    },
+    enabled: newOpen,
   });
 
   const stages = stagesQuery.data?.stages || [];
@@ -114,13 +127,7 @@ export default function DeveloperPipeline() {
     wonCount: allOpportunities.filter((opportunity) => /(?:won|final)/i.test(opportunity.stageName || "")).length,
   }), [allOpportunities]);
   const contacts = contactsQuery.data?.contacts || [];
-  const filteredContacts = useMemo(() => {
-    const search = contactSearch.trim().toLowerCase();
-    if (!search) return contacts;
-    return contacts.filter((contact) =>
-      `${contact.firstName} ${contact.lastName} ${contact.email || ""} ${contact.brokerage || ""}`.toLowerCase().includes(search),
-    );
-  }, [contacts, contactSearch]);
+  const filteredContacts = contacts;
 
   const invalidatePipeline = () => {
     void queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/pipeline/stages"] });
@@ -256,7 +263,7 @@ export default function DeveloperPipeline() {
               <Button variant="outline" size="sm" onClick={() => setManageOpen(true)}>
                 <Settings2 className="mr-2 h-4 w-4" />{activeStages.length ? "Manage Stages" : "Configure Stages"}
               </Button>
-              <Button variant="outline" size="sm" onClick={openNewOpportunity} disabled={!activeStages.length}>
+              <Button variant="outline" size="sm" onClick={() => openNewOpportunity()} disabled={!activeStages.length}>
                 <Plus className="mr-2 h-4 w-4" />New Opportunity
               </Button>
             </>
@@ -438,7 +445,18 @@ export default function DeveloperPipeline() {
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>New Opportunity</DialogTitle><DialogDescription>Add a CRM contact to your sales pipeline.</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-3">
-            <div><Label>Contact</Label><Input className="mt-2" placeholder="Search contacts…" value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} /><Select value={form.contactId} onValueChange={(value) => setForm({ ...form, contactId: value })}><SelectTrigger className="mt-2"><SelectValue placeholder={contacts.length ? "Choose a contact" : "No CRM contacts available"} /></SelectTrigger><SelectContent>{filteredContacts.slice(0, 100).map((contact) => <SelectItem key={contact.id} value={contact.id}>{contactName(contact)}{contact.email ? ` — ${contact.email}` : ""}</SelectItem>)}</SelectContent></Select>{filteredContacts.length > 100 && <p className="mt-2 text-xs text-slate-500">Showing first 100 of {filteredContacts.length} matching contacts — refine your search to narrow results.</p>}</div>
+            <div>
+              <Label>Contact</Label>
+              <Input className="mt-2" placeholder="Search contacts…" value={contactSearch} onChange={(event) => setContactSearch(event.target.value)} />
+              <Select value={form.contactId} onValueChange={(value) => setForm({ ...form, contactId: value })}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder={contactsQuery.isLoading ? "Searching contacts…" : contacts.length ? "Choose a contact" : "No matching contacts"} />
+                </SelectTrigger>
+                <SelectContent>{filteredContacts.map((contact) => <SelectItem key={contact.id} value={contact.id}>{contactName(contact)}{contact.email ? ` — ${contact.email}` : ""}</SelectItem>)}</SelectContent>
+              </Select>
+              {contactsQuery.isError && <p role="alert" className="mt-2 text-xs text-red-600">{(contactsQuery.error as Error).message}</p>}
+              {contactsQuery.data && contactsQuery.data.pagination.total > contacts.length && <p className="mt-2 text-xs text-slate-500">Showing the first {contacts.length} of {contactsQuery.data.pagination.total} matching contacts. Refine your search to narrow results.</p>}
+            </div>
             <div className="grid gap-4 sm:grid-cols-2"><div><Label>Title</Label><Input className="mt-2" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="e.g. Enterprise renewal" /></div><div><Label>Initial stage</Label><Select value={form.stageId} onValueChange={(value) => setForm({ ...form, stageId: value })}><SelectTrigger className="mt-2"><SelectValue placeholder="Choose a stage" /></SelectTrigger><SelectContent>{activeStages.map((stage) => <SelectItem key={stage.id} value={stage.id}>{stage.name}</SelectItem>)}</SelectContent></Select></div></div>
             <div><Label>Value</Label><Input className="mt-2" type="number" min="0" step="0.01" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} placeholder="Optional" /></div>
             <div><Label>Notes</Label><Textarea className="mt-2" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Add context for your team…" /></div>

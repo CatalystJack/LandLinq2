@@ -66,6 +66,7 @@ export default function SharedContactAccessEditor({
   onSourceTagsChange,
 }: SharedContactAccessEditorProps) {
   const [openFilters, setOpenFilters] = useState<FilterKey[]>(() => [
+    "states",
     ...(sectors.length ? ["sectors" as FilterKey] : []),
     ...(states.length ? ["states" as FilterKey] : []),
     ...(counties.length ? ["counties" as FilterKey] : []),
@@ -187,21 +188,24 @@ export default function SharedContactAccessEditor({
               )}
 
               {key === "states" && (
-                <div className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {stateOptions.length ? stateOptions.map((option) => (
-                    <label key={option.value} className="flex items-center gap-2 text-sm text-slate-700">
-                      <Checkbox
-                        checked={states.includes(option.value)}
-                        onCheckedChange={(checked) => onStatesChange(
-                          checked
-                            ? Array.from(new Set([...states, option.value]))
-                            : states.filter((value) => value !== option.value),
-                        )}
-                      />
-                      {option.value}
-                      <span className="text-xs text-slate-400">({option.contacts.toLocaleString()})</span>
-                    </label>
-                  )) : <p className="text-sm text-slate-500">{optionsLoading ? "Loading contact states…" : optionsError ? "Contact states could not be loaded." : "No contact state data is available yet."}</p>}
+                <div className="mt-3">
+                  <p className="mb-3 text-xs text-slate-500">Check the states this company should browse. With no states selected, all available states are visible.</p>
+                  <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {stateOptions.length ? stateOptions.map((option) => (
+                      <label key={option.value} className="flex items-center gap-2 text-sm text-slate-700">
+                        <Checkbox
+                          checked={states.includes(option.value)}
+                          onCheckedChange={(checked) => onStatesChange(
+                            checked
+                              ? Array.from(new Set([...states, option.value]))
+                              : states.filter((value) => value !== option.value),
+                          )}
+                        />
+                        {option.value}
+                        <span className="text-xs text-slate-400">({option.contacts.toLocaleString()})</span>
+                      </label>
+                    )) : <p className="text-sm text-slate-500">{optionsLoading ? "Loading contact states…" : optionsError ? "Contact states could not be loaded." : "No contact state data is available yet."}</p>}
+                  </div>
                 </div>
               )}
 
