@@ -103,6 +103,30 @@ interface DealWithBroker extends Omit<Deal, 'publicListings'> {
   broker: Broker;
   publicListings?: PublicListingData;
   coordinates?: { lat: number; lng: number } | null;
+  publicRecordFields?: Record<string, {
+    value: string;
+    source: string;
+    asOf: string;
+  }>;
+}
+
+const PUBLIC_RECORD_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+function isFreshPublicRecordDate(value: string | Date | null | undefined): boolean {
+  if (!value) return false;
+  const timestamp = value instanceof Date ? value.getTime() : Date.parse(value);
+  const ageMs = Date.now() - timestamp;
+  return Number.isFinite(timestamp) && ageMs >= 0 && ageMs <= PUBLIC_RECORD_MAX_AGE_MS;
+}
+
+function formatPublicRecordMoney(value: string): string {
+  const numeric = Number(value.replace(/[$,\s]/g, ""));
+  if (!Number.isFinite(numeric)) return value;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(numeric);
 }
 
 interface DeveloperOnboardingStatus {
@@ -164,6 +188,13 @@ const ALL_COLUMNS = [
   { key: 'sewer', label: 'Sewer', defaultVisible: false },
   { key: 'areaDemographics', label: 'Area Demographics', defaultVisible: false },
   { key: 'nearbyPermits', label: 'Nearby Permits (12mo)', defaultVisible: false },
+  { key: 'publicParcelId', label: 'Public Parcel ID', defaultVisible: false },
+  { key: 'publicOwner', label: 'Record Owner', defaultVisible: false },
+  { key: 'publicAssessedValue', label: 'Assessed Values', defaultVisible: false },
+  { key: 'publicLastSale', label: 'Last Sale', defaultVisible: false },
+  { key: 'publicMortgageLien', label: 'Mortgage / Liens', defaultVisible: false },
+  { key: 'publicPermitHistory', label: 'Permit History', defaultVisible: false },
+  { key: 'publicRecordsAsOf', label: 'Public Data As Of', defaultVisible: false },
   { key: 'brokerName', label: 'Broker Name', defaultVisible: true },
   { key: 'brokerEmail', label: 'Broker Email', defaultVisible: false },
   { key: 'brokerPhone', label: 'Broker Phone', defaultVisible: true },
@@ -4848,6 +4879,13 @@ export default function AnalystDashboard() {
       case 'sewer': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{headerLabel('Sewer')}</th>;
       case 'areaDemographics': return <th key={key} className={`${thBase} min-w-[170px]`} style={{display: vis?'':'none'}}>{headerLabel('Area Demographics')}</th>;
       case 'nearbyPermits': return <th key={key} className={`${thBase} min-w-[115px]`} style={{display: vis?'':'none'}}>{headerLabel('Nearby Permits (12mo)')}</th>;
+      case 'publicParcelId': return <th key={key} className={`${thBase} min-w-[120px]`} style={{display: vis?'':'none'}}>{headerLabel('Public Parcel ID')}</th>;
+      case 'publicOwner': return <th key={key} className={`${thBase} min-w-[130px]`} style={{display: vis?'':'none'}}>{headerLabel('Record Owner')}</th>;
+      case 'publicAssessedValue': return <th key={key} className={`${thBase} min-w-[180px]`} style={{display: vis?'':'none'}}>{headerLabel('Assessed Values')}</th>;
+      case 'publicLastSale': return <th key={key} className={`${thBase} min-w-[135px]`} style={{display: vis?'':'none'}}>{headerLabel('Last Sale')}</th>;
+      case 'publicMortgageLien': return <th key={key} className={`${thBase} min-w-[160px]`} style={{display: vis?'':'none'}}>{headerLabel('Mortgage / Liens')}</th>;
+      case 'publicPermitHistory': return <th key={key} className={`${thBase} min-w-[150px]`} style={{display: vis?'':'none'}}>{headerLabel('Permit History')}</th>;
+      case 'publicRecordsAsOf': return <th key={key} className={`${thBase} min-w-[110px]`} style={{display: vis?'':'none'}}>{headerLabel('Public Data As Of')}</th>;
       case 'brokerName': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{sortBtn('Broker Name','broker.firstName')}</th>;
       case 'brokerEmail': return <th key={key} className={`${thBase} min-w-[55px]`} style={{display: vis?'':'none'}}>{headerLabel('Broker Email')}</th>;
       case 'brokerPhone': return <th key={key} className={`${thBase} min-w-[52px]`} style={{display: vis?'':'none'}}>{headerLabel('Broker Phone')}</th>;
@@ -4858,6 +4896,12 @@ export default function AnalystDashboard() {
   const renderBodyCell = (deal: DealWithBroker, key: ReorderableColumnKey): JSX.Element | null => {
     const vis = isVisible(key);
     const d = deal as any;
+    const freshRecordField = (fieldName: string) => {
+      const field = deal.publicRecordFields?.[fieldName];
+      return field?.value?.trim() && isFreshPublicRecordDate(field.asOf) ? field : null;
+    };
+    const recordTitle = (label: string, field: { value: string; source: string; asOf: string }) =>
+      `${label} · ${field.source} · source date ${formatDateEST(new Date(field.asOf))}`;
     switch (key) {
       case 'assigned': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700 min-w-[130px]" style={{display: vis?'':'none'}}>
@@ -5407,12 +5451,83 @@ export default function AnalystDashboard() {
               ? d.censusDataJson
               : null;
             const permits = Number(census?.permitsTrailing12Mo);
-            return Number.isFinite(permits)
-              ? <span>{permits.toLocaleString()} permits</span>
+            return Number.isFinite(permits) && isFreshPublicRecordDate(d.censusDataFetchedAt)
+              ? <span title={`U.S. Census area-level estimate · data fetched ${formatDateEST(new Date(d.censusDataFetchedAt))}`}>{permits.toLocaleString()} permits</span>
               : <EmptyCell />;
           })()}
         </td>
       );
+      case 'publicParcelId':
+      case 'publicOwner':
+      case 'publicMortgageLien':
+      case 'publicPermitHistory': {
+        const fieldNameByColumn: Record<string, string> = {
+          publicParcelId: 'parcelId',
+          publicOwner: 'ownerName',
+          publicMortgageLien: 'mortgageLien',
+          publicPermitHistory: 'permitHistory',
+        };
+        const labels: Record<string, string> = {
+          publicParcelId: 'Parcel ID',
+          publicOwner: 'Record owner',
+          publicMortgageLien: 'Mortgage / lien record',
+          publicPermitHistory: 'Permit history',
+        };
+        const field = freshRecordField(fieldNameByColumn[key]);
+        const value = field?.value || '';
+        const clippedValue = value.length > 64 ? `${value.slice(0, 61)}…` : value;
+        return (
+          <td key={key} className="px-2 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+            {field
+              ? <span className="block max-w-[180px] truncate" title={recordTitle(labels[key], field)}>{clippedValue}</span>
+              : <EmptyCell />}
+          </td>
+        );
+      }
+      case 'publicAssessedValue': {
+        const parts = [
+          ['Total', freshRecordField('assessedValue')],
+          ['Land', freshRecordField('landValue')],
+          ['Improvements', freshRecordField('improvementValue')],
+        ].filter((part): part is [string, NonNullable<ReturnType<typeof freshRecordField>>] => Boolean(part[1]));
+        return (
+          <td key={key} className="px-2 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+            {parts.length
+              ? <span className="block max-w-[230px] truncate" title={parts.map(([label, field]) => recordTitle(label, field)).join('\n')}>
+                  {parts.map(([label, field]) => `${label}: ${formatPublicRecordMoney(field.value)}`).join(' · ')}
+                </span>
+              : <EmptyCell />}
+          </td>
+        );
+      }
+      case 'publicLastSale': {
+        const price = freshRecordField('lastSalePrice');
+        const saleDate = freshRecordField('lastSaleDate');
+        const displayedDate = saleDate
+          ? (Number.isFinite(Date.parse(saleDate.value)) ? formatDateEST(new Date(saleDate.value)) : saleDate.value)
+          : '';
+        const saleText = [price ? formatPublicRecordMoney(price.value) : '', displayedDate].filter(Boolean).join(' · ');
+        const title = [price && recordTitle('Sale price', price), saleDate && recordTitle('Sale date', saleDate)].filter(Boolean).join('\n');
+        return (
+          <td key={key} className="px-2 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
+            {saleText ? <span className="block max-w-[170px] truncate" title={title}>{saleText}</span> : <EmptyCell />}
+          </td>
+        );
+      }
+      case 'publicRecordsAsOf': {
+        const latest = Object.values(deal.publicRecordFields || {})
+          .filter((field) => field?.value?.trim() && isFreshPublicRecordDate(field.asOf))
+          .sort((a, b) => Date.parse(b.asOf) - Date.parse(a.asOf))[0];
+        const sourceCount = Object.values(deal.publicRecordFields || {})
+          .filter((field) => field?.value?.trim() && isFreshPublicRecordDate(field.asOf)).length;
+        return (
+          <td key={key} className="px-2 py-1 text-xs border-r border-gray-200 text-gray-700 whitespace-nowrap" style={{display: vis?'':'none'}}>
+            {latest
+              ? <span title={`${sourceCount} fresh public-record field${sourceCount === 1 ? '' : 's'}; newest source: ${latest.source}`}>{formatDateEST(new Date(latest.asOf))}</span>
+              : <EmptyCell />}
+          </td>
+        );
+      }
       case 'brokerName': return (
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           {editingRow===deal.id||(editingCell?.dealId===deal.id&&editingCell?.field==='brokerName') ? (
