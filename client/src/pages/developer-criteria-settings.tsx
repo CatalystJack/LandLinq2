@@ -724,7 +724,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
                   <Mail className="h-5 w-5" />
                 </div>
                 <div>
-                  <CardTitle>Broker notifications</CardTitle>
+                  <CardTitle>Outreach notifications</CardTitle>
                   <CardDescription>
                     Deal received, approved, and rejected messages use your connected Outlook sender.
                   </CardDescription>
