@@ -3277,7 +3277,10 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         return res.status(401).json({ message: "Unauthorized - Platform admin access required" });
       }
 
-      const users = await storage.getAllUsers();
+      const allUsers = await storage.getAllUsers();
+      const users = req.query.view === "people"
+        ? allUsers.filter((candidate) => String(candidate.role || "").toUpperCase() !== "BROKER")
+        : allUsers;
 
       const developerProfileIds = Array.from(new Set(
         users

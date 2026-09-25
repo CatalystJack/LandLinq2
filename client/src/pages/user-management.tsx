@@ -65,9 +65,9 @@ export default function UserManagement() {
 
   // Fetch all users
   const { data: usersData, isLoading: usersLoading, error: usersError } = useQuery({
-    queryKey: ["/api/users"],
+    queryKey: ["/api/users", { view: "people" }],
     queryFn: async () => {
-      const response = await fetch("/api/users", {
+      const response = await fetch("/api/users?view=people", {
         credentials: 'include',
         headers: { 'Cache-Control': 'no-cache' }
       });
@@ -244,6 +244,7 @@ export default function UserManagement() {
 
   // Filter users based on search and role
   const filteredUsers = users.filter((user: User) => {
+    if (getRoleKey(user) === "broker") return false;
     const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -355,7 +356,7 @@ export default function UserManagement() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PageHeader
           title="User Management"
-          description="Manage user accounts, broker profiles, roles, and permissions"
+          description="Manage admin and investment company accounts, roles, and permissions"
         />
 
         <div className="space-y-6">
@@ -380,10 +381,8 @@ export default function UserManagement() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Roles</SelectItem>
-                        <SelectItem value="super_admin">Super Admin</SelectItem>
                         <SelectItem value="admin">Admin Team</SelectItem>
                         <SelectItem value="developer">Investment Company Team</SelectItem>
-                        <SelectItem value="broker">Brokers</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
