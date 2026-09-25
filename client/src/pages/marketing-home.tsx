@@ -23,6 +23,56 @@ import {
 } from "lucide-react";
 import Footer from "@/components/footer";
 
+function usePreviewMotion<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const smallScreen = window.matchMedia("(max-width: 768px)");
+    let isInView = false;
+
+    const updateMotion = () => {
+      setShouldAnimate(
+        isInView &&
+          !reducedMotion.matches &&
+          !smallScreen.matches &&
+          document.visibilityState === "visible",
+      );
+    };
+
+    const observer = "IntersectionObserver" in window
+      ? new IntersectionObserver(([entry]) => {
+          isInView = entry.isIntersecting;
+          updateMotion();
+        }, { rootMargin: "120px 0px" })
+      : null;
+
+    if (observer) {
+      observer.observe(element);
+    } else {
+      isInView = true;
+      updateMotion();
+    }
+
+    reducedMotion.addEventListener("change", updateMotion);
+    smallScreen.addEventListener("change", updateMotion);
+    document.addEventListener("visibilitychange", updateMotion);
+
+    return () => {
+      observer?.disconnect();
+      reducedMotion.removeEventListener("change", updateMotion);
+      smallScreen.removeEventListener("change", updateMotion);
+      document.removeEventListener("visibilitychange", updateMotion);
+    };
+  }, []);
+
+  return { ref, shouldAnimate };
+}
+
 const faqs = [
   ["What is LandLinq?", "LandLinq is operating leverage for lean acquisitions teams. It handles sourcing, screening, outreach, and tracking in the background so your people can focus on the deals most likely to succeed."],
   ["Who is LandLinq for?", "LandLinq is built for real estate investment companies and sales teams in any industry that need to cover more ground without adding operational overhead."],
@@ -139,6 +189,7 @@ function OutreachCampaignsMockup() {
 
 function AutoYocMockup() {
   const stages = ["inputs", "rent", "revenue", "expenses"];
+  const { ref: previewRef, shouldAnimate } = usePreviewMotion<HTMLDivElement>();
   const deals = [
     {
       name: "3-story surface park",
@@ -170,12 +221,13 @@ function AutoYocMockup() {
   const [activeStage, setActiveStage] = useState(0);
 
   useEffect(() => {
+    if (!shouldAnimate) return;
     const interval = window.setInterval(() => setActiveStage((current) => (current + 1) % stages.length), 2200);
     return () => window.clearInterval(interval);
-  }, [stages.length]);
+  }, [shouldAnimate, stages.length]);
 
   return (
-    <div className="ll-app-frame ll-yoc-breakdown">
+    <div ref={previewRef} className="ll-app-frame ll-yoc-breakdown">
       <div className="ll-yoc-breakdown-head"><div><b>YOC Formula Breakdown</b><small>UNDERWRITING OUTPUT</small></div><span>Edit any field → YOC updates automatically</span></div>
       <div className="ll-yoc-alert">⚠ No rental comps — using project rents</div>
       <div className="ll-yoc-deals">
@@ -196,6 +248,7 @@ function AutoYocMockup() {
 
 function DripCampaignBuilderMockup() {
   const [activeStep, setActiveStep] = useState(1);
+  const { ref: previewRef, shouldAnimate } = usePreviewMotion<HTMLDivElement>();
   const steps = [
     ["1", "Audience", "184 eligible contacts"],
     ["2", "Sequence", "3 email steps"],
@@ -203,12 +256,13 @@ function DripCampaignBuilderMockup() {
   ];
 
   useEffect(() => {
+    if (!shouldAnimate) return;
     const interval = window.setInterval(() => setActiveStep((current) => (current + 1) % steps.length), 2800);
     return () => window.clearInterval(interval);
-  }, [steps.length]);
+  }, [shouldAnimate, steps.length]);
 
   return (
-    <div className="ll-app-frame ll-drip-builder">
+    <div ref={previewRef} className="ll-app-frame ll-drip-builder">
       <div className="ll-drip-canvas">
         <div className="ll-drip-window">
           <div className="ll-drip-head">
@@ -267,11 +321,21 @@ function AIAssistantMockup() {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [isThinking, setIsThinking] = useState(false);
+  const { ref: previewRef, shouldAnimate } = usePreviewMotion<HTMLDivElement>();
 
   const featuredQuestion = "Which demo-market opportunities have projected YOC above 8% and the strongest rent comps, and what should I review next?";
   const featuredAnswer = "Example Parcel A in Demo Market leads at 9.0% projected YOC and a $2.41 top rent PSF. Sample Parcel B follows at 8.6% and $2.34. Example Parcel A is review-ready, so I’d prioritize it for committee review and model the 280-unit plan next.";
 
   useEffect(() => {
+    if (!shouldAnimate) {
+      setMessages((current) => current.length ? current : [
+        { role: "user", text: featuredQuestion },
+        { role: "assistant", text: featuredAnswer },
+      ]);
+      setIsThinking(false);
+      return;
+    }
+
     let answerTimer: number | undefined;
     const playFeaturedAnswer = () => {
       setMessages([{ role: "user", text: featuredQuestion }]);
@@ -292,7 +356,7 @@ function AIAssistantMockup() {
       if (answerTimer) window.clearTimeout(answerTimer);
       window.clearInterval(cycleTimer);
     };
-  }, []);
+  }, [featuredAnswer, featuredQuestion, shouldAnimate]);
 
   const submitQuestion = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -307,7 +371,7 @@ function AIAssistantMockup() {
   };
 
   return (
-    <div className="ll-ai-assistant" aria-label="Truss AI assistant preview">
+    <div ref={previewRef} className="ll-ai-assistant" aria-label="Truss AI assistant preview">
       <div className="ll-ai-assistant-head">
         <div className="ll-ai-assistant-title">
           <span><b>Truss</b><small>Your multifamily development copilot</small></span>
@@ -341,13 +405,15 @@ function AIAssistantMockup() {
 
 function DashboardMockup({ compact = false }: { compact?: boolean }) {
   const [activeFilter, setActiveFilter] = useState("STATUS");
+  const { ref: previewRef, shouldAnimate } = usePreviewMotion<HTMLDivElement>();
   useEffect(() => {
+    if (!shouldAnimate) return;
     const filters = ["STATUS", "PRIORITY", "TYPE", "NEXT"];
     const interval = window.setInterval(() => {
       setActiveFilter((current) => filters[(filters.indexOf(current) + 1) % filters.length]);
     }, 3200);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [shouldAnimate]);
   const columns = ["ID", "Status", "Priority", "Property Address", "Name", "YOC", "Deal", "Type", "Analyst Notes", "Summary", "Dev Notes", "Broker Notes", "Top Rent/Unit", "Top Rent PSF", "OCC T."];
   const rows = [
     ["#84", "Review", "High", "Example Parcel A|Demo Market", "Example Parcel A", "7.8%", "Land", "Affordable", "Demo site plan received", "Strong sample opportunity", "Review density", "Demo timing noted", "$1,845", "$2.18", "YES"],
@@ -364,7 +430,7 @@ function DashboardMockup({ compact = false }: { compact?: boolean }) {
     ["#73", "Qualified", "Low", "Sample Parcel L|Test Market", "Sample Parcel L", "8.1%", "Land", "Active Adult", "Demo maps reviewed", "Low sample basis", "Order demo study", "Flexible demo window", "$1,575", "$1.87", "YES"],
   ];
   return (
-    <div className={`ll-window ll-analyst-real relative overflow-hidden rounded-[1.1rem] border border-white/15 bg-[#f7f9fa] text-[#182b3e] shadow-2xl ${compact ? "min-h-[280px]" : "min-h-[430px]"}`}>
+    <div ref={previewRef} className={`ll-window ll-analyst-real relative overflow-hidden rounded-[1.1rem] border border-white/15 bg-[#f7f9fa] text-[#182b3e] shadow-2xl ${compact ? "ll-dashboard-compact min-h-[280px]" : "min-h-[430px]"}`}>
       <div className="ll-analyst-head">
         <div><h3>Analyst Dashboard</h3><p>Review, analyze, and manage incoming land deals with AI-powered insights</p></div>
         <div className="ll-analyst-actions"><button type="button"><Plus /> Add New Deal</button><button type="button"><Download /> Export CSV</button></div>
@@ -614,7 +680,10 @@ function HeroStats() {
     const section = sectionRef.current;
     if (!section) return;
 
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      window.matchMedia("(max-width: 768px)").matches
+    ) {
       setProgress(1);
       return;
     }

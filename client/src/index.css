@@ -3836,3 +3836,85 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   .ll-shared-workspace-table b small { font-size: .4rem; }
   .ll-shared-workspace-table em { padding-inline: .28rem; font-size: .39rem; }
 }
+
+/* Keep product previews legible and quiet on phones. */
+@media (max-width: 768px) {
+  .ll-hero-dashboard *,
+  .ll-step-surface *,
+  .ll-route-line i {
+    animation: none !important;
+  }
+
+  .ll-scroll-reveal {
+    filter: none;
+    transform: translateY(12px);
+    transition: opacity 350ms ease, transform 350ms ease;
+  }
+}
+
+@media (max-width: 640px) {
+  .ll-hero-dashboard .ll-analyst-workspace,
+  .ll-dashboard-compact .ll-analyst-workspace {
+    min-height: 0;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table,
+  .ll-dashboard-compact .ll-analyst-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+    font-size: .6rem;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table tr > :nth-child(3),
+  .ll-hero-dashboard .ll-analyst-table tr > :nth-child(5),
+  .ll-hero-dashboard .ll-analyst-table tr > :nth-child(7),
+  .ll-hero-dashboard .ll-analyst-table tr > :nth-child(n+9),
+  .ll-dashboard-compact .ll-analyst-table tr > :nth-child(3),
+  .ll-dashboard-compact .ll-analyst-table tr > :nth-child(5),
+  .ll-dashboard-compact .ll-analyst-table tr > :nth-child(7),
+  .ll-dashboard-compact .ll-analyst-table tr > :nth-child(n+9) {
+    display: none;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table th,
+  .ll-hero-dashboard .ll-analyst-table td,
+  .ll-dashboard-compact .ll-analyst-table th,
+  .ll-dashboard-compact .ll-analyst-table td {
+    padding: .35rem .28rem;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table th:nth-child(1),
+  .ll-hero-dashboard .ll-analyst-table td:nth-child(1),
+  .ll-dashboard-compact .ll-analyst-table th:nth-child(1),
+  .ll-dashboard-compact .ll-analyst-table td:nth-child(1) { width: 2.25rem; }
+
+  .ll-hero-dashboard .ll-analyst-table th:nth-child(2),
+  .ll-hero-dashboard .ll-analyst-table td:nth-child(2),
+  .ll-dashboard-compact .ll-analyst-table th:nth-child(2),
+  .ll-dashboard-compact .ll-analyst-table td:nth-child(2) { width: 3rem; }
+
+  .ll-hero-dashboard .ll-analyst-table th:nth-child(4),
+  .ll-hero-dashboard .ll-analyst-table td:nth-child(4),
+  .ll-dashboard-compact .ll-analyst-table th:nth-child(4),
+  .ll-dashboard-compact .ll-analyst-table td:nth-child(4) { width: 6rem; }
+
+  .ll-hero-dashboard .ll-analyst-table th:nth-child(6),
+  .ll-hero-dashboard .ll-analyst-table td:nth-child(6),
+  .ll-dashboard-compact .ll-analyst-table th:nth-child(6),
+  .ll-dashboard-compact .ll-analyst-table td:nth-child(6) { width: 2.8rem; }
+
+  .ll-hero-dashboard .ll-analyst-table th:nth-child(8),
+  .ll-hero-dashboard .ll-analyst-table td:nth-child(8),
+  .ll-dashboard-compact .ll-analyst-table th:nth-child(8),
+  .ll-dashboard-compact .ll-analyst-table td:nth-child(8) { width: 3.5rem; }
+
+  .ll-hero-dashboard .ll-analyst-table th:nth-child(4),
+  .ll-dashboard-compact .ll-analyst-table th:nth-child(4) {
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table tbody tr:nth-child(n+6) { display: none; }
+  .ll-dashboard-compact .ll-analyst-table tbody tr:nth-child(n+5) { display: none; }
+}
