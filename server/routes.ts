@@ -3428,10 +3428,6 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       }
 
       const role = String(target.role || '').toUpperCase();
-      const temporaryPassword = randomBytes(12).toString("base64url");
-      const newPasswordHash = await hashPassword(temporaryPassword);
-      let emailMessage: Parameters<typeof sendNotificationEmail>[0];
-
       if (role === "DEVELOPER") {
         if (!target.developerProfileId) {
           return res.status(409).json({ message: "This account is not linked to an Investment Company profile" });
@@ -3442,28 +3438,15 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         if (!profile || !profile.isActive) {
           return res.status(409).json({ message: "Reactivate the Investment Company before resending its login" });
         }
+        await resendDeveloperInitialLoginEmail(profile, target);
+        return res.json({ message: "Initial login email accepted by the mail service; inbox delivery is not confirmed." });
+      }
 
-        const baseUrl = LANDLINQ_PUBLIC_ORIGIN;
-        const loginUrl = `${baseUrl}/developer/${encodeURIComponent(profile.slug)}/login`;
-        const logoUrl = `${baseUrl}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
-        const firstName = target.firstName || "there";
-        emailMessage = {
-          to: target.email,
-          subject: `Your ${profile.companyName} Investment Company portal access`,
-          type: "developer-team-invite",
-          priority: "high",
-          transactional: true,
-          text: `Hi ${firstName},\n\nYour ${profile.companyName} Investment Company portal is ready.\nEmail: ${target.email}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be required to set a new password after signing in.`,
-          html: buildDeveloperInvitationEmail({
-            firstName,
-            companyName: profile.companyName,
-            email: target.email,
-            temporaryPassword,
-            loginUrl,
-            logoUrl,
-          }),
-        };
-      } else if (role === "ADMIN" || role === "BROKER") {
+      const temporaryPassword = randomBytes(12).toString("base64url");
+      const newPasswordHash = await hashPassword(temporaryPassword);
+      let emailMessage: Parameters<typeof sendNotificationEmail>[0];
+
+      if (role === "ADMIN" || role === "BROKER") {
         emailMessage = buildPlatformUserInitialLoginEmail({
           firstName: target.firstName || "there",
           email: target.email,
@@ -14883,6 +14866,94 @@ RULES:
     }
   });
 
+  app.get("/api/admin/investment-companies/:profileId/initial-login/status", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const profileId = String(req.params.profileId || "").trim();
+      const [profile] = await db.select({ id: developerProfiles.id }).from(developerProfiles)
+        .where(eq(developerProfiles.id, profileId)).limit(1);
+      if (!profile) return res.status(404).json({ error: "Investment Company profile not found" });
+
+      const result = await db.execute(sql`
+        SELECT
+          invitee.id,
+          invitee.email,
+          invitee.first_name,
+          invitee.last_name,
+          delivery.status,
+          delivery.attempted_at,
+          delivery.accepted_at,
+          delivery.bounced_at
+        FROM users invitee
+        LEFT JOIN developer_initial_login_email_status delivery
+          ON delivery.user_id = invitee.id
+        WHERE invitee.developer_profile_id = ${profileId}
+          AND invitee.role = 'DEVELOPER'
+          AND invitee.must_reset_password = true
+        ORDER BY invitee.created_at DESC
+      `);
+      return res.json({
+        initialLogins: (result.rows as any[]).map((row) => ({
+          userId: row.id,
+          email: row.email,
+          name: [row.first_name, row.last_name].filter(Boolean).join(" "),
+          status: row.status || "unknown",
+          attemptedAt: row.attempted_at || null,
+          acceptedAt: row.accepted_at || null,
+          bouncedAt: row.bounced_at || null,
+        })),
+      });
+    } catch (error: any) {
+      console.error("[admin investment company initial login status] Error:", error);
+      return res.status(500).json({ error: "Failed to load initial login delivery status" });
+    }
+  });
+
+  app.post("/api/admin/investment-companies/:profileId/initial-login/:userId/retry", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const profileId = String(req.params.profileId || "").trim();
+      const userId = String(req.params.userId || "").trim();
+      const [profile] = await db.select().from(developerProfiles)
+        .where(eq(developerProfiles.id, profileId)).limit(1);
+      if (!profile) return res.status(404).json({ error: "Investment Company profile not found" });
+      if (!profile.isActive) {
+        return res.status(409).json({ error: "Reactivate the Investment Company before resending its login" });
+      }
+
+      const [target] = await db.select().from(users).where(and(
+        eq(users.id, userId),
+        eq(users.developerProfileId, profileId),
+        eq(users.role, "DEVELOPER"),
+      )).limit(1);
+      if (!target) return res.status(404).json({ error: "Initial-login account not found for this company" });
+      if (!target.mustResetPassword) {
+        return res.status(409).json({ error: "This account has already completed its initial password reset" });
+      }
+
+      const deliveryResult = await db.execute(sql`
+        SELECT status
+        FROM developer_initial_login_email_status
+        WHERE user_id = ${userId}
+          AND developer_profile_id = ${profileId}
+        LIMIT 1
+      `);
+      const status = String((deliveryResult.rows?.[0] as any)?.status || "");
+      if (status !== "bounced" && status !== "failed") {
+        return res.status(409).json({ error: "Only bounced or failed initial-login emails can be retried here" });
+      }
+
+      await resendDeveloperInitialLoginEmail(profile, target);
+      return res.json({
+        message: "Initial login email accepted by the mail service; inbox delivery is not confirmed.",
+      });
+    } catch (error: any) {
+      console.error("[admin investment company initial login retry] Error:", error);
+      const status = error?.message?.includes("email could not be sent") ? 502
+        : error?.message?.includes("account changed") ? 409
+        : 500;
+      return res.status(status).json({ error: error?.message || "Failed to retry initial login email" });
+    }
+  });
+
   const developerDealUpload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 25 * 1024 * 1024 },
@@ -15146,6 +15217,160 @@ RULES:
     });
   }
 
+  function buildDeveloperInitialLoginMessage(
+    profile: any,
+    firstName: string,
+    email: string,
+    temporaryPassword: string,
+  ): Parameters<typeof sendNotificationEmail>[0] {
+    const baseUrl = LANDLINQ_PUBLIC_ORIGIN;
+    const loginUrl = `${baseUrl}/developer/${encodeURIComponent(profile.slug)}/login`;
+    const logoUrl = `${baseUrl}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
+    return {
+      to: email,
+      subject: `Your ${profile.companyName} Investment Company portal access`,
+      type: "developer-team-invite",
+      priority: "high",
+      transactional: true,
+      text: `Hi ${firstName},\n\nYour ${profile.companyName} Investment Company portal is ready.\nEmail: ${email}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be required to set a new password after signing in.`,
+      html: buildDeveloperInvitationEmail({
+        firstName,
+        companyName: profile.companyName,
+        email,
+        temporaryPassword,
+        loginUrl,
+        logoUrl,
+      }),
+    };
+  }
+
+  async function beginDeveloperInitialLoginEmailAttempt(
+    profile: any,
+    user: { id: string; email: string },
+    subject: string,
+  ): Promise<Date | string> {
+    const result = await db.execute(sql`
+      INSERT INTO developer_initial_login_email_status (
+        user_id, developer_profile_id, recipient_email, invitation_subject,
+        status, attempted_at, accepted_at, bounced_at, updated_at
+      )
+      VALUES (${user.id}, ${profile.id}, ${user.email}, ${subject}, 'pending', NOW(), NULL, NULL, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET
+        developer_profile_id = EXCLUDED.developer_profile_id,
+        recipient_email = EXCLUDED.recipient_email,
+        invitation_subject = EXCLUDED.invitation_subject,
+        status = 'pending',
+        attempted_at = NOW(),
+        accepted_at = NULL,
+        bounced_at = NULL,
+        updated_at = NOW()
+      RETURNING attempted_at
+    `);
+    const attemptedAt = (result.rows?.[0] as any)?.attempted_at;
+    if (!attemptedAt) throw new Error("Could not record the initial-login email attempt");
+    return attemptedAt;
+  }
+
+  async function updateDeveloperInitialLoginEmailAttempt(
+    userId: string,
+    attemptedAt: Date | string,
+    outcome: "accepted" | "failed",
+  ): Promise<void> {
+    await db.execute(sql`
+      UPDATE developer_initial_login_email_status
+      SET status = CASE
+            WHEN status = 'bounced' THEN 'bounced'
+            ELSE ${outcome}
+          END,
+          accepted_at = CASE
+            WHEN ${outcome} = 'accepted' THEN NOW()
+            ELSE accepted_at
+          END,
+          updated_at = NOW()
+      WHERE user_id = ${userId}
+        AND attempted_at = ${attemptedAt}
+        AND status IN ('pending', 'accepted', 'bounced', 'failed')
+    `);
+  }
+
+  async function resendDeveloperInitialLoginEmail(profile: any, target: any): Promise<void> {
+    const temporaryPassword = randomBytes(12).toString("base64url");
+    const newPasswordHash = await hashPassword(temporaryPassword);
+    const [rotated] = await db.update(users).set({
+      password: newPasswordHash,
+      mustResetPassword: true,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(users.id, target.id),
+      eq(users.password, target.password),
+      eq(users.mustResetPassword, true),
+      eq(users.developerProfileId, profile.id),
+      eq(users.role, "DEVELOPER"),
+    )).returning({ id: users.id });
+    if (!rotated) throw new Error("The account changed. Refresh the page and try again.");
+
+    const emailMessage = buildDeveloperInitialLoginMessage(
+      profile,
+      target.firstName || "there",
+      target.email,
+      temporaryPassword,
+    );
+    let attemptedAt: Date | string;
+    try {
+      attemptedAt = await beginDeveloperInitialLoginEmailAttempt(
+        profile,
+        { id: target.id, email: target.email },
+        emailMessage.subject,
+      );
+    } catch (trackingError) {
+      const [restored] = await db.update(users).set({
+        password: target.password,
+        mustResetPassword: true,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(users.id, target.id),
+        eq(users.password, newPasswordHash),
+        eq(users.mustResetPassword, true),
+      )).returning({ id: users.id });
+      if (!restored) {
+        throw new Error("Could not record the retry or restore the previous temporary password; verify the account before retrying.");
+      }
+      throw trackingError;
+    }
+
+    try {
+      const result = await sendNotificationEmail(emailMessage, true, { includeError: true });
+      if (!result.success) {
+        throw new Error(result.error || "The initial login email could not be sent");
+      }
+      try {
+        await updateDeveloperInitialLoginEmailAttempt(target.id, attemptedAt, "accepted");
+      } catch (trackingError) {
+        console.error("[developer initial login] Mail service accepted the message, but delivery status could not be updated:", trackingError);
+      }
+    } catch (emailError) {
+      try {
+        await updateDeveloperInitialLoginEmailAttempt(target.id, attemptedAt, "failed");
+      } catch (trackingError) {
+        console.error("[developer initial login] Could not record the failed resend:", trackingError);
+      }
+      const [restored] = await db.update(users).set({
+        password: target.password,
+        mustResetPassword: true,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(users.id, target.id),
+        eq(users.password, newPasswordHash),
+        eq(users.mustResetPassword, true),
+      )).returning({ id: users.id });
+      if (!restored) {
+        throw new Error("The email could not be sent and the account changed during the attempt. Verify the account before retrying.");
+      }
+      console.error("[developer initial login] Email send failed; previous temporary password restored:", emailError);
+      throw new Error("The email could not be sent. The previous temporary password remains valid.");
+    }
+  }
+
   async function createDeveloperInvitation(profile: any, name: string, normalizedEmail: string) {
     const nameParts = name.split(/\s+/);
     const firstName = nameParts.shift() || "";
@@ -15162,29 +15387,27 @@ RULES:
     } as any);
 
     try {
-      const baseUrl = LANDLINQ_PUBLIC_ORIGIN;
-      const loginUrl = `${baseUrl}/developer/${encodeURIComponent(profile.slug)}/login`;
-      const logoUrl = `${baseUrl}/api/assets/public%2Fassets%2FAdd%20a%20heading%20copy_1762196498512.png`;
-      const invitationHtml = buildDeveloperInvitationEmail({
+      const emailMessage = buildDeveloperInitialLoginMessage(
+        profile,
         firstName,
-        companyName: profile.companyName,
-        email: normalizedEmail,
+        normalizedEmail,
         temporaryPassword,
-        loginUrl,
-        logoUrl,
-      });
-      const emailResult = await sendNotificationEmail({
-        to: normalizedEmail,
-        subject: `Your ${profile.companyName} Investment Company portal access`,
-        type: "developer-team-invite",
-        priority: "high",
-        transactional: true,
-        text: `Hi ${firstName},\n\nYour ${profile.companyName} Investment Company portal is ready.\nEmail: ${normalizedEmail}\nTemporary password: ${temporaryPassword}\nLogin: ${loginUrl}\n\nYou will be required to set a new password after signing in.`,
-        html: invitationHtml,
-      }, true, { includeError: true });
+      );
+      const attemptedAt = await beginDeveloperInitialLoginEmailAttempt(
+        profile,
+        { id: newUser.id, email: normalizedEmail },
+        emailMessage.subject,
+      );
+      const emailResult = await sendNotificationEmail(emailMessage, true, { includeError: true });
       if (!emailResult.success) {
+        await updateDeveloperInitialLoginEmailAttempt(newUser.id, attemptedAt, "failed").catch((trackingError) => {
+          console.error("[developer initial login] Could not record the failed invitation:", trackingError);
+        });
         throw new Error(`The invitation email could not be sent; no login was created: ${emailResult.error}`);
       }
+      await updateDeveloperInitialLoginEmailAttempt(newUser.id, attemptedAt, "accepted").catch((trackingError) => {
+        console.error("[developer initial login] Mail service accepted the message, but delivery status could not be updated:", trackingError);
+      });
     } catch (error) {
       await db.delete(users).where(eq(users.id, newUser.id)).catch(() => undefined);
       throw error;

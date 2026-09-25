@@ -8,6 +8,10 @@ import { outreachService } from '../services/outreachService';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { isBrokerEmailSuppressed, markBrokerEmailUnavailable } from '../emailUnsubscribe';
+import { normalizeBounceMatchText } from '../emailBounceParsing';
+import { createInitialLoginBouncePoller } from '../imapInitialLoginBouncePoller';
+
+let isInitialLoginBouncePollRunning = false;
 
 function formatDeveloperTargetMarket(states: unknown, counties: unknown): string {
   const values = [...(Array.isArray(states) ? states : []), ...(Array.isArray(counties) ? counties : [])]
@@ -1426,6 +1430,116 @@ export function getCrmPollStatus() {
   return { isRunning: isCrmPollRunning, lastPoll: lastCrmPoll };
 }
 
+async function processDeveloperInitialLoginBounceNotices(): Promise<void> {
+  if (isInitialLoginBouncePollRunning) return;
+  isInitialLoginBouncePollRunning = true;
+  const poll = createInitialLoginBouncePoller({
+    persistNotice: async (notice) => {
+      const receivedAt = new Date(notice.receivedDateTime);
+      if (Number.isNaN(receivedAt.getTime())) return false;
+
+      const candidateResult = await db.execute(sql`
+        SELECT
+          invitee.id AS user_id,
+          COALESCE(delivery.attempted_at, invitee.created_at) AS attempted_at,
+          COALESCE(
+            delivery.invitation_subject,
+            'Your ' || profile.company_name || ' Investment Company portal access'
+          ) AS invitation_subject,
+          COALESCE(delivery.developer_profile_id, invitee.developer_profile_id) AS developer_profile_id,
+          COALESCE(delivery.recipient_email, invitee.email) AS recipient_email
+        FROM users invitee
+        INNER JOIN developer_profiles profile
+          ON profile.id = invitee.developer_profile_id
+        LEFT JOIN developer_initial_login_email_status delivery
+          ON delivery.user_id = invitee.id
+         AND delivery.developer_profile_id = invitee.developer_profile_id
+        WHERE LOWER(COALESCE(delivery.recipient_email, invitee.email)) = LOWER(${notice.recipientEmail})
+          AND (delivery.user_id IS NULL OR delivery.status IN ('pending', 'accepted', 'bounced'))
+          AND COALESCE(delivery.attempted_at, invitee.created_at) <= ${receivedAt}
+          AND COALESCE(delivery.attempted_at, invitee.created_at) >= ${receivedAt} - INTERVAL '14 days'
+          AND invitee.role = 'DEVELOPER'
+          AND invitee.must_reset_password = true
+        ORDER BY COALESCE(delivery.attempted_at, invitee.created_at) DESC
+        LIMIT 20
+      `);
+      const candidates = candidateResult.rows as Array<{
+        user_id: string;
+        attempted_at: Date | string;
+        invitation_subject: string;
+        developer_profile_id: string;
+        recipient_email: string;
+      }>;
+      if (!candidates.length) return false;
+
+      const noticeText = normalizeBounceMatchText(`${notice.subject} ${notice.bodyText}`);
+      const matchingSubject = candidates.find((candidate) =>
+        candidate.invitation_subject &&
+        noticeText.includes(normalizeBounceMatchText(candidate.invitation_subject))
+      );
+      // Some providers omit the original subject from their NDR body. In that
+      // case, the latest invitation to this exact address is the best match.
+      const candidate = matchingSubject || candidates[0];
+
+      const updated = await db.execute(sql`
+        INSERT INTO developer_initial_login_email_status (
+          user_id,
+          developer_profile_id,
+          recipient_email,
+          invitation_subject,
+          status,
+          attempted_at,
+          accepted_at,
+          bounced_at,
+          updated_at
+        )
+        VALUES (
+          ${candidate.user_id},
+          ${candidate.developer_profile_id},
+          ${candidate.recipient_email},
+          ${candidate.invitation_subject},
+          'bounced',
+          ${candidate.attempted_at},
+          ${candidate.attempted_at},
+          ${receivedAt},
+          NOW()
+        )
+        ON CONFLICT (user_id) DO UPDATE SET
+          status = 'bounced',
+          bounced_at = EXCLUDED.bounced_at,
+          updated_at = NOW()
+        WHERE developer_initial_login_email_status.attempted_at = EXCLUDED.attempted_at
+          AND developer_initial_login_email_status.status IN ('pending', 'accepted', 'bounced')
+        RETURNING user_id
+      `);
+      if (!updated.rows?.length) return false;
+
+      console.log(
+        `📬 [INITIAL-LOGIN-BOUNCE] Recorded delivery failure for invitation ${candidate.user_id}`,
+      );
+      return true;
+    },
+  });
+
+  try {
+    const result = await poll();
+    if (result.matched || result.errors || result.markReadFailures) {
+      console.log(
+        `[INITIAL-LOGIN-BOUNCE] Checked ${result.messagesSeen} unread messages; ` +
+        `matched=${result.matched}, deferred=${result.deferred}, errors=${result.errors}, ` +
+        `markReadFailures=${result.markReadFailures}`,
+      );
+    }
+  } catch (error: any) {
+    console.warn(
+      '⚠️ [INITIAL-LOGIN-BOUNCE] Could not check the shared transactional mailbox:',
+      error?.message || error,
+    );
+  } finally {
+    isInitialLoginBouncePollRunning = false;
+  }
+}
+
 /**
  * Poll each connected Outlook sender's inbox for bounce-back emails and
  * preserve the corresponding CRM contact while marking it inactive and
@@ -1445,7 +1559,10 @@ export async function processOutlookBouncedEmails(): Promise<void> {
     `);
     const senders = sendersResult.rows as any[];
 
-    if (senders.length === 0) return;
+    if (senders.length === 0) {
+      await processDeveloperInitialLoginBounceNotices();
+      return;
+    }
 
     for (const sender of senders) {
       try {
@@ -1515,6 +1632,7 @@ export async function processOutlookBouncedEmails(): Promise<void> {
         console.warn(`   ⚠️ [BOUNCE-POLL] Skipping sender ${sender.name}: ${senderErr.message}`);
       }
     }
+    await processDeveloperInitialLoginBounceNotices();
   } catch (err: any) {
     console.error('❌ [BOUNCE-POLL] Unexpected error:', err.message);
   }

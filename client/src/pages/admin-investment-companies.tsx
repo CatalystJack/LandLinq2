@@ -132,6 +132,16 @@ interface InviteResult {
   failed: Array<{ email: string; reason: string }>;
 }
 
+interface InitialLoginStatusEntry {
+  userId: string;
+  email: string;
+  name: string;
+  status: "pending" | "accepted" | "bounced" | "failed" | "unknown";
+  attemptedAt: string | null;
+  acceptedAt: string | null;
+  bouncedAt: string | null;
+}
+
 type EntryContact = { id: string; firstName?: string | null; lastName?: string | null; email?: string | null; brokerage?: string | null };
 type EntryStage = { id: string; name: string; sortOrder?: number; isActive?: boolean };
 type EntryOptions = {
@@ -486,6 +496,14 @@ export default function AdminInvestmentCompanies() {
     queryFn: () => requestJson("/api/admin/investment-companies"),
     enabled: isPlatformAdmin,
   });
+  const initialLoginStatusQuery = useQuery<{ initialLogins: InitialLoginStatusEntry[] }>({
+    queryKey: ["/api/admin/investment-companies", loginCompany?.id, "initial-login-status"],
+    queryFn: () => requestJson(`/api/admin/investment-companies/${loginCompany?.id}/initial-login/status`),
+    enabled: Boolean(loginCompany),
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchInterval: loginCompany ? 60_000 : false,
+  });
   const sourceTagsQuery = useQuery<ContactFilterOptions>({
     queryKey: ["/api/crm/source-tags"],
     queryFn: () => requestJson("/api/crm/source-tags"),
@@ -676,6 +694,11 @@ export default function AdminInvestmentCompanies() {
     }),
     onSuccess: (result: InviteResult) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/investment-companies"] });
+      if (loginCompany) {
+        queryClient.invalidateQueries({
+          queryKey: ["/api/admin/investment-companies", loginCompany.id, "initial-login-status"],
+        });
+      }
       setInviteResult(result);
       if (result.failed.length) {
         const failedEmails = new Set(result.failed.map((failure) => failure.email.toLowerCase()));
@@ -691,6 +714,25 @@ export default function AdminInvestmentCompanies() {
       });
     },
     onError: (error: Error) => toast({ title: "Could not create login", description: error.message, variant: "destructive" }),
+  });
+
+  const retryInitialLoginMutation = useMutation({
+    mutationFn: ({ profileId, userId }: { profileId: string; userId: string }) =>
+      requestJson(`/api/admin/investment-companies/${profileId}/initial-login/${userId}/retry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+    onSuccess: (_result, { profileId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/investment-companies", profileId, "initial-login-status"],
+      });
+      toast({
+        title: "Initial login email accepted",
+        description: "The existing account was kept. Mail-service acceptance does not confirm Inbox delivery.",
+      });
+    },
+    onError: (error: Error) => toast({ title: "Could not retry initial login", description: error.message, variant: "destructive" }),
   });
 
   const sortedProfiles = useMemo(() => [...(companiesQuery.data?.profiles || [])].sort((a, b) => a.companyName.localeCompare(b.companyName)), [companiesQuery.data]);
@@ -823,6 +865,68 @@ export default function AdminInvestmentCompanies() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-3">
+            <section className="space-y-3 rounded-lg border bg-white p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-[#0A2B4A]">Pending initial logins</h3>
+                  <p className="text-xs text-slate-500">Accepted means the mail service took the message; it does not confirm Inbox delivery.</p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void initialLoginStatusQuery.refetch()}
+                  disabled={initialLoginStatusQuery.isFetching}
+                >
+                  <RotateCcw className={`mr-2 h-3.5 w-3.5 ${initialLoginStatusQuery.isFetching ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+              </div>
+              {initialLoginStatusQuery.isLoading ? <p className="text-sm text-slate-500">Loading invitation status…</p>
+                : initialLoginStatusQuery.isError ? <p className="text-sm text-red-700">Could not load invitation status.</p>
+                : !initialLoginStatusQuery.data?.initialLogins.length ? <p className="text-sm text-slate-500">No team members currently need an initial password reset.</p>
+                : <div className="space-y-2">
+                  {initialLoginStatusQuery.data.initialLogins.map((entry) => {
+                    const statusLabel = entry.status === "accepted" ? "Accepted by mail service"
+                      : entry.status === "bounced" ? "Delivery failure reported"
+                      : entry.status === "failed" ? "Mail-service send failed"
+                      : entry.status === "pending" ? "Mail handoff pending"
+                      : "Delivery status not tracked";
+                    const statusClass = entry.status === "bounced" || entry.status === "failed"
+                      ? "border-amber-200 bg-amber-50 text-amber-900"
+                      : entry.status === "accepted"
+                        ? "border-green-200 bg-green-50 text-green-900"
+                        : "border-slate-200 bg-slate-50 text-slate-700";
+                    const statusDate = entry.status === "bounced" ? entry.bouncedAt
+                      : entry.status === "accepted" ? entry.acceptedAt
+                      : entry.attemptedAt;
+                    return <div key={entry.userId} className="flex flex-col gap-2 rounded-md border border-slate-100 p-2.5 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-900">{entry.name || entry.email}</p>
+                        {entry.name && <p className="truncate text-xs text-slate-500">{entry.email}</p>}
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className={statusClass}>{statusLabel}</Badge>
+                          {statusDate && <span className="text-xs text-slate-500">{new Date(statusDate).toLocaleString()}</span>}
+                        </div>
+                      </div>
+                      {(entry.status === "bounced" || entry.status === "failed") && <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => loginCompany && retryInitialLoginMutation.mutate({
+                          profileId: loginCompany.id,
+                          userId: entry.userId,
+                        })}
+                        disabled={!loginCompany?.isActive || retryInitialLoginMutation.isPending}
+                      >
+                        {retryInitialLoginMutation.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="mr-2 h-3.5 w-3.5" />}
+                        Retry email
+                      </Button>}
+                    </div>;
+                  })}
+                </div>}
+              <p className="text-xs text-slate-500">This list refreshes every minute while open. A later bounce is matched to the recipient and the most recent pending invitation.</p>
+            </section>
             {inviteResult && <div className={`rounded-lg border p-3 text-sm ${inviteResult.failed.length ? "border-amber-200 bg-amber-50 text-amber-950" : "border-green-200 bg-green-50 text-green-900"}`}>
               <p className="font-semibold">{inviteResult.sent.length} initial login email{inviteResult.sent.length === 1 ? "" : "s"} accepted by the mail service</p>
               {inviteResult.sent.length > 0 && <div className="mt-2 space-y-1">

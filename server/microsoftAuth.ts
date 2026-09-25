@@ -1,6 +1,11 @@
 import { db } from './db';
 import { sql } from 'drizzle-orm';
 import { appendUnsubscribeFooter, resolveScopedBrokerId } from './emailUnsubscribe';
+import {
+  emailBounceBodyToText,
+  extractBouncedEmailFromText,
+  isBounceNotification,
+} from './emailBounceParsing';
 
 const GRAPH_SEND_URL = 'https://graph.microsoft.com/v1.0/me/sendMail';
 const TOKEN_URL = (tenantId: string) =>
@@ -164,75 +169,78 @@ export function isMailboxBounceError(errorMessage: string): boolean {
   );
 }
 
+export interface OutlookBounceNotice {
+  messageId: string;
+  recipientEmail: string;
+  subject: string;
+  bodyText: string;
+  receivedDateTime: string;
+}
+
 /**
- * Poll a sender's Outlook inbox for unread bounce/delivery-failure notifications.
- * Returns a list of bounced email addresses found. Marks matching messages as read.
- * Silently returns [] if the token lacks Mail.Read permission (403).
+ * Read recent unread bounce notices without consuming them. A mailbox address
+ * selects the app-only /users/{mailbox} endpoint; otherwise this reads /me.
  */
-export async function pollOutlookInboxForBounces(accessToken: string): Promise<string[]> {
+export async function readOutlookBounceNotices(
+  accessToken: string,
+  mailboxAddress?: string,
+): Promise<OutlookBounceNotice[]> {
   const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const mailboxPath = mailboxAddress
+    ? `/users/${encodeURIComponent(mailboxAddress.trim())}`
+    : '/me';
   const url =
-    `https://graph.microsoft.com/v1.0/me/messages` +
+    `https://graph.microsoft.com/v1.0${mailboxPath}/messages` +
     `?$filter=isRead eq false and receivedDateTime ge ${since}` +
-    `&$select=id,subject,from,body` +
+    `&$select=id,subject,from,body,receivedDateTime` +
     `&$top=100` +
     `&$orderby=receivedDateTime desc`;
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-  } catch {
-    return [];
-  }
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
 
   if (!response.ok) {
-    if (response.status === 403 || response.status === 401) return []; // No Mail.Read — skip silently
-    return [];
+    if (!mailboxAddress && (response.status === 403 || response.status === 401)) return [];
+    throw new Error(`Microsoft Graph could not read the ${mailboxAddress || 'connected sender'} inbox (HTTP ${response.status})`);
   }
 
   const data = await response.json() as { value?: any[] };
   const messages = data.value || [];
-
-  const bouncedEmails: string[] = [];
-  const toMarkRead: string[] = [];
+  const notices: OutlookBounceNotice[] = [];
 
   for (const msg of messages) {
     const fromAddr = (msg.from?.emailAddress?.address || '').toLowerCase();
-    const subject  = (msg.subject || '').toLowerCase();
-
-    const isBounce =
-      fromAddr.includes('mailer-daemon') ||
-      fromAddr.includes('postmaster@') ||
-      subject.includes('address not found') ||
-      subject.includes('undeliverable') ||
-      subject.includes('delivery failed') ||
-      subject.includes('delivery status notification') ||
-      subject.includes('returned mail') ||
-      subject.includes('mail delivery subsystem') ||
-      subject.includes('failed to deliver');
-
-    if (!isBounce) continue;
-
-    const bodyText = (msg.body?.content || '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&nbsp;/g, ' ');
-
-    const extracted = extractBouncedEmailFromText(bodyText + ' ' + subject);
-    if (extracted) {
-      bouncedEmails.push(extracted);
-      toMarkRead.push(msg.id);
-    }
+    const subject = msg.subject || '';
+    if (!isBounceNotification({ fromAddress: fromAddr, subject })) continue;
+    const bodyText = emailBounceBodyToText(msg.body?.content || '');
+    const recipientEmail = extractBouncedEmailFromText(
+      `${bodyText} ${subject}`,
+      mailboxAddress ? [mailboxAddress] : [],
+    );
+    if (!recipientEmail) continue;
+    notices.push({
+      messageId: String(msg.id || ''),
+      recipientEmail,
+      subject,
+      bodyText,
+      receivedDateTime: String(msg.receivedDateTime || ''),
+    });
   }
 
-  // Mark processed bounce emails as read so they aren't re-processed next run
-  for (const msgId of toMarkRead) {
-    try {
-      await fetch(`https://graph.microsoft.com/v1.0/me/messages/${msgId}`, {
+  return notices;
+}
+
+export async function markOutlookBounceNoticeAsRead(
+  accessToken: string,
+  messageId: string,
+  mailboxAddress?: string,
+): Promise<void> {
+  const mailboxPath = mailboxAddress
+    ? `/users/${encodeURIComponent(mailboxAddress.trim())}`
+    : '/me';
+  try {
+    await fetch(`https://graph.microsoft.com/v1.0${mailboxPath}/messages/${encodeURIComponent(messageId)}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -240,41 +248,25 @@ export async function pollOutlookInboxForBounces(accessToken: string): Promise<s
         },
         body: JSON.stringify({ isRead: true }),
       });
-    } catch { /* non-fatal */ }
-  }
-
-  return bouncedEmails;
+  } catch { /* non-fatal */ }
 }
 
-function extractBouncedEmailFromText(text: string): string | null {
-  const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
-
-  // Gmail / Google: "wasn't delivered to email@example.com"
-  const gmailM = text.match(/wasn['']t delivered to\s+([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i);
-  if (gmailM) return gmailM[1].toLowerCase();
-
-  // Generic DSN: "delivery to email@... failed" / "deliver to email@..."
-  const dsnM = text.match(/deliver(?:y to|ed to|y to the following)?\s+([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i);
-  if (dsnM) return dsnM[1].toLowerCase();
-
-  // "The following address(es) failed" style
-  const failM = text.match(/address(?:es)? (?:failed|rejected|could not be found)[:\s]+([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i);
-  if (failM) return failM[1].toLowerCase();
-
-  // "X-Failed-Recipients:" header (NDR standard)
-  const hdrM = text.match(/X-Failed-Recipients?:\s*([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i);
-  if (hdrM) return hdrM[1].toLowerCase();
-
-  // Last resort: first email found that isn't a well-known system domain
-  const SKIP = ['googlemail.com', 'gmail.com', 'outlook.com', 'microsoft.com', 'sendgrid.com', 'mailer-daemon'];
-  const all = text.match(EMAIL_RE) || [];
-  for (const addr of all) {
-    if (!SKIP.some(s => addr.toLowerCase().includes(s))) {
-      return addr.toLowerCase();
-    }
+/**
+ * Poll a connected sender's Outlook inbox and consume only notices that
+ * contain an identifiable failed recipient.
+ */
+export async function pollOutlookInboxForBounces(accessToken: string): Promise<string[]> {
+  let notices: OutlookBounceNotice[];
+  try {
+    notices = await readOutlookBounceNotices(accessToken);
+  } catch {
+    return [];
   }
 
-  return null;
+  for (const notice of notices) {
+    await markOutlookBounceNoticeAsRead(accessToken, notice.messageId);
+  }
+  return notices.map((notice) => notice.recipientEmail);
 }
 
 export async function sendEmailViaMicrosoft(
