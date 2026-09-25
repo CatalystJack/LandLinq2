@@ -12,6 +12,7 @@ import {
   dataQualitySnapshots, 
   dataQualityAlerts, 
   dealValidationHistory,
+  apiDataSources,
   reviewQueue, 
   reviewAssignments, 
   reviewActions, 
@@ -115,6 +116,48 @@ import {
 } from "./censusDataService";
 
 const LANDLINQ_PUBLIC_ORIGIN = "https://landlinq.ai";
+const PUBLIC_RECORD_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+const PUBLIC_RECORD_FIELD_ALIASES: Record<string, string[]> = {
+  parcelId: ["parcelid", "parcelnumber", "taxparcelid", "apn", "pin"],
+  ownerName: ["ownername", "assessedowner", "recordowner"],
+  assessedValue: ["assessedvalue", "totalassessedvalue", "totalvalue"],
+  landValue: ["landvalue", "assessedlandvalue"],
+  improvementValue: ["improvementvalue", "buildingvalue", "assessedimprovementvalue"],
+  lastSalePrice: ["lastsaleprice", "saleprice", "salesprice", "recordedconsideration"],
+  lastSaleDate: ["lastsaledate", "saledate", "recordingdate"],
+  mortgageLien: ["mortgagelien", "mortgagesummary", "lienummary", "lienhistory", "mortgagehistory", "recordedlien", "recordedmortgage"],
+  permitHistory: ["permithistory", "buildingpermits", "recentpermits", "permitcount"],
+};
+
+function publicRecordAsOf(source: {
+  sourceMetadata: unknown;
+  lastValidatedAt: Date | null;
+  retrievedAt: Date | null;
+}): Date | null {
+  let metadata: any = source.sourceMetadata;
+  if (typeof metadata === "string") {
+    try {
+      metadata = JSON.parse(metadata);
+    } catch {
+      metadata = null;
+    }
+  }
+
+  const explicitAsOf = metadata && typeof metadata === "object"
+    ? metadata.asOfDate ?? metadata.dataAsOfDate ?? metadata.sourceDate ?? metadata.effectiveDate
+    : null;
+  const candidate = explicitAsOf != null
+    ? new Date(String(explicitAsOf))
+    : source.lastValidatedAt ?? source.retrievedAt;
+  return candidate && Number.isFinite(candidate.getTime()) ? candidate : null;
+}
+
+function isPublicRecordFresh(asOf: Date | null, now = Date.now()): boolean {
+  if (!asOf) return false;
+  const ageMs = now - asOf.getTime();
+  return ageMs >= 0 && ageMs <= PUBLIC_RECORD_MAX_AGE_MS;
+}
 
 const DEFAULT_PIPELINE_STAGES = [
   { name: "New Lead", sortOrder: 1 },
