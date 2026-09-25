@@ -3943,3 +3943,172 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   .ll-hero-dashboard .ll-analyst-table tbody tr:nth-child(n+6) { display: none; }
   .ll-dashboard-compact .ll-analyst-table tbody tr:nth-child(n+5) { display: none; }
 }
+
+/* Public homepage palette: navy, blue, cyan, and white only. This is scoped so
+   the application workspace keeps its own interface colors. */
+#landlinq-home {
+  --ll-home-navy: #081526;
+  --ll-home-blue: #3286C8;
+  --ll-home-cyan: #55C3E9;
+  --ll-home-white: #FFFFFF;
+  background: #FFFFFF !important;
+  color: #081526 !important;
+}
+
+#landlinq-home :where(*) {
+  color: #081526 !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: rgba(8, 21, 38, .16) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+#landlinq-home > header {
+  background-color: transparent !important;
+}
+
+#landlinq-home main > section {
+  background-color: #FFFFFF !important;
+  color: #081526 !important;
+}
+
+#landlinq-home main > section:first-child {
+  background-color: #081526 !important;
+  color: #FFFFFF !important;
+}
+
+#landlinq-home main > section:first-child :where(*) {
+  color: #FFFFFF !important;
+  border-color: rgba(255, 255, 255, .3) !important;
+}
+
+#landlinq-home main > section:first-child h1 span {
+  color: #55C3E9 !important;
+}
+
+#landlinq-home main > section:first-child .ll-hero-dashboard,
+#landlinq-home .ll-step-surface,
+#landlinq-home .ll-app-frame,
+#landlinq-home .ll-window {
+  background-color: #FFFFFF !important;
+  color: #081526 !important;
+  border-color: rgba(8, 21, 38, .16) !important;
+  box-shadow: 0 12px 28px rgba(8, 21, 38, .12) !important;
+}
+
+#landlinq-home main > section:first-child .ll-hero-dashboard :where(*) {
+  color: #081526 !important;
+  border-color: rgba(8, 21, 38, .16) !important;
+}
+
+#landlinq-home .ll-detail-nav,
+#landlinq-home .ll-detail-hero,
+#landlinq-home .ll-app-titlebar button,
+#landlinq-home .ll-app-titlebar > div b,
+#landlinq-home .ll-outreach-campaigns-head > button {
+  background-color: #081526 !important;
+  color: #FFFFFF !important;
+  border-color: #081526 !important;
+}
+
+#landlinq-home .ll-detail-nav :where(*),
+#landlinq-home .ll-detail-hero :where(*) {
+  color: #FFFFFF !important;
+}
+
+#landlinq-home .ll-home-primary {
+  background-color: #3286C8 !important;
+  color: #FFFFFF !important;
+  border-color: #3286C8 !important;
+}
+
+#landlinq-home .ll-home-primary:hover,
+#landlinq-home .ll-home-primary-inverse,
+#landlinq-home .ll-home-primary-inverse:hover {
+  background-color: #FFFFFF !important;
+  color: #3286C8 !important;
+  border-color: #3286C8 !important;
+}
+
+#landlinq-home .ll-home-primary-inverse {
+  border-color: #FFFFFF !important;
+}
+
+#landlinq-home .ll-eyebrow,
+#landlinq-home .ll-step-marker,
+#landlinq-home .ll-step-meta span,
+#landlinq-home .ll-app-titlebar strong,
+#landlinq-home .ll-signal,
+#landlinq-home .ll-detail-tabs b,
+#landlinq-home .ll-detail-tags i {
+  color: #3286C8 !important;
+}
+
+#landlinq-home .ll-step-marker {
+  background-color: #FFFFFF !important;
+  border-color: #3286C8 !important;
+}
+
+#landlinq-home .ll-route-line {
+  background-color: rgba(50, 134, 200, .22) !important;
+}
+
+#landlinq-home .ll-route-line::before,
+#landlinq-home .ll-route-line::after {
+  background-color: #55C3E9 !important;
+}
+
+#landlinq-home .ll-route-line i {
+  background-color: #3286C8 !important;
+}
+
+#landlinq-home .ll-person i,
+#landlinq-home .ll-detail-person i,
+#landlinq-home .ll-outreach-card-title span,
+#landlinq-home .ll-outreach-campaign-icon {
+  background-color: rgba(50, 134, 200, .12) !important;
+  color: #3286C8 !important;
+}
+
+#landlinq-home .ll-person em,
+#landlinq-home .ll-outreach-campaign-copy em.is-active {
+  background-color: rgba(85, 195, 233, .2) !important;
+  color: #081526 !important;
+}
+
+#landlinq-home #contact > div {
+  background-color: #081526 !important;
+  color: #FFFFFF !important;
+}
+
+#landlinq-home #contact > div :where(*) {
+  color: #FFFFFF !important;
+}
+
+#landlinq-home #contact input,
+#landlinq-home #contact textarea {
+  background-color: transparent !important;
+  color: #FFFFFF !important;
+  border-color: rgba(255, 255, 255, .35) !important;
+}
+
+#landlinq-home #contact button[type="submit"] {
+  background-color: #FFFFFF !important;
+  color: #081526 !important;
+  border-color: #FFFFFF !important;
+}
+
+#landlinq-home .ll-step-surface {
+  height: clamp(24rem, 40vw, 32rem) !important;
+  min-height: 0 !important;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  #landlinq-home .ll-step-surface { height: 23rem !important; }
+}
+
+@media (max-width: 560px) {
+  #landlinq-home .ll-step-surface { height: 21rem !important; }
+}

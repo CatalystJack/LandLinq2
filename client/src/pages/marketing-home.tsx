@@ -84,7 +84,7 @@ const faqs = [
 
 function Button({ children, href = "/contact", dark = false }: { children: ReactNode; href?: string; dark?: boolean }) {
   return (
-    <a href={href} className={`inline-flex min-h-12 items-center justify-center rounded-full border px-5 text-sm font-semibold transition-all duration-300 ${dark ? "border-white bg-white text-landlinq-blue hover:bg-transparent hover:text-white" : "border-landlinq-sky bg-landlinq-sky text-white hover:border-landlinq-blue hover:bg-white hover:text-landlinq-blue"}`}>
+    <a href={href} className={`inline-flex min-h-12 items-center justify-center rounded-full border px-5 text-sm font-semibold transition-all duration-300 ${dark ? "ll-home-primary-inverse" : "ll-home-primary"}`}>
       {children}
     </a>
   );
@@ -752,7 +752,7 @@ export default function MarketingHome() {
     return () => observer.disconnect();
   }, []);
   return (
-    <div className="min-h-[100dvh] overflow-hidden bg-background text-foreground">
+    <div id="landlinq-home" className="min-h-[100dvh] overflow-hidden bg-white text-[#081526]">
       <header className="absolute inset-x-0 top-0 z-30">
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10" aria-label="Main navigation">
           <a href="/" aria-label="LandLinq home"><img src="/assets/landlinq-header-logo.png" alt="LandLinq" className="h-7 w-auto" /></a>
@@ -767,7 +767,7 @@ export default function MarketingHome() {
           <div className="relative mx-auto max-w-7xl">
              <div className="flex flex-col items-center gap-8 sm:gap-10 lg:gap-12">
               <div className="max-w-5xl text-center">
-                 <h1 className="ll-reveal text-balance text-[clamp(2.65rem,12vw,3.75rem)] font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[4.5rem]">Your supercharged<br /><span className="text-[#498EDE]">acquisitions operating system.</span></h1>
+                  <h1 className="ll-reveal text-balance text-[clamp(2.65rem,12vw,3.75rem)] font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[4.5rem]">Your supercharged<br /><span className="text-[#55C3E9]">acquisitions operating system.</span></h1>
                  <p className="ll-reveal ll-delay-2 mx-auto mt-5 max-w-lg text-base leading-6 text-white/68 sm:mt-6 sm:text-lg sm:leading-7">LandLinq opens the lead funnel wide, screens opportunities against your criteria, and keeps outreach moving, so lean teams can do more with less.</p>
                  <div className="ll-reveal ll-delay-3 mt-6 flex w-full max-w-xs flex-col justify-center gap-3 sm:mt-7 sm:max-w-none sm:flex-row"><Button dark>Get in touch</Button><Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/30 px-5 text-sm font-semibold text-white transition-all duration-300 hover:border-white hover:bg-white hover:text-landlinq-blue">Log In</Link></div>
               </div>
@@ -788,7 +788,7 @@ export default function MarketingHome() {
                  <span className="ll-eyebrow">THE INVESTMENT COMPANY WORKSPACE</span>
                  <h2 id="platform-journey-title" className="mt-4 max-w-3xl text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">One system from first look to next move.</h2>
                </div>
-               <p className="max-w-sm text-sm leading-7 text-[#647887] sm:text-base">The same workspace keeps deal review, relationships, outreach, and performance connected for your team.</p>
+                <p className="max-w-sm text-sm leading-7 text-[#081526] sm:text-base">The same workspace keeps deal review, relationships, outreach, and performance connected for your team.</p>
              </div>
              <div className="ll-journey-route">
                <article className="ll-journey-step">

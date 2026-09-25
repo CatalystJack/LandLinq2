@@ -84,6 +84,12 @@ interface ApiSourcesData {
   apiUsageStats: Array<{ service: string; calls: number; cost: number }>;
 }
 
+function displaySourceCost(cost: string): string {
+  return cost === 'Free (portal viewing; copy fees vary)'
+    ? 'Free to view; copies may cost extra'
+    : cost;
+}
+
 type LoopNetListing = {
   listingId: string;
   address: string;
@@ -752,7 +758,7 @@ export default function DataHub() {
                             <div className="flex items-center justify-between">
                               <CardTitle className="text-lg">{source.name}</CardTitle>
                               <Badge variant={source.cost.toLowerCase().startsWith('free') ? 'default' : 'secondary'}>
-                                {source.cost}
+                                {displaySourceCost(source.cost)}
                               </Badge>
                             </div>
                             <CardDescription>{source.description}</CardDescription>
