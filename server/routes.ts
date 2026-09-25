@@ -7620,6 +7620,61 @@ Provide your analysis in this exact JSON format:
       const total = sortedDeals.length;
       const deals = sortedDeals.slice(offset, offset + limit);
 
+      // Public-record values are attached only when their source carries a
+      // trustworthy as-of/retrieval date within the rolling 90-day window.
+      // Keep owner names out of broker responses; owner phone/email are never
+      // included in this dashboard payload.
+      const currentRole = String((req as any).user?.role || '').toUpperCase();
+      const canViewPublicRecords = ['ADMIN', 'ANALYST', 'DEVELOPER'].includes(currentRole)
+        || isPlatformAdminEmail(reqUserEmail)
+        || isSuperAdminEmail(reqUserEmail);
+      const publicRecordsByDeal = new Map<string, Record<string, {
+        value: string;
+        source: string;
+        asOf: string;
+      }>>();
+
+      if (canViewPublicRecords && deals.length > 0) {
+        const sourceRows = await db.select({
+          dealId: apiDataSources.dealId,
+          dataField: apiDataSources.dataField,
+          dataValue: apiDataSources.dataValue,
+          primarySource: apiDataSources.primarySource,
+          sourceMetadata: apiDataSources.sourceMetadata,
+          lastValidatedAt: apiDataSources.lastValidatedAt,
+          retrievedAt: apiDataSources.retrievedAt,
+          isMockData: apiDataSources.isMockData,
+          isUserProvided: apiDataSources.isUserProvided,
+        })
+          .from(apiDataSources)
+          .where(and(
+            inArray(apiDataSources.dealId, deals.map((deal: any) => deal.id)),
+            eq(apiDataSources.isMockData, false),
+            eq(apiDataSources.isUserProvided, false),
+          ));
+
+        for (const row of sourceRows) {
+          if (!row.dataValue) continue;
+          const normalizedField = String(row.dataField || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const fieldName = Object.entries(PUBLIC_RECORD_FIELD_ALIASES)
+            .find(([, aliases]) => aliases.includes(normalizedField))?.[0];
+          if (!fieldName) continue;
+
+          const asOf = publicRecordAsOf(row);
+          if (!isPublicRecordFresh(asOf)) continue;
+
+          const dealFields = publicRecordsByDeal.get(row.dealId) || {};
+          const previous = dealFields[fieldName];
+          if (previous && Date.parse(previous.asOf) >= asOf!.getTime()) continue;
+          dealFields[fieldName] = {
+            value: String(row.dataValue).trim(),
+            source: row.primarySource || 'Public record source',
+            asOf: asOf!.toISOString(),
+          };
+          publicRecordsByDeal.set(row.dealId, dealFields);
+        }
+      }
+
       // Census context is a read-only enrichment. Refresh stale rows before
       // returning the page, with bounded concurrency so a large dashboard
       // cannot fan out unbounded external requests.
@@ -7652,7 +7707,8 @@ Provide your analysis in this exact JSON format:
         
         return {
           ...deal,
-          coordinates
+          coordinates,
+          publicRecordFields: publicRecordsByDeal.get(deal.id) || {},
         };
       });
       
