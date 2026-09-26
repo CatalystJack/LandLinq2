@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Navigation from "@/components/navigation";
 import { CountyMarketEditor, StateMultiSelect } from "@/components/target-market-editors";
@@ -174,6 +174,25 @@ function darkestBrandColor(primaryColor: string | null | undefined, secondaryCol
   return colors.reduce((darkest, color) =>
     (hexColorLuminance(color) ?? 1) < (hexColorLuminance(darkest) ?? 1) ? color : darkest,
   );
+}
+
+function readableBrandActionColor(color: string | null | undefined, fallback = "#0A2B4A"): string {
+  const normalized = color?.trim().replace(/^#/, "");
+  if (!normalized || !/^(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(normalized)) return fallback;
+  const fullHex = normalized.length === 3
+    ? normalized.split("").map((character) => `${character}${character}`).join("")
+    : normalized;
+  const channels = [0, 2, 4].map((index) => Number.parseInt(fullHex.slice(index, index + 2), 16));
+
+  for (let factor = 1; factor >= 0.05; factor -= 0.025) {
+    const candidate = `#${channels
+      .map((channel) => Math.round(channel * factor).toString(16).padStart(2, "0"))
+      .join("")}`;
+    const luminance = hexColorLuminance(candidate);
+    if (luminance !== null && luminance <= 0.183) return candidate;
+  }
+
+  return fallback;
 }
 
 const blankForm: CompanyForm = {
