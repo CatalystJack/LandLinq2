@@ -145,7 +145,7 @@ export default function ContactPage() {
                     <button
                       type="submit"
                       disabled={status === "sending"}
-                       className="inline-flex h-12 items-center rounded-full border border-primary bg-primary px-6 text-sm font-semibold text-white transition-all hover:border-landlinq-sky hover:bg-white hover:text-landlinq-blue disabled:cursor-not-allowed disabled:opacity-60"
+                       className="ll-message-submit inline-flex h-12 items-center rounded-full border border-primary bg-primary px-6 text-sm font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {status === "sending" ? "Sending…" : "Send message"}
                     </button>
