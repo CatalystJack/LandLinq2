@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Navigation from "@/components/navigation";
 import { CountyMarketEditor, StateMultiSelect } from "@/components/target-market-editors";
@@ -174,25 +174,6 @@ function darkestBrandColor(primaryColor: string | null | undefined, secondaryCol
   return colors.reduce((darkest, color) =>
     (hexColorLuminance(color) ?? 1) < (hexColorLuminance(darkest) ?? 1) ? color : darkest,
   );
-}
-
-function readableBrandActionColor(color: string | null | undefined, fallback = "#0A2B4A"): string {
-  const normalized = color?.trim().replace(/^#/, "");
-  if (!normalized || !/^(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(normalized)) return fallback;
-  const fullHex = normalized.length === 3
-    ? normalized.split("").map((character) => `${character}${character}`).join("")
-    : normalized;
-  const channels = [0, 2, 4].map((index) => Number.parseInt(fullHex.slice(index, index + 2), 16));
-
-  for (let factor = 1; factor >= 0.05; factor -= 0.025) {
-    const candidate = `#${channels
-      .map((channel) => Math.round(channel * factor).toString(16).padStart(2, "0"))
-      .join("")}`;
-    const luminance = hexColorLuminance(candidate);
-    if (luminance !== null && luminance <= 0.183) return candidate;
-  }
-
-  return fallback;
 }
 
 const blankForm: CompanyForm = {
@@ -795,6 +776,141 @@ export default function AdminInvestmentCompanies() {
       return;
     }
     loginMutation.mutate();
+  };
+
+  const renderCompanyCard = (profile: InvestmentCompany) => {
+    const activeProductTypeCount = (profile.productTypes || []).filter((productType) => productType.isActive).length;
+    const isGeneralSales = profile.profileType === "general_sales";
+    const logoBackground = darkestBrandColor(profile.primaryColor, profile.secondaryColor);
+    const safeBrandFallback = readableBrandActionColor(logoBackground);
+    const primaryActionColor = readableBrandActionColor(profile.primaryColor, safeBrandFallback);
+    const secondaryActionColor = readableBrandActionColor(profile.secondaryColor, primaryActionColor);
+
+    return (
+      <Card key={profile.id} className={`overflow-hidden ${profile.isActive ? "" : "opacity-75"}`}>
+        <div
+          className="h-2"
+          style={{
+            background: `linear-gradient(90deg, ${profile.primaryColor || "#0A2B4A"}, ${profile.secondaryColor || "#4A90E2"})`,
+          }}
+        />
+        <CardHeader>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              {profile.logoUrl ? (
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border p-1"
+                  style={{ backgroundColor: logoBackground }}
+                >
+                  <img src={profile.logoUrl} alt="" className="h-full w-full object-contain" />
+                </div>
+              ) : (
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border"
+                  style={{ backgroundColor: logoBackground }}
+                >
+                  <Building2 className="h-6 w-6 text-white" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <CardTitle className="truncate">{profile.companyName}</CardTitle>
+                <p className="truncate text-sm text-slate-500">/developer/{profile.slug}/login</p>
+                <Badge variant="outline" className="mt-2">
+                  {isGeneralSales ? "General Sales" : "Real Estate"}
+                </Badge>
+              </div>
+            </div>
+            <Badge variant={profile.isActive ? "default" : "secondary"}>
+              {profile.isActive ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-5 grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-slate-500">Team members</p>
+              <p className="mt-1 flex items-center gap-1 font-semibold">
+                <Users className="h-4 w-4" />
+                {profile.teamMemberCount}
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-slate-500">{isGeneralSales ? "Capabilities" : "Product types"}</p>
+              <p className="mt-1 font-semibold">
+                {isGeneralSales
+                  ? "CRM & Outreach"
+                  : `${activeProductTypeCount} active ${activeProductTypeCount === 1 ? "type" : "types"}`}
+              </p>
+            </div>
+          </div>
+          <div className="mb-2">
+            <Button
+              disabled={!profile.isActive}
+              onClick={() => setEntryCompany(profile)}
+              className="company-brand-action w-full"
+              style={{ "--company-brand-action-color": primaryActionColor } as CSSProperties}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add {isGeneralSales ? "Opportunity" : "Deal / Opportunity"}
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => openEdit(profile)}>
+              <Edit3 className="mr-2 h-4 w-4" />
+              Manage
+            </Button>
+            {profile.isActive ? (
+              <>
+                <Button
+                  className="company-brand-action flex-1"
+                  onClick={() => openInvite(profile)}
+                  style={{ "--company-brand-action-color": secondaryActionColor } as CSSProperties}
+                >
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  Initial Login
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => {
+                    setDeactivatingCompany(profile);
+                    setDeactivationConfirmation("");
+                  }}
+                  aria-label={`Deactivate ${profile.companyName}`}
+                  title="Deactivate company"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  className="company-brand-action flex-1"
+                  onClick={() => companyStatusMutation.mutate({ profile, isActive: true })}
+                  disabled={companyStatusMutation.isPending}
+                  style={{ "--company-brand-action-color": primaryActionColor } as CSSProperties}
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Reactivate
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => {
+                    setPermanentlyDeletingCompany(profile);
+                    setPermanentDeletionConfirmation("");
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete permanently
+                </Button>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
 
   if (!isPlatformAdmin) return <div className="min-h-screen bg-warm"><Navigation /><div className="mx-auto flex max-w-xl flex-col items-center px-6 py-24 text-center"><LockKeyhole className="mb-4 h-12 w-12 text-slate-300" /><h1 className="font-serif text-3xl font-bold text-slate-900">Platform administrators only</h1><p className="mt-2 text-slate-500">This page is restricted to authenticated platform administrator accounts.</p></div></div>;
