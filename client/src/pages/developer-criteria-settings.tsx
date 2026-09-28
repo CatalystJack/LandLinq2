@@ -341,9 +341,6 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
         compMinUnits: data.profile.compMinUnits == null ? "" : String(data.profile.compMinUnits),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      // Contact visibility can change with shared-directory and CRM filter settings.
-      // Drop cached CRM results so the next visit uses the newly saved visibility.
-      queryClient.removeQueries({ queryKey: ["/api/crm/contacts"] });
       toast({ title: "Settings saved", description: "Your company criteria are up to date." });
     },
     onError: (error: Error) => toast({ title: "Could not save settings", description: error.message, variant: "destructive" }),

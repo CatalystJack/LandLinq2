@@ -231,31 +231,3 @@ mtime_ms = 1789756702116
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/8a8b10d4-279d-441b-9f11-75fca46ec3f1/596d0747-e75f-465f-b71f-a62738417d23"
 storage_version_token = "1789756716312850"
 content_type = "image/jpeg"
-
-[[outputs]]
-id = "CvOm4lvBRPJZqR1LzbKb7"
-uri = "file://.agent-output/npm-run-check-full-2026-09-28.html"
-type = "html"
-title = "Full npm run check output"
-description = "Copyable complete check log with every diagnostic and file/line reference; email-shaped literals masked."
-logical_id = "5545edac-3063-4f67-a974-616ef3ef48eb"
-content_hash = "sha256:052e39f5c03b2c4880cc5c676c0aa3cfc85131927fee3e92e23d434da0859d83"
-size = 69752
-mtime_ms = 1790622676244
-storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/5545edac-3063-4f67-a974-616ef3ef48eb/aa39bd9c-6e47-43b3-bea3-6fc6689d9de2"
-storage_version_token = "1790622677416114"
-content_type = "text/html"
-
-[[outputs]]
-id = "uww0Q9fmYl7mpSRuSvKmL"
-uri = "file://.agent-output/npm-run-check-full-verified.html"
-type = "html"
-title = "Complete npm run check output — verified"
-description = "Verified full 1,086-line output with every diagnostic and file/line reference; email-shaped literals masked."
-logical_id = "2456d8ed-6eb7-4844-8d29-ec6983975bd1"
-content_hash = "sha256:febe35681b73672b80410af0feb661fd1c8c61dcf5e219a5c8894e6d2ae34c69"
-size = 184019
-mtime_ms = 1790622710705
-storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/2456d8ed-6eb7-4844-8d29-ec6983975bd1/b052ba0e-dc5f-4262-845e-ac0d3acebd37"
-storage_version_token = "1790622711510830"
-content_type = "text/html"
