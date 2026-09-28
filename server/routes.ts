@@ -5924,6 +5924,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // POST /api/crm/import-contacts — bulk upsert contacts from CSV/Excel rows
   // Body: { contacts: [{ firstName, lastName, email, phone, brokerage, assignedTo, tags }] }
   app.post("/api/crm/import-contacts", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const userEmail = user?.claims?.email || user?.email || "";
+    if (!isPlatformAdminEmail(userEmail) && !isSuperAdminEmail(userEmail)) {
+      return res.status(403).json({ message: "Access denied. Platform administrator privileges required." });
+    }
+
     try {
       const { contacts: rows } = req.body;
       if (!Array.isArray(rows) || rows.length === 0) {
@@ -29604,38 +29610,6 @@ RULES:
   // DEAL PIPELINE API ROUTES
   // ==================================================
 
-  // Get deals with pipeline tracking data
-  app.get("/api/deals/pipeline", isAuthenticated, async (req, res) => {
-    try {
-      const deals = await storage.getAllDealsWithBrokers();
-      
-      // Enhanced pipeline data for each deal
-      const pipelineDeals = deals.map((deal: any) => {
-        // Calculate stage history and time tracking
-        const stageHistory = deal.stageHistory || [];
-        const currentStage = deal.pipelineStage || 1;
-        const statusUpdatedAt = deal.statusUpdatedAt || deal.createdAt || new Date();
-        const timeInCurrentStage = Math.floor((new Date().getTime() - new Date(statusUpdatedAt).getTime()) / (1000 * 60 * 60)); // hours
-        const totalPipelineTime = Math.floor((new Date().getTime() - new Date(deal.createdAt).getTime()) / (1000 * 60 * 60)); // hours
-
-        return {
-          ...deal,
-          timeInCurrentStage,
-          totalPipelineTime,
-          stageHistory,
-          priority: deal.priority || 'medium',
-          estimatedCloseDate: deal.estimatedCloseDate || null,
-          actualCloseDate: deal.actualCloseDate || null,
-        };
-      });
-
-      res.json(pipelineDeals);
-    } catch (error) {
-      console.error("Error fetching pipeline deals:", error);
-      res.status(500).json({ message: "Failed to fetch pipeline deals" });
-    }
-  });
-
   // Update deal pipeline stage
   app.put("/api/deals/:id/stage", isAuthenticated, async (req, res) => {
     try {
@@ -29752,73 +29726,6 @@ RULES:
     } catch (error) {
       console.error("Error updating deal priority:", error);
       res.status(500).json({ message: "Failed to update deal priority" });
-    }
-  });
-
-  // Get pipeline analytics and bottleneck analysis
-  app.get("/api/deals/pipeline/analytics", isAuthenticated, async (req, res) => {
-    try {
-      const deals = await storage.getAllDealsWithBrokers();
-      
-      // Calculate stage analytics
-      const stageAnalytics = Array.from({ length: 7 }, (_, i) => {
-        const stageId = i + 1;
-        const stageDeals = deals.filter((deal: any) => (deal.pipelineStage || 1) === stageId);
-        const totalValue = stageDeals.reduce((sum: number, deal: any) => sum + (parseFloat(deal.askingPrice) || 0), 0);
-        
-        // Calculate average time in stage
-        const avgTimeInStage = stageDeals.length > 0 ? 
-          stageDeals.reduce((sum: number, deal: any) => {
-            const timeInStage = Math.floor((new Date().getTime() - new Date(deal.statusUpdatedAt || deal.createdAt).getTime()) / (1000 * 60 * 60));
-            return sum + timeInStage;
-          }, 0) / stageDeals.length : 0;
-
-        // Expected times for each stage (in hours)
-        const expectedTimes = [4, 24, 72, 8, 48, 120, 168];
-        const expectedTime = expectedTimes[i];
-        
-        // Count overdue deals
-        const overdueDeals = stageDeals.filter((deal: any) => {
-          const timeInStage = Math.floor((new Date().getTime() - new Date(deal.statusUpdatedAt || deal.createdAt).getTime()) / (1000 * 60 * 60));
-          return timeInStage > expectedTime * 1.5;
-        }).length;
-
-        return {
-          stageId,
-          dealCount: stageDeals.length,
-          totalValue,
-          avgTimeInStage,
-          expectedTime,
-          overdueCount: overdueDeals,
-          bottleneckScore: stageDeals.length > 0 ? overdueDeals / stageDeals.length : 0,
-        };
-      });
-
-      // Overall pipeline metrics
-      const totalDeals = deals.length;
-      const totalValue = deals.reduce((sum: number, deal: any) => sum + (parseFloat(deal.askingPrice) || 0), 0);
-      const avgDealTime = deals.length > 0 ? 
-        deals.reduce((sum: number, deal: any) => {
-          const totalTime = Math.floor((new Date().getTime() - new Date(deal.createdAt).getTime()) / (1000 * 60 * 60));
-          return sum + totalTime;
-        }, 0) / deals.length : 0;
-
-      res.json({
-        totalDeals,
-        totalValue,
-        avgDealTime,
-        stageAnalytics,
-        bottlenecks: stageAnalytics.filter(stage => stage.bottleneckScore > 0.2).map(stage => ({
-          stageId: stage.stageId,
-          bottleneckScore: stage.bottleneckScore,
-          overdueCount: stage.overdueCount,
-          avgTimeInStage: stage.avgTimeInStage,
-          expectedTime: stage.expectedTime,
-        })),
-      });
-    } catch (error) {
-      console.error("Error fetching pipeline analytics:", error);
-      res.status(500).json({ message: "Failed to fetch pipeline analytics" });
     }
   });
 

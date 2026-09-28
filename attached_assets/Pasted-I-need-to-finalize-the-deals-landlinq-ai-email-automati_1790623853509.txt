@@ -1,0 +1,43 @@
+I need to finalize the deals@landlinq.ai email automation. Go stage by
+stage and stop for my confirmation at each checkpoint — don't skip ahead,
+don't push code changes without showing me the diff first, and don't touch
+GoDaddy or the mailbox itself directly.
+
+STAGE 1 — Confirm the production auth-failure issue is actually resolved:
+I previously asked you to check whether production was running stale code
+and to restart it if so. Tell me: did that happen, and does the current
+production deployment log show the poller skipping (because
+EMAIL_SCRAPING_ENABLED is false) instead of AUTHENTICATIONFAILED errors?
+Show me the most recent relevant log lines as proof either way. If it's
+still failing, diagnose why and fix it (restart/redeploy is fine; changing
+credentials or code logic is not) before moving on.
+
+STAGE 2 — Confirm the secret in production specifically:
+Confirm process.env.DEALS_EMAIL_PASSWORD is present in the PRODUCTION
+deployment's environment (not just development) — presence only, never
+the value. If it's missing there, tell me plainly so I can add it myself.
+
+STAGE 3 — Clean login test (no mail processing):
+Using the existing createProductionClient() in imapDealsPoller.ts, run a
+connect-then-logout-only test (no search/fetch) against the real mailbox.
+Confirm login succeeds. Report the result and stop.
+
+STAGE 4 — Wait for me:
+Tell me you're ready, and I'll personally send one real test deal email to
+deals@landlinq.ai myself.
+
+STAGE 5 — One real end-to-end test (only after I confirm I've sent it):
+Temporarily enable EMAIL_SCRAPING_ENABLED (or manually run
+pollDealsMailboxImap() once) to process just that one poll. Then show me:
+- Whether the message was picked up and marked read
+- What was created in emailIntakeQueue and whether a deal was created
+- The routing reason recorded for it
+- Any errors
+Then set EMAIL_SCRAPING_ENABLED back to false and wait for my review.
+
+STAGE 6 — only after I explicitly say the test looked right:
+Set EMAIL_SCRAPING_ENABLED = true for real and confirm the production log
+shows the poller running normally on its next cycle.
+
+Report clearly at each stage. Do not proceed to the next stage without my
+go-ahead.

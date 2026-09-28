@@ -630,7 +630,6 @@ export default function AnalystDashboard() {
   const [filterClassifications, setFilterClassifications] = useState<string[]>([]);
   const [filterPriorities, setFilterPriorities] = useState<string[]>([]);
   const [filterDealTypes, setFilterDealTypes] = useState<string[]>([]);
-  const [filterApex, setFilterApex] = useState<string[]>([]);
   const [filterNextAssignees, setFilterNextAssignees] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -832,7 +831,6 @@ export default function AnalystDashboard() {
   const [wetlandNotesModal, setWetlandNotesModal] = useState<{dealId: string; address: string; notes: string; isEditing: boolean} | null>(null);
   const wetlandNotesEditRef = useRef('');
   const [developerNotesModal, setDeveloperNotesModal] = useState<{dealId: string; address: string; notes: string; isEditing: boolean} | null>(null);
-  const [apexNotesModal, setApexNotesModal] = useState<{dealId: string; address: string; notes: string; isEditing: boolean} | null>(null);
   const [openProductTypePopover, setOpenProductTypePopover] = useState<string | null>(null);
 
   // File Viewer modal state (Dec 15, 2025) - View files inline without downloading
@@ -963,7 +961,7 @@ export default function AnalystDashboard() {
     isError,
     refetch: refetchDeals,
   } = useQuery({
-    queryKey: ['/api/deals', currentPage, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), filterApex.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection],
+    queryKey: ['/api/deals', currentPage, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection],
     queryFn: async ({ signal }) => {
       // Use flagged deals endpoint if only showing flagged deals
       const endpoint = showOnlyFlagged ? '/api/deals/flagged' : '/api/deals';
@@ -974,7 +972,6 @@ export default function AnalystDashboard() {
         ...(filterClassifications.length > 0 && { classifications: filterClassifications.join(',') }),
         ...(filterPriorities.length > 0 && { priorities: filterPriorities.join(',') }),
         ...(filterDealTypes.length > 0 && { dealTypes: filterDealTypes.join(',') }),
-            ...(filterApex.length > 0 && { apex: filterApex.join(',') }),
         ...(searchQuery && { search: searchQuery }),
         ...(filterRiskLevel !== 'all' && { riskLevel: filterRiskLevel }),
         ...(showOnlyFlagged && { sortBy: 'flaggedAt', sortOrder: 'desc' }),
@@ -1251,22 +1248,6 @@ export default function AnalystDashboard() {
           return prev.filter(d => d !== dealType);
         } else {
           return [...prev, dealType];
-        }
-      });
-    }
-    setCurrentPage(1);
-  };
-
-  // Apex filter handler (Yes/No)
-  const handleApexFilter = (value: string) => {
-    if (value === "all") {
-      setFilterApex([]);
-    } else {
-      setFilterApex(prev => {
-        if (prev.includes(value)) {
-          return prev.filter(v => v !== value);
-        } else {
-          return [...prev, value];
         }
       });
     }
@@ -1852,8 +1833,6 @@ export default function AnalystDashboard() {
       sewerAvailable?: boolean;
       underContract?: boolean;
       loiSubmitted?: boolean;
-      apex?: boolean;
-      apexNotes?: string | null;
       nextAssignee?: string | null;
       dealStep?: string | null;
       priority?: string | null;
@@ -1949,7 +1928,7 @@ export default function AnalystDashboard() {
                 console.log('✅ Reclassification complete:', variables.dealId, 'New classification:', updatedDeal.classification);
                 // Update the cache with new classification
                 queryClient.setQueryData(
-                  ['/api/deals', currentPage, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), filterApex.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection],
+                  ['/api/deals', currentPage, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection],
                   (oldData: any) => {
                     if (!oldData) return oldData;
                     return {
@@ -1981,7 +1960,7 @@ export default function AnalystDashboard() {
         console.log('🎯 Product type changed to:', productType, 'automatically assigning team...');
         
         // Get current deal data to check location
-        const currentDeal = (queryClient.getQueryData(['/api/deals', currentPage, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), filterApex.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection]) as any)?.deals?.find((d: any) => d.id === variables.dealId);
+        const currentDeal = (queryClient.getQueryData(['/api/deals', currentPage, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection]) as any)?.deals?.find((d: any) => d.id === variables.dealId);
         const dealAddress = currentDeal?.address || '';
         
         // Check if location is in North or South Carolina
@@ -2067,7 +2046,7 @@ export default function AnalystDashboard() {
       const hasBrokerFields = brokerFields.some(f => f in variables);
       
       queryClient.setQueryData(
-        ['/api/deals', currentPage, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), filterApex.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection],
+        ['/api/deals', currentPage, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection],
         (oldData: any) => {
           if (!oldData) return oldData;
 
@@ -2266,7 +2245,7 @@ export default function AnalystDashboard() {
     onSuccess: (data, variables) => {
       console.log('✅ updateDealMutation success for deal:', variables.dealId);
       // More specific query invalidation to avoid cancelling other mutations
-      queryClient.setQueryData(['/api/deals', currentPage, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), filterApex.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection], (oldData: any) => {
+      queryClient.setQueryData(['/api/deals', currentPage, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), searchQuery, filterRiskLevel, showOnlyFlagged, sortColumn, sortDirection], (oldData: any) => {
         if (!oldData) return oldData;
         return {
           ...oldData,
@@ -4158,7 +4137,7 @@ export default function AnalystDashboard() {
   // Instant prefetch on hover for even faster navigation
   const handleNextPageHover = useCallback(() => {
     if (hasNextPage) {
-      const nextPageKey = ['/api/deals', currentPage + 1, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), filterApex.join(','), searchQuery, filterRiskLevel, showOnlyFlagged];
+      const nextPageKey = ['/api/deals', currentPage + 1, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), searchQuery, filterRiskLevel, showOnlyFlagged];
       queryClient.prefetchQuery({
         queryKey: nextPageKey,
         queryFn: async ({ signal }) => {
@@ -4169,7 +4148,6 @@ export default function AnalystDashboard() {
             ...(filterClassifications.length > 0 && { classifications: filterClassifications.join(',') }),
             ...(filterPriorities.length > 0 && { priorities: filterPriorities.join(',') }),
             ...(filterDealTypes.length > 0 && { dealTypes: filterDealTypes.join(',') }),
-            ...(filterApex.length > 0 && { apex: filterApex.join(',') }),
             ...(searchQuery && { search: searchQuery }),
             ...(filterRiskLevel !== 'all' && { riskLevel: filterRiskLevel }),
             ...(showOnlyFlagged && { sortBy: 'flaggedAt', sortOrder: 'desc' })
@@ -4184,11 +4162,11 @@ export default function AnalystDashboard() {
         staleTime: 30 * 1000,
       });
     }
-  }, [hasNextPage, currentPage, pageSize, filterClassifications, filterPriorities, filterDealTypes, filterApex, searchQuery, filterRiskLevel, showOnlyFlagged, queryClient]);
+  }, [hasNextPage, currentPage, pageSize, filterClassifications, filterPriorities, filterDealTypes, searchQuery, filterRiskLevel, showOnlyFlagged, queryClient]);
 
   const handlePrevPageHover = useCallback(() => {
     if (hasPrevPage) {
-      const prevPageKey = ['/api/deals', currentPage - 1, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), filterApex.join(','), searchQuery, filterRiskLevel, showOnlyFlagged];
+      const prevPageKey = ['/api/deals', currentPage - 1, pageSize, filterClassifications.join(','), filterPriorities.join(','), filterDealTypes.join(','), searchQuery, filterRiskLevel, showOnlyFlagged];
       queryClient.prefetchQuery({
         queryKey: prevPageKey,
         queryFn: async ({ signal }) => {
@@ -4199,7 +4177,6 @@ export default function AnalystDashboard() {
             ...(filterClassifications.length > 0 && { classifications: filterClassifications.join(',') }),
             ...(filterPriorities.length > 0 && { priorities: filterPriorities.join(',') }),
             ...(filterDealTypes.length > 0 && { dealTypes: filterDealTypes.join(',') }),
-            ...(filterApex.length > 0 && { apex: filterApex.join(',') }),
             ...(searchQuery && { search: searchQuery }),
             ...(filterRiskLevel !== 'all' && { riskLevel: filterRiskLevel }),
             ...(showOnlyFlagged && { sortBy: 'flaggedAt', sortOrder: 'desc' })
@@ -4214,7 +4191,7 @@ export default function AnalystDashboard() {
         staleTime: 30 * 1000,
       });
     }
-  }, [hasPrevPage, currentPage, pageSize, filterClassifications, filterPriorities, filterDealTypes, filterApex, searchQuery, filterRiskLevel, showOnlyFlagged, queryClient]);
+  }, [hasPrevPage, currentPage, pageSize, filterClassifications, filterPriorities, filterDealTypes, searchQuery, filterRiskLevel, showOnlyFlagged, queryClient]);
 
   const goToPage = (page: number) => {
     if (page >= 1 && page <= totalPages) {
@@ -6842,12 +6819,6 @@ export default function AnalystDashboard() {
                               </SelectContent>
                             </Select>
                           </td>
-                          <td className="px-1 py-1 text-center text-xs border-r border-gray-200 bg-blue-50 z-10 shadow-lg">
-                            <input type="checkbox" checked={!!editData.apex} onChange={(e) => setEditData({...editData, apex: e.target.checked})} className="h-4 w-4 accent-[#4A90E2]" aria-label="Apex deal" />
-                          </td>
-                          <td className="px-1 py-1 text-xs border-r border-gray-200 bg-blue-50 z-10 shadow-lg">
-                            <Input value={editData.apexNotes || ''} onChange={(e) => setEditData({...editData, apexNotes: e.target.value})} className="h-8 text-xs" placeholder="Apex notes..." />
-                          </td>
                           <td className="px-1 py-1 text-xs border-r border-gray-200 bg-blue-50 z-10 shadow-lg">
                             <Select value={editData.priority || 'none'} onValueChange={(value) => setEditData({...editData, priority: value === 'none' ? null : value})}>
                               <SelectTrigger className="h-8 w-[50px] px-1 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
@@ -8997,88 +8968,6 @@ export default function AnalystDashboard() {
                     <Button
                       className="bg-[#4A90E2] hover:bg-[#357ABD] text-white hover:text-white"
                       onClick={() => { wetlandNotesEditRef.current = wetlandNotesModal?.notes || ''; setWetlandNotesModal({...wetlandNotesModal!, isEditing: true}); }}
-                    >
-                      <Edit size={14} className="mr-1" />
-                      Edit Notes
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Apex Notes Modal */}
-      <Dialog open={!!apexNotesModal} onOpenChange={(open) => !open && setApexNotesModal(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden" data-testid="dialog-apex-notes">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-purple-600" />
-              Apex Notes
-            </DialogTitle>
-            <DialogDescription>
-              {apexNotesModal?.address}
-            </DialogDescription>
-          </DialogHeader>
-
-          {apexNotesModal && (
-            <div className="mt-4 space-y-4">
-              {apexNotesModal.isEditing ? (
-                <>
-                  <FastTextarea
-                    value={apexNotesModal.notes}
-                    onChange={(val) => setApexNotesModal({...apexNotesModal, notes: val})}
-                    className="min-h-[200px] resize-none"
-                    placeholder="Add Apex notes here..."
-                    data-testid="textarea-apex-notes-modal"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      className="border-[#4A90E2] text-[#4A90E2] bg-white hover:bg-white"
-                      onClick={() => setApexNotesModal({...apexNotesModal, isEditing: false})}
-                      data-testid="button-cancel-apex-notes"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      className="bg-[#4A90E2] hover:bg-[#357ABD] text-white"
-                      onClick={() => {
-                        if (apexNotesModal) {
-                          setOptimisticUpdates(prev => ({ ...prev, [apexNotesModal.dealId]: { ...prev[apexNotesModal.dealId], apexNotes: apexNotesModal.notes } }));
-                          cellUpdateMutation.mutate({
-                            dealId: apexNotesModal.dealId,
-                            apexNotes: apexNotesModal.notes
-                          });
-                          setApexNotesModal(null);
-                        }
-                      }}
-                      data-testid="button-save-apex-notes"
-                    >
-                      SAVE NOTES
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="rounded-lg p-4 overflow-y-auto max-h-[50vh] bg-purple-50 border border-purple-200">
-                    <div className="text-sm whitespace-pre-wrap leading-relaxed text-purple-800">
-                      {apexNotesModal.notes ? linkifyText(apexNotesModal.notes) : 'No Apex notes yet'}
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setApexNotesModal(null)}
-                      data-testid="button-close-apex-notes"
-                    >
-                      Close
-                    </Button>
-                    <Button
-                      className="bg-[#4A90E2] hover:bg-[#357ABD] text-white hover:text-white"
-                      onClick={() => setApexNotesModal({...apexNotesModal, isEditing: true})}
-                      data-testid="button-edit-apex-notes"
                     >
                       <Edit size={14} className="mr-1" />
                       Edit Notes

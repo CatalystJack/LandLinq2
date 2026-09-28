@@ -7,8 +7,8 @@ import { classifyDealForProfile, isDealInProfileMarket } from './developerClassi
 import { normalizeUsStateCode } from '../shared/us-states';
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Auto-send engine: matches a newly-classified deal against every active
-// partner developer whose buy box criteria it satisfies.
+// Auto-send engine: queues deals for active partner developers when they match
+// the developer's market and criteria. No manual Apex flag gates eligibility.
 //
 // NEW BEHAVIOR (outbox queue):
 //  - ALL matching active developers → insert a 'pending' record in
@@ -43,7 +43,7 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
       try {
         if (profile) {
           if (profile.profileType === 'general_sales') continue;
-          if (!deal.apex || !isDealInProfileMarket(deal, profile)) continue;
+          if (!isDealInProfileMarket(deal, profile)) continue;
         } else if (!doesDealMatchDeveloper(deal, dev)) {
           continue;
         }
@@ -192,8 +192,6 @@ export function partnerDeveloperToClassificationProductTypes(dev: any): Develope
 // ── Matching logic (mirrors the routing endpoint in routes.ts) ─────────────
 
 export function doesDealMatchDeveloper(deal: any, dev: any): boolean {
-  // ── Apex gate — only apex-flagged deals may be sent to developers ──────────
-  if (!deal.apex) return false;
   if (!doesDealMatchDeveloperMarket(deal, dev)) return false;
 
   // Acreage floor

@@ -413,11 +413,28 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
   }).where(eq(deals.id, deal.id));
   // These are informational enrichments. Each service is independently
   // failure-tolerant and cannot block creation or classification.
+  const dealId = deal.id;
   await enrichDealWithGovernmentData({
     dealId: deal.id,
     latitude: location.latitude,
     longitude: location.longitude,
-  }).catch(error => console.warn(`⚠️ [GOVERNMENT-ENRICHMENT] Deal ${deal.id} skipped:`, error));
+  }).catch(error => console.warn(`⚠️ [GOVERNMENT-ENRICHMENT] Deal ${dealId} skipped:`, error));
+  try {
+    const { AutoClassificationEngine } = await import('./autoClassificationEngine.js');
+    const result = await AutoClassificationEngine.classifyDeal(deal as any);
+    const classificationUpdates = {
+      classification: result.classification,
+      classificationReason: result.rejectionReason || null,
+      aiExplanatoryNotes: result.aiExplanatoryNotes || null,
+      comparableNotes: result.comparableNotes || null,
+    };
+    deal = { ...deal, ...classificationUpdates };
+    const { storage } = await import('./storage.js');
+    await storage.updateDeal(deal.id, classificationUpdates);
+  } catch (error) {
+    const errorType = error instanceof Error ? error.name : 'Unknown error';
+    console.warn(`⚠️ [AUTO-CLASSIFICATION] Deal ${deal.id} skipped (${errorType}); continuing intake.`);
+  }
   const classifiedDeal = { ...deal, topRentPSF: comps.topRentPSF, avgRentPerUnit: comps.avgRentPerUnit, county: location.county, state: location.state };
   const classification = classifyDealForProfile(classifiedDeal, profile as DeveloperProfile, activeTypes);
   await db.insert(partnerDeveloperSends).values({
