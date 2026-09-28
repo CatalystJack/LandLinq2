@@ -1,8 +1,7 @@
 /**
- * Manual Email Processor - IMMEDIATE SOLUTION
+ * Manual email intake form
  * 
- * This component allows users to copy/paste emails directly into the system
- * while DNS propagation is in progress. Perfect for immediate email processing.
+ * Pasted emails are parsed and added to the analyst review queue.
  */
 
 import React, { useState } from 'react';
@@ -12,14 +11,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, AlertTriangle, Mail, Copy, ArrowRight } from 'lucide-react';
-import { formatDealNumber } from "@shared/schema";
+import { CheckCircle, AlertTriangle, Mail, ArrowRight } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
 interface ProcessResult {
   success: boolean;
-  dealId?: string;
-  dealNumber?: number;
+  intakeId?: string;
   message?: string;
   error?: string;
 }
@@ -46,8 +43,7 @@ export function ManualEmailProcessor() {
 
       setResult({
         success: true,
-        dealId: response.dealId,
-        dealNumber: response.dealNumber,
+        intakeId: response.intakeId,
         message: response.message
       });
 
@@ -92,11 +88,9 @@ john.broker@realty.com
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Manual Email Processor
-        </h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Manual Email Intake</h2>
         <p className="text-gray-600 dark:text-gray-400">
-          <strong>Immediate Solution:</strong> Process emails instantly while DNS propagates
+          Submit a pasted deal email for parsing and analyst review.
         </p>
       </div>
 
@@ -106,19 +100,19 @@ john.broker@realty.com
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
-              Process Email
+              Submit for Review
             </CardTitle>
             <CardDescription>
-              Copy and paste any deal email below to process immediately
+              The email will be added to the same intake queue used by the analyst dashboard.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="forwarder-email">Your Email (Optional)</Label>
+              <Label htmlFor="forwarder-email">Original sender email (optional if included in the pasted headers)</Label>
               <Input
                 id="forwarder-email"
                 type="email"
-                placeholder="your.email@company.com"
+                placeholder="broker@company.com"
                 value={forwarderEmail}
                 onChange={(e) => setForwarderEmail(e.target.value)}
                 data-testid="input-forwarder-email"
@@ -145,11 +139,11 @@ john.broker@realty.com
                 data-testid="button-process-email"
               >
                 {processing ? (
-                  <>Processing...</>
+                    <>Submitting...</>
                 ) : (
                   <>
                     <ArrowRight className="h-4 w-4 mr-2" />
-                    Process Email
+                    Queue for Review
                   </>
                 )}
               </Button>
@@ -175,9 +169,9 @@ john.broker@realty.com
                     {result.success ? (
                       <>
                         <strong>Success!</strong> {result.message}
-                        {result.dealId && (
+                        {result.intakeId && (
                           <div className="mt-1 text-sm">
-                            Deal ID: <code className="bg-green-100 px-1 rounded">{result.dealNumber ? formatDealNumber(result.dealNumber) : result.dealId}</code>
+                            Intake ID: <code className="bg-green-100 px-1 rounded">{result.intakeId}</code>
                           </div>
                         )}
                       </>
@@ -197,7 +191,7 @@ john.broker@realty.com
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>🚀 Immediate Solutions</CardTitle>
+              <CardTitle>Email Intake</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
@@ -206,11 +200,11 @@ john.broker@realty.com
                     #1
                   </div>
                   <div>
-                    <p className="font-semibold">Use Working Subdomain</p>
+                    <p className="font-semibold">Production mailbox polling</p>
                     <p className="text-sm text-gray-600">
-                      Send emails to: <code className="bg-gray-100 px-1 rounded">deals@inbound.landlinq.ai</code>
+                      The production app reads deals@landlinq.ai directly over IMAP.
                     </p>
-                    <p className="text-xs text-green-600 mt-1">✅ Works immediately</p>
+                    <p className="text-xs text-green-600 mt-1">No forwarding rule or webhook is needed</p>
                   </div>
                 </div>
 
@@ -219,11 +213,11 @@ john.broker@realty.com
                     #2
                   </div>
                   <div>
-                    <p className="font-semibold">Microsoft 365 Forwarding</p>
+                    <p className="font-semibold">Manual review</p>
                     <p className="text-sm text-gray-600">
-                      Set up email rule to forward deals@landlinq.ai → deals@inbound.landlinq.ai
+                      Paste an email here to add it to the intake queue.
                     </p>
-                    <p className="text-xs text-blue-600 mt-1">⚡ 10 minute setup</p>
+                    <p className="text-xs text-blue-600 mt-1">An analyst reviews the parsed fields</p>
                   </div>
                 </div>
 
@@ -232,11 +226,11 @@ john.broker@realty.com
                     #3
                   </div>
                   <div>
-                    <p className="font-semibold">Manual Processing</p>
+                    <p className="font-semibold">Review queue</p>
                     <p className="text-sm text-gray-600">
-                      Copy/paste emails here for instant processing
+                      Pasted emails do not create deals directly.
                     </p>
-                    <p className="text-xs text-purple-600 mt-1">📧 This form</p>
+                    <p className="text-xs text-purple-600 mt-1">Use the form on this page</p>
                   </div>
                 </div>
               </div>
@@ -258,11 +252,11 @@ john.broker@realty.com
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-blue-600 font-semibold">3.</span>
-                <span>Click "Process Email" - deal will be created instantly</span>
+                <span>Click "Queue for Review" to add it to the analyst intake queue</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-blue-600 font-semibold">4.</span>
-                <span>Broker gets automatic confirmation email</span>
+                <span>An analyst reviews the parsed details before taking action</span>
               </div>
             </CardContent>
           </Card>
@@ -273,10 +267,10 @@ john.broker@realty.com
                 <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-amber-800">
-                    DNS Propagation in Progress
+                    Manual submissions are reviewed by an analyst
                   </p>
                   <p className="text-xs text-amber-700 mt-1">
-                    Your MX record change is taking effect. Normal email processing will resume automatically once DNS propagates (usually 15-60 minutes).
+                    This form queues the email for review. It does not create a deal directly.
                   </p>
                 </div>
               </div>

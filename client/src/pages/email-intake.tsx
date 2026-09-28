@@ -16,7 +16,7 @@ import Footer from "@/components/footer";
 import {
   CheckCircle, XCircle, Mail, Paperclip, ChevronDown, ChevronUp,
   Edit2, Clock, AlertTriangle, RefreshCw, BookOpen, TrendingUp,
-  Trash2, Brain, Star, PlusCircle, Info
+  Trash2, Brain, Star, PlusCircle
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -714,19 +714,12 @@ function ManualSubmitModal({ open, onClose, onSuccess }: {
             <PlusCircle className="w-4 h-4 text-blue-600" /> Manually Submit an Email
           </DialogTitle>
           <p className="text-xs text-gray-500 mt-1">
-            Paste any deal email here and the AI will parse it instantly — same as if it was forwarded to deals@landlinq.ai.
+            Paste a deal email to parse it and add it to the intake queue for analyst review.
           </p>
         </DialogHeader>
 
-        <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800 flex items-start gap-2">
-          <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          <div>
-            <span className="font-semibold">SendGrid webhook not firing?</span> Make sure your SendGrid Inbound Parse is set to forward emails to:<br />
-            <code className="bg-amber-100 px-1 rounded mt-1 inline-block font-mono text-[11px]">
-              https://landlinq.replit.app/api/inbound-email
-            </code>
-            <br />and that MX records for <code className="font-mono">landlinq.ai</code> point to <code className="font-mono">mx.sendgrid.net</code>.
-          </div>
+        <div className="rounded border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+          Automatic mailbox intake uses the GoDaddy-hosted deals@landlinq.ai mailbox. Pasted emails are queued for analyst review.
         </div>
 
         <div className="space-y-3 mt-1">

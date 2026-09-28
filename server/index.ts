@@ -1260,15 +1260,18 @@ setTimeout(() => {
         console.error("❌ Failed to start developer weekly email scheduler:", error);
       }
 
-      // Poll deals@landlinq.ai directly over IMAP because the mailbox is
-      // GoDaddy-hosted rather than Microsoft 365. The poller marks a message
-      // read only after intake and automated routing are durably handled.
-      try {
-        const { startDealsImapPoller } = await import('./imapDealsPoller');
-        startDealsImapPoller();
-        log("📬 Deals mailbox IMAP poller scheduled — checking every 3 minutes");
-      } catch (error: any) {
-        console.error("❌ Failed to start deals mailbox IMAP poller:", error);
+      // Only production owns the live GoDaddy mailbox. Development shares
+      // credentials but must not consume messages or mark them read.
+      if (process.env.NODE_ENV === "production") {
+        try {
+          const { startDealsImapPoller } = await import('./imapDealsPoller');
+          startDealsImapPoller();
+          log("📬 Deals mailbox IMAP poller scheduled — checking every 3 minutes");
+        } catch (error: any) {
+          console.error("❌ Failed to start deals mailbox IMAP poller:", error);
+        }
+      } else {
+        log("📬 Deals mailbox IMAP poller not started outside production");
       }
 
       // Start the background job processor - async email/SMS processing to prevent webhook timeouts
@@ -1317,30 +1320,7 @@ setTimeout(() => {
     //   }
     // }, 5000);
       
-    // Initialize Email Service Fix - CRITICAL FOR EMAIL PROCESSING
     setTimeout(async () => {
-      try {
-        log("🔧 Applying email service fixes...");
-        const { EmailServiceFix } = await import('./emailServiceFix');
-        await EmailServiceFix.implementFix(app);
-        await EmailServiceFix.enhanceWebhookEndpoint(app);
-        log("✅ Email service fixes applied successfully!");
-      } catch (error) {
-        log("❌ Email service fix failed:", String(error));
-      }
-
-      // Email Test Endpoint already configured before routes registration
-
-      // Initialize Emergency Email Processing (DNS Workaround)
-      try {
-        log("🚨 Setting up emergency email processing due to DNS issue...");
-        const { setupEmergencyEndpoint } = await import('./emailWorkaround');
-        setupEmergencyEndpoint(app);
-        log("✅ Emergency email processing endpoint active!");
-      } catch (error) {
-        log("❌ Emergency email processing setup failed:", String(error));
-      }
-
       // Database Management System moved to top-level setTimeout for reliable startup
       
       // Daily team notification system — DISABLED per user request

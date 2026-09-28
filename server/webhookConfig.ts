@@ -7,16 +7,8 @@ export interface WebhookEndpoint {
   description?: string;
 }
 
-// External webhook endpoints configuration
-export const EXTERNAL_WEBHOOKS: WebhookEndpoint[] = [
-  {
-    name: 'LandLinq Email Webhook',
-    url: 'https://landlinq.ai/api/webhooks/email',
-    enabled: true,
-    type: 'email',
-    description: 'Main LandLinq domain email webhook endpoint'
-  }
-];
+// Mailbox intake is handled by the production IMAP poller; no email webhook is configured.
+export const EXTERNAL_WEBHOOKS: WebhookEndpoint[] = [];
 
 // Get webhook URLs by type
 export function getWebhooksByType(type: 'email' | 'sms' | 'teams' | 'slack'): WebhookEndpoint[] {
