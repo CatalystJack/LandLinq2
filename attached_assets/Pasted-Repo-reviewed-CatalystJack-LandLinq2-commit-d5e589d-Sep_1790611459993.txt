@@ -1,0 +1,43 @@
+Repo reviewed: CatalystJack/LandLinq2, commit d5e589d (Sep 25, 2026). Top 10 findings, ranked by severity.
+
+1. Production PII and financials committed to the public repo, plus a live session cookie
+Files: prod_export.sql, prod_export_brokers.csv, prod_export_deals.csv, exports_brokers.csv, exports_crm_deals.sql, exports_deals.csv, aj_cookies.txt (and newuser_cookies.txt, test_cookies.txt, test_register_cookies.txt)
+Why it matters: this is a public GitHub repo. The export files contain real broker/staff names, personal emails, and phone numbers, plus real deal addresses, pricing, and analyst notes — anyone can download them right now. aj_cookies.txt contains a live-looking Express session cookie (connect.sid) captured from a real login; if that session was still valid or the signing secret was reused, it's a direct account-hijack vector. These files need to be deleted and purged from git history (not just deleted going forward), and SESSION_SECRET should be rotated.
+
+2. Broker-portal account management has no admin check — full account takeover path
+File: server/routes.ts, lines 7597, 7633, 7706, 7769 (GET/POST/PUT/DELETE /api/broker-portal/accounts...)
+Why it matters: these routes only check isAuthenticated, not the platform-admin check used on sibling routes (e.g. line 7420). Any ordinary logged-in customer (DEVELOPER role) can list every broker's account, edit any broker's password, or delete any broker account — a straightforward privilege escalation to full account takeover across all tenants.
+
+3. Unauthenticated file-upload endpoints
+File: server/routes.ts, lines 11648 and 11670 (PUT/POST /api/upload-file/:uploadId)
+Why it matters: unlike the URL-issuing route that requires auth, these actual upload handlers have no auth check at all. Anyone on the internet, logged in or not, can PUT/POST files directly into storage.
+
+4. Deal document endpoints leak documents across tenants
+File: server/routes.ts, lines 9102, 9149, 9175 (/api/deals/:id/document/:index, /document/:index/image-preview, /analyst-document/:index)
+Why it matters: these only check isAuthenticated, with no check that the deal belongs to the requesting user's company — unlike other deal-detail routes that do check. Any broker or developer from one company can download another company's uploaded deal documents (LOIs, rent rolls, etc.) just by knowing/guessing a deal ID.
+
+5. Any user can mint a public share link for any tenant's deal
+File: server/routes.ts, line 8916 (POST /api/deals/:id/share)
+Why it matters: no ownership/role check before generating a public 7-day share token for a deal. Any logged-in user can create a public link exposing another company's deal to anyone who gets the URL.
+
+6. Deal memo PDF endpoint skips the per-deal ownership check used elsewhere
+File: server/routes.ts, line 9608 (GET /api/deals/:id/memo-pdf)
+Why it matters: it checks that the requesting developer's profile is active, but never calls the canDeveloperAccessDeal check that the sibling /full endpoint uses. Any Developer-role user can pull the full investment committee memo PDF for any deal ID in the system, not just their own.
+
+7. Pipeline endpoints and stage/priority updates ignore tenant ownership
+File: server/routes.ts, lines 29608, 29759 (GET /api/deals/pipeline, /pipeline/analytics) and 29640, 29730 (PUT /api/deals/:id/stage, /priority)
+Why it matters: these only check isAuthenticated with no company/broker filter. Any authenticated user can view every other company's full pipeline data, and can change the stage or priority of another company's deal — a cross-tenant write, not just a read leak.
+
+8. Valuation endpoints: missing auth with a "demo-user" fallback, and no ownership check on lookup by ID
+File: server/routes.ts, lines 27566, 27669 (POST /api/valuation/analyze, /share — no auth, falls back to a shared "demo-user-id") and 27734 (GET /api/valuation/:id — no check that the valuation belongs to the requester, unlike the /share endpoint nearby which does check)
+Why it matters: unauthenticated requests can create records under a shared demo identity (data-integrity risk), and any authenticated user can view any other broker's valuation by guessing the ID.
+
+9. Backup encryption key silently derives from the database URL if unset
+File: server/database/enhancedBackup.ts, lines 103-104
+Why it matters: if BACKUP_ENCRYPTION_KEY isn't set, the key is deterministically derived from DATABASE_URL (or the literal string "fallback" if that's unset too) rather than failing loudly or using a random secret — anyone who knows the DB connection string can derive the same key and decrypt backups.
+
+10. Unbounded full-table queries run on nearly every deal/broker request
+File: server/storage.ts, lines 1099 (getAllBrokers), 1610 (getAllDeals), 2140-2180 (getAllDealsWithBrokers) — called from 30+ routes including /api/deals/pipeline and /api/deals/stats
+Why it matters: these load the entire deals/brokers tables with no LIMIT, then filter in application code. As data grows this will slow every page load and eventually risk timeouts/OOM; it also means every tenant's dashboard scans the whole platform's data before any per-tenant filtering happens.
+
+Other notable but lower-priority items: no admin check on the broker-notify endpoint (routes.ts ~7179) which can enumerate broker PII; unauthenticated deal-blocking-status/emergency endpoints (~31393-32173); a partner invitation flow that silently never emails the invitee (~27812, marked TODO); and a super-admin analytics endpoint that returns a fabricated "active today" stat instead of real data (~21008).
