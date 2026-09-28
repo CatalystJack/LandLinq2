@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { deduplicateContactImportRows } from "@shared/contact-import-dedup";
 
 type ContactAvatarPerson = {
   label: string;
@@ -243,20 +244,19 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const stagedImportRows = rows
     .map((row) => Object.fromEntries(FIELDS.map(({ key }) => [key, mapping[key] ? row[mapping[key]] : ""])))
     .filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
+  const deduplicatedImport = deduplicateContactImportRows(stagedImportRows);
+  const importRowsToSubmit = deduplicatedImport.rows.map(({ row }) => row);
   const importValidationErrors: string[] = [];
   if (stagedImportRows.length > MAX_CONTACT_IMPORT_ROWS) {
     importValidationErrors.push(`The limit is ${MAX_CONTACT_IMPORT_ROWS.toLocaleString()} non-empty rows per import.`);
   }
-  const seenImportEmails = new Set<string>();
-  stagedImportRows.forEach((row, index) => {
-    const line = index + 2;
+  deduplicatedImport.rows.forEach(({ row, rowNumber }) => {
+    const line = rowNumber;
     const firstName = String(row.firstName || "").trim();
     const lastName = String(row.lastName || "").trim();
     const email = String(row.email || "").trim().toLowerCase();
     if (!firstName && !lastName && !email) importValidationErrors.push(`Row ${line} needs a name or email.`);
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) importValidationErrors.push(`Row ${line} has an invalid email address.`);
-    if (email && seenImportEmails.has(email)) importValidationErrors.push(`Row ${line} repeats email ${email}.`);
-    if (email) seenImportEmails.add(email);
     if (normalizeContactCategory(row.contactCategory) === null) importValidationErrors.push(`Row ${line} has an unsupported contact category.`);
   });
 
@@ -311,7 +311,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contacts: stagedImportRows,
+        contacts: importRowsToSubmit,
       }),
     }),
     onSuccess: (data) => {
@@ -987,10 +987,22 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
             <div className="py-8 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">✓</div><h3 className="font-semibold text-slate-900">Import complete</h3><p className="mt-2 text-sm text-slate-500">{result.inserted} inserted and {result.updated} updated.</p></div>
           ) : (
             <div className="space-y-5 py-2">
-              <p className="text-sm text-slate-600">{stagedImportRows.length.toLocaleString()} non-empty rows detected. Map available fields below; up to {MAX_CONTACT_IMPORT_ROWS.toLocaleString()} rows are allowed per import.</p>
+              <p className="text-sm text-slate-600">{stagedImportRows.length.toLocaleString()} non-empty rows detected; {importRowsToSubmit.length.toLocaleString()} unique rows will be imported. Map available fields below; up to {MAX_CONTACT_IMPORT_ROWS.toLocaleString()} rows are allowed per import.</p>
               <div className="grid gap-3 sm:grid-cols-2">{FIELDS.map((field) => (
                 <div key={field.key}><Label className="text-xs">{field.label}</Label><select value={mapping[field.key] || ""} onChange={(event) => setMapping((current) => ({ ...current, [field.key]: event.target.value }))} className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700"><option value="">Not mapped</option>{headers.map((header) => <option key={header} value={header}>{header}</option>)}</select></div>
               ))}</div>
+              {deduplicatedImport.duplicates.length > 0 && (
+                <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  <p className="mb-1 font-semibold">
+                    {deduplicatedImport.duplicates.length} duplicate {deduplicatedImport.duplicates.length === 1 ? "row" : "rows"} skipped (kept the first occurrence of each).
+                  </p>
+                  <ul className="max-h-36 space-y-1 overflow-y-auto break-words">
+                    {deduplicatedImport.duplicates.map(({ rowNumber, email }) => (
+                      <li key={`${rowNumber}-${email}`}>Row {rowNumber}: {email}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {importValidationErrors.length > 0 && (
                 <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
                   <p className="mb-1 font-semibold">Fix these rows before importing</p>
@@ -1000,8 +1012,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               )}
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
                 <p className="mb-2 font-semibold text-slate-800">Preview</p>
-                <div className="space-y-2">{stagedImportRows.slice(0, 3).map((row, index) => (
-                  <div key={index} className="border-t border-slate-200 pt-2 first:border-0 first:pt-0">
+                <div className="space-y-2">{deduplicatedImport.rows.slice(0, 3).map(({ row, rowNumber }) => (
+                  <div key={rowNumber} className="border-t border-slate-200 pt-2 first:border-0 first:pt-0">
                     <p className="font-medium text-slate-800">{row.firstName || ""} {row.lastName || ""} · {row.contactCategory || "Other"}</p>
                     <p>{row.email || "No email"} · {[row.city, row.stateRegion, row.postalCode].filter(Boolean).join(", ") || "No location"}</p>
                   </div>

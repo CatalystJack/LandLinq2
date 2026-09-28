@@ -67,6 +67,7 @@ import {
 import { isUsStateCode, normalizeUsStateCode } from "@shared/us-states";
 import { getBrokerStateCodes, getOutOfStateCodeFromCounty } from "@shared/broker-location";
 import { countyTargetMatchesDeal, parseCountyTarget } from "@shared/county-targets";
+import { deduplicateContactImportRows } from "@shared/contact-import-dedup";
 import { getDeveloperCrmContacts } from "./developerCrmContacts";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
@@ -5930,10 +5931,11 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         return res.status(400).json({ message: "contacts array required" });
       }
 
+      const { rows: uniqueRows } = deduplicateContactImportRows(rows);
       let inserted = 0;
       let updated = 0;
 
-      for (const row of rows) {
+      for (const { row } of uniqueRows) {
         const firstName = toTitleCase((row.firstName || "").trim());
         const lastName = toTitleCase((row.lastName || "").trim());
         const email = (row.email || "").trim().toLowerCase() || null;
@@ -17386,10 +17388,9 @@ RULES:
       }
 
       const validationErrors: string[] = [];
-      const seenEmails = new Set<string>();
       const allowedCategories = new Set(["broker", "attorney", "general_contractor", "other"]);
-      const validatedRows = rows.map((row: any, index: number) => {
-        const rowNumber = index + 2;
+      const { rows: uniqueRows } = deduplicateContactImportRows(rows);
+      const validatedRows = uniqueRows.map(({ row, rowNumber }) => {
         if (!row || typeof row !== "object" || Array.isArray(row)) {
           validationErrors.push(`Row ${rowNumber} is not a contact record.`);
           return null;
@@ -17419,8 +17420,6 @@ RULES:
 
         if (!firstName && !lastName && !email) validationErrors.push(`Row ${rowNumber} needs a name or email.`);
         if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) validationErrors.push(`Row ${rowNumber} has an invalid email address.`);
-        if (email && seenEmails.has(email)) validationErrors.push(`Row ${rowNumber} repeats an email address.`);
-        if (email) seenEmails.add(email);
         if (rawCategory && !allowedCategories.has(contactCategory)) validationErrors.push(`Row ${rowNumber} has an unsupported contact category.`);
         return {
           firstName,

@@ -1,0 +1,40 @@
+I want to finalize the deals@landlinq.ai automatic email intake. Do this in
+stages, and stop for my confirmation between each one — don't flip
+EMAIL_SCRAPING_ENABLED permanently on without me explicitly approving after
+seeing real results.
+
+Stage 1 — Confirm the secret exists:
+Check that process.env.DEALS_EMAIL_PASSWORD is set (both in this
+development environment and in production/deployment secrets, if they're
+managed separately). Don't print the value — just confirm presence/absence
+in each environment. Report back.
+
+Stage 2 — Confirm IMAP login works:
+Using imapDealsPoller.ts's createProductionClient(), write a small one-off
+script that connects and logs out only (no search/fetch, so it doesn't
+touch or process any real mail yet). Confirm the login succeeds against
+imap.secureserver.net for deals@landlinq.ai. Report the result, then stop.
+
+Stage 3 — One real end-to-end test:
+Tell me here when you're ready for this stage — I'll personally send one
+real test deal email to deals@landlinq.ai myself. Once I confirm it's
+sent, temporarily enable EMAIL_SCRAPING_ENABLED (or manually invoke
+pollDealsMailboxImap() once) to process just that one poll cycle. Then
+show me:
+- Whether the message was picked up and marked read
+- What row was created in emailIntakeQueue, and whether a deal was created
+  from it (or why not, if it landed in manual review)
+- The routing reason that got persisted for it (per this repo's own
+  email-intake-routing-audit note — every automated outcome must record
+  why it landed where it did)
+- Any errors in the logs
+
+Then set EMAIL_SCRAPING_ENABLED back to false and wait for me to review
+the result before deciding whether to leave it on permanently.
+
+Stage 4 — only after I explicitly say the test looked right:
+Set EMAIL_SCRAPING_ENABLED = true for real, and confirm the deployed
+scheduler log shows the poller running.
+
+Do not skip ahead to a later stage without my go-ahead. Show diffs before
+committing any code changes, same as always.
