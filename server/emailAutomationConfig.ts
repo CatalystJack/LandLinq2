@@ -1,5 +1,7 @@
 /**
- * Shared kill switch for production IMAP mailbox intake.
- * Webhook-based email ingress has been retired.
+ * Shared kill switch for every automatic email-to-deal ingress.
+ * Keep Graph and webhook behavior aligned so one switch stops all automation.
  */
-export const EMAIL_SCRAPING_ENABLED = true;
+// Keep disabled until the direct IMAP path has passed controlled verification
+// against the GoDaddy-hosted deals@landlinq.ai mailbox.
+export const EMAIL_SCRAPING_ENABLED = false;

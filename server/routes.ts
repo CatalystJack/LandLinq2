@@ -394,6 +394,7 @@ import {
   logSecurityEvent
 } from "./security";
 import { logAuditTrail, rateLimitMiddleware } from "./auditLogger";
+import { EmailInboundService } from "./emailInboundService";
 import { SMSInboundService } from "./smsInboundService";
 import { classificationProgressTracker } from "./classificationProgress";
 import { Client as ReplitObjectStorageClient } from "@replit/object-storage";
@@ -3249,7 +3250,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
   });
 
-  // Inbound deal emails are polled from the GoDaddy mailbox over IMAP.
+  // Email webhook removed - using /api/webhooks/email instead
 
   // Auth routes handled by auth.ts
 
@@ -25032,50 +25033,35 @@ RULES:
 
   // REMOVED: Legacy /api/webhooks/sms endpoint - use /api/sms/webhook instead
 
-  // Pasted emails use the same review queue as other manually submitted intake.
-  app.post("/api/emails/manual", isAuthenticated, dealSubmissionLimiter, validateDealSubmission, async (req, res) => {
+  // Manual Email Processing Endpoint - IMMEDIATE SOLUTION
+  app.post("/api/emails/manual", isAuthenticated, validateDealSubmission, async (req, res) => {
     try {
       const { emailText, forwarderEmail } = req.body;
-      if (typeof emailText !== "string" || emailText.length === 0) {
+      
+      if (!emailText) {
         return res.status(400).json({ message: "Email text required" });
       }
-      if (emailText.length > 40_000) {
-        return res.status(413).json({ message: "Email text must be 40,000 characters or less" });
-      }
 
-      const forwardedBlock = emailText.match(/(?:forwarded message|original message)[\s\S]*$/i)?.[0];
-      const fromHeader = forwardedBlock?.match(/^\s*From:\s*(.+)$/im)?.[1]
-        ?? emailText.match(/^\s*From:\s*(.+)$/im)?.[1];
-      const fromMatch = fromHeader?.match(/<([^>\s]+@[^>\s]+)>|([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i);
-      const from = (fromMatch?.[1] || fromMatch?.[2] || forwarderEmail || "").trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from)) {
-        return res.status(400).json({ message: "Provide the original sender's email address or include it in the pasted headers" });
+      // Import email bridge
+      const { emailBridge } = await import('./emailBridge');
+      
+      const result = await emailBridge.processEmailText(emailText, forwarderEmail);
+      
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          dealId: result.dealId,
+          message: "Email processed successfully - deal created!"
+        });
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          error: result.error 
+        });
       }
-      if (/@(?:landlinq\.ai|catalystcp\.com)$/i.test(from)) {
-        return res.status(400).json({ message: "Use the broker's email address, not an internal forwarding address" });
-      }
-
-      const subject = emailText.match(/^\s*Subject:\s*(.+)$/im)?.[1]?.trim() || "(Manual Submission)";
-      const { EmailIntakeService } = await import("./emailIntakeService.js");
-      const result = await EmailIntakeService.processInboundEmail({
-        from,
-        to: "deals@landlinq.ai",
-        subject,
-        text: emailText.trim(),
-        html: "",
-        envelope: JSON.stringify({ to: ["deals@landlinq.ai"] }),
-      });
-      if (!result) {
-        return res.status(409).json({ message: "This email was a duplicate or could not be queued" });
-      }
-      return res.json({
-        success: true,
-        intakeId: result.intakeId,
-        message: "Email added to the intake queue for analyst review.",
-      });
     } catch (error) {
-      console.error("❌ Manual email intake error:", error);
-      res.status(500).json({ message: "Failed to queue email for review" });
+      console.error('❌ Manual email processing error:', error);
+      res.status(500).json({ message: "Failed to process email" });
     }
   });
 
@@ -25090,7 +25076,8 @@ RULES:
     }
   });
   
-  // Retired email webhook ingress; mailbox intake uses the production IMAP poller.
+  // ENABLED - Email webhook for SendGrid Inbound Parse
+  app.post("/api/webhooks/email", emailWebhookUpload.any(), EmailInboundService.handleInboundEmail);
 
   // Update the main deal submission to use enhanced screening
   app.patch("/api/deals", dealSubmissionLimiter, async (req, res) => {
@@ -28451,13 +28438,10 @@ RULES:
   });
 
   // POST /api/email-intake/manual-submit — paste an email directly for AI parsing
-  app.post('/api/email-intake/manual-submit', isAuthenticated, dealSubmissionLimiter, async (req, res) => {
+  app.post('/api/email-intake/manual-submit', isAuthenticated, async (req, res) => {
     try {
       const { from, subject, text } = req.body;
       if (!from || !text) return res.status(400).json({ message: 'from and text are required' });
-      if (typeof text !== "string" || text.length > 40_000) {
-        return res.status(413).json({ message: "Email text must be 40,000 characters or less" });
-      }
       const { EmailIntakeService } = await import('./emailIntakeService.js');
       const result = await EmailIntakeService.processInboundEmail({
         from,
@@ -28511,7 +28495,60 @@ RULES:
     }
   });
 
-  // Automatic mailbox intake is handled only by the production IMAP poller.
+  // ── Inbound email webhook (SendGrid Inbound Parse → intake queue) ──────────
+  // Email ingestion webhook endpoint for SendGrid Inbound Parse - MUST BE BEFORE catch-all
+  // Uses multer callback mode so parse errors don't propagate to Express 500 handler
+  app.post('/api/inbound-email', (req: any, res: any) => {
+    emailWebhookUpload.any()(req, res, (multerErr: any) => {
+      // Always respond 200 to SendGrid immediately — even on parse error
+      // (SendGrid retries on any non-2xx, creating duplicate processing)
+      if (multerErr) {
+        console.error('⚠️ [INBOUND] Multer parse error (still returning 200):', multerErr.message);
+      }
+      res.status(200).json({ message: 'Email received and queued for analyst review.' });
+      // Process asynchronously after response is sent
+      (async () => {
+        try {
+          const { EmailIntakeService } = await import('./emailIntakeService.js');
+          const result = await EmailIntakeService.processInboundEmail(req.body || {}, req.files || []);
+          if (result) {
+            console.log(`✅ [INBOUND] Email saved to intake queue: ${result.intakeId}`);
+          }
+        } catch (error) {
+          console.error('❌ [INBOUND] Error saving to intake queue:', error);
+        }
+      })();
+    });
+  });
+
+
+  // NEW INBOUND MESSAGE PROCESSING WEBHOOK ENDPOINTS 
+  // These endpoints handle inbound messages, create communication records, and process deal information
+
+  // WEBHOOK HEALTH CHECK ENDPOINT - Test if webhook endpoint is reachable
+  app.get('/api/webhooks/email-inbound/health', (req, res) => {
+    console.log('🏥 Webhook health check requested');
+    res.json({
+      status: 'healthy',
+      endpoint: '/api/webhooks/email-inbound',
+      timestamp: new Date().toISOString(),
+      message: 'Webhook endpoint is reachable and ready to receive emails',
+      expectedUrl: `https://${req.get('host')}/api/webhooks/email-inbound`,
+      instructions: 'Configure this URL in SendGrid Inbound Parse settings for deals@landlinq.ai'
+    });
+  });
+
+  // Email Webhook Handler for SendGrid Inbound Parse (with SECURE signature verification and rate limiting)
+  app.post('/api/webhooks/email-inbound', express.raw({type: '*/*', limit: '10mb'}), webhookRateLimit, async (req, res) => {
+    // EMAIL SCRAPING DISABLED — return 200 so SendGrid does not retry
+    console.log('📧 [DISABLED] /api/webhooks/email-inbound received but email-to-deal scraping is turned off.');
+    console.log('🔍 [DUPLICATE-DEBUG] Disabled webhook source details:', {
+      timestamp: new Date().toISOString(),
+      sourceIP: req.ip || req.connection?.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
+      userAgent: req.get('user-agent') || 'unknown',
+      contentType: req.get('content-type') || 'unknown',
+    });
+    return res.status(200).json({ message: 'Email received. Automatic deal creation is currently disabled.' });
     /*
     try {
       console.log('\n' + '='.repeat(100));
@@ -28779,8 +28816,18 @@ RULES:
       res.status(500).json({ error: 'Internal server error processing email' });
     }
     */
+  });
 
-  /*
+  // SENDGRID INBOUND PARSE WEBHOOK - Proper multipart handling for deals@landlinq.ai
+  // Configure proper multer middleware for SendGrid's multipart/form-data format
+  const sendgridWebhookUpload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB for attachments
+  });
+  
+  app.post('/webhooks/landlinq-inbound', sendgridWebhookUpload.any(), webhookRateLimit, async (req, res) => {
+    return res.status(410).json({ error: 'This inbound provider webhook is no longer supported.' });
+    /*
     try {
       console.log('📧 Received SendGrid inbound email webhook');
       console.log('📧 Content-Type:', req.get('Content-Type') || 'Unknown');
@@ -29059,6 +29106,45 @@ RULES:
       res.status(500).json({ error: 'Failed to process SendGrid webhook' });
     }
     */
+  });
+
+  // MANUAL EMAIL TEST ENDPOINT - for testing email processing without SendGrid
+  app.post('/api/test/process-email', async (req, res) => {
+    try {
+      console.log('🧪 Manual email test triggered');
+      
+      const { from, subject, body, address } = req.body;
+      
+      // Create test email data
+      const emailData = {
+        from: from || 'test@example.com',
+        to: 'help@landlinq.ai',
+        subject: subject || 'Test Deal Submission',
+        text: body || `Property submission: ${address || '123 Main St, Charlotte, NC 28202'}`,
+        html: '',
+        attachments: [],
+        headers: {}
+      };
+      
+      console.log(`🧪 Processing test email from ${emailData.from}`);
+      console.log(`🧪 Email body: ${emailData.text}`);
+      
+      // Process using EmailInboundService
+      const formattedReq = {
+        body: emailData,
+        headers: {},
+        get: () => undefined
+      } as any;
+      
+      await EmailInboundService.handleInboundEmail(formattedReq, res);
+      return;
+      
+    } catch (error) {
+      console.error('❌ Manual email test error:', error);
+      res.status(500).json({ error: 'Failed to process test email', details: error });
+    }
+  });
+
   // SMS Webhook Handler for Twilio (with SECURE signature verification and rate limiting)
   // UPDATED: Use new SMSInboundService with property detection and conversation routing
   app.post('/api/webhooks/sms-inbound', express.urlencoded({extended: true}), webhookRateLimit, async (req, res) => {

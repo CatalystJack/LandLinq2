@@ -110,12 +110,14 @@ The system implements an idempotent notification system using `EventDispatchServ
 *   **GPT-5 (OpenAI)**: Intelligent parsing and content analysis.
 
 ## Email Intake Queue (email-to-deal pipeline)
-*   Production polls the GoDaddy-hosted `deals@landlinq.ai` mailbox directly over IMAP; development does not poll the live mailbox.
-*   IMAP messages use the automated email intake and deal-routing pipeline. Authenticated pasted emails are parsed into the `email_intake_queue` for analyst review.
+*   Inbound emails to `deals@landlinq.ai` POST to `/api/inbound-email` via SendGrid Inbound Parse.
+*   `server/emailIntakeService.ts` parses with GPT-4o (Vision for images, pdf-parse for PDFs), deduplicates by SHA-256 hash, and saves a pending record to `email_intake_queue` table.
+*   Analysts visit `/email-intake` to review each email, edit parsed fields, then Approve (creates deal + queues enrichment job) or Reject.
+*   Nothing auto-posts to the `deals` table — every email requires explicit analyst approval.
 *   API routes: `GET /api/email-intake?status=pending|approved|rejected`, `GET /api/email-intake/count`, `POST /api/email-intake/:id/approve`, `POST /api/email-intake/:id/reject`, `PATCH /api/email-intake/:id`.
 
 ## Communication Integration
 *   **Twilio**: SMS integration.
-*   **GoDaddy IMAP**: Inbound deals mailbox polling.
+*   **SendGrid**: Email services, including Inbound Parse Email webhook.
 *   **Microsoft Graph API**: For Outlook OAuth connection in outreach.
 *   **HubSpot API**: CRM integration for contact management and webhooks.

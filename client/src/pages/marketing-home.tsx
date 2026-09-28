@@ -620,7 +620,7 @@ function SharedWorkspaceMockup() {
 
 function InvestmentCompanyDemo() {
   const [activeScreen, setActiveScreen] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const screens = [
     { label: "Deal Dashboard", detail: "Screen every opportunity", render: <DashboardMockup compact /> },
     { label: "Pipeline", detail: "Move the right deals forward", render: <PipelineWorkspaceMockup /> },
@@ -632,29 +632,10 @@ function InvestmentCompanyDemo() {
   ];
 
   useEffect(() => {
-    const smallScreen = window.matchMedia("(max-width: 768px)");
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const pauseForMotionSettings = () => {
-      if (smallScreen.matches || reducedMotion.matches) setIsPlaying(false);
-    };
-
-    if (!smallScreen.matches && !reducedMotion.matches) setIsPlaying(true);
-    smallScreen.addEventListener("change", pauseForMotionSettings);
-    reducedMotion.addEventListener("change", pauseForMotionSettings);
-
-    return () => {
-      smallScreen.removeEventListener("change", pauseForMotionSettings);
-      reducedMotion.removeEventListener("change", pauseForMotionSettings);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!isPlaying) return;
-    const smallScreen = window.matchMedia("(max-width: 768px)").matches;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const interval = window.setInterval(() => {
       setActiveScreen((current) => (current + 1) % screens.length);
-    }, smallScreen || reducedMotion ? 8000 : 4600);
+    }, 4600);
     return () => window.clearInterval(interval);
   }, [isPlaying, screens.length]);
 
@@ -736,7 +717,7 @@ function HeroStats() {
       <div className="mx-auto grid max-w-7xl sm:grid-cols-2 lg:grid-cols-4">
         {heroStats.map((stat) => (
           <div className="ll-hero-stat" key={stat.label}>
-              <strong className="font-serif" style={{ transform: `scale(${0.94 + progress * 0.06})` }}>
+            <strong className="font-serif" style={{ transform: `scale(${0.78 + progress * 0.22})` }}>
               {stat.format(stat.value * progress)}
             </strong>
             <p>{stat.label}</p>
@@ -786,7 +767,7 @@ export default function MarketingHome() {
           <div className="relative mx-auto max-w-7xl">
              <div className="flex flex-col items-center gap-8 sm:gap-10 lg:gap-12">
               <div className="max-w-5xl text-center">
-                  <h1 className="ll-reveal text-balance text-[clamp(2.65rem,12vw,3.75rem)] font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[4.5rem]">Your supercharged<br /><span className="text-[#6EC6F3]">acquisitions operating system.</span></h1>
+                  <h1 className="ll-reveal text-balance text-[clamp(2.65rem,12vw,3.75rem)] font-semibold leading-[0.96] tracking-[-0.06em] sm:text-7xl lg:text-[4.5rem]">Your supercharged<br /><span className="text-[#55C3E9]">acquisitions operating system.</span></h1>
                  <p className="ll-reveal ll-delay-2 mx-auto mt-5 max-w-lg text-base leading-6 text-white/68 sm:mt-6 sm:text-lg sm:leading-7">LandLinq opens the lead funnel wide, screens opportunities against your criteria, and keeps outreach moving, so lean teams can do more with less.</p>
                  <div className="ll-reveal ll-delay-3 mt-6 flex w-full max-w-xs flex-col justify-center gap-3 sm:mt-7 sm:max-w-none sm:flex-row"><Button dark>Get in touch</Button><Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/30 px-5 text-sm font-semibold text-white transition-all duration-300 hover:border-white hover:bg-white hover:text-landlinq-blue">Log In</Link></div>
               </div>
@@ -903,7 +884,7 @@ export default function MarketingHome() {
                      <input aria-label="Your email" type="email" required value={contactForm.email} onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })} placeholder="you@company.com" className="h-14 rounded-full border border-white/25 bg-transparent px-6 text-base text-white outline-none transition-colors placeholder:text-white/40 focus:border-white/60" />
                   </div>
                     <textarea aria-label="Your message" required rows={5} value={contactForm.message} onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })} placeholder="How can we help?" className="mt-4 min-h-[150px] w-full resize-none rounded-3xl border border-white/25 bg-transparent p-5 text-base leading-7 text-white outline-none transition-colors placeholder:text-white/40 focus:border-white/60" />
-                    <button type="submit" disabled={contactStatus === "sending"} className="ll-message-submit mt-4 inline-flex h-12 items-center rounded-full border border-transparent bg-white px-7 text-sm font-semibold text-primary transition-all disabled:opacity-60">{contactStatus === "sending" ? "Sending…" : "Send message"}</button>
+                    <button type="submit" disabled={contactStatus === "sending"} className="mt-4 h-12 rounded-full bg-white px-7 text-sm font-semibold text-primary transition-colors hover:bg-white/90 disabled:opacity-60">{contactStatus === "sending" ? "Sending…" : "Send message"}</button>
                   {contactStatus === "error" && <p role="alert" className="mt-3 text-sm text-red-200">{contactError}</p>}
                 </>}
               </form>
