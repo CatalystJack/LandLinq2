@@ -81,7 +81,7 @@ function enforcePlatformRolePolicy<T extends SelectUser | null | undefined>(user
   return user;
 }
 
-export function setupAuth(app: Express) {
+export function setupAuthMiddleware(app: Express) {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {
     throw new Error("SESSION_SECRET is required; refusing to start with insecure session configuration");
@@ -327,7 +327,9 @@ export function setupAuth(app: Express) {
       done(error);
     }
   });
+}
 
+export function setupAuthRoutes(app: Express) {
   app.post("/api/register", (_req, res) => {
     return res.status(403).json({
       message: "Public registration is disabled. Contact a LandLinq administrator for an account.",

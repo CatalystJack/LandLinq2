@@ -52,7 +52,7 @@ import {
   dealShareTokens,
 } from "@shared/schema";
 import { or, like, ilike, eq, ne, desc, asc, gte, lte, gt, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
-import { setupAuth, isAuthenticated, hashPassword, comparePasswords, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
+import { setupAuthMiddleware, setupAuthRoutes, isAuthenticated, hashPassword, comparePasswords, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
 import { isAnalyticsAuthorized } from "@shared/admin-auth";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
@@ -391,6 +391,7 @@ import { outreachService, OutreachService } from "./services/outreachService";
 import { insertOutreachCampaignSchema, updateOutreachCampaignSchema, insertOutreachRunSchema, insertOutreachMessageSchema } from "@shared/schema";
 import { 
   setupSecurity, 
+  setupGlobalRateLimit,
   strictRateLimit, 
   validateDealSubmission, 
   validateBrokerRegistration, 
@@ -2178,14 +2179,17 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   
   // Security middleware - must be first
   setupSecurity(app);
+  // Load the session and Passport identity before applying the general limiter.
+  setupAuthMiddleware(app);
+  setupGlobalRateLimit(app);
   
-  // SMS webhook for inbound SMS processing (Twilio) - MUST be before auth
-  // IMPORTANT: Twilio sends form-urlencoded data, so we need this middleware
+  // Public Twilio inbound route; signature validation is handled by SMSInboundService.
+  // Twilio sends form-urlencoded data, so register its parser on this route.
   app.post('/api/sms/webhook', express.urlencoded({ extended: true }), async (req, res) => {
     await SMSInboundService.handleInboundSMS(req, res);
   });
 
-  // Setup SMS testing routes (MUST be before auth for testing)
+  // Setup optional SMS test routes before the application route handlers.
   // Only load in explicit development mode to prevent deployment issues
   if (process.env.NODE_ENV === 'development' && process.env.ENABLE_TEST_OPERATIONS === 'true') {
     try {
@@ -2196,7 +2200,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
   }
 
-  // Test endpoint for daily digest - MUST be before auth
+  // This developer test action is protected by its explicit authentication guard.
   app.get('/api/test-daily-digest', isAuthenticated, async (req, res) => {
     try {
       console.log('🧪 Manual test of daily digest triggered');
@@ -2400,8 +2404,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
   // PDF File serving endpoint for deal attachments
   // Handles /objects/* paths - files are protected by UUID-based paths (not guessable)
-  // Note: Authentication removed because route was defined before setupAuth() and
-  // files are already protected by unique UUID paths in object storage
+  // Files are addressed by unique UUID paths in object storage rather than session auth.
   // CRITICAL FIX (Dec 4, 2025): Resolve /objects/email-attachments/... to full bucket path
   app.get('/objects/:objectPath(*)', async (req, res) => {
     try {
@@ -2676,7 +2679,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
   });
 
-  // PUBLIC DEAL SUBMISSION ENDPOINT (instant response with background processing) - MUST be before auth
+  // Public deal submission uses its own IP-based limiter and upload controls.
   app.post('/api/deals/submit', dealSubmissionLimiter, dealSubmissionUpload.array('files', 10), async (req, res) => {
     try {
       console.log('\n' + '='.repeat(100));
@@ -2894,8 +2897,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
   });
 
-  // Auth middleware - using our own user/password system
-  setupAuth(app);
+  // Authentication endpoints using our own user/password system
+  setupAuthRoutes(app);
   registerBrokerStateImportRoutes(app);
   registerSharedBrokerStateImportRoutes(app);
 
@@ -30580,7 +30583,7 @@ RULES:
   // Store broadcast function for use in deal creation
   (app as any).broadcastNotification = broadcastNotification;
   
-  // SMS testing routes already setup above before auth
+  // SMS testing routes were registered above.
 
   // Test missing info follow-up email endpoint
   app.post('/api/test-missing-info-email', async (req, res) => {

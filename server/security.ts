@@ -13,21 +13,26 @@ interface RateLimitStore {
 
 const rateLimitStore: RateLimitStore = {};
 
-// Enhanced rate limiting configuration
-const RATE_LIMIT_CONFIG = {
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 200, // Increased for better UX while maintaining security
-  message: "Too many requests from this IP, please try again later.",
-  skipSuccessfulRequests: false,
-  skipFailedRequests: false,
+type RateLimitConfig = {
+  windowMs: number;
+  maxRequests: number;
+  message: string;
+  keyStrategy?: "identity" | "ip";
 };
 
-const STRICT_RATE_LIMIT_CONFIG = {
+// Enhanced rate limiting configuration
+const RATE_LIMIT_CONFIG: RateLimitConfig = {
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 200, // Increased for better UX while maintaining security
+  message: "Too many requests for this account or IP, please try again later.",
+  keyStrategy: "identity",
+};
+
+const STRICT_RATE_LIMIT_CONFIG: RateLimitConfig = {
   windowMs: 5 * 60 * 1000, // 5 minutes for sensitive endpoints
   maxRequests: 15, // Slightly increased for better usability
   message: "Rate limit exceeded for this endpoint, please try again later.",
-  skipSuccessfulRequests: false,
-  skipFailedRequests: false,
+  keyStrategy: "ip",
 };
 
 // API-specific rate limits for better granular control
@@ -90,7 +95,8 @@ export function createApiRateLimit(apiType: keyof typeof API_RATE_LIMITS) {
   const config = API_RATE_LIMITS[apiType];
   return rateLimit({
     ...RATE_LIMIT_CONFIG,
-    ...config
+    ...config,
+    keyStrategy: "ip",
   });
 }
 
@@ -171,14 +177,24 @@ const RATE_LIMIT_EXEMPT_PATHS = [
 /**
  * Rate limiting middleware
  */
-export function rateLimit(config = RATE_LIMIT_CONFIG) {
+export function rateLimit(config: RateLimitConfig = RATE_LIMIT_CONFIG) {
   return (req: Request, res: Response, next: NextFunction) => {
     // Skip rate limiting for exempt paths (frequently polled status endpoints)
     if (RATE_LIMIT_EXEMPT_PATHS.some(path => req.path === path || req.path.startsWith(path))) {
       return next();
     }
     
-    const key = `${req.ip}:${req.path}`;
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    const requestIdentity = (req as any).user?.id;
+    const brokerPortalIdentity = (req as any).session?.brokerPortalId;
+    const identity = config.keyStrategy === "ip"
+      ? null
+      : requestIdentity != null
+        ? `user:${requestIdentity}`
+        : brokerPortalIdentity != null
+          ? `broker:${brokerPortalIdentity}`
+          : null;
+    const key = `${identity || `ip:${ip}`}:${req.path}`;
     const now = Date.now();
     
     // Clean up expired entries
@@ -750,8 +766,13 @@ export function setupSecurity(app: Express) {
   // Apply SQL injection prevention to all routes
   app.use(preventSQLInjection);
   
-  // Apply general rate limiting to all routes
-  app.use(rateLimit());
-  
   console.log('✅ Security middleware initialized');
+}
+
+/**
+ * Apply the general limiter after session and Passport middleware so authenticated
+ * accounts are counted independently even when they share an IP address.
+ */
+export function setupGlobalRateLimit(app: Express) {
+  app.use(rateLimit());
 }
