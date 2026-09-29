@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +33,12 @@ interface BrokerStatistics {
     sms: number;
     form: number;
   };
+}
+
+interface BrokerDirectoryPage {
+  brokers: Broker[];
+  nextCursor: string | null;
+  hasMore: boolean;
 }
 
 // Editing broker type - marketsCovered as string for form input
@@ -126,6 +132,7 @@ export default function BrokerManagement() {
   const queryClient = useQueryClient();
   const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [selectedBroker, setSelectedBroker] = useState<Broker | null>(null);
   const [editingBroker, setEditingBroker] = useState<EditingBroker | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -134,11 +141,83 @@ export default function BrokerManagement() {
   const [highlightedBrokerId, setHighlightedBrokerId] = useState<string | null>(null);
   const brokerCardRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
-  // Fetch brokers
-  const { data: brokers = [], isLoading } = useQuery<Broker[]>({
-    queryKey: ["/api/brokers"],
-    enabled: isAuthenticated,
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearchQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
+  const isSearchMode = searchQuery.trim().length > 0;
+  const isSearchReady = searchQuery.trim().length >= 2 &&
+    searchQuery.trim() === debouncedSearchQuery;
+
+  const brokerDirectoryQuery = useInfiniteQuery({
+    queryKey: ["/api/brokers", "directory"],
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam, signal }): Promise<BrokerDirectoryPage> => {
+      const params = new URLSearchParams({ limit: "50" });
+      if (pageParam) params.set("cursor", pageParam);
+      const response = await fetch(`/api/brokers?${params}`, {
+        credentials: "include",
+        signal,
+      });
+      if (!response.ok) throw new Error((await response.text()) || "Failed to fetch brokers");
+      return response.json();
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: isAuthenticated && !isSearchMode,
   });
+
+  const brokerSearchQuery = useInfiniteQuery({
+    queryKey: ["/api/brokers", "search", debouncedSearchQuery],
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam, signal }): Promise<BrokerDirectoryPage> => {
+      const params = new URLSearchParams({ query: debouncedSearchQuery, limit: "50" });
+      if (pageParam) params.set("cursor", pageParam);
+      const response = await fetch(`/api/brokers/search?${params}`, {
+        credentials: "include",
+        signal,
+      });
+      if (!response.ok) throw new Error((await response.text()) || "Failed to search brokers");
+      return response.json();
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: isAuthenticated && isSearchReady,
+  });
+
+  const visiblePages = isSearchMode
+    ? isSearchReady ? brokerSearchQuery.data?.pages || [] : []
+    : brokerDirectoryQuery.data?.pages || [];
+  const loadedBrokers = visiblePages.flatMap((page) => page.brokers);
+  const deepLinkBrokerId = new URLSearchParams(window.location.search).get("brokerId");
+  const deepLinkBrokerQuery = useQuery<Broker>({
+    queryKey: ["/api/brokers", deepLinkBrokerId],
+    enabled: Boolean(isAuthenticated && deepLinkBrokerId) &&
+      !loadedBrokers.some((broker) => broker.id === deepLinkBrokerId),
+    retry: false,
+  });
+  const deepLinkBroker = !isSearchMode ? deepLinkBrokerQuery.data : undefined;
+  const brokers = deepLinkBroker && !loadedBrokers.some((broker) => broker.id === deepLinkBroker.id)
+    ? [deepLinkBroker, ...loadedBrokers]
+    : loadedBrokers;
+  const isLoading = isSearchMode
+    ? isSearchReady && brokerSearchQuery.isLoading
+    : brokerDirectoryQuery.isLoading;
+  const hasNextPage = isSearchMode
+    ? isSearchReady && Boolean(brokerSearchQuery.hasNextPage)
+    : Boolean(brokerDirectoryQuery.hasNextPage);
+  const isFetchingNextPage = isSearchMode
+    ? brokerSearchQuery.isFetchingNextPage
+    : brokerDirectoryQuery.isFetchingNextPage;
+
+  const loadNextPage = () => {
+    if (isSearchMode) {
+      if (brokerSearchQuery.hasNextPage && !brokerSearchQuery.isFetchingNextPage) {
+        void brokerSearchQuery.fetchNextPage();
+      }
+    } else if (brokerDirectoryQuery.hasNextPage && !brokerDirectoryQuery.isFetchingNextPage) {
+      void brokerDirectoryQuery.fetchNextPage();
+    }
+  };
   
   // Handle brokerId from URL query parameter - scroll to and highlight the broker
   useEffect(() => {
@@ -212,24 +291,6 @@ export default function BrokerManagement() {
     },
   });
 
-  // Filter brokers based on search query
-  const filteredBrokers = brokers.filter((broker) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    const marketsText = Array.isArray(broker.marketsCovered) 
-      ? broker.marketsCovered.join(' ').toLowerCase()
-      : (broker.marketsCovered || '').toLowerCase();
-    
-    return (
-      broker.firstName?.toLowerCase().includes(query) ||
-      broker.lastName?.toLowerCase().includes(query) ||
-      broker.email?.toLowerCase().includes(query) ||
-      broker.phone?.toLowerCase().includes(query) ||
-      broker.brokerage?.toLowerCase().includes(query) ||
-      marketsText.includes(query)
-    );
-  });
-
   const openEditDialog = (broker: Broker) => {
     // Convert broker to editing format (marketsCovered as string)
     const editingData: EditingBroker = {
@@ -251,9 +312,11 @@ export default function BrokerManagement() {
       lastName: editingBroker.lastName,
       email: editingBroker.email,
       phone: editingBroker.phone,
-      marketsCovered: editingBroker.marketsCovered 
-        ? editingBroker.marketsCovered.split(',').map(market => market.trim()).filter(market => market.length > 0)
-        : [],
+      marketsCovered: editingBroker.marketsCovered
+        .split(',')
+        .map((market) => market.trim())
+        .filter((market) => market.length > 0)
+        .join(', '),
       brokerage: editingBroker.brokerage,
       yearsExperience: editingBroker.yearsExperience,
       isActive: editingBroker.isActive,
@@ -304,7 +367,7 @@ export default function BrokerManagement() {
         </div>
         <div className="flex items-center gap-3">
           <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-            {filteredBrokers.length} Brokers
+            {brokers.length} Brokers loaded
           </Badge>
         </div>
       </div>
@@ -333,7 +396,7 @@ export default function BrokerManagement() {
 
       {/* Brokers Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredBrokers.map((broker) => (
+        {brokers.map((broker) => (
           <Card 
             key={broker.id} 
             ref={(el) => { brokerCardRefs.current[broker.id] = el; }}
@@ -426,16 +489,37 @@ export default function BrokerManagement() {
         ))}
       </div>
 
-      {filteredBrokers.length === 0 && (
+      {hasNextPage && (
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            onClick={loadNextPage}
+            disabled={isFetchingNextPage}
+            data-testid="load-more-brokers"
+          >
+            {isFetchingNextPage ? "Loading brokers..." : "Load more brokers"}
+          </Button>
+        </div>
+      )}
+
+      {brokers.length === 0 && (
         <Card>
           <CardContent className="py-8">
             <div className="text-center text-gray-500 dark:text-gray-400">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-medium mb-2">No brokers found</h3>
+              <h3 className="text-lg font-medium mb-2">
+                {isSearchMode && searchQuery.trim().length < 2
+                  ? "Enter at least 2 characters"
+                  : isSearchMode && !isSearchReady
+                    ? "Searching brokers..."
+                    : "No brokers found"}
+              </h3>
               <p>
-                {searchQuery
-                  ? "No brokers match your search criteria."
-                  : "No brokers are currently registered."}
+                {isSearchMode && searchQuery.trim().length < 2
+                  ? "Search the full directory by entering at least two characters."
+                  : isSearchMode
+                    ? "No brokers match your search criteria."
+                    : "No brokers are currently registered."}
               </p>
             </div>
           </CardContent>

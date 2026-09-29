@@ -68,6 +68,11 @@ import { isUsStateCode, normalizeUsStateCode } from "@shared/us-states";
 import { getBrokerStateCodes, getOutOfStateCodeFromCounty } from "@shared/broker-location";
 import { countyTargetMatchesDeal, parseCountyTarget } from "@shared/county-targets";
 import { getDeveloperCrmContacts } from "./developerCrmContacts";
+import {
+  decodeBrokerDirectoryCursor,
+  encodeBrokerDirectoryCursor,
+  parseBrokerDirectoryLimit,
+} from "./brokerDirectory";
 import { insertBrokerSchema, insertDealSchema, insertCommunicationSchema, insertBrandSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
@@ -4103,26 +4108,68 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
   // Get all brokers
   app.get("/api/brokers", isAuthenticated, async (req, res) => {
+    const startedAt = Date.now();
     try {
+      const limit = parseBrokerDirectoryLimit(req.query.limit);
+      const rawCursor = req.query.cursor;
+      const cursor = rawCursor === undefined ? null : decodeBrokerDirectoryCursor(rawCursor);
+      if (rawCursor !== undefined && !cursor) {
+        return res.status(400).json({ message: "Invalid broker directory cursor" });
+      }
+
       // Demo sandbox: return only the demo user's broker
       const reqEmail = ((req as any).user?.claims?.email || (req as any).user?.email || '').toLowerCase();
       if (reqEmail === 'demo@catalystcp.com') {
         const demoUser = await storage.getUserByEmail('demo@catalystcp.com');
         if (demoUser) {
           const demoBroker = await storage.getBrokerByUserId(demoUser.id);
-          return res.json(demoBroker ? [demoBroker] : []);
+          const brokers = demoBroker ? [demoBroker] : [];
+          const pageBrokers = brokers.slice(0, limit);
+          const hasMore = false;
+          const nextCursor = null;
+          console.info("[broker-directory] list", {
+            role: "demo",
+            rowsFetched: brokers.length,
+            rowsReturned: pageBrokers.length,
+            elapsedMs: Date.now() - startedAt,
+          });
+          return res.json({ brokers: pageBrokers, nextCursor, hasMore });
         }
-        return res.json([]);
+        console.info("[broker-directory] list", {
+          role: "demo",
+          rowsFetched: 0,
+          rowsReturned: 0,
+          elapsedMs: Date.now() - startedAt,
+        });
+        return res.json({ brokers: [], nextCursor: null, hasMore: false });
       }
-      let allBrokers = await storage.getAllBrokers();
+
+      let developerProfileId: string | undefined;
+      let visibility: Awaited<ReturnType<typeof getDeveloperContactVisibility>> | undefined;
       if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
-        const developerProfileId = getDeveloperProfileId(req, res);
-        if (!developerProfileId) return;
-        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
-        const visibility = await getDeveloperContactVisibility(developerProfileId);
-        allBrokers = allBrokers.filter((broker) => isSharedBrokerVisible(broker, developerProfileId, visibility));
+        const profileId = getDeveloperProfileId(req, res);
+        if (!profileId) return;
+        if (!await requireActiveDeveloperProfile(profileId, res)) return;
+        developerProfileId = profileId;
+        visibility = await getDeveloperContactVisibility(profileId);
       }
-      res.json(allBrokers);
+
+      const page = await storage.getBrokerDirectoryPage({
+        limit,
+        cursor,
+        developerProfileId,
+        visibility,
+      });
+      const nextCursor = page.nextCursor
+        ? encodeBrokerDirectoryCursor(page.nextCursor)
+        : null;
+      console.info("[broker-directory] list", {
+        role: developerProfileId ? "developer" : "internal",
+        rowsFetched: page.rowsFetched,
+        rowsReturned: page.brokers.length,
+        elapsedMs: Date.now() - startedAt,
+      });
+      res.json({ brokers: page.brokers, hasMore: page.hasMore, nextCursor });
     } catch (error) {
       console.error("Error fetching brokers:", error);
       res.status(500).json({ message: "Failed to fetch brokers" });
@@ -4419,40 +4466,75 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
   // Search brokers by email or name (for merge dropdown)
   app.get("/api/brokers/search", isAuthenticated, async (req, res) => {
+    const startedAt = Date.now();
     try {
       const { query, excludeId } = req.query;
       
       if (!query || typeof query !== 'string' || query.length < 2) {
-        return res.json([]);
+        return res.json({ brokers: [], nextCursor: null, hasMore: false });
       }
-      
-      let allBrokers = await storage.getAllBrokers();
+
+      const limit = parseBrokerDirectoryLimit(req.query.limit ?? 10);
+      const rawCursor = req.query.cursor;
+      const cursor = rawCursor === undefined ? null : decodeBrokerDirectoryCursor(rawCursor);
+      if (rawCursor !== undefined && !cursor) {
+        return res.status(400).json({ message: "Invalid broker directory cursor" });
+      }
+
+      let developerProfileId: string | undefined;
+      let visibility: Awaited<ReturnType<typeof getDeveloperContactVisibility>> | undefined;
       if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
-        const developerProfileId = getDeveloperProfileId(req, res);
-        if (!developerProfileId) return;
-        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
-        const visibility = await getDeveloperContactVisibility(developerProfileId);
-        allBrokers = allBrokers.filter((broker) => isSharedBrokerVisible(broker, developerProfileId, visibility));
+        const profileId = getDeveloperProfileId(req, res);
+        if (!profileId) return;
+        if (!await requireActiveDeveloperProfile(profileId, res)) return;
+        developerProfileId = profileId;
+        visibility = await getDeveloperContactVisibility(profileId);
       }
-      const searchLower = query.toLowerCase();
-      
-      // Filter brokers by email, name, or phone
-      const matches = allBrokers.filter(broker => {
-        // Exclude the specified broker ID
-        if (excludeId && broker.id === excludeId) {
-          return false;
-        }
-        
-        const fullName = `${broker.firstName || ''} ${broker.lastName || ''}`.toLowerCase();
-        const email = (broker.email || '').toLowerCase();
-        const phone = (broker.phone || '').toLowerCase();
-        
-        return fullName.includes(searchLower) || 
-               email.includes(searchLower) ||
-               phone.includes(searchLower);
-      }).slice(0, 10); // Limit to 10 results
-      
-      res.json(matches);
+
+      const reqEmail = ((req as any).user?.claims?.email || (req as any).user?.email || '').toLowerCase();
+      let page: Awaited<ReturnType<typeof storage.getBrokerDirectoryPage>>;
+      if (reqEmail === 'demo@catalystcp.com') {
+        const demoUser = await storage.getUserByEmail('demo@catalystcp.com');
+        const demoBroker = demoUser ? await storage.getBrokerByUserId(demoUser.id) : undefined;
+        const searchLower = query.trim().toLowerCase();
+        const candidate = demoBroker && demoBroker.id !== excludeId &&
+          [
+            `${demoBroker.firstName || ''} ${demoBroker.lastName || ''}`,
+            demoBroker.email || '',
+            demoBroker.phone || '',
+            demoBroker.brokerage || '',
+            demoBroker.marketsCovered || '',
+          ].some((value) => value.toLowerCase().includes(searchLower))
+          ? [demoBroker]
+          : [];
+        page = {
+          brokers: candidate.slice(0, limit),
+          hasMore: candidate.length > limit,
+          rowsFetched: candidate.length,
+          nextCursor: null,
+        };
+      } else {
+        page = await storage.getBrokerDirectoryPage({
+          limit,
+          cursor,
+          query,
+          excludeId: typeof excludeId === "string" ? excludeId : undefined,
+          developerProfileId,
+          visibility,
+        });
+      }
+
+      const nextCursor = page.nextCursor
+        ? encodeBrokerDirectoryCursor(page.nextCursor)
+        : null;
+      console.info("[broker-directory] search", {
+        role: developerProfileId ? "developer" : reqEmail === "demo@catalystcp.com" ? "demo" : "internal",
+        queryLength: query.length,
+        rowsFetched: page.rowsFetched,
+        rowsReturned: page.brokers.length,
+        elapsedMs: Date.now() - startedAt,
+      });
+      res.json({ brokers: page.brokers, hasMore: page.hasMore, nextCursor });
     } catch (error: any) {
       console.error('Error searching brokers:', error);
       res.status(500).json({ error: 'Failed to search brokers' });

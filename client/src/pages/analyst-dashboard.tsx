@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
@@ -1171,12 +1171,28 @@ export default function AnalystDashboard() {
   }, [ncOneMapModal?.dealId]);
 
   // Fetch brokers for dropdown selection
-  const { data: brokersData } = useQuery<{ brokers: Broker[] }>({
-    queryKey: ['/api/brokers'],
+  const brokerDirectoryQuery = useInfiniteQuery({
+    queryKey: ['/api/brokers', 'analyst-directory'],
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam, signal }): Promise<{
+      brokers: Broker[];
+      nextCursor: string | null;
+      hasMore: boolean;
+    }> => {
+      const params = new URLSearchParams({ limit: '50' });
+      if (pageParam) params.set('cursor', pageParam);
+      const response = await fetch(`/api/brokers?${params}`, {
+        credentials: 'include',
+        signal,
+      });
+      if (!response.ok) throw new Error('Failed to fetch brokers');
+      return response.json();
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
   
-  const brokers = brokersData?.brokers || [];
+  const brokers = brokerDirectoryQuery.data?.pages.flatMap((page) => page.brokers) || [];
 
   // Extract classification summary from API response
   const classificationSummary = dealsData?.classificationSummary || {
@@ -5509,7 +5525,7 @@ export default function AnalystDashboard() {
         <td key={key} className="px-1 py-1 text-xs border-r border-gray-200 text-gray-700" style={{display: vis?'':'none'}}>
           {editingRow===deal.id||(editingCell?.dealId===deal.id&&editingCell?.field==='brokerName') ? (
             <div className="relative">
-              <Input value={editingRow===deal.id?(`${editData.brokerFirstName||''} ${editData.brokerLastName||''}`.trim()||`${deal.broker?.firstName||''} ${deal.broker?.lastName||''}`.trim()):cellEditValue} onChange={(e) => { const fn=e.target.value; if(editingRow===deal.id){const ns=fn.split(' '); setEditData({...editData,brokerFirstName:ns[0]||'',brokerLastName:ns.slice(1).join(' ')||'',brokerId:''});}else{setCellEditValue(fn);} if(brokerSearchTimerRef.current)clearTimeout(brokerSearchTimerRef.current); if(fn.length>=2){brokerSearchTimerRef.current=setTimeout(async()=>{try{const r=await fetch(`/api/brokers/search?query=${encodeURIComponent(fn)}`); const data=await r.json(); setBrokerSuggestions(Array.isArray(data)?data:[]); setShowBrokerSuggestions(Array.isArray(data)&&data.length>0);}catch{setBrokerSuggestions([]);setShowBrokerSuggestions(false);}},220);}else{setBrokerSuggestions([]);setShowBrokerSuggestions(false);} }} onBlur={() => { setTimeout(()=>{ setShowBrokerSuggestions(false); if(editingCell?.dealId===deal.id&&editingCell?.field==='brokerName'){const ns=cellEditValue.split(' '); cellUpdateMutation.mutate({dealId:deal.id,brokerName:cellEditValue,brokerFirstName:ns[0]||'',brokerLastName:ns.slice(1).join(' ')||''}); setEditingCell(null); setCellEditValue(''); }},150); }} onKeyDown={(e) => { if(e.key==='Escape'){setShowBrokerSuggestions(false);setEditingCell(null);setCellEditValue('');return;} if(e.key==='Enter'&&!showBrokerSuggestions&&editingCell?.dealId===deal.id){const ns=cellEditValue.split(' '); cellUpdateMutation.mutate({dealId:deal.id,brokerName:cellEditValue,brokerFirstName:ns[0]||'',brokerLastName:ns.slice(1).join(' ')||''}); setEditingCell(null); setCellEditValue('');} }} className="h-8 text-xs" placeholder="Type to search CRM..." data-testid="input-broker-name" autoFocus={editingCell?.dealId===deal.id} />
+              <Input value={editingRow===deal.id?(`${editData.brokerFirstName||''} ${editData.brokerLastName||''}`.trim()||`${deal.broker?.firstName||''} ${deal.broker?.lastName||''}`.trim()):cellEditValue} onChange={(e) => { const fn=e.target.value; if(editingRow===deal.id){const ns=fn.split(' '); setEditData({...editData,brokerFirstName:ns[0]||'',brokerLastName:ns.slice(1).join(' ')||'',brokerId:''});}else{setCellEditValue(fn);} if(brokerSearchTimerRef.current)clearTimeout(brokerSearchTimerRef.current); if(fn.length>=2){brokerSearchTimerRef.current=setTimeout(async()=>{try{const r=await fetch(`/api/brokers/search?query=${encodeURIComponent(fn)}`); const data=await r.json(); const suggestions=Array.isArray(data?.brokers)?data.brokers:[]; setBrokerSuggestions(suggestions); setShowBrokerSuggestions(suggestions.length>0);}catch{setBrokerSuggestions([]);setShowBrokerSuggestions(false);}},220);}else{setBrokerSuggestions([]);setShowBrokerSuggestions(false);} }} onBlur={() => { setTimeout(()=>{ setShowBrokerSuggestions(false); if(editingCell?.dealId===deal.id&&editingCell?.field==='brokerName'){const ns=cellEditValue.split(' '); cellUpdateMutation.mutate({dealId:deal.id,brokerName:cellEditValue,brokerFirstName:ns[0]||'',brokerLastName:ns.slice(1).join(' ')||''}); setEditingCell(null); setCellEditValue(''); }},150); }} onKeyDown={(e) => { if(e.key==='Escape'){setShowBrokerSuggestions(false);setEditingCell(null);setCellEditValue('');return;} if(e.key==='Enter'&&!showBrokerSuggestions&&editingCell?.dealId===deal.id){const ns=cellEditValue.split(' '); cellUpdateMutation.mutate({dealId:deal.id,brokerName:cellEditValue,brokerFirstName:ns[0]||'',brokerLastName:ns.slice(1).join(' ')||''}); setEditingCell(null); setCellEditValue('');} }} className="h-8 text-xs" placeholder="Type to search CRM..." data-testid="input-broker-name" autoFocus={editingCell?.dealId===deal.id} />
               {showBrokerSuggestions&&brokerSuggestions.length>0&&(<div className="absolute top-full left-0 z-[200] mt-0.5 w-64 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">{brokerSuggestions.map((b: any) => { const nm=`${b.firstName||''} ${b.lastName||''}`.trim()||b.email||'(no name)'; return (<div key={b.id} className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0" onMouseDown={(e) => { e.preventDefault(); setShowBrokerSuggestions(false); setBrokerSuggestions([]); if(editingRow===deal.id){setEditData({...editData,brokerFirstName:b.firstName||'',brokerLastName:b.lastName||'',brokerId:b.id,brokerEmail:b.email||''});}else{cellUpdateMutation.mutate({dealId:deal.id,brokerName:nm,brokerFirstName:b.firstName||'',brokerLastName:b.lastName||'',brokerId:b.id,brokerEmail:b.email||''});setEditingCell(null);setCellEditValue('');} }}><div className="text-xs font-semibold text-gray-800">{nm}</div>{b.email&&<div className="text-xs text-gray-400 truncate">{b.email}</div>}{b.brokerage&&<div className="text-xs text-gray-400 truncate">{b.brokerage}</div>}</div>); })}</div>)}
             </div>
           ) : (
@@ -7083,7 +7099,15 @@ export default function AnalystDashboard() {
                             <div className="flex flex-col gap-1">
                               <Select 
                                 value={editData.brokerId || ''} 
-                                onValueChange={handleBrokerSelection}
+                                onValueChange={(brokerId) => {
+                                  if (brokerId === '__load_more_brokers__') {
+                                    if (brokerDirectoryQuery.hasNextPage && !brokerDirectoryQuery.isFetchingNextPage) {
+                                      void brokerDirectoryQuery.fetchNextPage();
+                                    }
+                                    return;
+                                  }
+                                  handleBrokerSelection(brokerId);
+                                }}
                               >
                                 <SelectTrigger className="h-8 text-xs">
                                   <SelectValue placeholder="Select Existing Broker">
@@ -7098,6 +7122,16 @@ export default function AnalystDashboard() {
                                       {broker.firstName} {broker.lastName}
                                     </SelectItem>
                                   ))}
+                                  {brokerDirectoryQuery.hasNextPage && (
+                                    <SelectItem
+                                      value="__load_more_brokers__"
+                                      disabled={brokerDirectoryQuery.isFetchingNextPage}
+                                    >
+                                      {brokerDirectoryQuery.isFetchingNextPage
+                                        ? 'Loading more brokers...'
+                                        : 'Load next 50 brokers'}
+                                    </SelectItem>
+                                  )}
                                 </SelectContent>
                               </Select>
                               <div className="text-xs text-gray-500">or type new:</div>

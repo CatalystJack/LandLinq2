@@ -275,7 +275,8 @@ export default function MessagingPage() {
       try {
         const response = await fetch(`/api/brokers/search?query=${encodeURIComponent(mergeSearchQuery)}&excludeId=${excludeId}`);
         if (response.ok) {
-          const results = await response.json();
+          const data = await response.json();
+          const results = Array.isArray(data?.brokers) ? data.brokers : [];
           setSearchResults(results);
         }
       } catch (error) {

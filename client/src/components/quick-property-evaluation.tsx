@@ -186,7 +186,8 @@ export default function QuickDealAddition({ defaultOpen = false }: QuickDealAddi
     try {
       const res = await fetch(`/api/brokers/search?query=${encodeURIComponent(query)}`);
       if (res.ok) {
-        const results = await res.json();
+        const data = await res.json();
+        const results = Array.isArray(data?.brokers) ? data.brokers : [];
         setBrokerSuggestions(results);
         setShowBrokerSuggestions(results.length > 0);
       }

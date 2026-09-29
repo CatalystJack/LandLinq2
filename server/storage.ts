@@ -139,6 +139,13 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, count, avg, sum, and, or, like, sql, isNull, isNotNull, inArray, gt, gte, lte } from "drizzle-orm";
+import {
+  buildBrokerDirectoryCursorCondition,
+  buildBrokerDirectorySearchCondition,
+  buildBrokerDirectoryVisibilityCondition,
+  type BrokerDirectoryCursor,
+  type BrokerDirectoryVisibility,
+} from "./brokerDirectory";
 
 // Utility function to format deal numbers as 001, 002, etc.
 export function formatDealNumber(dealNumber: number): string {
@@ -192,6 +199,19 @@ export interface IStorage {
   }): Promise<{ broker: Broker; isNew: boolean; wasUpdated: boolean }>;
   getBrokerById(id: string): Promise<Broker | undefined>;
   getAllBrokers(): Promise<Broker[]>;
+  getBrokerDirectoryPage(options: {
+    limit: number;
+    cursor?: BrokerDirectoryCursor | null;
+    query?: string;
+    excludeId?: string;
+    developerProfileId?: string;
+    visibility?: BrokerDirectoryVisibility;
+  }): Promise<{
+    brokers: Broker[];
+    hasMore: boolean;
+    rowsFetched: number;
+    nextCursor: BrokerDirectoryCursor | null;
+  }>;
   updateBroker(id: string, updates: Partial<Broker>): Promise<Broker>;
   deleteBroker(id: string): Promise<void>;
   mergeBrokers(sourceBrokerId: string, targetBrokerId: string): Promise<{ mergedDeals: number; mergedConversations: number; mergedCommunications: number }>;
@@ -1098,6 +1118,65 @@ export class DatabaseStorage implements IStorage {
 
   async getAllBrokers(): Promise<Broker[]> {
     return await db.select().from(brokers).orderBy(desc(brokers.createdAt)) as Broker[];
+  }
+
+  async getBrokerDirectoryPage(options: {
+    limit: number;
+    cursor?: BrokerDirectoryCursor | null;
+    query?: string;
+    excludeId?: string;
+    developerProfileId?: string;
+    visibility?: BrokerDirectoryVisibility;
+  }): Promise<{
+    brokers: Broker[];
+    hasMore: boolean;
+    rowsFetched: number;
+    nextCursor: BrokerDirectoryCursor | null;
+  }> {
+    const conditions = [];
+    if (options.cursor) {
+      conditions.push(buildBrokerDirectoryCursorCondition(options.cursor));
+    }
+    if (options.query !== undefined) {
+      const searchCondition = buildBrokerDirectorySearchCondition(options.query, options.excludeId);
+      if (searchCondition) conditions.push(searchCondition);
+    } else if (options.excludeId) {
+      const searchCondition = buildBrokerDirectorySearchCondition("", options.excludeId);
+      if (searchCondition) conditions.push(searchCondition);
+    }
+    if (options.developerProfileId) {
+      if (!options.visibility) {
+        throw new Error("Developer broker visibility is required for directory queries");
+      }
+      conditions.push(buildBrokerDirectoryVisibilityCondition(
+        options.developerProfileId,
+        options.visibility,
+      ));
+    }
+
+    const baseQuery = db.select({
+      broker: brokers,
+      cursorCreatedAt: sql<string | null>`
+        to_char(${brokers.createdAt}, 'YYYY-MM-DD"T"HH24:MI:SS.US')
+      `,
+    }).from(brokers);
+    const filteredQuery = conditions.length > 0
+      ? baseQuery.where(and(...conditions))
+      : baseQuery;
+    const rows = await filteredQuery
+      .orderBy(sql`${brokers.createdAt} DESC NULLS LAST`, desc(brokers.id))
+      .limit(options.limit + 1);
+    const pageRows = rows.slice(0, options.limit);
+    const lastPageRow = pageRows[pageRows.length - 1];
+
+    return {
+      brokers: pageRows.map((row) => row.broker as Broker),
+      hasMore: rows.length > options.limit,
+      rowsFetched: rows.length,
+      nextCursor: rows.length > options.limit && lastPageRow
+        ? { createdAt: lastPageRow.cursorCreatedAt, id: lastPageRow.broker.id }
+        : null,
+    };
   }
 
   async updateBroker(id: string, updates: Partial<Broker>): Promise<Broker> {
