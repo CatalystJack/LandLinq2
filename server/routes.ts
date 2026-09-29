@@ -3188,6 +3188,58 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     }
   });
 
+  // Development-only diagnostics used by the guarded local load-test script.
+  // Keep this route absent from published deployments.
+  if (process.env.NODE_ENV === "development" && process.env.REPLIT_DEPLOYMENT !== "1") {
+    app.get("/api/dev/db-pool-metrics", isAuthenticated, async (_req, res) => {
+      try {
+        const [{ db, getMainDatabasePoolStats }, { sql }, { connectionPoolManager }] = await Promise.all([
+          import("./db"),
+          import("drizzle-orm"),
+          import("./database/connectionPool"),
+        ]);
+        const dbResult = await db.execute(sql`
+          SELECT
+            current_setting('max_connections') AS max_connections,
+            (SELECT count(*)::int FROM pg_stat_activity WHERE datname = current_database()) AS active_connections
+        `);
+        const dbRow = (dbResult as any).rows?.[0] || {};
+        const managerStats = connectionPoolManager.getPoolStats();
+        const managerMetrics = (connectionPoolManager as any).getMetrics?.() || {};
+        const memory = process.memoryUsage();
+        const cpu = process.cpuUsage();
+
+        res.setHeader("Cache-Control", "no-store");
+        res.json({
+          mainPool: getMainDatabasePoolStats(),
+          managerPool: {
+            totalConnections: managerStats.totalConnections,
+            activeConnections: managerStats.activeConnections,
+            idleConnections: managerStats.idleConnections,
+            waitingCount: managerStats.waitingCount,
+            maxConnections: managerStats.maxConnections,
+            connectionsFailed: managerMetrics.connectionsFailed ?? 0,
+            poolOverflows: managerMetrics.poolOverflows ?? 0,
+          },
+          database: {
+            activeConnections: Number(dbRow.active_connections || 0),
+            maxConnections: Number(dbRow.max_connections || 0),
+          },
+          process: {
+            rssBytes: memory.rss,
+            heapUsedBytes: memory.heapUsed,
+            heapTotalBytes: memory.heapTotal,
+            cpuUserMicros: cpu.user,
+            cpuSystemMicros: cpu.system,
+          },
+        });
+      } catch (error) {
+        console.error("[DEV-LOAD-TEST] Could not collect pool metrics", error);
+        res.status(503).json({ error: "Development pool metrics unavailable" });
+      }
+    });
+  }
+
   app.post("/api/demo-login", (_req, res) => {
     return res.status(410).json({ message: "The public demo has been retired" });
   });
