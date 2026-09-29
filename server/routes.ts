@@ -15230,7 +15230,7 @@ RULES:
       }
       return res.json({
         invited: invited.length,
-        sent: invited.map(({ member }) => ({ email: member.email })),
+        sent: invited.map(({ email }) => ({ email })),
         failed,
       });
     } catch (error: any) {
