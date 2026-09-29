@@ -16551,6 +16551,48 @@ RULES:
     }
   });
 
+  app.get("/api/developer-profile/me/contacts/ids", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const visibility = await getDeveloperContactVisibility(developerProfileId);
+      const rawTagFilters = req.query.tags;
+      const tagFilters = (Array.isArray(rawTagFilters) ? rawTagFilters : rawTagFilters ? [rawTagFilters] : [])
+        .map((value: unknown) => String(value).trim())
+        .filter(Boolean);
+      const result = await getDeveloperCrmContacts({
+        developerProfileId,
+        visibility,
+        page: 1,
+        limit: 1,
+        search: String(req.query.search || "").trim(),
+        tag: "",
+        tagFilters,
+        sourceTagFilter: String(req.query.sourceTag || "").trim(),
+        crmStateFilter: String(req.query.crmState || "").trim().toLowerCase(),
+        stateFilter: "",
+        msaFilter: "",
+        countyFilter: "",
+        market: "",
+        smsFilter: "",
+        assignedToFilter: String(req.query.assignedTo || "").trim(),
+        brokerageFilter: String(req.query.brokerage || "").trim(),
+        multiCampaignTagFilter: false,
+        contactCategoryFilter: String(req.query.contactCategory || "").trim(),
+        includeFilterOptions: false,
+        includeContactEnrichment: false,
+        idsOnly: true,
+      });
+      return res.json(result);
+    } catch (error: any) {
+      console.error("[developer-profile/me/contacts/ids] Contact selection failed", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+      return res.status(500).json({ error: "Failed to select matching contacts" });
+    }
+  });
+
   app.post("/api/developer-profile/me/contacts/remove", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);

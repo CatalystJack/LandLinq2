@@ -34,6 +34,7 @@ type DeveloperCrmContactQuery = {
   includeFilterOptions?: boolean;
   filterOptionsOnly?: boolean;
   includeContactEnrichment?: boolean;
+  idsOnly?: boolean;
 };
 
 const DEMO_USER_ID = "20974d7b-e103-4fc7-b42f-7a13d41041fb";
@@ -327,7 +328,7 @@ export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
     `
     : sql``;
   const [countResult, pageResult, optionsResult] = await Promise.all([
-    query.filterOptionsOnly
+    query.filterOptionsOnly || query.idsOnly
       ? Promise.resolve({ rows: [{ total: 0 }] })
       : db.execute(sql`
       WITH ${accessibleCte}, ${filteredCte}
@@ -335,7 +336,14 @@ export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
     `),
     query.filterOptionsOnly
       ? Promise.resolve({ rows: [] as any[] })
-      : db.execute(sql`
+      : query.idsOnly
+        ? db.execute(sql`
+      WITH ${accessibleCte}, ${filteredCte}
+      SELECT f.id
+      FROM filtered_brokers AS f
+      ORDER BY f.created_at DESC NULLS LAST, f.id DESC
+    `)
+        : db.execute(sql`
       WITH ${accessibleCte}, ${filteredCte}
       SELECT f.*${pageEnrichmentProjection}
       FROM filtered_brokers AS f
@@ -343,7 +351,7 @@ export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
       ORDER BY f.created_at DESC NULLS LAST, f.id DESC
       LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
     `),
-    query.includeFilterOptions === false && !query.filterOptionsOnly
+    query.idsOnly || (query.includeFilterOptions === false && !query.filterOptionsOnly)
       ? Promise.resolve({ rows: [] as any[] })
       : db.execute(sql`
       WITH ${accessibleCte},
@@ -406,6 +414,9 @@ export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
 
   const total = Number((countResult.rows[0] as any)?.total || 0);
   const pageRows = pageResult.rows as Array<Record<string, any>>;
+  if (query.idsOnly) {
+    return { contactIds: pageRows.map((row) => String(row.id)) };
+  }
   const contacts = pageRows.map((row) => ({
     id: row.id,
     firstName: row.first_name,

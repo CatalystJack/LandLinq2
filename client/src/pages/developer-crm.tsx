@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
 import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, Pencil, Plus, X, Trash2 } from "lucide-react";
@@ -225,6 +225,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [assignedToFilter, setAssignedToFilter] = useState("all");
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [undoSelectionIds, setUndoSelectionIds] = useState<string[] | null>(null);
+  const [allMatchingSelectionKey, setAllMatchingSelectionKey] = useState<string | null>(null);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [removeConfirmationIds, setRemoveConfirmationIds] = useState<string[] | null>(null);
   const [tagEditor, setTagEditor] = useState<{ contactIds: string[]; action: "add" | "remove"; initialTag?: string } | null>(null);
@@ -235,11 +237,21 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [createTagValue, setCreateTagValue] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<Record<string, any>[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [parsing, setParsing] = useState(false);
   const [result, setResult] = useState<{ inserted: number; updated: number } | null>(null);
+  const [importProgress, setImportProgress] = useState<{
+    completedRows: number;
+    totalRows: number;
+    inserted: number;
+    updated: number;
+    currentBatch: number;
+    totalBatches: number;
+  } | null>(null);
+  const [importFailure, setImportFailure] = useState<string | null>(null);
   const stagedImportRows = rows
     .map((row) => Object.fromEntries(FIELDS.map(({ key }) => [key, mapping[key] ? row[mapping[key]] : ""])))
     .filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
@@ -272,22 +284,57 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const contactsQueryKey = adminMode
     ? `/api/crm/contacts?developerProfileId=${encodeURIComponent(selectedAdminProfileId)}`
     : "/api/crm/contacts";
+  const buildContactFilterParams = () => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (companyFilter !== "all") params.set("brokerage", companyFilter);
+    selectedTags.forEach((tag) => params.append("tags", tag));
+    if (sourceTagFilter !== "all") params.set("sourceTag", sourceTagFilter);
+    if (stateFilter !== "all") params.set("crmState", stateFilter);
+    if (categoryFilter !== "all") params.set("contactCategory", categoryFilter);
+    if (assignedToFilter !== "all") params.set("assignedTo", assignedToFilter);
+    return params;
+  };
+  const currentFilterKey = JSON.stringify([
+    debouncedSearch,
+    companyFilter,
+    [...selectedTags].sort(),
+    sourceTagFilter,
+    stateFilter,
+    categoryFilter,
+    assignedToFilter,
+  ]);
   const contactsQuery = useQuery<ContactCrmResponse>({
     queryKey: [contactsQueryKey, page, debouncedSearch, companyFilter, selectedTags, sourceTagFilter, stateFilter, categoryFilter, assignedToFilter],
     queryFn: () => {
-      const params = new URLSearchParams({ page: String(page), limit: "25" });
+      const params = buildContactFilterParams();
+      params.set("page", String(page));
+      params.set("limit", "25");
       if (adminMode) params.set("developerProfileId", selectedAdminProfileId);
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      if (companyFilter !== "all") params.set("brokerage", companyFilter);
-      selectedTags.forEach((tag) => params.append("tags", tag));
-      if (sourceTagFilter !== "all") params.set("sourceTag", sourceTagFilter);
-      if (stateFilter !== "all") params.set("crmState", stateFilter);
-      if (categoryFilter !== "all") params.set("contactCategory", categoryFilter);
-      if (assignedToFilter !== "all") params.set("assignedTo", assignedToFilter);
       params.set("includeFilterOptions", "false");
       return requestJson(`/api/crm/contacts?${params.toString()}`);
     },
     enabled: !adminMode || Boolean(selectedAdminProfileId),
+  });
+
+  const selectMatchingContactsMutation = useMutation({
+    mutationFn: (variables: { previousSelection: string[]; filterParams: string; filterKey: string }) =>
+      requestJson(`/api/developer-profile/me/contacts/ids?${variables.filterParams}`),
+    onSuccess: (data, variables) => {
+      const contactIds = Array.isArray(data.contactIds) ? data.contactIds as string[] : [];
+      setUndoSelectionIds(variables.previousSelection);
+      setSelectedContactIds(contactIds);
+      setAllMatchingSelectionKey(variables.filterKey);
+      toast({
+        title: "Matching contacts selected",
+        description: `${contactIds.length.toLocaleString()} contacts are selected across all pages.`,
+      });
+    },
+    onError: (error: Error) => toast({
+      title: "Could not select matching contacts",
+      description: error.message,
+      variant: "destructive",
+    }),
   });
 
   const filterOptionsQuery = useQuery<ContactCrmResponse>({
@@ -307,13 +354,63 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   });
 
   const importMutation = useMutation({
-    mutationFn: () => requestJson(importEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contacts: stagedImportRows,
-      }),
-    }),
+    mutationFn: async () => {
+      const batchSize = 500;
+      const batches = Array.from(
+        { length: Math.ceil(stagedImportRows.length / batchSize) },
+        (_, index) => stagedImportRows.slice(index * batchSize, (index + 1) * batchSize),
+      );
+      let inserted = 0;
+      let updated = 0;
+      let completedRows = 0;
+      setImportFailure(null);
+      setImportProgress({
+        completedRows,
+        totalRows: stagedImportRows.length,
+        inserted,
+        updated,
+        currentBatch: 1,
+        totalBatches: batches.length,
+      });
+
+      for (let index = 0; index < batches.length; index++) {
+        const batch = batches[index];
+        const firstRow = index * batchSize + 1;
+        const lastRow = firstRow + batch.length - 1;
+        setImportProgress({
+          completedRows,
+          totalRows: stagedImportRows.length,
+          inserted,
+          updated,
+          currentBatch: index + 1,
+          totalBatches: batches.length,
+        });
+        try {
+          const data = await requestJson(importEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contacts: batch }),
+          });
+          inserted += Number(data.inserted || 0);
+          updated += Number(data.updated || 0);
+          completedRows += batch.length;
+          setImportProgress({
+            completedRows,
+            totalRows: stagedImportRows.length,
+            inserted,
+            updated,
+            currentBatch: index + 1,
+            totalBatches: batches.length,
+          });
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : "Request failed";
+          const failureMessage = `Batch ${index + 1} of ${batches.length} failed (import rows ${firstRow.toLocaleString()}–${lastRow.toLocaleString()}). ${completedRows.toLocaleString()} rows from earlier batches completed: ${inserted} inserted and ${updated} updated. ${reason} The failed batch may have partially processed; review those records before retrying.`;
+          setImportFailure(failureMessage);
+          throw new Error(failureMessage);
+        }
+      }
+      return { inserted, updated };
+    },
     onSuccess: (data) => {
       setResult(data);
       queryClient.invalidateQueries({ queryKey: [contactsQueryKey] });
@@ -323,15 +420,34 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   });
 
   const tagMutation = useMutation({
-    mutationFn: ({ contactIds, tag, action }: { contactIds: string[]; tag: string; action: "add" | "remove" }) => requestJson("/api/developer-profile/me/crm-tags/apply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contactIds, tag, action }),
-    }),
+    mutationFn: async ({ contactIds, tag, action }: { contactIds: string[]; tag: string; action: "add" | "remove" }) => {
+      const batchSize = 500;
+      const batches = Array.from(
+        { length: Math.ceil(contactIds.length / batchSize) },
+        (_, index) => contactIds.slice(index * batchSize, (index + 1) * batchSize),
+      );
+      let updatedCount = 0;
+      for (let index = 0; index < batches.length; index++) {
+        try {
+          const data = await requestJson("/api/developer-profile/me/crm-tags/apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contactIds: batches[index], tag, action }),
+          });
+          updatedCount += Number(data.updatedCount || 0);
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : "Request failed";
+          throw new Error(`Tag update batch ${index + 1} of ${batches.length} failed after ${updatedCount} contacts were updated. ${reason}`);
+        }
+      }
+      return { updatedCount };
+    },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: [contactsQueryKey] });
       queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/crm-tags"] });
       setSelectedContactIds([]);
+      setUndoSelectionIds(null);
+      setAllMatchingSelectionKey(null);
       setTagEditor(null);
       setTagValue("");
       toast({
@@ -385,6 +501,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [contactsQueryKey] });
       setSelectedContactIds([]);
+      setUndoSelectionIds(null);
+      setAllMatchingSelectionKey(null);
       setSelectedContact(null);
       toast({ title: "Contacts removed", description: `Removed ${data.removedCount} ${data.removedCount === 1 ? "contact" : "contacts"} from your CRM. Other companies can still see shared contacts.` });
     },
@@ -402,6 +520,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       setClearCompanyCrmOpen(false);
       setSelectedContact(null);
       setSelectedContactIds([]);
+      setUndoSelectionIds(null);
+      setAllMatchingSelectionKey(null);
       toast({
         title: "Company CRM cleared",
         description: `Removed ${data.clearedCount} ${data.clearedCount === 1 ? "contact" : "contacts"} from ${selectedAdminProfile?.companyName || "the selected company's"} CRM. Shared records and other companies' CRM were preserved.`,
@@ -442,14 +562,23 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     setTagValue(initialTag);
   };
   const toggleAllVisible = (checked: boolean) => {
+    setUndoSelectionIds(null);
+    setAllMatchingSelectionKey(null);
     setSelectedContactIds((current) => checked
       ? Array.from(new Set([...current, ...visibleContactIds]))
       : current.filter((id) => !visibleContactIds.includes(id)));
   };
   const toggleContact = (contactId: string, checked: boolean) => {
+    setUndoSelectionIds(null);
+    setAllMatchingSelectionKey(null);
     setSelectedContactIds((current) => checked
       ? Array.from(new Set([...current, contactId]))
       : current.filter((id) => id !== contactId));
+  };
+  const clearSelection = () => {
+    setSelectedContactIds([]);
+    setUndoSelectionIds(null);
+    setAllMatchingSelectionKey(null);
   };
 
   const hasActiveFilters = companyFilter !== "all" || selectedTags.length > 0 || sourceTagFilter !== "all" || stateFilter !== "all" || categoryFilter !== "all" || assignedToFilter !== "all";
@@ -503,6 +632,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     setRows([]);
     setMapping({});
     setResult(null);
+    setImportProgress(null);
+    setImportFailure(null);
     importMutation.reset();
   };
 
@@ -554,6 +685,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                     setSelectedAdminProfileId(event.target.value);
                     setSelectedContact(null);
                     setSelectedContactIds([]);
+                    setUndoSelectionIds(null);
+                    setAllMatchingSelectionKey(null);
                     setSearch("");
                     setCompanyFilter("all");
                     setSelectedTags([]);
@@ -667,6 +800,55 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
              {hasActiveFilters && <button type="button" onClick={clearFilters} className="h-8 rounded-md px-2 text-xs font-medium text-catalyst-blue hover:bg-[#edf4fa]">Clear filters</button>}
               {!adminMode && (
                 <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 gap-1.5 px-2.5 text-xs"
+                    disabled={
+                      selectMatchingContactsMutation.isPending ||
+                      contactsQuery.isFetching ||
+                      !contactsQuery.data?.pagination.total ||
+                      allMatchingSelectionKey === currentFilterKey
+                    }
+                    onClick={() => selectMatchingContactsMutation.mutate({
+                      previousSelection: [...selectedContactIds],
+                      filterParams: buildContactFilterParams().toString(),
+                      filterKey: currentFilterKey,
+                    })}
+                  >
+                    {selectMatchingContactsMutation.isPending
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Users className="h-3.5 w-3.5" />}
+                    {allMatchingSelectionKey === currentFilterKey
+                      ? "All matching selected"
+                      : `Select all ${contactsQuery.data?.pagination.total.toLocaleString() || 0} matching`}
+                  </Button>
+                  {undoSelectionIds && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-8 px-2.5 text-xs"
+                      disabled={selectMatchingContactsMutation.isPending}
+                      onClick={() => {
+                        setSelectedContactIds(undoSelectionIds);
+                        setUndoSelectionIds(null);
+                        setAllMatchingSelectionKey(null);
+                      }}
+                    >
+                      Undo select all
+                    </Button>
+                  )}
+                  {selectedContactIds.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-8 px-2.5 text-xs"
+                      disabled={selectMatchingContactsMutation.isPending}
+                      onClick={clearSelection}
+                    >
+                      Clear selection
+                    </Button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -682,16 +864,16 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                     <>
                       <span className="mx-1 h-5 w-px bg-[#dfe7ec]" />
                       <span className="font-medium text-[#405a70]">{selectedContactIds.length} selected</span>
-                      <button type="button" onClick={() => openTagEditor(selectedContactIds, "add")} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] hover:bg-[#f5f8fa]">
+                      <button type="button" onClick={() => openTagEditor(selectedContactIds, "add")} disabled={selectMatchingContactsMutation.isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] hover:bg-[#f5f8fa] disabled:cursor-not-allowed disabled:opacity-60">
                         <Plus className="h-3.5 w-3.5" />Add tag
                       </button>
-                      <button type="button" onClick={() => openTagEditor(selectedContactIds, "remove")} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] hover:bg-[#f5f8fa]">
+                      <button type="button" onClick={() => openTagEditor(selectedContactIds, "remove")} disabled={selectMatchingContactsMutation.isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#d7e2e9] bg-white px-2.5 text-xs font-medium text-[#405a70] hover:bg-[#f5f8fa] disabled:cursor-not-allowed disabled:opacity-60">
                         <X className="h-3.5 w-3.5" />Remove tag
                       </button>
                       <button
                         type="button"
                         onClick={() => setRemoveConfirmationIds(selectedContactIds)}
-                        disabled={removeContactsMutation.isPending}
+                        disabled={removeContactsMutation.isPending || selectMatchingContactsMutation.isPending}
                         className="inline-flex h-8 items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
                       >
                         <UserRound className="h-3.5 w-3.5" />Remove contact
@@ -725,6 +907,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                     <Checkbox
                       className="mt-1"
                       aria-label={`Select ${[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "contact"}`}
+                      disabled={selectMatchingContactsMutation.isPending}
                       checked={selectedContactIds.includes(contact.id)}
                       onCheckedChange={(checked) => toggleContact(contact.id, checked === true)}
                     />
@@ -747,7 +930,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                <Table className="min-w-[1180px]">
                  <TableHeader>
                    <TableRow className="border-[#e3e9ee] bg-[#f8fafb] hover:bg-[#f8fafb]">
-                     {!adminMode && <TableHead className="h-11 w-12 pl-5"><Checkbox aria-label="Select all visible contacts" checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false} onCheckedChange={(checked) => toggleAllVisible(checked === true)} /></TableHead>}
+                     {!adminMode && <TableHead className="h-11 w-12 pl-5"><Checkbox aria-label="Select all visible contacts" disabled={selectMatchingContactsMutation.isPending} checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false} onCheckedChange={(checked) => toggleAllVisible(checked === true)} /></TableHead>}
                      <TableHead className="h-11 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Name</TableHead>
                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Email</TableHead>
                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Phone</TableHead>
@@ -773,7 +956,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                      }}
                      aria-label={`Open profile for ${[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "contact"}`}
                    >
-                      {!adminMode && <TableCell className="pl-5" onClick={(event) => event.stopPropagation()}><Checkbox aria-label={`Select ${[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "contact"}`} checked={selectedContactIds.includes(contact.id)} onCheckedChange={(checked) => toggleContact(contact.id, checked === true)} /></TableCell>}
+                      {!adminMode && <TableCell className="pl-5" onClick={(event) => event.stopPropagation()}><Checkbox aria-label={`Select ${[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "contact"}`} disabled={selectMatchingContactsMutation.isPending} checked={selectedContactIds.includes(contact.id)} onCheckedChange={(checked) => toggleContact(contact.id, checked === true)} /></TableCell>}
                     <TableCell className="pl-5">
                       <div className="flex items-center gap-3">
                         <div
@@ -966,9 +1149,26 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={importOpen} onOpenChange={(open) => (open ? setImportOpen(true) : reset())}>
+      <Dialog open={importOpen} onOpenChange={(open) => {
+        if (open) setImportOpen(true);
+        else if (!importMutation.isPending) reset();
+      }}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
           <DialogHeader><DialogTitle>{isGeneralSales ? "Import company contacts" : "Import contacts"}</DialogTitle><DialogDescription>Use the standard template or map a CSV/Excel file. Email matches update only contacts owned by your company.</DialogDescription></DialogHeader>
+          <Input
+            ref={fileInputRef}
+            id="developer-contact-file"
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            aria-label="Choose a CSV or Excel contact file"
+            className="sr-only"
+            disabled={parsing || importMutation.isPending}
+            onChange={(event) => {
+              const selectedFile = event.currentTarget.files?.[0];
+              event.currentTarget.value = "";
+              if (selectedFile) readFile(selectedFile);
+            }}
+          />
           {!file ? (
             <div className="space-y-4 py-4">
               <div className="flex flex-col gap-3 rounded-xl border border-[#dce5eb] bg-[#f8fafb] p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -980,14 +1180,81 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                   <FileSpreadsheet className="mr-2 h-4 w-4" />Download Excel template
                 </Button>
               </div>
-              <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center"><FileSpreadsheet className="mx-auto mb-3 h-10 w-10 text-slate-400" /><Label htmlFor="developer-contact-file" className="cursor-pointer font-semibold text-slate-800">Choose a CSV or Excel file</Label><Input id="developer-contact-file" type="file" accept=".csv,.xlsx,.xls" className="mx-auto mt-4 max-w-sm bg-white" onChange={(event) => event.target.files?.[0] && readFile(event.target.files[0])} /><p className="mt-3 text-xs text-slate-500">First row should contain column headers.</p></div>
+              <div className="rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center sm:p-8">
+                <FileSpreadsheet className="mx-auto mb-3 h-10 w-10 text-slate-400" />
+                <p className="font-semibold text-slate-800">Choose a CSV or Excel file</p>
+                <p className="mt-1 text-xs text-slate-500">First row should contain column headers. Files must be under 10 MB.</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-4 min-h-10"
+                  disabled={parsing}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />Browse files
+                </Button>
+              </div>
               {parsing && <div className="flex items-center justify-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Reading spreadsheet…</div>}
             </div>
           ) : result ? (
             <div className="py-8 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">✓</div><h3 className="font-semibold text-slate-900">Import complete</h3><p className="mt-2 text-sm text-slate-500">{result.inserted} inserted and {result.updated} updated.</p></div>
           ) : (
             <div className="space-y-5 py-2">
+              <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <FileSpreadsheet className="h-5 w-5 shrink-0 text-[#498EDE]" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-slate-500">Selected spreadsheet</p>
+                    <p className="break-all text-sm font-semibold text-slate-800">{file.name}</p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-10 shrink-0"
+                  disabled={parsing || importMutation.isPending}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Choose another file
+                </Button>
+              </div>
               <p className="text-sm text-slate-600">{stagedImportRows.length.toLocaleString()} non-empty rows detected. Map available fields below; up to {MAX_CONTACT_IMPORT_ROWS.toLocaleString()} rows are allowed per import.</p>
+              {importProgress && (
+                <div className="space-y-2 rounded-lg border border-[#dce5eb] bg-[#f8fafb] p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <p aria-live="polite" className="font-semibold text-[#405a70]">
+                      {importMutation.isPending
+                        ? `Importing batch ${importProgress.currentBatch} of ${importProgress.totalBatches}`
+                        : `${importProgress.completedRows.toLocaleString()} of ${importProgress.totalRows.toLocaleString()} rows processed`}
+                    </p>
+                    <span className="font-semibold text-[#405a70]">
+                      {Math.floor((importProgress.completedRows / importProgress.totalRows) * 100)}%
+                    </span>
+                  </div>
+                  <div
+                    role="progressbar"
+                    aria-label="Contact import progress"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.floor((importProgress.completedRows / importProgress.totalRows) * 100)}
+                    className="h-2 overflow-hidden rounded-full bg-[#dfe8ee]"
+                  >
+                    <div
+                      className="h-full rounded-full bg-[#498EDE] transition-[width] duration-300"
+                      style={{ width: `${Math.floor((importProgress.completedRows / importProgress.totalRows) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-[#718493]">
+                    {importProgress.completedRows.toLocaleString()} rows completed · {importProgress.inserted.toLocaleString()} inserted · {importProgress.updated.toLocaleString()} updated
+                  </p>
+                </div>
+              )}
+              {importFailure && (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <p className="font-semibold">Import stopped</p>
+                  <p className="mt-1 break-words">{importFailure}</p>
+                </div>
+              )}
               <div className="grid gap-3 sm:grid-cols-2">{FIELDS.map((field) => (
                 <div key={field.key}><Label className="text-xs">{field.label}</Label><select value={mapping[field.key] || ""} onChange={(event) => setMapping((current) => ({ ...current, [field.key]: event.target.value }))} className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700"><option value="">Not mapped</option>{headers.map((header) => <option key={header} value={header}>{header}</option>)}</select></div>
               ))}</div>
@@ -1009,7 +1276,23 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               </div>
             </div>
           )}
-          <DialogFooter>{result ? <Button onClick={reset} style={{ backgroundColor: primaryColor }} className="text-white">Done</Button> : <Button onClick={() => importMutation.mutate()} disabled={!file || !stagedImportRows.length || importValidationErrors.length > 0 || importMutation.isPending} style={{ backgroundColor: primaryColor }} className="text-white">{importMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isGeneralSales ? "Import company contacts" : "Import contacts"}</Button>}</DialogFooter>
+          <DialogFooter>
+            {result || importFailure ? (
+              <Button onClick={reset} style={{ backgroundColor: primaryColor }} className="min-h-10 text-white">
+                {result ? "Done" : "Close import"}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => importMutation.mutate()}
+                disabled={!file || !stagedImportRows.length || importValidationErrors.length > 0 || importMutation.isPending || parsing}
+                style={{ backgroundColor: primaryColor }}
+                className="min-h-10 text-white"
+              >
+                {importMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {importMutation.isPending ? "Importing…" : isGeneralSales ? "Import company contacts" : "Import contacts"}
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
