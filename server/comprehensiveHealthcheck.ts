@@ -173,8 +173,13 @@ class ComprehensiveHealthChecker {
     }, 'Read operations execute successfully');
 
     await this.addCheck('Database', 'Data Integrity', async () => {
-      const deals = await storage.getAllDealsWithBrokers();
-      return deals.every(deal => deal.broker); // All deals should have brokers
+      let offset = 0;
+      while (true) {
+        const page = await storage.getAllDealsWithBrokers({ limit: 200, offset });
+        if (page.deals.some(deal => !deal.broker)) return false;
+        offset += page.deals.length;
+        if (!page.hasMore) return true;
+      }
     }, 'Foreign key relationships intact');
   }
 

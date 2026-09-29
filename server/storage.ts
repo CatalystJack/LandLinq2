@@ -160,6 +160,11 @@ export function addFormattedDealId(deal: any): any {
   };
 }
 
+export type DealsWithBrokersPage = {
+  deals: (Deal & { broker: Broker })[];
+  hasMore: boolean;
+};
+
 export interface IStorage {
   // User operations 
   getUser(id: string): Promise<User | undefined>;
@@ -239,7 +244,12 @@ export interface IStorage {
     search?: string;
     classification?: string;
   }): Promise<{ deals: (Deal & { broker: Broker })[]; total: number }>;
-  getAllDealsWithBrokers(): Promise<(Deal & { broker: Broker })[]>;
+  getAllDealsWithBrokers(options?: {
+    limit?: number;
+    offset?: number;
+    createdAfter?: Date;
+    visibleDealIds?: readonly string[];
+  }): Promise<DealsWithBrokersPage>;
   getUnassignedDeals(): Promise<Deal[]>;
   getDealsAssignedToTeamMember(userId: string): Promise<Deal[]>;
   
@@ -2216,42 +2226,56 @@ export class DatabaseStorage implements IStorage {
     })) as (Deal & { broker: Broker })[];
   }
 
-  async getAllDealsWithBrokers(): Promise<(Deal & { broker: Broker })[]> {
+  async getAllDealsWithBrokers(options: {
+    limit?: number;
+    offset?: number;
+    createdAfter?: Date;
+    visibleDealIds?: readonly string[];
+  } = {}): Promise<DealsWithBrokersPage> {
     try {
-      console.log('Starting getAllDealsWithBrokers query...');
-      
-      // Use a simpler, more reliable query structure
-      const allDeals = await db.select().from(deals).orderBy(desc(deals.createdAt));
-      console.log('✅ Successfully fetched', allDeals.length, 'deals');
-      
-      // Fetch brokers separately to avoid complex join issues
-      const allBrokers = await db.select().from(brokers);
-      console.log('✅ Successfully fetched', allBrokers.length, 'brokers');
-      
-      // Create a broker lookup map for efficiency
-      const brokerMap = new Map();
-      allBrokers.forEach(broker => {
-        brokerMap.set(broker.id, broker);
-      });
-      
-      // Combine deals with their brokers and construct coordinates object for map
-      const dealsWithBrokers = allDeals.map(deal => {
-        // Type assertion since latitude/longitude exist in DB but may not be in base type
+      const requestedLimit = Number(options.limit);
+      const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, 200)
+        : 100;
+      const requestedOffset = Number(options.offset);
+      const offset = Number.isInteger(requestedOffset) && requestedOffset > 0
+        ? requestedOffset
+        : 0;
+      const filters = [];
+
+      if (options.createdAfter) {
+        filters.push(gte(deals.createdAt, options.createdAfter));
+      }
+      if (options.visibleDealIds) {
+        if (options.visibleDealIds.length === 0) {
+          return { deals: [], hasMore: false };
+        }
+        filters.push(inArray(deals.id, [...options.visibleDealIds]));
+      }
+
+      const rows = await db
+        .select({ deal: deals, broker: brokers })
+        .from(deals)
+        .leftJoin(brokers, eq(deals.brokerId, brokers.id))
+        .where(filters.length ? and(...filters) : undefined)
+        .orderBy(desc(deals.createdAt), desc(deals.id))
+        .limit(limit + 1)
+        .offset(offset);
+      const hasMore = rows.length > limit;
+
+      const dealsWithBrokers = rows.slice(0, limit).map(({ deal, broker }) => {
         const dealData = deal as any;
         return {
           ...deal,
-          broker: deal.brokerId ? brokerMap.get(deal.brokerId) || null : null,
-          // Construct coordinates object from latitude/longitude for map compatibility
+          broker: broker || null,
           coordinates: dealData.latitude && dealData.longitude ? {
             lat: parseFloat(dealData.latitude),
             lng: parseFloat(dealData.longitude)
           } : null
         };
-      });
-      
-      console.log('✅ Successfully combined deals with brokers:', dealsWithBrokers.length, 'results');
-      return dealsWithBrokers;
-      
+      }) as (Deal & { broker: Broker })[];
+
+      return { deals: dealsWithBrokers, hasMore };
     } catch (error) {
       console.error('❌ Error in getAllDealsWithBrokers:', error);
       throw error;

@@ -169,15 +169,25 @@ export class EmailAutomationService {
   async sendWeeklyAnalystDigest(): Promise<void> {
     try {
       const teamMembers = await storage.getCatalystTeamMembers();
-      const recentDeals = await storage.getAllDealsWithBrokers();
-      
-      // Filter deals from last 7 days
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
-      
-      const weeklyDeals = recentDeals.filter(deal => 
-        deal.createdAt && new Date(deal.createdAt) >= weekAgo
-      );
+      const weeklyDeals: any[] = [];
+      let totalDeals = 0;
+      let highPriorityDeals = 0;
+      let underReviewDeals = 0;
+      let offset = 0;
+
+      while (true) {
+        const page = await storage.getAllDealsWithBrokers({ limit: 200, offset });
+        totalDeals += page.deals.length;
+        highPriorityDeals += page.deals.filter(deal => deal.classification === 'green').length;
+        underReviewDeals += page.deals.filter(deal => deal.classification === 'yellow').length;
+        weeklyDeals.push(...page.deals.filter(deal =>
+          deal.createdAt && new Date(deal.createdAt) >= weekAgo
+        ));
+        offset += page.deals.length;
+        if (!page.hasMore) break;
+      }
 
       if (weeklyDeals.length === 0) {
         console.log("No new deals this week, skipping digest");
@@ -202,10 +212,10 @@ ${weeklyDeals.filter(d => d.classification === 'yellow').map(d =>
 ).join('\n')}
 
 Pipeline Summary:
-- Total Active Deals: ${recentDeals.length}
+- Total Active Deals: ${totalDeals}
 - Approved This Week: ${weeklyDeals.filter(d => d.status === 'approved').length}
-- High Priority: ${recentDeals.filter(d => d.classification === 'green').length}
-- Under Review: ${recentDeals.filter(d => d.classification === 'yellow').length}
+- High Priority: ${highPriorityDeals}
+- Under Review: ${underReviewDeals}
 
 View full dashboard: https://landlinq.ai/analyst-dashboard
 

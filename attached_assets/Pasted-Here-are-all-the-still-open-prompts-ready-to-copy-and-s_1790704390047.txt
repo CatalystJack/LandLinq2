@@ -1,0 +1,48 @@
+Here are all the still-open prompts, ready to copy and send.
+
+1. Admin-check security batch (highest priority):
+
+Add the platform-admin check to the following routes in server/routes.ts, matching the requirePlatformAdmin/isPlatformAdminEmail pattern already used elsewhere in this file — each of these currently only requires being logged in, not being an admin:
+
+POST /api/crm/import-contacts (~5926)
+POST /api/crm/import-assignments (~5808)
+POST /api/crm/normalize-names (~4966)
+POST /api/crm/contacts/strip-middle-names (~4324)
+POST /api/crm/backfill-assigned-to (~4984)
+POST /api/crm/bulk-tag (~5782)
+POST /api/admin/backfill-qct-status (~10522), /api/admin/backfill-oz-status (~10600), /api/admin/backfill-dda-status (~10677), /api/admin/backfill-government-data (~10719)
+GET /api/admin/broker-portal/debug (~20360) and GET /api/admin/broker-portal/deal-queue (~20382)
+While you're in POST /api/crm/bulk-tag, also fix its performance: it currently loops over the submitted broker IDs and does one SELECT plus one UPDATE per broker sequentially — tagging 500 contacts means 1,000 separate database round-trips in one request. Batch it into a single query instead. Show the diff and confirm each route now returns 403 for a non-admin logged-in user.
+
+2. Truss — full read access + action expansion:
+
+Expand the Truss developer assistant (server/routes.ts, server/aiEmailParser.ts, server/developerAssistantData.ts) from read-only Q&A on deals/contacts/pipeline into a fuller agent for the developer's own account, using the same confirm-before-execute pattern already used for markDealPursuing/addContactTag/createPipelineOpportunity (session-stored pending action, explicit user confirmation, 5-minute expiry) for every new write.
+
+Fix the current bug first: getMyContacts and getMyContactCount in server/developerAssistantData.ts only filter by a search string matched against first_name/last_name/email/brokerage — they never check b.state_region or b.crm_tags, so a question like "how many broker contacts do I have in Rhea county" fails outright. Add optional region and tag filter args to both functions, update the tool schema in planDeveloperAssistantQuestion to accept them, and update the route handler to pass them through. When a read tool returns zero results or the planner can't map the question to any tool, return a clear specific message instead of the generic 500 error.
+
+Read access to add: getMyCampaigns (already exists in server/developerAssistantData.ts, just needs wiring in) for drip campaign name/status/trigger tag/steps; and a new getMyAnalyticsSummary function, factored out of the existing analytics route (GET /api/developer-profile/me/analytics, ~line 18694), for deal status breakdown, top cities, top brokers, monthly trends, conversion rate, and total pipeline value.
+
+Action access to add (all behind the same confirm-first flow): start/pause a campaign (updateMyCampaignStatus), change a campaign's frequency (updateMyCampaignFrequency), change a campaign's trigger tag (updateMyCampaignTriggerTag), edit a campaign step (updateMyCampaignStep), move a pipeline opportunity to a different stage, and mark a deal as passed (not just pursuing).
+
+Do not add delete actions or anything touching account settings, billing, or user management. Keep the new read tools on-demand (selected per question), not part of the upfront context payload, so this doesn't undo the earlier speed work. Confirm a few sample flows (propose → confirm, propose → cancel) and show the diff.
+
+3. Performance — unbounded queries, duplicate route, missing indexes:
+
+Two fixes in server/storage.ts / server/partnerDeveloperAutoSend.ts:
+
+First, getAllDealsWithBrokers() in server/storage.ts (~2140) pulls every row from the deals table and every row from the brokers table with no limit at all, and it's called directly from non-admin, regular-use routes like the deals pipeline view. Add proper pagination/limits to this function and its call sites. Also check GET /api/deals/pipeline — it's registered twice in server/routes.ts (once around line 8616, again around 29608); confirm and remove the duplicate.
+
+Second, autoSendMatchingDeveloperEmails in server/partnerDeveloperAutoSend.ts runs every time a new deal comes in, and for each active developer it does up to 3 separate sequential database calls — with 50 active developers that's 100-150 sequential queries before a single deal can finish being created. Batch these into fewer queries.
+
+Also add indexes on deals.flagged (used directly by the analyst review-queue filters) and on partner_developer_sends.dealId and .developerId individually (currently only a combined index exists) — both in shared/schema.ts, with a migration.
+
+4. Duplicate-deal check on two creation paths (lower priority):
+
+Two deal-creation paths don't check for an existing duplicate before inserting, unlike the other paths that already do: admin manual deal entry (POST /api/admin/investment-companies/:profileId/deals in server/routes.ts, ~line 15809) inserts directly with no address check, and the external API lead-intake endpoint (POST /api/v1/leads in server/externalApiRoutes.ts, ~line 174) dedups the broker by email but not the deal by address. Add the same normalized-address duplicate check used by the developer-facing manual entry route (server/routes.ts ~18973, lower(trim(address)) = lower(trim(...))) to both, so a matching address reuses the existing deal instead of creating a second row. Show the diff.
+
+5. Off-market upload file validation (lower priority):
+
+The off-market upload endpoints (POST /api/off-market/preview and /api/off-market/import in server/routes.ts, multer config offMarketUpload ~line 38578) accept up to 200MB with no file-type filter at all. Add a fileFilter restricting to the expected spreadsheet/CSV types, matching the pattern used by the other upload configs in this file (e.g. dealSubmissionUpload), and lower the 200MB ceiling if legitimate files don't need it. Show the diff.
+
+Send them in whatever order you want — I'd still put the admin-check batch and Truss ahead of the other three if you're picking.
+

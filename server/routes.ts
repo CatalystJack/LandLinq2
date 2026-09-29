@@ -173,6 +173,42 @@ const DEFAULT_PIPELINE_STAGES = [
 ] as const;
 
 const CENSUS_DATA_REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
+const DEALS_WITH_BROKERS_PAGE_SIZE = 200;
+
+function parseDealsPageOptions(query: any, defaultLimit = 100): { limit: number; offset: number } {
+  const requestedLimit = Number(query?.limit);
+  const requestedOffset = Number(query?.offset);
+  return {
+    limit: Number.isInteger(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, DEALS_WITH_BROKERS_PAGE_SIZE)
+      : defaultLimit,
+    offset: Number.isInteger(requestedOffset) && requestedOffset > 0
+      ? requestedOffset
+      : 0,
+  };
+}
+
+async function forEachDealsWithBrokersPage(
+  options: { createdAfter?: Date; visibleDealIds?: readonly string[] },
+  onPage: (deals: any[]) => Promise<void> | void,
+): Promise<number> {
+  let offset = 0;
+  let processed = 0;
+
+  while (true) {
+    const page = await storage.getAllDealsWithBrokers({
+      ...options,
+      limit: DEALS_WITH_BROKERS_PAGE_SIZE,
+      offset,
+    });
+    if (page.deals.length) {
+      await onPage(page.deals);
+      processed += page.deals.length;
+      offset += page.deals.length;
+    }
+    if (!page.hasMore) return processed;
+  }
+}
 
 function validCoordinate(value: unknown): number | null {
   const parsed = Number(value);
@@ -8758,17 +8794,19 @@ Provide your analysis in this exact JSON format:
   // Get deals with pipeline tracking data
   app.get("/api/deals/pipeline", isAuthenticated, async (req, res) => {
     try {
-      let deals = await storage.getAllDealsWithBrokers();
+      const pageOptions = parseDealsPageOptions(req.query);
+      let visibleDealIds: string[] | undefined;
       if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
         const developerProfileId = getDeveloperProfileId(req, res);
         if (!developerProfileId) return;
         if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
-        const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
-        deals = deals.filter((deal) => visibleDealIds.has(deal.id));
+        visibleDealIds = Array.from(await getDeveloperVisibleDealIds(developerProfileId));
       }
+      const page = await storage.getAllDealsWithBrokers({ ...pageOptions, visibleDealIds });
+      res.setHeader("X-Has-More", String(page.hasMore));
       
       // Enhanced pipeline data for each deal
-      const pipelineDeals = deals.map((deal: any) => {
+      const pipelineDeals = page.deals.map((deal: any) => {
         // Calculate stage history and time tracking
         const stageHistory = deal.stageHistory || [];
         const currentStage = deal.pipelineStage || 1;
@@ -8797,57 +8835,55 @@ Provide your analysis in this exact JSON format:
   // Get pipeline analytics and bottleneck analysis
   app.get("/api/deals/pipeline/analytics", isAuthenticated, async (req, res) => {
     try {
-      let deals = await storage.getAllDealsWithBrokers();
+      let visibleDealIds: string[] | undefined;
       if (String((req as any).user?.role || '').toUpperCase() === 'DEVELOPER') {
         const developerProfileId = getDeveloperProfileId(req, res);
         if (!developerProfileId) return;
         if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
-        const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
-        deals = deals.filter((deal) => visibleDealIds.has(deal.id));
+        visibleDealIds = Array.from(await getDeveloperVisibleDealIds(developerProfileId));
       }
-      
-      // Calculate stage analytics
-      const stageAnalytics = Array.from({ length: 7 }, (_, i) => {
-        const stageId = i + 1;
-        const stageDeals = deals.filter((deal: any) => (deal.pipelineStage || 1) === stageId);
-        const totalValue = stageDeals.reduce((sum: number, deal: any) => sum + (parseFloat(deal.askingPrice) || 0), 0);
-        
-        // Calculate average time in stage
-        const avgTimeInStage = stageDeals.length > 0 ? 
-          stageDeals.reduce((sum: number, deal: any) => {
-            const timeInStage = Math.floor((new Date().getTime() - new Date(deal.statusUpdatedAt || deal.createdAt).getTime()) / (1000 * 60 * 60));
-            return sum + timeInStage;
-          }, 0) / stageDeals.length : 0;
+      const expectedTimes = [4, 24, 72, 8, 48, 120, 168];
+      const stageTotals = expectedTimes.map(() => ({
+        dealCount: 0,
+        totalValue: 0,
+        timeInStageTotal: 0,
+        overdueCount: 0,
+      }));
+      let totalDeals = 0;
+      let totalValue = 0;
+      let totalDealTime = 0;
+      const now = Date.now();
 
-        // Expected times for each stage (in hours)
-        const expectedTimes = [4, 24, 72, 8, 48, 120, 168];
-        const expectedTime = expectedTimes[i];
-        
-        // Count overdue deals
-        const overdueDeals = stageDeals.filter((deal: any) => {
-          const timeInStage = Math.floor((new Date().getTime() - new Date(deal.statusUpdatedAt || deal.createdAt).getTime()) / (1000 * 60 * 60));
-          return timeInStage > expectedTime * 1.5;
-        }).length;
+      await forEachDealsWithBrokersPage({ visibleDealIds }, (pageDeals) => {
+        for (const deal of pageDeals) {
+          totalDeals++;
+          const askingPrice = parseFloat(String(deal.askingPrice)) || 0;
+          totalValue += askingPrice;
+          totalDealTime += Math.floor((now - new Date(deal.createdAt).getTime()) / (1000 * 60 * 60));
 
-        return {
-          stageId,
-          dealCount: stageDeals.length,
-          totalValue,
-          avgTimeInStage,
-          expectedTime,
-          overdueCount: overdueDeals,
-          bottleneckScore: stageDeals.length > 0 ? overdueDeals / stageDeals.length : 0,
-        };
+          const stageIndex = Number(deal.pipelineStage || 1) - 1;
+          if (stageIndex < 0 || stageIndex >= stageTotals.length) continue;
+          const stage = stageTotals[stageIndex];
+          const timeInStage = Math.floor(
+            (now - new Date(deal.statusUpdatedAt || deal.createdAt).getTime()) / (1000 * 60 * 60),
+          );
+          stage.dealCount++;
+          stage.totalValue += askingPrice;
+          stage.timeInStageTotal += timeInStage;
+          if (timeInStage > expectedTimes[stageIndex] * 1.5) stage.overdueCount++;
+        }
       });
 
-      // Overall pipeline metrics
-      const totalDeals = deals.length;
-      const totalValue = deals.reduce((sum: number, deal: any) => sum + (parseFloat(deal.askingPrice) || 0), 0);
-      const avgDealTime = deals.length > 0 ? 
-        deals.reduce((sum: number, deal: any) => {
-          const totalTime = Math.floor((new Date().getTime() - new Date(deal.createdAt).getTime()) / (1000 * 60 * 60));
-          return sum + totalTime;
-        }, 0) / deals.length : 0;
+      const stageAnalytics = stageTotals.map((stage, index) => ({
+        stageId: index + 1,
+        dealCount: stage.dealCount,
+        totalValue: stage.totalValue,
+        avgTimeInStage: stage.dealCount ? stage.timeInStageTotal / stage.dealCount : 0,
+        expectedTime: expectedTimes[index],
+        overdueCount: stage.overdueCount,
+        bottleneckScore: stage.dealCount ? stage.overdueCount / stage.dealCount : 0,
+      }));
+      const avgDealTime = totalDeals ? totalDealTime / totalDeals : 0;
 
       res.json({
         totalDeals,
@@ -10369,15 +10405,15 @@ Provide your analysis in this exact JSON format:
       console.log(`   Requested by: ${userEmail}`);
       console.log('='.repeat(100));
 
-      // Get all deals
-      const allDeals = await storage.getAllDealsWithBrokers();
-      console.log(`📊 [DEMOGRAPHICS-BACKFILL] Total deals found: ${allDeals.length}`);
-
       // Filter deals missing EITHER demographic field (explicit null/undefined check)
       // Note: Zero (0) is a valid value, so use == null instead of falsy check
-      const dealsNeedingDemographics = allDeals.filter(deal => 
-        deal.address && (deal.population55Plus5Mile == null || deal.income75Plus55Plus == null)
-      );
+      const dealsNeedingDemographics: any[] = [];
+      const totalDeals = await forEachDealsWithBrokersPage({}, (pageDeals) => {
+        dealsNeedingDemographics.push(...pageDeals.filter(deal =>
+          deal.address && (deal.population55Plus5Mile == null || deal.income75Plus55Plus == null)
+        ));
+      });
+      console.log(`📊 [DEMOGRAPHICS-BACKFILL] Total deals found: ${totalDeals}`);
       console.log(`🎯 [DEMOGRAPHICS-BACKFILL] Deals missing demographics: ${dealsNeedingDemographics.length}`);
 
       if (dealsNeedingDemographics.length === 0) {
@@ -10385,7 +10421,7 @@ Provide your analysis in this exact JSON format:
           success: true,
           message: 'All deals already have demographics data',
           processed: 0,
-          skipped: allDeals.length
+          skipped: totalDeals
         });
       }
 
@@ -10484,15 +10520,16 @@ Provide your analysis in this exact JSON format:
       console.log(`   Requested by: ${userEmail}`);
       console.log('='.repeat(100));
 
-      const allDeals = await storage.getAllDealsWithBrokers();
-      console.log(`📊 [CENSUS-BACKFILL] Total deals found: ${allDeals.length}`);
-
       // Filter deals missing Census data (with or without coordinates - we'll geocode if needed)
-      const dealsNeedingCensus = allDeals.filter(deal => 
-        deal.address && 
-        (deal as any).censusTotalPopulation == null && 
-        (deal as any).censusMedianIncome == null
-      );
+      const dealsNeedingCensus: any[] = [];
+      const totalDeals = await forEachDealsWithBrokersPage({}, (pageDeals) => {
+        dealsNeedingCensus.push(...pageDeals.filter(deal =>
+          deal.address &&
+          (deal as any).censusTotalPopulation == null &&
+          (deal as any).censusMedianIncome == null
+        ));
+      });
+      console.log(`📊 [CENSUS-BACKFILL] Total deals found: ${totalDeals}`);
       console.log(`🎯 [CENSUS-BACKFILL] Deals needing Census data: ${dealsNeedingCensus.length}`);
 
       if (dealsNeedingCensus.length === 0) {
@@ -10500,7 +10537,7 @@ Provide your analysis in this exact JSON format:
           success: true,
           message: 'All deals already have Census data',
           processed: 0,
-          skipped: allDeals.length
+          skipped: totalDeals
         });
       }
 
@@ -10728,7 +10765,7 @@ Provide your analysis in this exact JSON format:
         updatedFips,
         updatedGeocode,
         skipped,
-        total: allDeals.length,
+        total: totalDeals,
       });
     } catch (error) {
       console.error('❌ [QCT-BACKFILL] Error:', error);
@@ -22580,14 +22617,17 @@ RULES:
         return res.status(403).json({ message: "Access denied. Analyst privileges required." });
       }
 
-      let deals = await storage.getAllDealsWithBrokers();
+      let visibleDealIds: string[] | undefined;
       if (isDeveloper) {
         const developerProfileId = getDeveloperProfileId(req, res);
         if (!developerProfileId) return;
         if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
-        const visibleDealIds = await getDeveloperVisibleDealIds(developerProfileId);
-        deals = deals.filter((deal: any) => visibleDealIds.has(deal.id));
+        visibleDealIds = Array.from(await getDeveloperVisibleDealIds(developerProfileId));
       }
+      const pageOptions = parseDealsPageOptions(req.query, 200);
+      const page = await storage.getAllDealsWithBrokers({ ...pageOptions, visibleDealIds });
+      res.setHeader("X-Has-More", String(page.hasMore));
+      let deals = page.deals;
 
       // Demo user: filter to only deals whose broker belongs to demo@catalystcp.com
       const reqUser2 = req.user as any;
@@ -24123,8 +24163,9 @@ RULES:
       const priorities = parseFilterValues(req.query.priorities ?? req.query.priority);
       const dealTypes = parseFilterValues(req.query.dealTypes ?? req.query.type);
       const search = String(req.query.search || "").trim().toLowerCase();
-      const allDeals = await storage.getAllDealsWithBrokers();
-      const deals = allDeals.filter((deal) => {
+      const deals: any[] = [];
+      await forEachDealsWithBrokersPage({}, (pageDeals) => {
+        deals.push(...pageDeals.filter((deal) => {
         const matchesSearch = !search
           || deal.address?.toLowerCase().includes(search)
           || deal.city?.toLowerCase().includes(search)
@@ -24143,6 +24184,7 @@ RULES:
         const matchesPriority = priorities.length === 0 || priorities.includes(deal.priority);
         const matchesDealType = dealTypes.length === 0 || dealTypes.includes((deal as any).dealType || "land");
         return matchesSearch && matchesClassification && matchesPriority && matchesDealType;
+        }));
       });
       const hasFilters = classifications.length > 0 || priorities.length > 0 || dealTypes.length > 0 || Boolean(search);
       

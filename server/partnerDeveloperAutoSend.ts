@@ -1,7 +1,7 @@
 import { db } from './db';
 import { developerProductTypes, developerProfiles, partnerDevelopers, partnerDeveloperSends } from '../shared/schema';
 import type { DeveloperProductType, DeveloperProfile } from '../shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { deals } from '../shared/schema';
 import { classifyDealForProfile, isDealInProfileMarket } from './developerClassificationService';
 import { normalizeUsStateCode } from '../shared/us-states';
@@ -39,6 +39,38 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
 
     console.log(`🔍 [AUTO-SEND] Checking deal ${deal.id} against ${recipients.length} active developers`);
 
+    const profileIds = Array.from(new Set(
+      recipients
+        .map(({ profile }) => profile?.id)
+        .filter((id): id is string => Boolean(id)),
+    ));
+    const [activeProductTypes, existingSends] = await Promise.all([
+      profileIds.length
+        ? db.select().from(developerProductTypes).where(inArray(developerProductTypes.developerProfileId, profileIds))
+        : Promise.resolve([] as DeveloperProductType[]),
+      db
+        .select({
+          developerId: partnerDeveloperSends.developerId,
+          developerProfileId: partnerDeveloperSends.developerProfileId,
+        })
+        .from(partnerDeveloperSends)
+        .where(eq(partnerDeveloperSends.dealId, deal.id)),
+    ]);
+    const productTypesByProfile = new Map<string, DeveloperProductType[]>();
+    for (const productType of activeProductTypes) {
+      if (!productType.isActive) continue;
+      const group = productTypesByProfile.get(productType.developerProfileId) || [];
+      group.push(productType);
+      productTypesByProfile.set(productType.developerProfileId, group);
+    }
+    const existingProfileIds = new Set(
+      existingSends.map((send) => send.developerProfileId).filter((id): id is string => Boolean(id)),
+    );
+    const existingDeveloperIds = new Set(existingSends.map((send) => send.developerId));
+    const seenRecipientKeys = new Set<string>();
+    const sendsToInsert: Array<typeof partnerDeveloperSends.$inferInsert> = [];
+    const autoSendCandidates = new Map<string, typeof partnerDevelopers.$inferSelect>();
+
     for (const { developer: dev, profile } of recipients) {
       try {
         if (profile) {
@@ -47,11 +79,21 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
         } else if (!doesDealMatchDeveloper(deal, dev)) {
           continue;
         }
+
+        const profileId = profile?.id || dev.developerProfileId || null;
+        const recipientKey = profileId ? `profile:${profileId}` : `developer:${dev.id}`;
+        if (
+          (profileId && existingProfileIds.has(profileId)) ||
+          (!profileId && existingDeveloperIds.has(dev.id)) ||
+          seenRecipientKeys.has(recipientKey)
+        ) {
+          console.log(`⏭️ [AUTO-SEND] Deal ${deal.id} already queued/sent for ${dev.companyName}, skipping`);
+          continue;
+        }
+        seenRecipientKeys.add(recipientKey);
+
         const productTypes = profile
-          ? await db.select().from(developerProductTypes).where(and(
-              eq(developerProductTypes.developerProfileId, profile.id),
-              eq(developerProductTypes.isActive, true),
-            ))
+          ? productTypesByProfile.get(profile.id) || []
           : partnerDeveloperToClassificationProductTypes(dev);
         const classificationResult = classifyDealForProfile(
           deal,
@@ -59,53 +101,64 @@ export async function autoSendMatchingDeveloperEmails(deal: any): Promise<void> 
           productTypes,
         );
 
-        // Check if a record already exists (pending or sent)
-        const existing = await db
-          .select({ id: partnerDeveloperSends.id, status: partnerDeveloperSends.status })
-          .from(partnerDeveloperSends)
-          .where(and(
-            eq(partnerDeveloperSends.dealId, deal.id),
-            profile?.id || dev.developerProfileId
-              ? eq(partnerDeveloperSends.developerProfileId, profile?.id || dev.developerProfileId!)
-              : eq(partnerDeveloperSends.developerId, dev.id),
-          ))
-          .limit(1);
-
-        if (existing.length > 0) {
-          console.log(`⏭️ [AUTO-SEND] Deal ${deal.id} already queued/sent for ${dev.companyName} (status: ${existing[0].status}), skipping`);
-          continue;
-        }
-
         if (dev.autoSendEnabled) {
-          // Send immediately + record as 'sent'
-          await sendDeveloperDealEmail(deal, dev);
-          await db.insert(partnerDeveloperSends).values({
-            developerId: dev.id,
-            developerProfileId: profile?.id || dev.developerProfileId || null,
-            dealId: deal.id,
-            classification: classificationResult.classification,
-            matchedProductTypes: classificationResult.matchedProductTypes,
-            address: deal.address,
-            status: 'sent',
-            sentAt: new Date(),
-          }).onConflictDoNothing();
-          console.log(`✅ [AUTO-SEND] Deal ${deal.id} auto-sent to ${dev.email} (${dev.companyName})`);
+          autoSendCandidates.set(recipientKey, dev);
         } else {
-          // Queue as pending for manual review
-          await db.insert(partnerDeveloperSends).values({
-            developerId: dev.id,
-            developerProfileId: profile?.id || dev.developerProfileId || null,
-            dealId: deal.id,
-            classification: classificationResult.classification,
-            matchedProductTypes: classificationResult.matchedProductTypes,
-            address: deal.address,
-            status: 'pending',
-            sentAt: null,
-          }).onConflictDoNothing();
           console.log(`📥 [AUTO-SEND] Deal ${deal.id} queued (pending) for ${dev.companyName} — manual send required`);
         }
+        // Reserve every eligible deal/profile pair before sending, so a failed
+        // insert can never leave a delivered email without a dedupe record.
+        sendsToInsert.push({
+          developerId: dev.id,
+          developerProfileId: profileId,
+          dealId: deal.id,
+          classification: classificationResult.classification,
+          matchedProductTypes: classificationResult.matchedProductTypes,
+          address: deal.address,
+          status: 'pending',
+          sentAt: null,
+        });
       } catch (devError) {
         console.error(`❌ [AUTO-SEND] Failed for ${dev.companyName}:`, devError);
+      }
+    }
+
+    if (sendsToInsert.length) {
+      const insertedSends = await db
+        .insert(partnerDeveloperSends)
+        .values(sendsToInsert)
+        .onConflictDoNothing()
+        .returning({
+          id: partnerDeveloperSends.id,
+          developerId: partnerDeveloperSends.developerId,
+          developerProfileId: partnerDeveloperSends.developerProfileId,
+        });
+      const sendIdsByRecipient = new Map<string, string>();
+      for (const send of insertedSends) {
+        const recipientKey = send.developerProfileId
+          ? `profile:${send.developerProfileId}`
+          : `developer:${send.developerId}`;
+        sendIdsByRecipient.set(recipientKey, send.id);
+      }
+
+      const sentIds: string[] = [];
+      for (const [recipientKey, dev] of autoSendCandidates) {
+        const sendId = sendIdsByRecipient.get(recipientKey);
+        if (!sendId) continue; // A concurrent process already queued this pair.
+        try {
+          await sendDeveloperDealEmail(deal, dev);
+          sentIds.push(sendId);
+          console.log(`✅ [AUTO-SEND] Deal ${deal.id} auto-sent to ${dev.email} (${dev.companyName})`);
+        } catch (sendError) {
+          console.error(`❌ [AUTO-SEND] Email failed for ${dev.companyName}; deal remains pending:`, sendError);
+        }
+      }
+
+      if (sentIds.length) {
+        await db
+          .update(partnerDeveloperSends)
+          .set({ status: 'sent', sentAt: new Date() })
+          .where(inArray(partnerDeveloperSends.id, sentIds));
       }
     }
   } catch (err) {

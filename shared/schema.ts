@@ -788,7 +788,8 @@ export const deals = pgTable("deals", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("idx_deals_status").on(table.status),
-  index("idx_deals_broker_id").on(table.brokerId)
+  index("idx_deals_broker_id").on(table.brokerId),
+  index("idx_deals_flagged").on(table.flagged)
 ]);
 
 // Immutable archive of every unmodified HelloData response received by the app.
@@ -3832,6 +3833,8 @@ export const partnerDeveloperSends = pgTable("partner_developer_sends", {
 }, (table) => [
   uniqueIndex("partner_developer_sends_profile_deal_unique")
     .on(table.developerProfileId, table.dealId),
+  index("partner_developer_sends_deal_id_idx").on(table.dealId),
+  index("partner_developer_sends_developer_id_idx").on(table.developerId),
 ]);
 
 // ── Partner Broker Portal Accounts ──────────────────────────────────────────

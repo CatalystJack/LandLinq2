@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -132,10 +132,33 @@ export function DealPipeline() {
   const queryClient = useQueryClient();
 
   // Fetch deals with pipeline data
-  const { data: deals = [], isLoading } = useQuery({
+  const {
+    data: dealPages,
+    isLoading,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['/api/deals/pipeline'],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const response = await fetch(`/api/deals/pipeline?limit=100&offset=${pageParam}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to load pipeline deals');
+      }
+      const pageDeals = await response.json() as Deal[];
+      const hasMore = response.headers.get('X-Has-More') === 'true';
+      return {
+        deals: pageDeals,
+        nextOffset: hasMore ? pageParam + pageDeals.length : undefined,
+      };
+    },
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
     staleTime: 30000, // 30 seconds
   });
+  const deals = dealPages?.pages.flatMap((page) => page.deals) ?? [];
 
   // Update deal stage mutation
   const updateStageMutation = useMutation({
@@ -494,6 +517,18 @@ export function DealPipeline() {
           </div>
         </CardContent>
       </Card>
+
+      {hasNextPage && (
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+          >
+            {isFetchingNextPage ? 'Loading more deals…' : 'Load more deals'}
+          </Button>
+        </div>
+      )}
       
       {/* Stage Bottleneck Analysis */}
       <Card className="border-catalyst-gray-200 shadow-sm">
