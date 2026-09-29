@@ -56,6 +56,19 @@ test("each requested admin-only route is registered behind platform-admin middle
   }
 });
 
+test("email automation toggle GET and PATCH routes authenticate and check analyst access", () => {
+  const routes = readFileSync(new URL("./routes.ts", import.meta.url), "utf8");
+
+  for (const method of ["get", "patch"]) {
+    const routeStart = routes.indexOf(`app.${method}('/api/admin/email-automation-toggle'`);
+    assert.notEqual(routeStart, -1, `${method.toUpperCase()} email automation route must exist`);
+    const nextRouteStart = routes.indexOf("\n  app.", routeStart + 1);
+    const routeBody = routes.slice(routeStart, nextRouteStart === -1 ? undefined : nextRouteStart);
+    assert.match(routeBody, /isAuthenticated/);
+    assert.match(routeBody, /isPlatformAdminEmail/);
+  }
+});
+
 test("profile-scoped CRM tag routes exclude removed and demo shared contacts", () => {
   const routes = readFileSync(new URL("./routes.ts", import.meta.url), "utf8");
   assert.match(routes, /developer_broker_crm AS shared_crm[\s\S]{0,900}shared_crm\.is_removed = false/);

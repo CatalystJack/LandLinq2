@@ -75,6 +75,7 @@ import {
 } from "@shared/off-market-upload";
 import { getDeveloperCrmContacts } from "./developerCrmContacts";
 import { getInternalCrmContacts } from "./internalCrmContacts";
+import { getEmailScrapingEnabledFromDatabase } from "./emailAutomationConfig";
 import {
   decodeBrokerDirectoryCursor,
   encodeBrokerDirectoryCursor,
@@ -28487,6 +28488,50 @@ RULES:
 
   app.get("/api/demo/analyst/deals", (_req, res) => {
     return res.status(410).json({ message: "The public demo has been retired" });
+  });
+
+  // ── Admin email automation control ────────────────────────────────────────
+  app.get('/api/admin/email-automation-toggle', isAuthenticated, async (req: any, res) => {
+    const user = req.user as any;
+    if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+      return res.status(403).json({ message: 'Access denied. Analyst privileges required.' });
+    }
+
+    try {
+      const enabled = await getEmailScrapingEnabledFromDatabase();
+      return res.json({ enabled });
+    } catch {
+      console.error('[EMAIL-AUTOMATION] Failed to read the email intake setting.');
+      return res.status(500).json({ message: 'Unable to read email automation status.' });
+    }
+  });
+
+  app.patch('/api/admin/email-automation-toggle', isAuthenticated, async (req: any, res) => {
+    const user = req.user as any;
+    if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+      return res.status(403).json({ message: 'Access denied. Analyst privileges required.' });
+    }
+
+    const { enabled } = req.body || {};
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: 'enabled must be a boolean.' });
+    }
+
+    try {
+      // Ensure an active settings row exists before updating the toggle.
+      await storage.getBusinessSettings();
+      await storage.updateBusinessSettingsField('emailScrapingEnabled', enabled);
+      const persistedEnabled = await getEmailScrapingEnabledFromDatabase();
+      if (persistedEnabled !== enabled) {
+        throw new Error('Email automation setting did not persist');
+      }
+
+      console.log(`[EMAIL-AUTOMATION] Email deal intake set to ${enabled ? 'ON' : 'OFF'}.`);
+      return res.json({ success: true, enabled: persistedEnabled });
+    } catch {
+      console.error('[EMAIL-AUTOMATION] Failed to update the email intake setting.');
+      return res.status(500).json({ message: 'Unable to update email automation status.' });
+    }
   });
 
   // ── Sourcing audit API (platform administrators only) ──────────────────────

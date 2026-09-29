@@ -3026,6 +3026,10 @@ export class DatabaseStorage implements IStorage {
         tagline: updates.tagline || settings.tagline,
         buttonStyle: updates.buttonStyle || settings.buttonStyle,
         emailWidth: updates.emailWidth || settings.emailWidth,
+        // Preserve global automation switches when branding/settings saves
+        // replace the active business_settings row.
+        outreachMasterEnabled: updates.outreachMasterEnabled ?? settings.outreachMasterEnabled,
+        emailScrapingEnabled: updates.emailScrapingEnabled ?? settings.emailScrapingEnabled,
         isActive: true
       };
       

@@ -2179,6 +2179,8 @@ export const businessSettings = pgTable("business_settings", {
   emailWidth: varchar("email_width").default("600px").notNull(),
   // Master Outreach Toggle (Dec 12, 2025) - When false, ALL broker outreach is disabled
   outreachMasterEnabled: boolean("outreach_master_enabled").default(true).notNull(),
+  // Platform-wide automatic email-to-deal intake kill switch (safe off by default)
+  emailScrapingEnabled: boolean("email_scraping_enabled").default(false).notNull(),
   // HubSpot Daily Sync Limit - Max new contacts to sync per day (for email deliverability)
   hubspotDailySyncLimit: integer("hubspot_daily_sync_limit").default(100),
   // News Feed Preferences for Executive Dashboard

@@ -13,6 +13,7 @@ import { simpleParser } from 'mailparser';
 import { db } from './db.js';
 import { emailIntakeQueue } from '../shared/schema.js';
 import { eq } from 'drizzle-orm';
+import { getEmailScrapingEnabled } from './emailAutomationConfig.js';
 
 export const DEALS_IMAP_MAILBOX = 'deals@landlinq.ai';
 export const DEALS_IMAP_HOST = 'imap.secureserver.net';
@@ -297,18 +298,25 @@ export function pollDealsMailboxImap(): Promise<ImapDealsPollResult> {
   return defaultPoller();
 }
 
+export async function runDealsImapPollCycle(
+  readEnabled: () => Promise<boolean> = getEmailScrapingEnabled,
+  pollMailbox: () => Promise<ImapDealsPollResult> = pollDealsMailboxImap,
+): Promise<ImapDealsPollResult | null> {
+  if (!(await readEnabled())) return null;
+  return pollMailbox();
+}
+
 /** Start one delayed, non-overlapping production schedule. */
 export function startDealsImapPoller(intervalMs = DEFAULT_IMAP_INTERVAL_MS): void {
   if (pollSchedule) return;
 
   const run = async () => {
     try {
-      const { EMAIL_SCRAPING_ENABLED } = await import('./emailAutomationConfig.js');
-      if (!EMAIL_SCRAPING_ENABLED) {
+      const result = await runDealsImapPollCycle();
+      if (result === null) {
         console.log('[IMAP-DEALS] Poll skipped — email automation is disabled');
         return;
       }
-      const result = await pollDealsMailboxImap();
       console.log(
         `[IMAP-DEALS] Poll complete: seen=${result.messagesSeen}, processed=${result.processed}, ` +
         `manual/deferred=${result.deferred}, errors=${result.errors}, readFailures=${result.markReadFailures}`,

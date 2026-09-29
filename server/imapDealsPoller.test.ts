@@ -4,6 +4,7 @@ import {
   buildImapMessageId,
   createImapDealsPoller,
   parseImapMessage,
+  runDealsImapPollCycle,
 } from './imapDealsPoller';
 
 const fixture = [
@@ -92,4 +93,26 @@ const deferredPoll = createImapDealsPoller({
 const deferredResult = await deferredPoll();
 assert.equal(deferredResult.deferred, 1);
 assert.equal(deferredMarkCount, 0);
+
+let enabled = false;
+let livePollCount = 0;
+const pollCycleResult = {
+  messagesSeen: 0,
+  processed: 0,
+  deferred: 0,
+  errors: 0,
+  markReadFailures: 0,
+  skippedBecauseRunning: false,
+};
+const readEnabled = async () => enabled;
+const fakeMailboxPoll = async () => {
+  livePollCount++;
+  return pollCycleResult;
+};
+
+assert.equal(await runDealsImapPollCycle(readEnabled, fakeMailboxPoll), null);
+assert.equal(livePollCount, 0);
+enabled = true;
+assert.equal(await runDealsImapPollCycle(readEnabled, fakeMailboxPoll), pollCycleResult);
+assert.equal(livePollCount, 1);
 console.log('imapDealsPoller fixture assertions passed');

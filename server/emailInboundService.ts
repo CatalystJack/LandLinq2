@@ -2,11 +2,11 @@ import { Request, Response } from 'express';
 import * as XLSX from 'xlsx';
 // AI Service import will be added later
 import { storage } from './storage';
-import { EMAIL_SCRAPING_ENABLED } from './emailAutomationConfig';
+import { getEmailScrapingEnabled } from './emailAutomationConfig';
 
 // ── KILL SWITCH ──────────────────────────────────────────────────────────────
-// Change EMAIL_SCRAPING_ENABLED in emailAutomationConfig.ts to stop all
-// automatic email ingestion, including the Microsoft Graph mailbox poller.
+// The database-backed platform toggle gates webhook intake; the IMAP poller
+// checks the same setting before each scheduled mailbox poll.
 // ─────────────────────────────────────────────────────────────────────────────
 import { sendNotificationEmail } from './emailService';
 import { getWebhooksByType } from './webhookConfig';
@@ -184,7 +184,7 @@ export class EmailInboundService {
    * Webhook endpoint to receive emails from SendGrid Inbound Parse
    */
   static async handleInboundEmail(req: Request, res: Response) {
-    if (!EMAIL_SCRAPING_ENABLED) {
+    if (!(await getEmailScrapingEnabled())) {
       console.log('📧 [DISABLED] Inbound email received but email-to-deal scraping is turned off.');
       return res.status(200).json({ message: 'Email received. Automatic deal creation is currently disabled.' });
     }

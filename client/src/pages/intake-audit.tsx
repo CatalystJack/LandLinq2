@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { AlertCircle, ChevronDown, ChevronUp, FileText, Mail, Search } from "lucide-react";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 type UnknownRecord = Record<string, any>;
@@ -103,6 +104,113 @@ function AuditItem({ item }: { item: UnknownRecord }) {
   </Card>;
 }
 
+function EmailAutomationToggle() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const queryKey = ["/api/admin/email-automation-toggle"];
+  const { data, isLoading, isError } = useQuery<{ enabled: boolean }>({
+    queryKey,
+    queryFn: async () => {
+      const response = await fetch("/api/admin/email-automation-toggle", { credentials: "include" });
+      if (!response.ok) throw new Error("Unable to load email automation status");
+      return response.json();
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const response = await fetch("/api/admin/email-automation-toggle", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      if (!response.ok) throw new Error("Unable to update email automation");
+      return response.json() as Promise<{ enabled: boolean }>;
+    },
+    onSuccess: ({ enabled }) => {
+      queryClient.setQueryData(queryKey, { enabled });
+      toast({
+        title: enabled ? "Email intake automation is ON" : "Email intake automation is OFF",
+        description: enabled
+          ? "New deal emails will be processed by automatic intake."
+          : "Automatic processing of new deal emails is disabled.",
+        variant: enabled ? "default" : "destructive",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Could not update email automation",
+        description: "The saved setting was not changed. Refresh and try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const enabled = data?.enabled === true;
+  const requestToggle = () => {
+    if (isLoading || isError || !data || toggleMutation.isPending) return;
+    const nextValue = !enabled;
+    if (nextValue && !window.confirm(
+      "Turn on automatic deal-email processing? Live emails sent to deals@landlinq.ai may be parsed and added to the deal intake queue.",
+    )) {
+      return;
+    }
+    toggleMutation.mutate(nextValue);
+  };
+
+  return (
+    <Card className={`mb-5 border-2 ${enabled ? "border-green-500/50 bg-green-50/50" : "border-slate-300 bg-white"}`}>
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-semibold text-catalyst-navy">Automatic email deal intake</h2>
+              {isLoading ? (
+                <Badge variant="secondary">Loading status</Badge>
+              ) : isError ? (
+                <Badge variant="destructive">Status unavailable</Badge>
+              ) : (
+                <Badge
+                  aria-live="polite"
+                  className={enabled ? "bg-green-700 text-white hover:bg-green-700" : "bg-slate-600 text-white hover:bg-slate-600"}
+                >
+                  {enabled ? "ON" : "OFF"}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {enabled
+                ? "Live deal emails are eligible for automatic processing."
+                : "Automatic processing is disabled. Incoming emails will not be converted into deals."}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              The IMAP poller reads this setting every 3 minutes; inbound email requests read it when received.
+              Changing the toggle does not require a server restart.
+            </p>
+            {isError && (
+              <p role="alert" className="text-sm text-red-700">
+                Could not load the saved status. The control is disabled to avoid changing an unknown state.
+              </p>
+            )}
+          </div>
+          <Button
+            type="button"
+            onClick={requestToggle}
+            disabled={isLoading || isError || !data || toggleMutation.isPending}
+            className={enabled
+              ? "w-full shrink-0 sm:w-auto"
+              : "w-full shrink-0 border border-[#4A90E2] bg-[#4A90E2] text-white hover:border-[#4A90E2] hover:bg-white hover:text-[#4A90E2] sm:w-auto"}
+            variant={enabled ? "destructive" : "default"}
+          >
+            {toggleMutation.isPending ? "Saving…" : enabled ? "Turn automation off" : "Turn automation on"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function IntakeAudit() {
   const { user } = useAuth();
   const [status, setStatus] = useState("");
@@ -120,6 +228,7 @@ export default function IntakeAudit() {
   return <div className="min-h-screen bg-gray-50 flex flex-col"><Navigation /><main className="mx-auto w-full max-w-6xl flex-1 px-4 py-7 sm:px-6">
     {!allowed ? <Card className="max-w-md mx-auto"><CardContent className="p-6 text-center"><AlertCircle className="mx-auto mb-3 text-red-500" /><h1 className="font-semibold">Access denied</h1><p className="mt-1 text-sm text-muted-foreground">Intake Audit is available to platform administrators only.</p></CardContent></Card> : <>
       <div className="mb-6"><h1 className="text-2xl font-bold text-catalyst-navy">Intake Audit</h1><p className="mt-1 text-sm text-muted-foreground">Review email sourcing, extraction, and final deal values. Results are newest first.</p></div>
+      <EmailAutomationToggle />
       <Card className="mb-5"><CardContent className="p-4"><form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" onSubmit={e => { e.preventDefault(); setPage(1); setAppliedSearch(search); }}><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search sender, subject, deal" /><select className="h-10 rounded-md border bg-background px-3 text-sm" value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select><Input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setPage(1); }} aria-label="From date" /><Input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setPage(1); }} aria-label="To date" /><Button type="submit"><Search className="mr-2 h-4 w-4" />Search</Button></form></CardContent></Card>
       <p className="mb-3 text-sm text-muted-foreground">{data?.total ?? 0} audit record{data?.total === 1 ? "" : "s"}</p>
       {isLoading ? <p className="py-12 text-center text-sm text-muted-foreground">Loading audit records…</p> : isError ? <p className="py-12 text-center text-sm text-red-600">Unable to load intake audit records.</p> : !data?.items.length ? <p className="py-12 text-center text-sm text-muted-foreground">No intake records match these filters.</p> : <div className="space-y-3">{data.items.map((item, index) => <AuditItem key={item.id || item.dealId || index} item={item} />)}</div>}
