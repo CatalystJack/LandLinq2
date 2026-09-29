@@ -34,6 +34,8 @@ export interface AuthUser {
   [key: string]: any;
 }
 
+export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'uncertain';
+
 // Helper to format business roles for display
 export function formatBusinessRole(role: BusinessRole | string): string {
   const roleMap: { [key: string]: string } = {
@@ -54,6 +56,7 @@ let globalAuthState: {
   userRole: UserRole | null;
   businessRole: BusinessRole | null;
   permissions: string[];
+  authStatus: AuthStatus;
 } = {
   user: null,
   isLoading: true,
@@ -61,11 +64,13 @@ let globalAuthState: {
   isInitialized: false,
   userRole: null,
   businessRole: null,
-  permissions: []
+  permissions: [],
+  authStatus: 'loading'
 };
 
 const authListeners: Set<() => void> = new Set();
 let authFetchPromise: Promise<void> | null = null;
+let authRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
 const notifyListeners = () => {
   authListeners.forEach(listener => listener());
@@ -80,60 +85,97 @@ export function clearLocalAuthState() {
     userRole: null,
     businessRole: null,
     permissions: [],
+    authStatus: 'unauthenticated',
   };
+  if (authRetryTimer) {
+    clearTimeout(authRetryTimer);
+    authRetryTimer = null;
+  }
   notifyListeners();
 }
 
-const fetchUserOnce = async () => {
-  if (globalAuthState.isInitialized) return;
+const RETRY_DELAYS_MS = [250, 500, 1000, 2000];
+const RETRY_LATER_MS = 30_000;
+
+function isRetryableAuthFailure(status?: number) {
+  return status === undefined || status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
+const fetchUserOnce = async (force = false): Promise<void> => {
+  if (globalAuthState.isInitialized && !force) return;
   if (authFetchPromise) return authFetchPromise;
 
   authFetchPromise = (async () => {
-    try {
-      const response = await fetch('/api/user', {
-        credentials: 'include',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
+    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
+      try {
+        const response = await fetch('/api/user', {
+          credentials: 'include',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
 
-      if (response.ok) {
-        const user = await response.json();
+        if (response.ok) {
+          const user = await response.json();
+          const userRole = await determineUserRole(user);
+          const businessRole = await determineBusinessRole(user);
+          const permissions = await getUserPermissions(userRole);
 
-        // Determine user role based on email and role data
-        const userRole = await determineUserRole(user);
-        const businessRole = await determineBusinessRole(user);
-        const permissions = await getUserPermissions(userRole);
+          globalAuthState = {
+            user,
+            isLoading: false,
+            isAuthenticated: true,
+            isInitialized: true,
+            userRole,
+            businessRole,
+            permissions,
+            authStatus: 'authenticated',
+          };
+          if (authRetryTimer) {
+            clearTimeout(authRetryTimer);
+            authRetryTimer = null;
+          }
+          notifyListeners();
+          return;
+        }
 
-        globalAuthState = {
-          user,
-          isLoading: false,
-          isAuthenticated: true,
-          isInitialized: true,
-          userRole,
-          businessRole,
-          permissions
-        };
-      } else {
-        globalAuthState = {
-          user: null,
-          isLoading: false,
-          isAuthenticated: false,
-          isInitialized: true,
-          userRole: null,
-          businessRole: null,
-          permissions: []
-        };
+        if (!isRetryableAuthFailure(response.status)) {
+          // A 401 is the server's explicit indication that the session is gone.
+          globalAuthState = {
+            user: null,
+            isLoading: false,
+            isAuthenticated: false,
+            isInitialized: true,
+            userRole: null,
+            businessRole: null,
+            permissions: [],
+            authStatus: 'unauthenticated',
+          };
+          notifyListeners();
+          return;
+        }
+        if (attempt === RETRY_DELAYS_MS.length) break;
+      } catch (error) {
+        if (attempt === RETRY_DELAYS_MS.length) {
+          console.error('Auth fetch error after retries:', error);
+          break;
+        }
       }
-    } catch (error) {
-      console.error('Auth fetch error:', error);
-      globalAuthState = {
-        user: null,
-        isLoading: false,
-        isAuthenticated: false,
-        isInitialized: true,
-        userRole: null,
-        businessRole: null,
-        permissions: []
-      };
+
+      await new Promise<void>((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+    }
+
+    // Do not turn a temporary outage into a logout. Keep the last confirmed
+    // identity and retry in the background so recovery needs no page reload.
+    globalAuthState = {
+      ...globalAuthState,
+      isLoading: false,
+      isInitialized: true,
+      authStatus: 'uncertain',
+    };
+    if (!authRetryTimer) {
+      authRetryTimer = setTimeout(() => {
+        authRetryTimer = null;
+        void fetchUserOnce(true);
+      }, RETRY_LATER_MS);
     }
     notifyListeners();
   })();
@@ -281,14 +323,21 @@ export function useAuth() {
     userRole: globalAuthState.userRole,
     businessRole: globalAuthState.businessRole,
     permissions: globalAuthState.permissions,
+    authStatus: globalAuthState.authStatus,
+    isUncertain: globalAuthState.authStatus === 'uncertain',
     hasPermission: (permission: string) => globalAuthState.permissions.includes(permission),
     isRole: (role: UserRole) => globalAuthState.userRole === role,
     isBusinessRole: (role: BusinessRole) => globalAuthState.businessRole === role,
     refetch: async () => {
+      if (authRetryTimer) {
+        clearTimeout(authRetryTimer);
+        authRetryTimer = null;
+      }
       globalAuthState.isInitialized = false;
       globalAuthState.isLoading = true;
+      globalAuthState.authStatus = globalAuthState.user ? 'authenticated' : 'loading';
       notifyListeners();
-      await fetchUserOnce();
+      await fetchUserOnce(true);
     },
     logout: async () => {
       try {

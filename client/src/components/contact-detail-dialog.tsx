@@ -112,6 +112,13 @@ type ContactDraft = {
   lastContactedAt: string;
 };
 
+type TeamMember = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+};
+
 type TimelineItem = {
   id: string;
   kind: "communication" | "deal";
@@ -247,6 +254,27 @@ export default function ContactDetailDialog({
     queryFn: () => requestJson(`/api/crm/contacts/${contact?.id}/activity`),
     enabled: Boolean(contact?.id),
   });
+
+  const teamQuery = useQuery<{ team: TeamMember[] }>({
+    queryKey: ["/api/developer-profile/me/team"],
+    queryFn: () => requestJson("/api/developer-profile/me/team"),
+    enabled: Boolean(contact?.id) && !adminMode,
+  });
+
+  const teamMembers = useMemo(
+    () => (Array.isArray(teamQuery.data?.team) ? teamQuery.data.team : []).map((member) => {
+      const fullName = [member.firstName, member.lastName]
+        .map((name) => name?.trim())
+        .filter(Boolean)
+        .join(" ");
+      return {
+        id: member.id,
+        value: fullName || member.email,
+        label: fullName || member.email,
+      };
+    }),
+    [teamQuery.data?.team],
+  );
 
   const details = contact
     ? { ...contact, ...(activityQuery.data?.broker || {}) }
@@ -511,7 +539,26 @@ export default function ContactDetailDialog({
                   ) : (
                     <DetailValue label="Contact identity">Managed by the shared network</DetailValue>
                   )}
-                  <div className="space-y-1.5"><Label htmlFor="contact-assigned-to">Assigned to</Label><Input id="contact-assigned-to" value={draft.assignedTo} onChange={(event) => updateDraft("assignedTo", event.target.value)} placeholder="Unassigned" /></div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contact-assigned-to">Assigned to</Label>
+                    <select
+                      id="contact-assigned-to"
+                      value={draft.assignedTo}
+                      onChange={(event) => updateDraft("assignedTo", event.target.value)}
+                      className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                    >
+                      <option value="">Unassigned</option>
+                      {draft.assignedTo && !teamMembers.some((member) => member.value === draft.assignedTo) && (
+                        <option value={draft.assignedTo}>{draft.assignedTo} (current assignment)</option>
+                      )}
+                      {teamMembers.map((member) => (
+                        <option key={member.id} value={member.value}>{member.label}</option>
+                      ))}
+                    </select>
+                    {teamQuery.isError && !adminMode && (
+                      <p className="text-xs text-amber-700">Team members could not be loaded. The current assignment is preserved.</p>
+                    )}
+                  </div>
                   <div className="space-y-1.5"><Label htmlFor="contact-last-contacted">Last contacted</Label><Input id="contact-last-contacted" type="date" value={draft.lastContactedAt} onChange={(event) => updateDraft("lastContactedAt", event.target.value)} /></div>
                 </>
               ) : (

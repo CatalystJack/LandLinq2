@@ -45,7 +45,7 @@ const iconForTab = (label: string) => {
 };
 
 export default function DeveloperNavigation() {
-  const { user, logout } = useAuth();
+  const { user, logout, authStatus } = useAuth();
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
@@ -65,6 +65,23 @@ export default function DeveloperNavigation() {
       delete document.body.dataset.appSidebar;
     };
   }, []);
+
+  // Never render the shared LandLinq identity while the tenant profile is
+  // still being resolved. This prevents a transient auth outage from showing
+  // the wrong company's name or logo.
+  if (authStatus !== "authenticated") {
+    return (
+      <nav
+        className="relative sticky top-0 z-50 border-b border-slate-800 bg-[#081729] md:fixed md:inset-y-0 md:left-0 md:border-0"
+        aria-label="Developer navigation"
+        data-testid="developer-navigation-loading"
+      >
+        <div className="flex h-16 items-center px-4 text-sm text-slate-300 md:h-20 md:w-[4.5rem] md:justify-center md:px-2">
+          <span className="sr-only">Loading company workspace</span>
+        </div>
+      </nav>
+    );
+  }
 
   const navigateTo = (href: string) => {
     preloadRoute(href);

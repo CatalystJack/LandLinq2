@@ -7,6 +7,7 @@ import {
   findDuplicateDeal,
   hasGeographyConflict,
   isCompleteConfidentIntake,
+  isWithinPropertyDuplicateWindow,
   normalizeState,
   routeProfile,
   validateIntakePlausibility,
@@ -79,6 +80,17 @@ const profile = (id: string, county = 'Wake') => ({
     null,
   );
   assert.ok(duplicate);
+}
+
+// Property deduplication uses the original Deal Dashboard creation date and a
+// strict three-calendar-month boundary. Missing timestamps fail closed.
+{
+  const now = new Date('2026-06-15T12:00:00.000Z');
+  assert.equal(isWithinPropertyDuplicateWindow(new Date('2026-05-01T00:00:00.000Z'), now), true);
+  assert.equal(isWithinPropertyDuplicateWindow(new Date('2026-03-15T12:00:00.000Z'), now), false);
+  assert.equal(isWithinPropertyDuplicateWindow(new Date('2026-03-14T23:59:59.000Z'), now), false);
+  assert.equal(isWithinPropertyDuplicateWindow(new Date('2026-03-16T00:00:00.000Z'), now), true);
+  assert.equal(isWithinPropertyDuplicateWindow(null, now), true);
 }
 
 // Coordinate-only submissions retain valid latitude/longitude for reverse geocoding.

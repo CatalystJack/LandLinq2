@@ -78,33 +78,6 @@ type CampaignStep = {
   attachments: CampaignAttachment[];
 };
 
-const STARTING_TEMPLATES = [
-  {
-    id: "cold-intro",
-    name: "Cold intro to a new broker",
-    subject: "Land site inquiry, {{targetMarket}}",
-    content: "Hi {{firstName}},\n\nI'm reaching out from {{companyName}}. We're actively acquiring multifamily development sites in {{targetMarket}}. If you have anything off market or coming up that fits, I'd love to take a look. Happy to move quickly on the right deal.\n\nWould you be open to a quick call this week?",
-  },
-  {
-    id: "specific-site-follow-up",
-    name: "Following up on a specific site",
-    subject: "Following up",
-    content: "Hi {{firstName}},\n\nThanks for sending that site over, it looks like a strong fit for what we're targeting. Could you share more on pricing expectations and timeline?\n\nHappy to hop on a call if that's easier.",
-  },
-  {
-    id: "staying-top-of-mind",
-    name: "Staying top of mind",
-    subject: "Still actively acquiring in {{targetMarket}}",
-    content: "Hi {{firstName}},\n\nWanted to check back in, we're still very active in {{targetMarket}} and always looking for good land opportunities, on or off market. If anything has come across your desk recently, I'd love to hear about it, even if it's still early.",
-  },
-  {
-    id: "reengage-quiet-contact",
-    name: "Re-engaging a quiet contact",
-    subject: "Still looking in {{targetMarket}}",
-    content: "Hi {{firstName}},\n\nIt's been a bit since we last connected. Just wanted to reconnect and see if anything has come up on your end. We're still actively pursuing sites in {{targetMarket}}, and always appreciate being kept in the loop on new listings.",
-  },
-] as const;
-
 const emptyForm: CampaignForm = {
   name: "",
   subject: "",
@@ -194,12 +167,9 @@ export default function DeveloperOutreach() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: () => jsonRequest(
-      editing
-        ? `/api/developer-profile/me/outreach/campaigns/${editing.id}`
-        : "/api/developer-profile/me/outreach/campaigns",
+    mutationFn: () => jsonRequest(`/api/developer-profile/me/outreach/campaigns/${editing!.id}`,
       {
-        method: editing ? "PATCH" : "POST",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       },
@@ -209,7 +179,7 @@ export default function DeveloperOutreach() {
       setDialogOpen(false);
       setEditing(null);
       setForm(emptyForm);
-      toast({ title: editing ? "Campaign updated" : "Campaign created" });
+      toast({ title: "Campaign updated" });
     },
     onError: (error: Error) => toast({ title: "Could not save campaign", description: error.message, variant: "destructive" }),
   });
@@ -301,22 +271,6 @@ export default function DeveloperOutreach() {
     return [...states, ...counties].join(", ");
   }, [targetsQuery.data]);
 
-  const openCreate = () => {
-    setNewCampaignChoiceOpen(false);
-    setEditing(null);
-    setForm(emptyForm);
-    setAiMessages([]);
-    setAiInput("");
-    setAiSuggestedDraft(null);
-    setDialogOpen(true);
-  };
-  const openNewCampaignChoice = () => {
-    setNewCampaignChoiceOpen(true);
-  };
-  const openAiCampaignBuilder = () => {
-    setNewCampaignChoiceOpen(false);
-    openSequenceWizard();
-  };
   const openEdit = (campaign: Campaign) => {
     setEditing(campaign);
     setForm({
@@ -333,14 +287,6 @@ export default function DeveloperOutreach() {
     setDialogOpen(true);
   };
 
-  const openSequenceWizard = () => {
-    setSequenceForm({
-      ...emptySequenceForm,
-      crmTagId: tagsQuery.data?.[0] || "",
-    });
-    setGeneratedSteps([]);
-    setSequenceDialogOpen(true);
-  };
 
   const openSteps = (campaign: Campaign) => {
     setStepsCampaign(campaign);
@@ -383,17 +329,6 @@ export default function DeveloperOutreach() {
     }
   };
 
-  const updateGeneratedStep = (stepNumber: number, field: "subject" | "content", value: string) => {
-    setGeneratedSteps((current) => current.map((step) => (
-      step.stepNumber === stepNumber ? { ...step, [field]: value } : step
-    )));
-  };
-
-  const canSaveGeneratedSequence = generatedSteps.length === sequenceForm.stepCount
-    && Boolean(sequenceForm.name.trim())
-    && Boolean(sequenceForm.crmTagId)
-    && generatedSteps.every((step) => step.subject.trim() && step.content.trim());
-
   const insertSuggestedDraft = (replace: boolean) => {
     if (!aiSuggestedDraft) return;
     setForm((current) => ({
@@ -418,27 +353,12 @@ export default function DeveloperOutreach() {
     aiDraftMutation.mutate();
   };
 
-  const applyStartingTemplate = (templateId: string) => {
-    const template = STARTING_TEMPLATES.find((candidate) => candidate.id === templateId);
-    if (!template) return;
-    setForm((current) => ({
-      ...current,
-      subject: template.subject,
-      content: template.content,
-    }));
-  };
-
   return (
     <div className="min-h-screen bg-slate-50">
       <DeveloperNavigation />
       <main className="mx-auto max-w-[1680px] px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
           title="Campaigns"
-          actions={
-            <Button variant="outline" size="sm" onClick={openNewCampaignChoice} disabled={!sender?.outlookConnected}>
-              <Plus className="mr-2 h-4 w-4" />New Campaign
-            </Button>
-          }
         />
 
         <div className="mb-6 grid gap-4 lg:grid-cols-3">
@@ -465,7 +385,7 @@ export default function DeveloperOutreach() {
                 </div>
               ) : (
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                  <div><p className="font-semibold text-slate-900">Connect your Outlook account</p><p className="mt-1 text-sm text-slate-500">You must connect your own mailbox before creating or launching campaigns.</p></div>
+                   <div><p className="font-semibold text-slate-900">Connect your Outlook account</p><p className="mt-1 text-sm text-slate-500">You must connect your own mailbox before launching campaigns.</p></div>
                   <Button variant="brand" onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending}>{connectMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Connect Outlook</Button>
                 </div>
               )}
@@ -481,7 +401,7 @@ export default function DeveloperOutreach() {
           <CardHeader className="border-b border-slate-100"><CardTitle className="flex items-center gap-2 text-lg"><div className="rounded-xl bg-[#498EDE]/15 p-2 text-[#498EDE]"><Send className="h-4 w-4" /></div>Your campaigns</CardTitle></CardHeader>
           <CardContent className="p-0">
             {campaignsQuery.isLoading ? <div className="flex min-h-52 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div> : campaigns.length === 0 ? (
-              <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><Send className="mb-3 h-10 w-10 text-slate-300" /><p className="font-semibold text-slate-800">No campaigns yet</p><p className="mt-1 text-sm text-slate-500">{sender?.outlookConnected ? "Create your first email campaign." : "Connect Outlook to get started."}</p></div>
+               <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><Send className="mb-3 h-10 w-10 text-slate-300" /><p className="font-semibold text-slate-800">No campaigns available</p><p className="mt-1 text-sm text-slate-500">{sender?.outlookConnected ? "Campaigns will appear here when they are configured." : "Connect Outlook to get started."}</p></div>
             ) : (
               <div className="divide-y divide-slate-100">{campaigns.map((campaign) => (
                 <div key={campaign.id} className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
@@ -498,46 +418,9 @@ export default function DeveloperOutreach() {
         </Card>
       </main>
 
-      <Dialog open={newCampaignChoiceOpen} onOpenChange={setNewCampaignChoiceOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Build a drip campaign</DialogTitle>
-            <DialogDescription>
-              Choose how you want to start. You can review and edit everything before saving.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 py-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={openAiCampaignBuilder}
-              className="group rounded-xl border border-slate-200 bg-white p-5 text-left transition-colors hover:border-[#4A90E2] hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-              data-testid="button-build-campaign-with-ai"
-            >
-              <Sparkles className="mb-3 h-5 w-5 text-[#4A90E2]" />
-              <span className="block font-semibold text-slate-900">Build with AI</span>
-              <span className="mt-1 block text-sm leading-5 text-slate-500">
-                Answer a few questions and generate a complete multi-step sequence.
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={openCreate}
-              className="group rounded-xl border border-slate-200 bg-white p-5 text-left transition-colors hover:border-[#4A90E2] hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/30"
-              data-testid="button-start-campaign-from-scratch"
-            >
-              <Edit3 className="mb-3 h-5 w-5 text-slate-600" />
-              <span className="block font-semibold text-slate-900">Start from scratch</span>
-              <span className="mt-1 block text-sm leading-5 text-slate-500">
-                Open the manual editor and write each campaign detail yourself.
-              </span>
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
-          <DialogHeader><DialogTitle>{editing ? "Edit campaign" : "Create campaign"}</DialogTitle><DialogDescription>Email will send only from your connected Outlook account. Launching uses your saved target geography; tagged contacts can also enroll automatically.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Edit campaign</DialogTitle><DialogDescription>Email will send only from your connected Outlook account. Launching uses your saved target geography; tagged contacts can also enroll automatically.</DialogDescription></DialogHeader>
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Sender identity</p>
             <p className="mt-1 font-semibold text-slate-900">{sender?.name || "Connected Outlook account"}</p>
@@ -549,25 +432,6 @@ export default function DeveloperOutreach() {
               <div><Label htmlFor="campaign-name">Campaign name</Label><Input id="campaign-name" className="mt-1.5" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Broker introduction" /></div>
               <div><Label htmlFor="campaign-subject">Subject line</Label><Input id="campaign-subject" className="mt-1.5" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} placeholder="A quick introduction" /></div>
               <div><Label htmlFor="campaign-trigger-tag">Auto-enrollment tag</Label><Input id="campaign-trigger-tag" className="mt-1.5" value={form.triggerTag} onChange={(event) => setForm({ ...form, triggerTag: event.target.value })} placeholder="Interested Broker" /><p className="mt-1 text-xs text-slate-500">Contacts owned by your company are enrolled when this exact CRM tag is added. Geography targeting remains available when you launch the campaign.</p></div>
-              <div>
-                <Label htmlFor="campaign-template">Starting template</Label>
-                <select
-                  id="campaign-template"
-                  defaultValue=""
-                  onChange={(event) => {
-                    applyStartingTemplate(event.target.value);
-                    event.target.value = "";
-                  }}
-                  className="mt-1.5 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
-                  data-testid="campaign-starting-template"
-                >
-                  <option value="">Choose a starting template...</option>
-                  {STARTING_TEMPLATES.map((template) => (
-                    <option key={template.id} value={template.id}>{template.name}</option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-slate-500">Templates are editable starting points. Merge fields resolve when the email is sent.</p>
-              </div>
               <div>
                 <Label htmlFor="campaign-content">Email message</Label>
                 <RichTextEditor
@@ -816,171 +680,6 @@ export default function DeveloperOutreach() {
               {updateStepMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save step
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={sequenceDialogOpen} onOpenChange={setSequenceDialogOpen}>
-        <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5" style={{ color: secondaryColor }} />Build campaign with AI</DialogTitle>
-            <DialogDescription>Choose the outreach style and cadence. The generated drafts are for review only and will not be saved.</DialogDescription>
-          </DialogHeader>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Sender identity</p>
-            <p className="mt-1 font-semibold text-slate-900">{sender?.name || "Connected Outlook account"}</p>
-            <p className="text-sm text-slate-600">{sender?.email || "Mailbox address unavailable"}</p>
-            {sender?.signatureHtml ? <div className="mt-2 border-t border-slate-200 pt-2 text-xs text-slate-600" dangerouslySetInnerHTML={{ __html: sender.signatureHtml }} /> : <p className="mt-2 text-xs text-amber-700">No configured signature will be added.</p>}
-          </div>
-
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!sequenceForm.crmTagId || sequenceGenerationMutation.isPending) return;
-              sequenceGenerationMutation.mutate();
-            }}
-            className="space-y-5"
-          >
-            <div>
-              <Label htmlFor="ai-sequence-name">Campaign name</Label>
-              <Input
-                id="ai-sequence-name"
-                value={sequenceForm.name}
-                onChange={(event) => setSequenceForm({ ...sequenceForm, name: event.target.value })}
-                className="mt-1.5"
-                placeholder="AI outreach sequence"
-                maxLength={160}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="ai-sequence-tone">Tone</Label>
-                <select
-                  id="ai-sequence-tone"
-                  value={sequenceForm.tone}
-                  onChange={(event) => setSequenceForm({ ...sequenceForm, tone: event.target.value as SequenceGenerationForm["tone"] })}
-                  className="mt-1.5 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/20"
-                >
-                  <option value="professional">Professional</option>
-                  <option value="casual">Casual</option>
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="ai-sequence-length">Length</Label>
-                <select
-                  id="ai-sequence-length"
-                  value={sequenceForm.length}
-                  onChange={(event) => setSequenceForm({ ...sequenceForm, length: event.target.value as SequenceGenerationForm["length"] })}
-                  className="mt-1.5 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/20"
-                >
-                  <option value="short">Short</option>
-                  <option value="medium">Medium</option>
-                  <option value="long">Long</option>
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="ai-sequence-step-count">Number of steps</Label>
-                <select
-                  id="ai-sequence-step-count"
-                  value={sequenceForm.stepCount}
-                  onChange={(event) => setSequenceForm({ ...sequenceForm, stepCount: Number(event.target.value) })}
-                  className="mt-1.5 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/20"
-                >
-                  {[2, 3, 4, 5].map((count) => <option key={count} value={count}>{count} steps</option>)}
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="ai-sequence-frequency">Frequency</Label>
-                <select
-                  id="ai-sequence-frequency"
-                  value={sequenceForm.frequencyDays}
-                  onChange={(event) => setSequenceForm({ ...sequenceForm, frequencyDays: Number(event.target.value) })}
-                  className="mt-1.5 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/20"
-                >
-                  {[30, 45, 60, 90].map((days) => <option key={days} value={days}>Every {days} days</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="ai-sequence-crm-tag">CRM tag trigger</Label>
-              <select
-                id="ai-sequence-crm-tag"
-                value={sequenceForm.crmTagId}
-                onChange={(event) => setSequenceForm({ ...sequenceForm, crmTagId: event.target.value })}
-                disabled={tagsQuery.isLoading || !tagsQuery.data?.length}
-                className="mt-1.5 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/20 disabled:bg-slate-100"
-              >
-                <option value="">{tagsQuery.isLoading ? "Loading CRM tags…" : "Select a CRM tag"}</option>
-                {(tagsQuery.data || []).map((tag) => <option key={tag} value={tag}>{tag}</option>)}
-              </select>
-              <p className="mt-1.5 text-xs text-slate-500">Only active contacts owned by your company can be used for this trigger.</p>
-            </div>
-
-            {generatedSteps.length > 0 && (
-              <div className="space-y-3 border-t border-slate-200 pt-5" data-testid="generated-sequence-results">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-950">Generated draft steps</h3>
-                  <p className="mt-1 text-xs text-slate-500">Review these drafts before deciding what to do next. Nothing has been saved.</p>
-                </div>
-                {generatedSteps.map((step) => (
-                  <Card key={step.stepNumber} className="border-slate-200 bg-slate-50/70">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center justify-between text-sm">
-                        <span>Step {step.stepNumber}</span>
-                        <Badge variant="outline">Day {step.dayNumber}</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div>
-                        <Label htmlFor={`ai-sequence-subject-${step.stepNumber}`}>Subject</Label>
-                        <Input
-                          id={`ai-sequence-subject-${step.stepNumber}`}
-                          value={step.subject}
-                          onChange={(event) => updateGeneratedStep(step.stepNumber, "subject", event.target.value)}
-                          className="mt-1.5 bg-white"
-                          maxLength={240}
-                        />
-                      </div>
-                       <div>
-                         <Label htmlFor={`ai-sequence-content-${step.stepNumber}`}>Email content</Label>
-                         <RichTextEditor
-                           value={step.content}
-                           onChange={(content) => updateGeneratedStep(step.stepNumber, "content", content)}
-                           placeholder="Write the email content..."
-                           minHeight="180px"
-                           className="mt-1.5"
-                         />
-                       </div>
-                       <div className="rounded-md border border-slate-200 bg-white p-3">
-                         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Outlook preview</p>
-                         <p className="mb-2 text-sm font-semibold text-slate-900">{step.subject || "No subject"}</p>
-                         <div className="prose prose-sm max-w-none text-slate-700" dangerouslySetInnerHTML={{ __html: renderEmailPreview(step.content, step.subject) }} />
-                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setSequenceDialogOpen(false)}>Close</Button>
-              <Button type="submit" variant="brand" disabled={!sequenceForm.crmTagId || sequenceGenerationMutation.isPending || tagsQuery.isLoading}>
-                {sequenceGenerationMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {generatedSteps.length ? "Generate again" : "Generate sequence"}
-              </Button>
-              {generatedSteps.length > 0 && (
-                <Button
-                  type="button"
-                  variant="brand"
-                  onClick={() => sequenceSaveMutation.mutate()}
-                  disabled={!canSaveGeneratedSequence || sequenceSaveMutation.isPending}
-                >
-                  {sequenceSaveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save campaign
-                </Button>
-              )}
-            </DialogFooter>
-          </form>
         </DialogContent>
       </Dialog>
 

@@ -14603,21 +14603,38 @@ RULES:
       const developerProfileId = String(req.params.profileId || "").trim();
       if (!developerProfileId) return res.status(400).json({ error: "Investment Company profile ID is required" });
 
-      const result = await db.execute(sql`
-        SELECT DISTINCT tag
-        FROM brokers AS owned_broker
-        CROSS JOIN LATERAL unnest(owned_broker.crm_tags) AS tag
-        WHERE owned_broker.owner_developer_profile_id = ${developerProfileId}
-          AND owned_broker.crm_tags IS NOT NULL
-          AND tag IS NOT NULL
-          AND NOT EXISTS (
-            SELECT 1
-            FROM users AS demo_owner
-            WHERE demo_owner.id = owned_broker.user_id
-              AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
-          )
-        ORDER BY tag
-      `);
+       const result = await db.execute(sql`
+         SELECT DISTINCT BTRIM(tag) AS tag
+         FROM (
+           SELECT name AS tag
+           FROM developer_crm_tags
+           WHERE developer_profile_id = ${developerProfileId}
+           UNION ALL
+           SELECT unnest(owned_broker.crm_tags) AS tag
+           FROM brokers AS owned_broker
+           WHERE owned_broker.owner_developer_profile_id = ${developerProfileId}
+             AND owned_broker.crm_tags IS NOT NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM users AS demo_owner
+               WHERE demo_owner.id = owned_broker.user_id
+                 AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+             )
+           UNION ALL
+           SELECT unnest(shared_crm.crm_tags) AS tag
+           FROM developer_broker_crm AS shared_crm
+           JOIN brokers AS shared_broker ON shared_broker.id = shared_crm.broker_id
+           WHERE shared_crm.developer_profile_id = ${developerProfileId}
+             AND shared_crm.is_removed = false
+             AND shared_crm.crm_tags IS NOT NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM users AS demo_owner
+               WHERE demo_owner.id = shared_broker.user_id
+                 AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+             )
+         ) AS company_tags
+         WHERE tag IS NOT NULL AND BTRIM(tag) <> ''
+         ORDER BY BTRIM(tag)
+       `);
 
       return res.json((result.rows as Array<{ tag: unknown }>)
         .map((row) => String(row.tag || "").trim())
@@ -16784,13 +16801,13 @@ RULES:
       if (!developerProfileId) return;
 
       const result = await db.execute(sql`
-        SELECT DISTINCT tag
+         SELECT DISTINCT BTRIM(tag) AS tag
         FROM (
           SELECT name AS tag
           FROM developer_crm_tags
           WHERE developer_profile_id = ${developerProfileId}
           UNION ALL
-          SELECT unnest(owned_broker.crm_tags) AS tag
+           SELECT unnest(owned_broker.crm_tags) AS tag
           FROM brokers AS owned_broker
           WHERE owned_broker.owner_developer_profile_id = ${developerProfileId}
             AND owned_broker.crm_tags IS NOT NULL
@@ -16800,9 +16817,21 @@ RULES:
               WHERE demo_owner.id = owned_broker.user_id
                 AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
             )
+           UNION ALL
+           SELECT unnest(shared_crm.crm_tags) AS tag
+           FROM developer_broker_crm AS shared_crm
+           JOIN brokers AS shared_broker ON shared_broker.id = shared_crm.broker_id
+           WHERE shared_crm.developer_profile_id = ${developerProfileId}
+             AND shared_crm.is_removed = false
+             AND shared_crm.crm_tags IS NOT NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM users AS demo_owner
+               WHERE demo_owner.id = shared_broker.user_id
+                 AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+             )
         ) AS company_tags
         WHERE tag IS NOT NULL AND BTRIM(tag) <> ''
-        ORDER BY tag
+         ORDER BY BTRIM(tag)
       `);
 
       return res.json((result.rows as Array<{ tag: unknown }>)
@@ -33890,6 +33919,27 @@ RULES:
   // =====================================================
   // OUTREACH SENDERS (White-Label SaaS Feature)
   // =====================================================
+
+  // Shared sender records (NULL developer_profile_id) are internal-only.
+  // A developer may access only sender records owned by its active profile.
+  const getOutreachSenderScope = async (req: any, res: any, senderId: string) => {
+    const user = req.user as any;
+    const email = String(user?.claims?.email || user?.email || "").toLowerCase();
+    if (isPlatformAdminEmail(email)) return { isPlatformAdmin: true, developerProfileId: null };
+    const developerProfileId = getDeveloperProfileId(req, res);
+    if (!developerProfileId) return null;
+    if (!await requireActiveDeveloperProfile(developerProfileId, res)) return null;
+    const owned = await db.execute(sql`
+      SELECT id FROM outreach_senders
+      WHERE id = ${senderId} AND developer_profile_id = ${developerProfileId}
+      LIMIT 1
+    `);
+    if (!owned.rows?.length) {
+      res.status(404).json({ error: "Sender not found" });
+      return null;
+    }
+    return { isPlatformAdmin: false, developerProfileId };
+  };
   
   // Get all outreach senders
   app.get('/api/outreach/senders', isAuthenticated, async (req: any, res) => {
@@ -34046,25 +34096,9 @@ RULES:
   // Update outreach sender
   app.patch('/api/outreach/senders/:senderId', isAuthenticated, async (req: any, res) => {
     try {
-      const user = req.user as any;
-      const userEmail = (user?.claims?.email || user?.email || '').toLowerCase();
-      const isAnalyst = isPlatformAdminEmail(userEmail);
-      
-      // Also allow registered outreach senders to update their own settings
-      let isOutreachSender = false;
-      if (!isAnalyst && userEmail) {
-        const { senderId: senderIdForCheck } = req.params;
-        const senderCheck = await db.execute(sql`
-          SELECT id FROM outreach_senders WHERE email = ${userEmail} AND id = ${senderIdForCheck} AND is_active = true LIMIT 1
-        `);
-        isOutreachSender = ((senderCheck.rows || senderCheck) as any[]).length > 0;
-      }
-      
-      if (!isAnalyst && !isOutreachSender) {
-        return res.status(403).json({ message: "Access denied. Analyst privileges required." });
-      }
-
       const { senderId } = req.params;
+      const scope = await getOutreachSenderScope(req, res, senderId);
+      if (!scope) return;
       const { 
         name, email, role, smsFollowupEnabled, smsFollowupDays, isActive, hubspotOwnerId,
         hubspotTriggerTag, hubspotTriggerTags, welcomeTemplateKey, deliveryMethod, delayAfterTagging, signatureHtml,
@@ -34103,6 +34137,7 @@ RULES:
           daily_limit_override = COALESCE(${dailyLimitOverride ?? null}, daily_limit_override),
           updated_at = now()
         WHERE id = ${senderId}
+          ${scope.isPlatformAdmin ? sql`` : sql`AND developer_profile_id = ${scope.developerProfileId}`}
         RETURNING id, name, email, role, outlook_connected as "outlookConnected",
                   sms_followup_enabled as "smsFollowupEnabled",
                   sms_followup_days as "smsFollowupDays",
@@ -34135,7 +34170,8 @@ RULES:
               // Create new campaign template with this trigger tag
               await db.execute(sql`
                 INSERT INTO outreach_campaign_templates (name, hubspot_trigger_tag, is_active, team_id)
-                VALUES (${tag}, ${tag}, true, (SELECT team_id FROM outreach_senders WHERE id = ${senderId}))
+                VALUES (${tag}, ${tag}, true, (SELECT team_id FROM outreach_senders WHERE id = ${senderId}
+                  ${scope.isPlatformAdmin ? sql`` : sql`AND developer_profile_id = ${scope.developerProfileId}`}))
               `);
               console.log(`📋 Auto-created campaign template for tag: ${tag}`);
             }
@@ -34159,7 +34195,9 @@ RULES:
     try {
       const user = req.user as any;
       const userEmail = (user?.claims?.email || user?.email || '').toLowerCase();
-      const isAnalyst = isPlatformAdminEmail(userEmail);
+      const { senderId } = req.params;
+      const scope = await getOutreachSenderScope(req, res, senderId);
+      if (!scope) return;
       
       console.log(`📝 [SIGNATURE-SAVE] Request received:`, {
         senderId: req.params.senderId,
@@ -34169,12 +34207,6 @@ RULES:
         signatureLength: req.body?.signatureHtml?.length || 0
       });
       
-      if (!isAnalyst) {
-        console.log(`❌ [SIGNATURE-SAVE] Access denied for email: ${userEmail}`);
-        return res.status(403).json({ message: "Access denied. Analyst privileges required." });
-      }
-
-      const { senderId } = req.params;
       const { signatureHtml, senderEmail } = req.body;
 
       console.log(`📝 [SIGNATURE-SAVE] Updating signature for sender ${senderId}, email fallback: ${senderEmail || 'none'}, length: ${signatureHtml?.length || 0}`);
@@ -34184,6 +34216,7 @@ RULES:
         UPDATE outreach_senders
         SET signature_html = ${signatureHtml || ''}, updated_at = now()
         WHERE id::text = ${senderId}
+          ${scope.isPlatformAdmin ? sql`` : sql`AND developer_profile_id = ${scope.developerProfileId}`}
         RETURNING id, name, email, signature_html as "signatureHtml"
       `);
 
@@ -34193,6 +34226,7 @@ RULES:
           UPDATE outreach_senders
           SET signature_html = ${signatureHtml || ''}, updated_at = now()
           WHERE email = ${senderEmail}
+            ${scope.isPlatformAdmin ? sql`` : sql`AND developer_profile_id = ${scope.developerProfileId}`}
           RETURNING id, name, email, signature_html as "signatureHtml"
         `);
       }
@@ -34214,13 +34248,15 @@ RULES:
   app.delete('/api/outreach/senders/:senderId', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
+      const { senderId } = req.params;
+      const scope = await getOutreachSenderScope(req, res, senderId);
+      if (!scope) return;
       const userEmail = (user?.claims?.email || user?.email || '').toLowerCase();
       console.log(`🗑️ [DELETE-SENDER] Request from: ${userEmail || 'unknown'}, senderId: ${req.params.senderId}`);
 
-      const { senderId } = req.params;
-
       const result = await db.execute(sql`
         DELETE FROM outreach_senders WHERE id = ${senderId}
+          ${scope.isPlatformAdmin ? sql`` : sql`AND developer_profile_id = ${scope.developerProfileId}`}
         RETURNING id
       `);
 
@@ -34243,18 +34279,14 @@ RULES:
   // Get all campaign steps for a sender (synced with campaign template if available)
   app.get('/api/outreach/senders/:senderId/campaign-steps', isAuthenticated, async (req: any, res) => {
     try {
-      const user = req.user as any;
-      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
-      
-      if (!isAnalyst) {
-        return res.status(403).json({ message: "Access denied. Analyst privileges required." });
-      }
-
       const { senderId } = req.params;
+      const scope = await getOutreachSenderScope(req, res, senderId);
+      if (!scope) return;
       
       // Check if sender has hubspot trigger tags - if so, use the FIRST matching template's steps
       const senderResult = await db.execute(sql`
         SELECT hubspot_trigger_tags FROM outreach_senders WHERE id = ${senderId}
+          ${scope.isPlatformAdmin ? sql`` : sql`AND developer_profile_id = ${scope.developerProfileId}`}
       `);
       const senderTags = (senderResult.rows?.[0] as any)?.hubspot_trigger_tags;
       
@@ -34262,7 +34294,13 @@ RULES:
         // Find matching campaign template for the first tag
         const firstTag = senderTags[0];
         const templateResult = await db.execute(sql`
-          SELECT id FROM outreach_campaign_templates WHERE hubspot_trigger_tag = ${firstTag}
+          SELECT id FROM outreach_campaign_templates
+          WHERE hubspot_trigger_tag = ${firstTag}
+            AND (${scope.isPlatformAdmin ? sql`TRUE` : sql`EXISTS (
+              SELECT 1 FROM outreach_senders owned_sender
+              WHERE owned_sender.developer_profile_id = ${scope.developerProfileId}
+                AND ${firstTag} = ANY(COALESCE(owned_sender.hubspot_trigger_tags, ARRAY[]::text[]))
+            )`})
         `);
         
         if (templateResult.rows?.length > 0) {
@@ -34306,14 +34344,9 @@ RULES:
   // Create a new campaign step (syncs to template if available)
   app.post('/api/outreach/senders/:senderId/campaign-steps', isAuthenticated, async (req: any, res) => {
     try {
-      const user = req.user as any;
-      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
-      
-      if (!isAnalyst) {
-        return res.status(403).json({ message: "Access denied. Analyst privileges required." });
-      }
-
       const { senderId } = req.params;
+      const scope = await getOutreachSenderScope(req, res, senderId);
+      if (!scope) return;
       const { dayNumber, channel, subject, content, templateKey, attachments } = req.body;
 
       if (!dayNumber || !channel || !content) {
@@ -34325,13 +34358,20 @@ RULES:
       // Check if sender has hubspot trigger tags - if so, create in template instead
       const senderResult = await db.execute(sql`
         SELECT hubspot_trigger_tags FROM outreach_senders WHERE id = ${senderId}
+          ${scope.isPlatformAdmin ? sql`` : sql`AND developer_profile_id = ${scope.developerProfileId}`}
       `);
       const senderTags = (senderResult.rows?.[0] as any)?.hubspot_trigger_tags;
       
       if (senderTags && senderTags.length > 0) {
         const firstTag = senderTags[0];
         const templateResult = await db.execute(sql`
-          SELECT id FROM outreach_campaign_templates WHERE hubspot_trigger_tag = ${firstTag}
+          SELECT id FROM outreach_campaign_templates
+          WHERE hubspot_trigger_tag = ${firstTag}
+            AND (${scope.isPlatformAdmin ? sql`TRUE` : sql`EXISTS (
+              SELECT 1 FROM outreach_senders owned_sender
+              WHERE owned_sender.developer_profile_id = ${scope.developerProfileId}
+                AND ${firstTag} = ANY(COALESCE(owned_sender.hubspot_trigger_tags, ARRAY[]::text[]))
+            )`})
         `);
         
         if (templateResult.rows?.length > 0) {
@@ -34386,9 +34426,11 @@ RULES:
     try {
       const user = req.user as any;
       const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
-      
+      let developerProfileId: string | null = null;
       if (!isAnalyst) {
-        return res.status(403).json({ message: "Access denied. Analyst privileges required." });
+        developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
       }
 
       const { stepId } = req.params;
@@ -34404,7 +34446,15 @@ RULES:
 
       // Check if this is a template step or sender step
       const templateCheck = await db.execute(sql`
-        SELECT id FROM outreach_campaign_template_steps WHERE id = ${stepId}
+        SELECT ts.id
+        FROM outreach_campaign_template_steps ts
+        JOIN outreach_campaign_templates t ON t.id = ts.template_id
+        WHERE ts.id = ${stepId}
+          AND (${isAnalyst ? sql`TRUE` : sql`EXISTS (
+            SELECT 1 FROM outreach_senders s
+            WHERE s.developer_profile_id = ${developerProfileId}
+              AND t.hubspot_trigger_tag = ANY(COALESCE(s.hubspot_trigger_tags, ARRAY[]::text[]))
+          )`})
       `);
       
       if (templateCheck.rows?.length > 0) {
@@ -34420,6 +34470,12 @@ RULES:
             attachments = CASE WHEN ${atts}::text IS NOT NULL THEN ${atts}::text ELSE attachments END,
             updated_at = now()
           WHERE id = ${stepId}
+            AND (${isAnalyst ? sql`TRUE` : sql`EXISTS (
+              SELECT 1 FROM outreach_campaign_templates t
+              JOIN outreach_senders s ON s.developer_profile_id = ${developerProfileId}
+                AND t.hubspot_trigger_tag = ANY(COALESCE(s.hubspot_trigger_tags, ARRAY[]::text[]))
+              WHERE t.id = outreach_campaign_template_steps.template_id
+            )`})
           RETURNING id, template_id as "templateId", sequence_index as "sequenceIndex",
                     day_number as "dayNumber", channel, subject, content,
                     is_active as "isActive", attachments, 'template' as "stepSource"
@@ -34441,6 +34497,11 @@ RULES:
           attachments = CASE WHEN ${atts}::text IS NOT NULL THEN ${atts}::text ELSE attachments END,
           updated_at = now()
         WHERE id = ${stepId}
+          AND (${isAnalyst ? sql`TRUE` : sql`EXISTS (
+            SELECT 1 FROM outreach_senders s
+            WHERE s.id = outreach_campaign_steps.sender_id
+              AND s.developer_profile_id = ${developerProfileId}
+          )`})
         RETURNING id, sender_id as "senderId", sequence_index as "sequenceIndex",
                   day_number as "dayNumber", channel, subject, content,
                   template_key as "templateKey", is_active as "isActive", attachments, 'sender' as "stepSource"
@@ -34462,12 +34523,14 @@ RULES:
   app.delete('/api/outreach/campaign-steps/:stepId', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user as any;
-      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
-      
+      const userEmail = String(user?.claims?.email || user?.email || "").toLowerCase();
+      const isAnalyst = isPlatformAdminEmail(userEmail);
+      let developerProfileId: string | null = null;
       if (!isAnalyst) {
-        return res.status(403).json({ message: "Access denied. Analyst privileges required." });
-      }
-      if (!isSuperAdminEmail(user?.claims?.email || user?.email)) {
+        developerProfileId = getDeveloperProfileId(req, res);
+        if (!developerProfileId) return;
+        if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      } else if (!isSuperAdminEmail(userEmail)) {
         return res.status(403).json({ message: "Access denied. Super admin privileges are required to delete campaign steps." });
       }
 
@@ -34475,14 +34538,29 @@ RULES:
 
       // Check if this is a template step
       const templateCheck = await db.execute(sql`
-        SELECT id, template_id FROM outreach_campaign_template_steps WHERE id = ${stepId}
+        SELECT ts.id, ts.template_id
+        FROM outreach_campaign_template_steps ts
+        JOIN outreach_campaign_templates t ON t.id = ts.template_id
+        WHERE ts.id = ${stepId}
+          AND (${isAnalyst ? sql`TRUE` : sql`EXISTS (
+            SELECT 1 FROM outreach_senders s
+            WHERE s.developer_profile_id = ${developerProfileId}
+              AND t.hubspot_trigger_tag = ANY(COALESCE(s.hubspot_trigger_tags, ARRAY[]::text[]))
+          )`})
       `);
       
       if (templateCheck.rows?.length > 0) {
         const templateId = (templateCheck.rows[0] as any).template_id;
         
         await db.execute(sql`
-          DELETE FROM outreach_campaign_template_steps WHERE id = ${stepId}
+          DELETE FROM outreach_campaign_template_steps
+          WHERE id = ${stepId}
+            AND (${isAnalyst ? sql`TRUE` : sql`EXISTS (
+              SELECT 1 FROM outreach_campaign_templates t
+              JOIN outreach_senders s ON s.developer_profile_id = ${developerProfileId}
+                AND t.hubspot_trigger_tag = ANY(COALESCE(s.hubspot_trigger_tags, ARRAY[]::text[]))
+              WHERE t.id = outreach_campaign_template_steps.template_id
+            )`})
         `);
         
         // Re-index remaining template steps
@@ -34504,7 +34582,13 @@ RULES:
 
       // Delete sender step
       const result = await db.execute(sql`
-        DELETE FROM outreach_campaign_steps WHERE id = ${stepId}
+        DELETE FROM outreach_campaign_steps
+        WHERE id = ${stepId}
+          AND (${isAnalyst ? sql`TRUE` : sql`EXISTS (
+            SELECT 1 FROM outreach_senders s
+            WHERE s.id = outreach_campaign_steps.sender_id
+              AND s.developer_profile_id = ${developerProfileId}
+          )`})
         RETURNING id, sender_id as "senderId"
       `);
 
@@ -34537,14 +34621,9 @@ RULES:
   // Reorder campaign steps
   app.post('/api/outreach/senders/:senderId/campaign-steps/reorder', isAuthenticated, async (req: any, res) => {
     try {
-      const user = req.user as any;
-      const isAnalyst = isPlatformAdminEmail(user?.claims?.email || user?.email);
-      
-      if (!isAnalyst) {
-        return res.status(403).json({ message: "Access denied. Analyst privileges required." });
-      }
-
       const { senderId } = req.params;
+      const scope = await getOutreachSenderScope(req, res, senderId);
+      if (!scope) return;
       const { stepIds } = req.body; // Array of step IDs in new order
 
       if (!Array.isArray(stepIds)) {
@@ -34557,6 +34636,11 @@ RULES:
           UPDATE outreach_campaign_steps
           SET sequence_index = ${i}, updated_at = now()
           WHERE id = ${stepIds[i]} AND sender_id = ${senderId}
+            AND EXISTS (
+              SELECT 1 FROM outreach_senders s
+              WHERE s.id = outreach_campaign_steps.sender_id
+                ${scope.isPlatformAdmin ? sql`` : sql`AND s.developer_profile_id = ${scope.developerProfileId}`}
+            )
         `);
       }
 
@@ -34583,13 +34667,9 @@ RULES:
     try {
       const user = req.user as any;
       const userEmail = user?.claims?.email || user?.email || '';
-      const isAuthorized = isPlatformAdminEmail(userEmail);
-      
-      if (!isAuthorized) {
-        return res.status(403).json({ message: "Access denied. Admin privileges required." });
-      }
-
       const { senderId } = req.params;
+      const scope = await getOutreachSenderScope(req, res, senderId);
+      if (!scope) return;
       const { testRecipientEmail, stepIndex = 0, subject: directSubject, content: directContent, attachments: directAttachments } = req.body;
 
       if (!testRecipientEmail) {
@@ -34601,7 +34681,9 @@ RULES:
         SELECT id, name, email, microsoft_access_token as "microsoftAccessToken",
                signature_html as "signatureHtml",
                developer_profile_id as "developerProfileId"
-        FROM outreach_senders WHERE id::text = ${senderId}
+        FROM outreach_senders
+        WHERE id::text = ${senderId}
+          ${scope.isPlatformAdmin ? sql`` : sql`AND developer_profile_id = ${scope.developerProfileId}`}
       `);
 
       // Fallback: if the ID is stale/wrong, look up by the logged-in user's own email
@@ -34611,7 +34693,9 @@ RULES:
           SELECT id, name, email, microsoft_access_token as "microsoftAccessToken",
                  signature_html as "signatureHtml",
                  developer_profile_id as "developerProfileId"
-          FROM outreach_senders WHERE email = ${userEmail}
+          FROM outreach_senders
+          WHERE email = ${userEmail}
+            ${scope.isPlatformAdmin ? sql`` : sql`AND developer_profile_id = ${scope.developerProfileId}`}
         `);
       }
 

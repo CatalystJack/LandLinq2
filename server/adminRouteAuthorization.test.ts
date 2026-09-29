@@ -44,6 +44,7 @@ test("each requested admin-only route is registered behind platform-admin middle
     "/api/admin/backfill-government-data",
     "/api/admin/broker-portal/debug",
     "/api/admin/broker-portal/deal-queue",
+    "/api/admin/investment-companies/:profileId/crm-tags",
   ];
 
   for (const routePath of protectedPaths) {
@@ -53,4 +54,11 @@ test("each requested admin-only route is registered behind platform-admin middle
     );
     assert.match(routes, route, `${routePath} must enforce login and platform-admin authorization`);
   }
+});
+
+test("profile-scoped CRM tag routes exclude removed and demo shared contacts", () => {
+  const routes = readFileSync(new URL("./routes.ts", import.meta.url), "utf8");
+  assert.match(routes, /developer_broker_crm AS shared_crm[\s\S]{0,900}shared_crm\.is_removed = false/);
+  assert.match(routes, /shared_crm[\s\S]{0,1200}LOWER\(demo_owner\.email\) = 'demo@catalystcp\.com'/);
+  assert.match(routes, /developer_crm_tags[\s\S]{0,500}developer_profile_id = \$\{developerProfileId\}/);
 });

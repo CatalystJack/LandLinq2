@@ -18,6 +18,7 @@ import { recordEmailIntakeOutcomeAndAlert } from './emailIntakeVolumeAlert.js';
 import { countyTargetMatchesDeal } from '../shared/county-targets.js';
 
 export const AUTOMATION_CONFIDENCE_THRESHOLD = 75;
+export const PROPERTY_DUPLICATE_WINDOW_MONTHS = 3;
 
 export interface AutomationRouteProfile {
   id: string;
@@ -67,6 +68,28 @@ export function normalizeState(value: string | null | undefined): string {
 export function normalizeAddress(value: string | null | undefined): string {
   return String(value || '').toLowerCase().replace(/\b(street)\b/g, 'st').replace(/\b(road)\b/g, 'rd')
     .replace(/\b(avenue)\b/g, 'ave').replace(/\b(drive)\b/g, 'dr').replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Existing properties are merged only for the prior three calendar months.
+ * The boundary is exclusive, so a row created exactly three months ago can
+ * be added again. Missing/invalid timestamps fail closed as duplicates.
+ */
+export function isWithinPropertyDuplicateWindow(
+  createdAt: Date | string | null | undefined,
+  now = new Date(),
+): boolean {
+  if (!createdAt) return true;
+  const created = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  if (Number.isNaN(created.getTime())) return true;
+
+  const cutoff = new Date(now);
+  const originalDay = cutoff.getDate();
+  cutoff.setDate(1);
+  cutoff.setMonth(cutoff.getMonth() - PROPERTY_DUPLICATE_WINDOW_MONTHS);
+  const lastDayOfTargetMonth = new Date(cutoff.getFullYear(), cutoff.getMonth() + 1, 0).getDate();
+  cutoff.setDate(Math.min(originalDay, lastDayOfTargetMonth));
+  return created.getTime() > cutoff.getTime();
 }
 
 /** Pure, deliberately conservative routing: a domain match never falls back to geography. */
@@ -345,7 +368,8 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
       eq(partnerDeveloperSends.developerProfileId, profile.id),
     ),
   );
-  const profileDeals = profileDealRows.map(row => row.deal);
+  const profileDeals = profileDealRows.map(row => row.deal)
+    .filter(deal => isWithinPropertyDuplicateWindow(deal.createdAt));
   const duplicate = findDuplicateDeal(profileDeals, intake.parsedAddress, intake.parsedParcelId, location.latitude !== null && location.longitude !== null ? { latitude: location.latitude, longitude: location.longitude } : null);
   if (duplicate) {
     await db.update(deals).set({
