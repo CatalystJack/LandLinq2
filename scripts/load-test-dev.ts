@@ -173,7 +173,8 @@ async function cleanupFixture() {
     await db.transaction(async (tx) => {
       await tx.execute(sql`
         DELETE FROM sessions
-        WHERE sess #>> '{passport,user,id}' = ${testUser!.id}
+        WHERE sess #>> '{passport,user}' = ${testUser!.id}
+           OR sess #>> '{passport,user,id}' = ${testUser!.id}
       `);
       const deleted = await tx.execute(sql`
         DELETE FROM users
