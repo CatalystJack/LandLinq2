@@ -143,6 +143,10 @@ export class DatabaseManager {
     await db.execute(sql`ALTER TABLE brokers ADD COLUMN IF NOT EXISTS postal_code VARCHAR`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS brokers_owner_category_idx ON brokers(owner_developer_profile_id, contact_category)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS brokers_owner_state_idx ON brokers(owner_developer_profile_id, state_region)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS brokers_created_crm_page_idx ON brokers(created_at DESC NULLS LAST, id DESC)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS brokers_brokerage_normalized_idx ON brokers(LOWER(BTRIM(brokerage))) WHERE brokerage IS NOT NULL`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS brokers_crm_tags_gin_idx ON brokers USING GIN(crm_tags)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS brokers_source_tags_gin_idx ON brokers USING GIN(source_tags)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_deals_flagged ON deals(flagged)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS partner_developer_sends_deal_id_idx ON partner_developer_sends(deal_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS partner_developer_sends_developer_id_idx ON partner_developer_sends(developer_id)`);

@@ -86,8 +86,8 @@ function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? value : [];
 }
 
-async function fetchJson(url: string): Promise<unknown> {
-  const response = await fetch(url, { credentials: "include" });
+async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
+  const response = await fetch(url, { credentials: "include", signal });
   if (!response.ok) {
     const message = await response.text().catch(() => response.statusText);
     throw new Error(`${response.status}: ${message}`);
@@ -188,8 +188,9 @@ export default function CRMPage() {
   const qc = useQueryClient();
 
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState<number | "all">("all");
+  const [limit, setLimit] = useState(100);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [marketFilter, setMarketFilter] = useState("");
   const [smsFilter, setSmsFilter] = useState("all");
@@ -221,6 +222,11 @@ export default function CRMPage() {
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
   const contactImportInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => {
     setEditFields({
       firstName: selectedContact?.firstName || "",
       lastName: selectedContact?.lastName || "",
@@ -245,10 +251,10 @@ export default function CRMPage() {
   }, [tagDropdownOpen]);
 
   const contactsQuery = useQuery<ContactsResponse>({
-    queryKey: ["/api/crm/contacts", page, limit, search, tagFilter, marketFilter, smsFilter, stateFilter, msaFilter, countyFilter, assignedToFilter, companyFilter, multiCampaignTagFilter],
-    queryFn: () => {
-      const params = new URLSearchParams({ page: String(page), limit: limit === "all" ? "9999" : String(limit) });
-      if (search) params.set("search", search);
+    queryKey: ["/api/crm/contacts", page, limit, debouncedSearch, tagFilter, marketFilter, smsFilter, stateFilter, msaFilter, countyFilter, assignedToFilter, companyFilter, multiCampaignTagFilter],
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams({ page: String(page), limit: String(limit), includeFilterOptions: "false" });
+      if (debouncedSearch) params.set("search", debouncedSearch);
       if (tagFilter && tagFilter !== "all") params.set("tag", tagFilter);
       if (marketFilter) params.set("market", marketFilter);
       if (smsFilter && smsFilter !== "all") params.set("sms", smsFilter);
@@ -258,7 +264,7 @@ export default function CRMPage() {
       if (assignedToFilter && assignedToFilter !== "all") params.set("assignedTo", assignedToFilter);
       if (companyFilter && companyFilter !== "all") params.set("brokerage", companyFilter);
       if (multiCampaignTagFilter) params.set("multiCampaignTag", "true");
-      return fetchJson(`/api/crm/contacts?${params}`).then(normalizeContactsResponse);
+      return fetchJson(`/api/crm/contacts?${params}`, signal).then(normalizeContactsResponse);
     },
   });
 
@@ -544,6 +550,8 @@ export default function CRMPage() {
 
   const contacts = asArray<Contact>(contactsQuery.data?.contacts);
   const pagination = contactsQuery.data?.pagination;
+  const showingFrom = pagination && contacts.length ? (page - 1) * pagination.limit + 1 : 0;
+  const showingTo = pagination && contacts.length ? showingFrom + contacts.length - 1 : 0;
 
   const allSelected = contacts.length > 0 && contacts.every(c => selectedIds.has(c.id));
   const toggleAll = () => {
@@ -977,9 +985,9 @@ export default function CRMPage() {
         {pagination && (
           <div className="shrink-0 border-t border-gray-200 bg-white px-4 py-2 flex items-center justify-between gap-3">
             <span className="text-xs text-gray-500 whitespace-nowrap">
-              {limit === "all" || pagination.totalPages <= 1
-                ? `Showing all ${pagination.total.toLocaleString()} contacts`
-                : `Showing ${contacts.length} of ${pagination.total.toLocaleString()} contacts`}
+              {pagination.total === 0
+                ? "No contacts to show"
+                : `Showing ${showingFrom.toLocaleString()}–${showingTo.toLocaleString()} of ${pagination.total.toLocaleString()} contacts`}
             </span>
             <div className="flex items-center gap-1.5">
               <Button
@@ -1024,7 +1032,7 @@ export default function CRMPage() {
               <span className="text-xs text-gray-400">Show:</span>
               <Select
                 value={String(limit)}
-                onValueChange={v => { setLimit(v === "all" ? "all" : Number(v)); setPage(1); }}
+                  onValueChange={v => { setLimit(Number(v)); setPage(1); }}
               >
                 <SelectTrigger className="h-7 text-xs w-[70px]">
                   <SelectValue />
@@ -1033,8 +1041,6 @@ export default function CRMPage() {
                   <SelectItem value="25">25</SelectItem>
                   <SelectItem value="50">50</SelectItem>
                   <SelectItem value="100">100</SelectItem>
-                  <SelectItem value="250">250</SelectItem>
-                  <SelectItem value="all">All</SelectItem>
                 </SelectContent>
               </Select>
             </div>

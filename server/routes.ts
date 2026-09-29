@@ -74,6 +74,7 @@ import {
   isOffMarketFileNameAllowed,
 } from "@shared/off-market-upload";
 import { getDeveloperCrmContacts } from "./developerCrmContacts";
+import { getInternalCrmContacts } from "./internalCrmContacts";
 import {
   decodeBrokerDirectoryCursor,
   encodeBrokerDirectoryCursor,
@@ -4782,6 +4783,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const page = Math.max(parseInt(req.query.page as string) || 1, 1);
       const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
       const search = (req.query.search as string || '').trim();
+      if (search.length > 200) return res.status(400).json({ error: "Search must be 200 characters or fewer" });
       const tag = req.query.tag as string;
       const rawTagFilters = req.query.tags;
       const tagFilters = (Array.isArray(rawTagFilters) ? rawTagFilters : rawTagFilters ? [rawTagFilters] : [])
@@ -4800,7 +4802,6 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       const filterOptionsOnly = req.query.optionsOnly === 'true';
       const includeFilterOptions = req.query.includeFilterOptions !== 'false';
       const multiCampaignTagFilter = req.query.multiCampaignTag === 'true';
-      const offset = (page - 1) * limit;
       const requestedProfileId = String(req.query.developerProfileId || '').trim();
       const userRole = String((req as any).user?.role || '').toUpperCase();
       const isDeveloper = userRole === 'DEVELOPER';
@@ -4845,226 +4846,32 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
           contactCategoryFilter,
           includeFilterOptions,
           filterOptionsOnly,
+          includeContactEnrichment: false,
         });
         return res.json(result);
       }
 
-      // For geo filters: build set of county names that match the requested state/MSA
-      let geoCountySet: Set<string> | null = null;
-      let geoMsaSet: Set<string> | null = null;
-      if (stateFilter || msaFilter || countyFilter) {
-        let q = db.select({ county: acquisitionMarkets.county, msa: acquisitionMarkets.msaName, state: acquisitionMarkets.state })
-          .from(acquisitionMarkets);
-        const conditions: any[] = [];
-        if (stateFilter) conditions.push(eq(acquisitionMarkets.state, stateFilter));
-        if (msaFilter) conditions.push(eq(acquisitionMarkets.msaName, msaFilter));
-        if (countyFilter) conditions.push(eq(acquisitionMarkets.county, countyFilter));
-        const geoRows = await (conditions.length ? (q as any).where(and(...conditions)) : q);
-        geoCountySet = new Set(geoRows.map((r: any) => r.county.toLowerCase()));
-        geoMsaSet = new Set(geoRows.map((r: any) => r.msa.toLowerCase()));
-      }
-
-      // If geo filter active: also get broker IDs with deals in matching state/county
-      let brokerIdsFromDeals: Set<string> | null = null;
-      if (stateFilter || msaFilter || countyFilter) {
-        const dealConditions: any[] = [];
-        if (stateFilter) dealConditions.push(eq(deals.state, stateFilter));
-        if (countyFilter) dealConditions.push(sql`LOWER(${deals.county}) = LOWER(${countyFilter})`);
-        if (msaFilter) dealConditions.push(eq(deals.msaName, msaFilter));
-        const matchingDeals = await db.select({ brokerId: deals.brokerId }).from(deals)
-          .where(and(...dealConditions.map(c => c)));
-        brokerIdsFromDeals = new Set(matchingDeals.map((d: any) => d.brokerId).filter(Boolean));
-      }
-
-      // Fetch all brokers then filter — brokers table is typically < 10k rows
-      const allBrokersQuery = db.select({
-        id: brokers.id,
-        firstName: brokers.firstName,
-        lastName: brokers.lastName,
-        email: brokers.email,
-        phone: brokers.phone,
-        brokerage: brokers.brokerage,
-        marketsCovered: brokers.marketsCovered,
-        smsOptIn: brokers.smsOptIn,
-        isActive: brokers.isActive,
-        assignedTo: (brokers as any).assignedTo,
-        crmTags: (brokers as any).crmTags,
-         sourceTags: brokers.sourceTags,
-        crmNotes: (brokers as any).crmNotes,
-        lastContactedAt: (brokers as any).lastContactedAt,
-        stateRegion: (brokers as any).stateRegion,
-        ownerDeveloperProfileId: brokers.ownerDeveloperProfileId,
-        contactSector: (brokers as any).contactSector,
-        contactCounty: (brokers as any).contactCounty,
-        contactSpecialty: (brokers as any).contactSpecialty,
-        userId: brokers.userId,
-        createdAt: brokers.createdAt,
-      }).from(brokers);
-      let allBrokers: any[] = await (
-        developerProfileId
-          ? (allBrokersQuery as any).where(isNonDemoBroker())
-          : allBrokersQuery
-      ).orderBy(desc(brokers.createdAt), desc(brokers.id));
-
-      if (developerProfileId) {
-        const privateCrmRows = await db.select({
-          brokerId: developerBrokerCrm.brokerId,
-          crmTags: developerBrokerCrm.crmTags,
-         isRemoved: developerBrokerCrm.isRemoved,
-          crmNotes: developerBrokerCrm.crmNotes,
-          lastContactedAt: developerBrokerCrm.lastContactedAt,
-          assignedTo: developerBrokerCrm.assignedTo,
-        }).from(developerBrokerCrm).where(eq(developerBrokerCrm.developerProfileId, developerProfileId));
-        const privateCrmByBroker = new Map(privateCrmRows.map((row) => [row.brokerId, row]));
-        allBrokers = allBrokers
-          .filter((broker) => isSharedBrokerVisible(broker, developerProfileId, contactVisibility))
-          .map((broker) => {
-            const privateCrm = privateCrmByBroker.get(broker.id);
-            if (privateCrm) return { ...broker, ...privateCrm };
-            // Shared directory identity is readable, but CRM state belongs to
-            // the company and must never fall back to another company's state.
-            if (broker.ownerDeveloperProfileId === null || broker.ownerDeveloperProfileId === undefined) {
-              return { ...broker, crmTags: [], crmNotes: null, lastContactedAt: null, assignedTo: null };
-            }
-            return broker;
-          })
-          .filter((broker) => !broker.isRemoved);
-      }
-
-      const companyMemberCounts = allBrokers.reduce((counts: Record<string, number>, broker: any) => {
-        const key = String(broker.brokerage || "").trim().toLowerCase();
-        if (key) counts[key] = (counts[key] || 0) + 1;
-        return counts;
-      }, {});
-      const companyNames = new Map<string, string>();
-      for (const broker of allBrokers) {
-        const name = String(broker.brokerage || "").trim();
-        const key = name.toLowerCase();
-        if (key && !companyNames.has(key)) companyNames.set(key, name);
-      }
-      const uniqueSortedValues = (values: unknown[]) => Array.from(new Set(
-        values.map((value) => String(value || "").trim()).filter(Boolean),
-      )).sort((a, b) => a.localeCompare(b));
-      const filterOptions = {
-        companies: Array.from(companyNames.entries())
-          .map(([key, name]) => ({ name, people: companyMemberCounts[key] || 0 }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-        tags: uniqueSortedValues(allBrokers.flatMap((broker: any) => Array.isArray(broker.crmTags) ? broker.crmTags : [])),
-        sourceTags: uniqueSortedValues(allBrokers.flatMap((broker: any) => Array.isArray(broker.sourceTags) ? broker.sourceTags : [])),
-        states: uniqueSortedValues(allBrokers.map((broker: any) => broker.stateRegion)),
-        assignedTo: uniqueSortedValues(allBrokers.map((broker: any) => broker.assignedTo)),
-      };
-
-      // Apply filters
-      let filtered = allBrokers;
-      if (search) {
-        const q = search.toLowerCase();
-        filtered = filtered.filter(b =>
-          `${b.firstName} ${b.lastName}`.toLowerCase().includes(q) ||
-          (b.email || '').toLowerCase().includes(q) ||
-          (b.phone || '').includes(q) ||
-          (b.brokerage || '').toLowerCase().includes(q) ||
-          (b.assignedTo || '').toLowerCase().includes(q) ||
-          (b.stateRegion || '').toLowerCase().includes(q)
-        );
-      }
-      if (tag) {
-        filtered = filtered.filter(b => Array.isArray(b.crmTags) && b.crmTags.includes(tag));
-      }
-      if (tagFilters.length > 0) {
-        filtered = filtered.filter((broker) =>
-          Array.isArray(broker.crmTags) && tagFilters.some((filterTag) => broker.crmTags.includes(filterTag)),
-        );
-      }
-      if (sourceTagFilter) {
-        filtered = filtered.filter((broker) =>
-          Array.isArray(broker.sourceTags) && broker.sourceTags.includes(sourceTagFilter),
-        );
-      }
-      if (crmStateFilter) {
-        filtered = filtered.filter((broker) =>
-          String(broker.stateRegion || "").trim().toLowerCase() === crmStateFilter,
-        );
-      }
-      if (market) {
-        filtered = filtered.filter(b => Array.isArray(b.marketsCovered) && b.marketsCovered.some((m: string) => m.toLowerCase().includes(market.toLowerCase())));
-      }
-      if (stateFilter && !msaFilter && !countyFilter) {
-        // Simple state filter — match directly on state_region column OR deals in that state
-        filtered = filtered.filter(b =>
-          (b.stateRegion || '').toUpperCase().split(',').map((state: string) => state.trim()).includes(stateFilter) ||
-          (brokerIdsFromDeals ? brokerIdsFromDeals.has(b.id) : false)
-        );
-      } else if (geoCountySet && geoCountySet.size > 0) {
-        // MSA/county geo filter — match via marketsCovered or deals
-        filtered = filtered.filter(b => {
-          const covered = (b.marketsCovered || []).map((m: string) => m.toLowerCase());
-          const matchesCovered = covered.some((m: string) =>
-            (geoCountySet!.size > 0 && [...geoCountySet!].some(c => m.includes(c))) ||
-            (geoMsaSet!.size > 0 && [...geoMsaSet!].some(msa => m.includes(msa)))
-          );
-          const matchesDeal = brokerIdsFromDeals ? brokerIdsFromDeals.has(b.id) : false;
-          return matchesCovered || matchesDeal;
-        });
-      }
-      if (smsFilter === 'opted_in') {
-        filtered = filtered.filter(b => b.smsOptIn);
-      } else if (smsFilter === 'opted_out') {
-        filtered = filtered.filter(b => !b.smsOptIn);
-      }
-      if (assignedToFilter) {
-        filtered = filtered.filter(b => (b.assignedTo || '').toLowerCase() === assignedToFilter.toLowerCase());
-      }
-      if (brokerageFilter) {
-        filtered = filtered.filter(b => (b.brokerage || '').toLowerCase() === brokerageFilter.toLowerCase());
-      }
-      if (multiCampaignTagFilter) {
-        // Get all outreach campaign trigger tags from active templates
-        const outreachTagRows = await db.execute(sql`
-          SELECT hubspot_trigger_tag FROM outreach_campaign_templates
-          WHERE is_active = true AND hubspot_trigger_tag IS NOT NULL
-        `);
-        const outreachTagSet = new Set((outreachTagRows as any).rows.map((r: any) => r.hubspot_trigger_tag as string));
-        filtered = filtered.filter(b => {
-          const appliedOutreachTags = (b.crmTags || []).filter((t: string) => outreachTagSet.has(t));
-          return appliedOutreachTags.length > 1;
-        });
-      }
-
-      const total = filtered.length;
-      const pageBrokers = filtered.slice(offset, offset + limit);
-
-      // Enrich only the page being returned rather than scanning every deal
-      // whenever a company opens its CRM.
-      const brokerIds = pageBrokers.map((b) => b.id);
-      let dealCounts: Record<string, number> = {};
-      if (brokerIds.length > 0) {
-        const rawDeals = await db.select({ brokerId: deals.brokerId })
-          .from(deals)
-          .where(inArray(deals.brokerId, brokerIds));
-        rawDeals.forEach((d: any) => {
-          if (d.brokerId) dealCounts[d.brokerId] = (dealCounts[d.brokerId] || 0) + 1;
-        });
-      }
-
-      const paginated = pageBrokers.map(b => ({
-        ...b,
-        dealCount: dealCounts[b.id] || 0,
-        companyMemberCount: companyMemberCounts[String(b.brokerage || "").trim().toLowerCase()] || 0,
-      }));
-
-      res.json({
-        contacts: paginated,
-        filterOptions,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-          hasNextPage: offset + limit < total,
-          hasPrevPage: page > 1,
-        }
+      const result = await getInternalCrmContacts({
+        page,
+        limit,
+        search,
+        tag: tag || "",
+        tagFilters,
+        sourceTagFilter,
+        crmStateFilter,
+        stateFilter,
+        msaFilter,
+        countyFilter,
+        market: market || "",
+        smsFilter: smsFilter || "",
+        assignedToFilter,
+        brokerageFilter,
+        multiCampaignTagFilter,
+        contactCategoryFilter,
+        includeFilterOptions,
+        filterOptionsOnly,
       });
+      return res.json(result);
     } catch (error) {
       console.error("CRM contacts query failed", {
         errorName: error instanceof Error ? error.name : "UnknownError",
@@ -5097,14 +4904,17 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         registryResult.forEach((row) => tagSet.add(row.name));
         return res.json(Array.from(tagSet).sort());
       }
-      const [contactResult, registryResult] = await Promise.all([
-        db.select({ crmTags: (brokers as any).crmTags }).from(brokers),
+      const [contactTagResult, registryResult] = await Promise.all([
+        db.execute(sql`
+          SELECT DISTINCT tag
+          FROM brokers AS contacts
+          CROSS JOIN LATERAL unnest(COALESCE(contacts.crm_tags, ARRAY[]::text[])) AS contact_tags(tag)
+          WHERE BTRIM(tag) <> ''
+        `),
         db.select({ name: crmTagRegistry.name }).from(crmTagRegistry),
       ]);
       const tagSet = new Set<string>();
-      contactResult.forEach((r: any) => {
-        if (Array.isArray(r.crmTags)) r.crmTags.forEach((t: string) => tagSet.add(t));
-      });
+      ((contactTagResult as any).rows || []).forEach((row: any) => tagSet.add(String(row.tag)));
       registryResult.forEach((r) => tagSet.add(r.name));
       res.json(Array.from(tagSet).sort());
     } catch (error) {

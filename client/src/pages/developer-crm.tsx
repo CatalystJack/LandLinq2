@@ -273,7 +273,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   });
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => window.clearTimeout(timeout);
   }, [search]);
 
