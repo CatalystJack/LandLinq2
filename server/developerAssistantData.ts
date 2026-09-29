@@ -16,6 +16,12 @@ export type NearbyDealFilters = {
   radiusMiles?: number;
 };
 
+export type MyContactFilters = {
+  search?: string;
+  region?: string;
+  tag?: string;
+};
+
 export type MyCampaign = {
   id: string;
   name: string;
@@ -32,6 +38,66 @@ export type MyCampaign = {
 function normalizeStatus(status: unknown): string | null {
   const value = String(status || "").trim().toLowerCase();
   return value || null;
+}
+
+// Keep assistant contact visibility identical to the CRM directory: owned
+// contacts are private, while shared contacts require the profile's enabled
+// directory setting and all configured sector/state/county/source-tag filters.
+function assistantContactVisibility(developerProfileId: string) {
+  return sql`(
+    b.owner_developer_profile_id = ${developerProfileId}
+    OR (
+      b.owner_developer_profile_id IS NULL
+      AND b.user_id IS DISTINCT FROM '20974d7b-e103-4fc7-b42f-7a13d41041fb'
+      AND EXISTS (
+        SELECT 1 FROM developer_profiles dp
+        WHERE dp.id = ${developerProfileId}
+          AND dp.is_active = true
+          AND dp.profile_type = 'real_estate'
+          AND dp.crm_shared_contacts_enabled = true
+          AND (
+            COALESCE(cardinality(dp.crm_contact_sectors), 0) = 0
+            OR EXISTS (
+              SELECT 1 FROM unnest(dp.crm_contact_sectors) target_sector
+              WHERE LOWER(BTRIM(COALESCE(b.contact_sector, ''))) = LOWER(BTRIM(target_sector))
+            )
+          )
+          AND (
+            COALESCE(cardinality(dp.crm_contact_states), 0) = 0
+            OR EXISTS (
+              SELECT 1 FROM unnest(string_to_array(COALESCE(b.state_region, ''), ',')) state_value
+              WHERE EXISTS (
+                SELECT 1 FROM unnest(dp.crm_contact_states) target_state
+                WHERE UPPER(BTRIM(state_value)) = UPPER(BTRIM(target_state))
+              )
+            )
+            OR (
+              LOWER(BTRIM(COALESCE(b.contact_county, ''))) LIKE 'out of state (%'
+              AND EXISTS (
+                SELECT 1 FROM unnest(dp.crm_contact_states) target_state
+                WHERE UPPER(BTRIM(SPLIT_PART(SPLIT_PART(b.contact_county, '(', 2), ')', 1))) = UPPER(BTRIM(target_state))
+              )
+            )
+          )
+          AND (
+            COALESCE(cardinality(dp.crm_contact_counties), 0) = 0
+            OR EXISTS (
+              SELECT 1 FROM unnest(dp.crm_contact_counties) target_county
+              WHERE LOWER(BTRIM(COALESCE(b.contact_county, ''))) = LOWER(BTRIM(target_county))
+            )
+          )
+          AND (
+            COALESCE(cardinality(dp.crm_contact_source_tags), 0) = 0
+            OR EXISTS (
+              SELECT 1
+              FROM unnest(COALESCE(b.source_tags, ARRAY[]::text[])) broker_tag
+              JOIN unnest(dp.crm_contact_source_tags) target_tag
+                ON LOWER(BTRIM(broker_tag)) = LOWER(BTRIM(target_tag))
+            )
+          )
+      )
+    )
+  )`;
 }
 
 export async function getMyDeals(developerProfileId: string, filters: MyDealFilters = {}) {
@@ -163,14 +229,26 @@ export async function getMyPipelineSummary(developerProfileId: string) {
   };
 }
 
-export async function getMyContacts(developerProfileId: string, search = "") {
-  const normalizedSearch = String(search || "").trim();
+export async function getMyContacts(
+  developerProfileId: string,
+  filters: string | MyContactFilters = "",
+) {
+  const normalizedSearch = typeof filters === "string" ? filters.trim() : String(filters.search || "").trim();
+  const region = typeof filters === "string" ? "" : String(filters.region || "").trim();
+  const tag = typeof filters === "string" ? "" : String(filters.tag || "").trim();
   const result = await db.execute(sql`
     SELECT b.id, b.first_name, b.last_name, b.email, b.phone, b.brokerage,
-      b.state_region, b.crm_tags
+      b.state_region, b.contact_county, b.city,
+      CASE WHEN b.owner_developer_profile_id IS NULL
+        THEN COALESCE(dbc.crm_tags, ARRAY[]::text[])
+        ELSE COALESCE(b.crm_tags, ARRAY[]::text[])
+      END AS crm_tags
     FROM brokers b
+    LEFT JOIN developer_broker_crm dbc
+      ON dbc.broker_id = b.id AND dbc.developer_profile_id = ${developerProfileId}
     WHERE b.is_active = true
-      AND (b.owner_developer_profile_id = ${developerProfileId} OR b.owner_developer_profile_id IS NULL)
+      AND ${assistantContactVisibility(developerProfileId)}
+      AND (dbc.id IS NULL OR dbc.is_removed = false)
       AND NOT EXISTS (
         SELECT 1
         FROM users demo_owner
@@ -183,6 +261,22 @@ export async function getMyContacts(developerProfileId: string, search = "") {
         OR LOWER(COALESCE(b.last_name, '')) LIKE LOWER(${"%" + normalizedSearch + "%"})
         OR LOWER(COALESCE(b.email, '')) LIKE LOWER(${"%" + normalizedSearch + "%"})
         OR LOWER(COALESCE(b.brokerage, '')) LIKE LOWER(${"%" + normalizedSearch + "%"})
+      )
+      AND (
+        ${region === ""}
+        OR LOWER(COALESCE(b.state_region, '')) LIKE LOWER(${"%" + region + "%"})
+        OR LOWER(COALESCE(b.contact_county, '')) LIKE LOWER(${"%" + region + "%"})
+        OR LOWER(COALESCE(b.city, '')) LIKE LOWER(${"%" + region + "%"})
+      )
+      AND (
+        ${tag === ""}
+        OR (
+          CASE WHEN b.owner_developer_profile_id IS NULL
+        THEN CASE WHEN COALESCE(dbc.is_removed, false) = false
+          THEN COALESCE(dbc.crm_tags, ARRAY[]::text[]) ELSE ARRAY[]::text[] END
+            ELSE COALESCE(b.crm_tags, ARRAY[]::text[])
+          END
+        ) @> ARRAY[${tag}]::text[]
       )
     ORDER BY b.last_name, b.first_name
     LIMIT 100
@@ -198,13 +292,21 @@ export async function getMyContacts(developerProfileId: string, search = "") {
   }));
 }
 
-export async function getMyContactCount(developerProfileId: string, search = "") {
-  const normalizedSearch = String(search || "").trim();
+export async function getMyContactCount(
+  developerProfileId: string,
+  filters: string | MyContactFilters = "",
+) {
+  const normalizedSearch = typeof filters === "string" ? filters.trim() : String(filters.search || "").trim();
+  const region = typeof filters === "string" ? "" : String(filters.region || "").trim();
+  const tag = typeof filters === "string" ? "" : String(filters.tag || "").trim();
   const result = await db.execute(sql`
     SELECT COUNT(*)::int AS total_count
     FROM brokers b
+    LEFT JOIN developer_broker_crm dbc
+      ON dbc.broker_id = b.id AND dbc.developer_profile_id = ${developerProfileId}
     WHERE b.is_active = true
-      AND (b.owner_developer_profile_id = ${developerProfileId} OR b.owner_developer_profile_id IS NULL)
+      AND ${assistantContactVisibility(developerProfileId)}
+      AND (dbc.id IS NULL OR dbc.is_removed = false)
       AND NOT EXISTS (
         SELECT 1
         FROM users demo_owner
@@ -217,6 +319,19 @@ export async function getMyContactCount(developerProfileId: string, search = "")
         OR LOWER(COALESCE(b.last_name, '')) LIKE LOWER(${"%" + normalizedSearch + "%"})
         OR LOWER(COALESCE(b.email, '')) LIKE LOWER(${"%" + normalizedSearch + "%"})
         OR LOWER(COALESCE(b.brokerage, '')) LIKE LOWER(${"%" + normalizedSearch + "%"})
+      )
+      AND (
+        ${region === ""}
+        OR LOWER(COALESCE(b.state_region, '')) LIKE LOWER(${"%" + region + "%"})
+        OR LOWER(COALESCE(b.contact_county, '')) LIKE LOWER(${"%" + region + "%"})
+        OR LOWER(COALESCE(b.city, '')) LIKE LOWER(${"%" + region + "%"})
+      )
+      AND (
+        ${tag === ""}
+        OR (CASE WHEN b.owner_developer_profile_id IS NULL
+          THEN COALESCE(dbc.crm_tags, ARRAY[]::text[])
+          ELSE COALESCE(b.crm_tags, ARRAY[]::text[])
+        END) @> ARRAY[${tag}]::text[]
       )
   `);
   return Number((result.rows?.[0] as any)?.total_count) || 0;
@@ -460,6 +575,12 @@ async function getOwnedCampaignId(developerProfileId: string, campaignId: string
     WHERE c.id = ${campaignId}
       AND c.developer_profile_id = ${developerProfileId}
       AND COALESCE(c.is_archived, false) = false
+      AND EXISTS (
+        SELECT 1
+        FROM outreach_campaign_templates owned_template
+        WHERE owned_template.id = (c.broker_filter->>'templateId')
+          AND owned_template.team_id = ${developerProfileId}
+      )
     LIMIT 1
   `);
   return result.rows?.[0] as any || null;
@@ -495,12 +616,22 @@ export async function updateMyCampaignFrequency(
       UPDATE outreach_campaign_template_steps
       SET day_number = sequence_index * ${daySpacing}, updated_at = NOW()
       WHERE template_id = ${templateId} AND is_active = true
+        AND EXISTS (
+          SELECT 1 FROM outreach_campaign_templates owned_template
+          WHERE owned_template.id = outreach_campaign_template_steps.template_id
+            AND owned_template.team_id = ${developerProfileId}
+        )
     `);
     await tx.execute(sql`
       UPDATE outreach_campaign_steps
       SET day_number = sequence_index * ${daySpacing}, updated_at = NOW()
       WHERE sender_id = ((${campaign.broker_filter?.senderId})::varchar)
         AND is_active = true
+        AND EXISTS (
+          SELECT 1 FROM outreach_senders os
+          WHERE os.id = outreach_campaign_steps.sender_id
+            AND os.developer_profile_id = ${developerProfileId}
+        )
     `);
     const steps = await tx.execute(sql`
       SELECT sequence_index, day_number
@@ -563,12 +694,22 @@ export async function updateMyCampaignStep(
       UPDATE outreach_campaign_template_steps
       SET subject = ${updatedSubject}, content = ${updatedContent}, updated_at = NOW()
       WHERE template_id = ${templateId} AND sequence_index = ${sequenceIndex}
+        AND EXISTS (
+          SELECT 1 FROM outreach_campaign_templates owned_template
+          WHERE owned_template.id = outreach_campaign_template_steps.template_id
+            AND owned_template.team_id = ${developerProfileId}
+        )
     `);
     await tx.execute(sql`
       UPDATE outreach_campaign_steps
       SET subject = ${updatedSubject}, content = ${updatedContent}, updated_at = NOW()
       WHERE sender_id = ((${campaign.broker_filter?.senderId})::varchar)
         AND sequence_index = ${sequenceIndex}
+        AND EXISTS (
+          SELECT 1 FROM outreach_senders os
+          WHERE os.id = outreach_campaign_steps.sender_id
+            AND os.developer_profile_id = ${developerProfileId}
+        )
     `);
     return {
       campaignId,
@@ -596,6 +737,138 @@ export async function markMyDealPursuing(developerProfileId: string, dealId: str
   return result.rows?.[0] || null;
 }
 
+export async function markMyDealPassed(developerProfileId: string, dealId: string) {
+  const result = await db.execute(sql`
+    UPDATE partner_developer_sends pds
+    SET classification = 'passed',
+        green_flagged_by_developer = false,
+        green_flagged_at = NULL
+    FROM partner_developers pd
+    WHERE pds.deal_id = ${dealId}
+      AND (
+        pds.developer_profile_id = ${developerProfileId}
+        OR (pds.developer_profile_id IS NULL AND pd.id = pds.developer_id
+            AND pd.developer_profile_id = ${developerProfileId})
+      )
+    RETURNING pds.deal_id
+  `);
+  return result.rows?.[0] || null;
+}
+
+export async function moveMyPipelineOpportunityStage(
+  developerProfileId: string,
+  input: { opportunityId: string; stageId: string; expectedCurrentStageId?: string },
+) {
+  const result = await db.execute(sql`
+    UPDATE pipeline_opportunities o
+    SET stage_id = ${input.stageId}, updated_at = NOW()
+    WHERE o.id = ${input.opportunityId}
+      AND o.developer_profile_id = ${developerProfileId}
+      AND (${input.expectedCurrentStageId || null} IS NULL OR o.stage_id = ${input.expectedCurrentStageId || null})
+      AND EXISTS (
+        SELECT 1 FROM pipeline_stages s
+        WHERE s.id = ${input.stageId}
+          AND s.developer_profile_id = ${developerProfileId}
+          AND s.is_active = true
+      )
+    RETURNING o.id, o.stage_id
+  `);
+  return result.rows?.[0] || null;
+}
+
+export type MyAnalyticsDealRow = {
+  asking_price?: number | string | null;
+  city?: string | null;
+  broker_first_name?: string | null;
+  broker_last_name?: string | null;
+  created_at?: string | Date | null;
+  developer_status?: string | null;
+};
+
+export async function getMyAnalyticsSummary(
+  developerProfileId: string,
+  sourceDealRows?: MyAnalyticsDealRow[],
+) {
+  const deals = sourceDealRows === undefined ? await db.execute(sql`
+    SELECT asking_price, city, broker_first_name, broker_last_name, created_at, developer_status
+    FROM (
+      SELECT DISTINCT ON (d.id)
+        d.asking_price, d.city,
+        b.first_name AS broker_first_name, b.last_name AS broker_last_name,
+        d.created_at,
+        CASE WHEN pds.green_flagged_by_developer = true THEN 'Pursuing'
+          WHEN LOWER(COALESCE(pds.classification, '')) IN ('green', 'passed', 'accepted') THEN 'Passed'
+          ELSE 'Review' END AS developer_status
+      FROM deals d
+      INNER JOIN partner_developer_sends pds ON pds.deal_id = d.id
+      LEFT JOIN partner_developers pd ON pd.id = pds.developer_id
+      LEFT JOIN brokers b ON b.id = d.broker_id
+        AND (b.owner_developer_profile_id = ${developerProfileId} OR b.owner_developer_profile_id IS NULL)
+      WHERE pds.developer_profile_id = ${developerProfileId}
+        OR (pds.developer_profile_id IS NULL AND pd.developer_profile_id = ${developerProfileId})
+      ORDER BY d.id, pds.matched_at DESC NULLS LAST, pd.created_at DESC NULLS LAST
+    ) visible_deals
+  `) : null;
+  const rows = (sourceDealRows ?? deals?.rows ?? []) as MyAnalyticsDealRow[];
+  const statusBreakdown = { Pursuing: 0, Passed: 0, Review: 0 };
+  const cities = new Map<string, { count: number; value: number }>();
+  const brokers = new Map<string, { count: number; value: number }>();
+  const months = new Map<string, number>();
+  let totalAskingPrice = 0;
+  for (const row of rows) {
+    const status = (row.developer_status && row.developer_status in statusBreakdown
+      ? row.developer_status
+      : "Review") as keyof typeof statusBreakdown;
+    statusBreakdown[status]++;
+    const value = Number(row.asking_price) || 0;
+    totalAskingPrice += value;
+    const city = String(row.city || "").trim() || "Unknown";
+    const cityEntry = cities.get(city) || { count: 0, value: 0 };
+    cityEntry.count++; cityEntry.value += value; cities.set(city, cityEntry);
+    const broker = [row.broker_first_name, row.broker_last_name].filter(Boolean).join(" ") || "Unknown Broker";
+    const brokerEntry = brokers.get(broker) || { count: 0, value: 0 };
+    brokerEntry.count++; brokerEntry.value += value; brokers.set(broker, brokerEntry);
+    if (row.created_at) {
+      const createdAt = new Date(row.created_at);
+      if (!Number.isNaN(createdAt.getTime())) {
+        const month = createdAt.toISOString().slice(0, 7);
+        months.set(month, (months.get(month) || 0) + 1);
+      }
+    }
+  }
+  const pipeline = await db.execute(sql`
+    SELECT COALESCE(SUM(value), 0)::numeric AS total_value
+    FROM pipeline_opportunities
+    WHERE developer_profile_id = ${developerProfileId}
+  `);
+  const totalDeals = rows.length;
+  return {
+    totalDeals,
+    totalAskingPrice,
+    totalPipelineValue: Number((pipeline.rows?.[0] as any)?.total_value) || 0,
+    conversionRate: totalDeals ? (statusBreakdown.Pursuing / totalDeals) * 100 : 0,
+    statusBreakdown: Object.entries(statusBreakdown).map(([status, count]) => ({
+      status,
+      count,
+      percentage: totalDeals ? (count / totalDeals) * 100 : 0,
+    })),
+    topCities: Array.from(cities, ([city, value]) => ({
+      city,
+      count: value.count,
+      totalValue: value.value,
+      avgValue: value.count ? value.value / value.count : 0,
+    })).sort((a, b) => b.count - a.count).slice(0, 10),
+    topBrokers: Array.from(brokers, ([broker, value]) => ({
+      broker,
+      count: value.count,
+      totalValue: value.value,
+      avgValue: value.count ? value.value / value.count : 0,
+    })).sort((a, b) => b.totalValue - a.totalValue).slice(0, 10),
+    monthlyTrends: Array.from(months, ([month, submissions]) => ({ month, submissions, closings: 0, revenue: 0 }))
+      .sort((a, b) => a.month.localeCompare(b.month)).slice(-12),
+  };
+}
+
 export async function addMyContactTag(
   developerProfileId: string,
   contactId: string,
@@ -611,9 +884,50 @@ export async function addMyContactTag(
     WHERE id = ${contactId}
       AND owner_developer_profile_id = ${developerProfileId}
       AND is_active = true
+      AND NOT EXISTS (
+        SELECT 1
+        FROM developer_broker_crm hidden_contact
+        WHERE hidden_contact.developer_profile_id = ${developerProfileId}
+          AND hidden_contact.broker_id = brokers.id
+          AND hidden_contact.is_removed IS DISTINCT FROM false
+      )
     RETURNING id, first_name, last_name, crm_tags
   `);
-  return result.rows?.[0] || null;
+  if (result.rows?.[0]) return result.rows[0];
+  await db.execute(sql`
+    INSERT INTO developer_broker_crm (developer_profile_id, broker_id, crm_tags)
+    SELECT ${developerProfileId}, b.id, ARRAY[${tag}::text]
+    FROM brokers b
+    WHERE b.id = ${contactId}
+      AND b.owner_developer_profile_id IS NULL
+      AND b.is_active = true
+      AND ${assistantContactVisibility(developerProfileId)}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM developer_broker_crm hidden_contact
+        WHERE hidden_contact.developer_profile_id = ${developerProfileId}
+          AND hidden_contact.broker_id = b.id
+          AND hidden_contact.is_removed IS DISTINCT FROM false
+      )
+    ON CONFLICT (developer_profile_id, broker_id) DO UPDATE
+      SET crm_tags = ARRAY(
+        SELECT DISTINCT value
+        FROM unnest(COALESCE(developer_broker_crm.crm_tags, ARRAY[]::text[]) || ARRAY[${tag}::text]) AS value
+        ORDER BY value
+      ),
+      updated_at = NOW(),
+      is_removed = false
+  `);
+  const sharedResult = await db.execute(sql`
+    SELECT b.id, b.first_name, b.last_name,
+      COALESCE(dbc.crm_tags, ARRAY[]::text[]) AS crm_tags
+    FROM brokers b
+    INNER JOIN developer_broker_crm dbc
+      ON dbc.broker_id = b.id AND dbc.developer_profile_id = ${developerProfileId}
+    WHERE b.id = ${contactId} AND b.owner_developer_profile_id IS NULL
+      AND b.is_active = true AND dbc.is_removed = false
+  `);
+  return sharedResult.rows?.[0] || null;
 }
 
 export async function createMyPipelineOpportunity(
@@ -621,11 +935,14 @@ export async function createMyPipelineOpportunity(
   input: { contactId: string; stageId?: string; title?: string; value?: number; notes?: string },
 ) {
   const contact = await db.execute(sql`
-    SELECT id, first_name, last_name
-    FROM brokers
-    WHERE id = ${input.contactId}
-      AND owner_developer_profile_id = ${developerProfileId}
-      AND is_active = true
+    SELECT b.id, b.first_name, b.last_name
+    FROM brokers b
+    LEFT JOIN developer_broker_crm dbc
+      ON dbc.broker_id = b.id AND dbc.developer_profile_id = ${developerProfileId}
+    WHERE b.id = ${input.contactId}
+      AND b.is_active = true
+      AND ${assistantContactVisibility(developerProfileId)}
+      AND (dbc.id IS NULL OR dbc.is_removed = false)
     LIMIT 1
   `);
   if (!contact.rows?.length) return null;

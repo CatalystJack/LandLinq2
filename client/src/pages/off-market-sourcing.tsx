@@ -28,6 +28,11 @@ import {
   Building2,
   AlertTriangle,
 } from "lucide-react";
+import {
+  OFF_MARKET_MAX_IMPORT_ROWS,
+  OFF_MARKET_MAX_UPLOAD_BYTES,
+  isOffMarketFileNameAllowed,
+} from "@shared/off-market-upload";
 
 interface OffMarketImportRow {
   id: string;
@@ -172,6 +177,9 @@ export default function OffMarketSourcing() {
         const wb = XLSX.read(data, { type: "array", raw: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const json = XLSX.utils.sheet_to_json(ws, { defval: "", raw: false }) as Record<string, any>[];
+        if (json.length > OFF_MARKET_MAX_IMPORT_ROWS) {
+          throw new Error(`This file has more than ${OFF_MARKET_MAX_IMPORT_ROWS.toLocaleString()} data rows. Split it into smaller files and try again.`);
+        }
         const hdrs = json.length > 0 ? Object.keys(json[0]) : [];
         setHeaders(hdrs);
         setSampleRows(json.slice(0, 3));
@@ -202,6 +210,12 @@ export default function OffMarketSourcing() {
         setMapping(autoMap);
         setStep("map");
       } catch (err: any) {
+        setFile(null);
+        setHeaders([]);
+        setSampleRows([]);
+        setAllParsedRows([]);
+        setRowCount(0);
+        setStep("select");
         toast({ title: "Could not read file", description: err.message, variant: "destructive" });
       } finally {
         setParsing(false);
@@ -213,14 +227,30 @@ export default function OffMarketSourcing() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    setFile(f);
-    setImportSummary(null);
+    setFile(null);
+    setHeaders([]);
+    setSampleRows([]);
     setAllParsedRows([]);
     setRowCount(0);
+    setStep("select");
+    setImportSummary(null);
+    if (!isOffMarketFileNameAllowed(f.name)) {
+      toast({ title: "Unsupported file type", description: "Choose a CSV, XLS, or XLSX file.", variant: "destructive" });
+      e.currentTarget.value = "";
+      return;
+    }
+    if (f.size > OFF_MARKET_MAX_UPLOAD_BYTES) {
+      toast({ title: "File is too large", description: "Files are limited to 50 MiB.", variant: "destructive" });
+      e.currentTarget.value = "";
+      return;
+    }
+    setFile(f);
+    setImportSummary(null);
     parseFile(f);
   };
 
-  const canImport = !!mapping.ownerName && !!file && !!county.trim() && allParsedRows.length > 0 && !parsing;
+  const canImport = !!mapping.ownerName && !!file && !!county.trim() &&
+    allParsedRows.length > 0 && allParsedRows.length <= OFF_MARKET_MAX_IMPORT_ROWS && !parsing;
 
   const MAPPED_FIELDS = [
     "ownerName","ownerAddress","ownerCity","ownerState","ownerZip",
@@ -231,6 +261,14 @@ export default function OffMarketSourcing() {
 
   const handleImport = async () => {
     if (!file || !county.trim() || allParsedRows.length === 0) return;
+    if (allParsedRows.length > OFF_MARKET_MAX_IMPORT_ROWS) {
+      toast({
+        title: "Too many rows",
+        description: `Imports are limited to ${OFF_MARKET_MAX_IMPORT_ROWS.toLocaleString()} data rows per file.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setImporting(true);
     try {
       // Apply column mapping client-side and send only mapped field values as JSON.
@@ -261,7 +299,7 @@ export default function OffMarketSourcing() {
           errorMsg = errData.error || errorMsg;
         } catch {
           if (res.status === 413) {
-            errorMsg = "File has too many rows. Try splitting it into batches of 20,000 rows or fewer.";
+            errorMsg = "The import request is too large. Keep the source file under 50 MiB and split it into smaller files.";
           }
         }
         throw new Error(errorMsg);
@@ -537,6 +575,9 @@ export default function OffMarketSourcing() {
               <div>
                 <Label htmlFor="file-input">CSV or Excel File</Label>
                 <Input id="file-input" type="file" accept=".csv,.xlsx,.xls" onChange={handleFileChange} data-testid="input-file" />
+                <p className="mt-1 text-xs text-gray-500">
+                  CSV or Excel, up to 50 MiB and {OFF_MARKET_MAX_IMPORT_ROWS.toLocaleString()} data rows.
+                </p>
               </div>
               {file && headers.length === 0 && (
                 <div className="flex items-center gap-2 text-sm text-gray-500">

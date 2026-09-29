@@ -21,7 +21,7 @@ import { db } from "./db";
 import { isAuthenticated } from "./auth";
 import { apiKeys, leadAttachments, deals, brokers } from "@shared/schema";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
-import { eq, desc, and, isNull } from "drizzle-orm";
+import { eq, desc, and, isNull, sql } from "drizzle-orm";
 import crypto from "crypto";
 import multer from "multer";
 
@@ -82,8 +82,8 @@ async function upsertBrokerByEmail(opts: {
   firstName: string;
   lastName: string;
   phone?: string;
-}): Promise<string> {
-  const existing = await db
+}, executor: any = db): Promise<string> {
+  const existing = await executor
     .select({ id: brokers.id })
     .from(brokers)
     .where(and(
@@ -94,7 +94,7 @@ async function upsertBrokerByEmail(opts: {
 
   if (existing.length) return existing[0].id;
 
-  const [row] = await db
+  const [row] = await executor
     .insert(brokers)
     .values({
       firstName: opts.firstName || "Unknown",
@@ -132,7 +132,8 @@ export function registerExternalApiRoutes(app: Express) {
         asking_price,
       } = req.body;
 
-      if (!property_address) {
+      const normalizedPropertyAddress = typeof property_address === "string" ? property_address.trim() : "";
+      if (!normalizedPropertyAddress) {
         return res.status(400).json({ error: "property_address is required." });
       }
       if (!sender_email && !sender_phone) {
@@ -146,17 +147,6 @@ export function registerExternalApiRoutes(app: Express) {
       const firstName = nameParts[0] || "API";
       const lastName = nameParts.slice(1).join(" ") || "Submission";
 
-      // Find or create broker
-      let brokerId: string | null = null;
-      if (sender_email) {
-        brokerId = await upsertBrokerByEmail({
-          email: sender_email,
-          firstName,
-          lastName,
-          phone: sender_phone,
-        });
-      }
-
       // Compose combined notes (notes field + zoning_notes)
       const combinedNotes = [
         notes ? `--- Original Email Body ---\n${notes}` : null,
@@ -167,44 +157,74 @@ export function registerExternalApiRoutes(app: Express) {
 
       // Sandbox: prefix address so it's obvious in the UI
       const finalAddress = isSandbox
-        ? `[SANDBOX TEST] ${property_address}`
-        : property_address;
+        ? `[SANDBOX TEST] ${normalizedPropertyAddress}`
+        : normalizedPropertyAddress;
 
-      const [deal] = await db
-        .insert(deals)
-        .values({
-          brokerId,
-          address: finalAddress,
-          dealType: property_type === "commercial" ? "commercial" : "land",
-          sizeAcres: size_acres ? String(size_acres) : null,
-          askingPrice: asking_price ? String(asking_price) : null,
-          zoning: zoning_notes ? zoning_notes.slice(0, 100) : null,
-          apexNotes: combinedNotes,
-          status: "pending_review",
-          submissionMethod: "api",
-          brokerPhone: sender_phone || null,
-        } as any)
-        .returning({
+      const submission = await db.transaction(async (tx) => {
+        await tx.execute(sql`
+          SELECT pg_advisory_xact_lock(hashtext(LOWER(TRIM(${finalAddress})))::bigint)
+        `);
+        const [existingDeal] = await tx.select({
           id: deals.id,
           dealNumber: deals.dealNumber,
           status: deals.status,
           address: deals.address,
           createdAt: deals.createdAt,
-        });
+        }).from(deals)
+          .where(sql`lower(trim(${deals.address})) = lower(trim(${finalAddress}))`)
+          .limit(1);
+        if (existingDeal) {
+          return { deal: existingDeal, reusedExistingLead: true };
+        }
 
-      return res.status(201).json({
+        let brokerId: string | null = null;
+        if (sender_email) {
+          brokerId = await upsertBrokerByEmail({
+            email: sender_email,
+            firstName,
+            lastName,
+            phone: sender_phone,
+          }, tx);
+        }
+
+        const [deal] = await tx
+          .insert(deals)
+          .values({
+            brokerId,
+            address: finalAddress,
+            dealType: property_type === "commercial" ? "commercial" : "land",
+            sizeAcres: size_acres ? String(size_acres) : null,
+            askingPrice: asking_price ? String(asking_price) : null,
+            zoning: zoning_notes ? zoning_notes.slice(0, 100) : null,
+            apexNotes: combinedNotes,
+            status: "pending_review",
+            submissionMethod: "api",
+            brokerPhone: sender_phone || null,
+          } as any)
+          .returning({
+            id: deals.id,
+            dealNumber: deals.dealNumber,
+            status: deals.status,
+            address: deals.address,
+            createdAt: deals.createdAt,
+          });
+        return { deal, reusedExistingLead: false };
+      });
+
+      return res.status(submission.reusedExistingLead ? 200 : 201).json({
         ok: true,
+        reused_existing_lead: submission.reusedExistingLead,
         lead: {
-          id: deal.id,
-          deal_number: deal.dealNumber,
-          status: deal.status,
-          address: deal.address,
-          created_at: deal.createdAt,
+          id: submission.deal.id,
+          deal_number: submission.deal.dealNumber,
+          status: submission.deal.status,
+          address: submission.deal.address,
+          created_at: submission.deal.createdAt,
           sandbox: isSandbox,
         },
         _links: {
-          self: `/api/v1/leads/${deal.id}`,
-          attachments: `/api/v1/leads/${deal.id}/attachments`,
+          self: `/api/v1/leads/${submission.deal.id}`,
+          attachments: `/api/v1/leads/${submission.deal.id}/attachments`,
         },
       });
     } catch (err: any) {

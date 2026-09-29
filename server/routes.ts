@@ -53,6 +53,7 @@ import {
 } from "@shared/schema";
 import { or, like, ilike, eq, ne, desc, asc, gte, lte, gt, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
 import { setupAuthMiddleware, setupAuthRoutes, isAuthenticated, hashPassword, comparePasswords, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
+import { requirePlatformAdmin } from "./requirePlatformAdmin";
 import { isAnalyticsAuthorized } from "@shared/admin-auth";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
@@ -67,6 +68,11 @@ import {
 import { isUsStateCode, normalizeUsStateCode } from "@shared/us-states";
 import { getBrokerStateCodes, getOutOfStateCodeFromCounty } from "@shared/broker-location";
 import { countyTargetMatchesDeal, parseCountyTarget } from "@shared/county-targets";
+import {
+  OFF_MARKET_MAX_IMPORT_ROWS,
+  OFF_MARKET_MAX_UPLOAD_BYTES,
+  isOffMarketFileNameAllowed,
+} from "@shared/off-market-upload";
 import { getDeveloperCrmContacts } from "./developerCrmContacts";
 import {
   decodeBrokerDirectoryCursor,
@@ -98,11 +104,14 @@ import {
   generateOutreachSequenceWithAI,
   parseInvestmentCompanyCriteriaText,
   planDeveloperAssistantQuestion,
+  UnsupportedDeveloperAssistantPlanError,
 } from "./aiEmailParser";
 import {
   addMyContactTag,
   createMyPipelineOpportunity,
   getCompsForDeal,
+  getMyAnalyticsSummary,
+  getMyCampaigns,
   getMyContactCount,
   getMyContacts,
   getMyCriteria,
@@ -110,8 +119,18 @@ import {
   getMyDeals,
   getNearbyDeals,
   getMyPipelineSummary,
+  markMyDealPassed,
   markMyDealPursuing,
+  moveMyPipelineOpportunityStage,
+  updateMyCampaignFrequency,
+  updateMyCampaignStatus,
+  updateMyCampaignStep,
+  updateMyCampaignTriggerTag,
 } from "./developerAssistantData";
+import {
+  createPendingDeveloperAssistantAction,
+  resolvePendingDeveloperAssistantAction,
+} from "./developerAssistantActionState";
 import { sendDripEmailViaMicrosoft } from "./microsoftAuth";
 import { lookupHudDataForDeal } from "./hudService";
 import {
@@ -119,6 +138,7 @@ import {
   getFipsForCoordinates,
   getRecentBuildingPermits,
 } from "./censusDataService";
+import { validateOffMarketFileContents } from "./offMarketUploadValidation";
 
 const LANDLINQ_PUBLIC_ORIGIN = "https://landlinq.ai";
 const PUBLIC_RECORD_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
@@ -4459,7 +4479,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
   // Deduplicate brokers by email (case-insensitive)
   // POST /api/crm/contacts/strip-middle-names — remove middle names/initials from firstName
-  app.post("/api/crm/contacts/strip-middle-names", isAuthenticated, async (req, res) => {
+  app.post("/api/crm/contacts/strip-middle-names", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const allBrokers = await db.execute(sql`SELECT id, first_name FROM brokers WHERE first_name IS NOT NULL`);
       const rows = (allBrokers as any).rows as { id: string; first_name: string }[];
@@ -5136,7 +5156,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   });
 
   // POST /api/crm/normalize-names — title-case all contact first/last names
-  app.post("/api/crm/normalize-names", isAuthenticated, async (req, res) => {
+  app.post("/api/crm/normalize-names", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const result = await db.execute(sql`
         UPDATE brokers
@@ -5154,7 +5174,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   });
 
   // POST /api/crm/backfill-assigned-to — set assignedTo from tag prefixes (e.g. "AJ - Known Sophisticated" → AJ Klenk)
-  app.post("/api/crm/backfill-assigned-to", isAuthenticated, async (req, res) => {
+  app.post("/api/crm/backfill-assigned-to", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       // 1. Build prefix → full-name map from existing assigned_to data (most reliable source)
       const existingReps = await db.execute(sql`
@@ -5952,23 +5972,43 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   });
 
   // POST /api/crm/bulk-tag — add/remove tag from multiple contacts at once
-  app.post("/api/crm/bulk-tag", isAuthenticated, async (req, res) => {
+  app.post("/api/crm/bulk-tag", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
-      const { brokerIds: ids, tag, action } = req.body; // action: 'add' | 'remove'
-      if (!ids?.length || !tag) return res.status(400).json({ message: "brokerIds and tag required" });
-
-      for (const brokerId of ids) {
-        const [row] = await db.select({ crmTags: (brokers as any).crmTags }).from(brokers).where(eq(brokers.id, brokerId));
-        const current: string[] = Array.isArray((row as any)?.crmTags) ? (row as any).crmTags : [];
-        let next: string[];
-        if (action === 'add') {
-          next = current.includes(tag) ? current : [...current, tag];
-        } else {
-          next = current.filter((t: string) => t !== tag);
-        }
-        await db.update(brokers).set({ crmTags: next, updatedAt: new Date() } as any).where(eq(brokers.id, brokerId));
+      const body = req.body || {};
+      const rawIds = body.brokerIds;
+      const tag = typeof body.tag === "string" ? body.tag.trim() : "";
+      const action = body.action;
+      if (!Array.isArray(rawIds) || rawIds.length === 0 || !tag) {
+        return res.status(400).json({ message: "brokerIds and tag required" });
       }
-      res.json({ message: `Tag ${action === 'add' ? 'added to' : 'removed from'} ${ids.length} contact(s)` });
+      if (rawIds.length > 500) {
+        return res.status(400).json({ message: "A maximum of 500 contacts can be tagged at once" });
+      }
+      if (tag.length > 100 || !["add", "remove"].includes(action)) {
+        return res.status(400).json({ message: "tag must be 1–100 characters and action must be add or remove" });
+      }
+      const ids = Array.from(new Set(rawIds.filter((id: unknown): id is string =>
+        typeof id === "string" && id.trim().length > 0
+      ).map((id: string) => id.trim())));
+      if (!ids.length) {
+        return res.status(400).json({ message: "brokerIds must contain valid IDs" });
+      }
+
+      const currentTags = sql`COALESCE(${brokers.crmTags}, ARRAY[]::text[])`;
+      const nextTags = action === "add"
+        ? sql`CASE
+            WHEN ${currentTags} @> ARRAY[${tag}]::text[] THEN ${currentTags}
+            ELSE array_append(${currentTags}, ${tag})
+          END`
+        : sql`array_remove(${currentTags}, ${tag})`;
+      const updated = await db.update(brokers)
+        .set({ crmTags: nextTags, updatedAt: new Date() })
+        .where(and(inArray(brokers.id, ids), isNull(brokers.ownerDeveloperProfileId)))
+        .returning({ id: brokers.id });
+      res.json({
+        message: `Tag ${action === "add" ? "added to" : "removed from"} ${updated.length} contact(s)`,
+        updated: updated.length,
+      });
     } catch (error) {
       console.error("Bulk tag error:", error);
       res.status(500).json({ message: "Failed to bulk update tags" });
@@ -5978,7 +6018,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   // POST /api/crm/import-assignments — bulk assign contacts from Excel rows
   // Body: { assignments: [{ identifier: string, assignedTo: string }] }
   // identifier can be email, phone, or "firstName lastName"
-  app.post("/api/crm/import-assignments", isAuthenticated, async (req, res) => {
+  app.post("/api/crm/import-assignments", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { assignments } = req.body;
       if (!Array.isArray(assignments) || assignments.length === 0) {
@@ -6096,7 +6136,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
 
   // POST /api/crm/import-contacts — bulk upsert contacts from CSV/Excel rows
   // Body: { contacts: [{ firstName, lastName, email, phone, brokerage, assignedTo, tags }] }
-  app.post("/api/crm/import-contacts", isAuthenticated, async (req, res) => {
+  app.post("/api/crm/import-contacts", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     const user = req.user as any;
     const userEmail = user?.claims?.email || user?.email || "";
     if (!isPlatformAdminEmail(userEmail) && !isSuperAdminEmail(userEmail)) {
@@ -10699,7 +10739,7 @@ Provide your analysis in this exact JSON format:
   });
 
   // ADMIN: Backfill QCT status for all deals using stored FIPS or geocoding
-  app.post("/api/admin/backfill-qct-status", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/backfill-qct-status", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { qctService } = await import('./qctService');
       const { geocodioService } = await import('./geocodioService');
@@ -10777,7 +10817,7 @@ Provide your analysis in this exact JSON format:
   // Pass { force: true } in the request body to re-geocode ALL deals from their lat/lng
   // coordinates (refreshes FIPS codes, fixing any decimal-in-tract-code construction bugs)
   // and then re-check OZ status for every deal.
-  app.post("/api/admin/backfill-oz-status", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/backfill-oz-status", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { ozService } = await import('./ozService');
       const { geocodioService } = await import('./geocodioService');
@@ -10854,7 +10894,7 @@ Provide your analysis in this exact JSON format:
   });
 
   // ADMIN: Backfill DDA status for all deals using 2026 HUD DDA data (bulk SQL)
-  app.post("/api/admin/backfill-dda-status", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/backfill-dda-status", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { checkDDA, extractZipFromAddress } = await import('./ddaLookupService');
       const force: boolean = req.body?.force === true;
@@ -10896,7 +10936,7 @@ Provide your analysis in this exact JSON format:
   });
 
   // ADMIN: Populate FEMA, USFWS wetlands, and EPA screening data for existing deals.
-  app.post("/api/admin/backfill-government-data", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/backfill-government-data", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
       const { enrichDealWithGovernmentData } = await import('./governmentDataEnrichment');
       const force = req.body?.force === true;
@@ -13486,14 +13526,6 @@ RULES:
     return null;
   }
 
-  function requirePlatformAdmin(req: any, res: any, next: any) {
-    const email = String(req.user?.email || req.user?.claims?.email || "").trim().toLowerCase();
-    if (!isPlatformAdminEmail(email)) {
-      return res.status(403).json({ error: "Apex Resi administrator access required" });
-    }
-    next();
-  }
-
   type ListingReviewScope = {
     isPlatformAdmin: boolean;
     userId: string;
@@ -16034,32 +16066,76 @@ RULES:
         if (!industrial && !selectedProductType) throw adminRequestError(400, "Selected product type is not active for this Investment Company");
         const dealValues: any = {
           address, city, state, county, sizeAcres: String(sizeAcres), askingPrice: askingPrice === null ? null : String(askingPrice),
-          productTypes: [industrial ? "Industrial site" : selectedProductType.name], submissionMethod: "admin_manual_entry", source: "admin_manual_entry",
+          productTypes: [industrial ? "Industrial site" : selectedProductType!.name], submissionMethod: "admin_manual_entry", source: "admin_manual_entry",
           status: "pending_review", isQct: body.qctDesignation === true, isDda: body.ddaDesignation === true, isOz: body.opportunityZone === true,
         };
         if (!industrial) {
           if (profile.rentMetric === "per_unit") dealValues.avgRentPerUnit = String(rent);
           else dealValues.topRentPSF = String(rent);
         }
-        const [deal] = await tx.insert(deals).values(dealValues).returning();
+        await tx.execute(sql`
+          SELECT pg_advisory_xact_lock(hashtext(LOWER(TRIM(${address})))::bigint)
+        `);
+        const [existingDeal] = await tx.select().from(deals)
+          .where(sql`lower(trim(${deals.address})) = lower(trim(${address}))`)
+          .limit(1);
+        let deal: any;
+        let canonicalDealUpdated = true;
+        if (existingDeal) {
+          const [existingSend] = await tx.select({ id: partnerDeveloperSends.id })
+            .from(partnerDeveloperSends)
+            .where(and(
+              eq(partnerDeveloperSends.developerProfileId, profile.id),
+              eq(partnerDeveloperSends.dealId, existingDeal.id),
+            ))
+            .limit(1);
+          if (existingSend) {
+            [deal] = await tx.update(deals).set(dealValues)
+              .where(eq(deals.id, existingDeal.id)).returning();
+          } else {
+            deal = existingDeal;
+            canonicalDealUpdated = false;
+          }
+        } else {
+          [deal] = await tx.insert(deals).values(dealValues).returning();
+        }
         const classificationResult = classifyDealForProfile(deal, profile, productTypes);
-        const [send] = await tx.insert(partnerDeveloperSends).values({
-          developerId: profile.id, developerProfileId: profile.id, dealId: deal.id,
+        const [recipient] = await tx.select({ id: partnerDevelopers.id })
+          .from(partnerDevelopers)
+          .where(eq(partnerDevelopers.developerProfileId, profile.id))
+          .limit(1);
+        const sendValues = {
+          developerId: recipient?.id || profile.id,
+          developerProfileId: profile.id,
+          dealId: deal.id,
           classification: classificationResult.classification, matchedProductTypes: classificationResult.matchedProductTypes,
           address: deal.address, status: "sent", matchedAt: new Date(),
+        };
+        const [send] = await tx.insert(partnerDeveloperSends).values(sendValues).onConflictDoUpdate({
+          target: [partnerDeveloperSends.developerProfileId, partnerDeveloperSends.dealId],
+          set: {
+            classification: classificationResult.classification,
+            matchedProductTypes: classificationResult.matchedProductTypes,
+            address: deal.address,
+            matchedAt: new Date(),
+          },
         }).returning();
-        return { deal, send, classificationResult };
+        return { deal, send, classificationResult, reusedExistingDeal: Boolean(existingDeal), canonicalDealUpdated };
       });
-      try {
-        const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
-        const recomputed = await recomputeDealYoc(result.deal.id);
-        if (recomputed) result.deal = recomputed;
-      } catch (yocError) {
-        console.error("[admin investment company deal POST] YOC recompute failed:", yocError);
+      if (result.canonicalDealUpdated) {
+        try {
+          const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
+          const recomputed = await recomputeDealYoc(result.deal.id);
+          if (recomputed) result.deal = recomputed;
+        } catch (yocError) {
+          console.error("[admin investment company deal POST] YOC recompute failed:", yocError);
+        }
       }
-      return res.status(201).json({
+      return res.status(result.reusedExistingDeal ? 200 : 201).json({
         deal: result.deal, send: result.send, classification: result.classificationResult.classification,
         matchedProductTypes: result.classificationResult.matchedProductTypes,
+        reusedExistingDeal: result.reusedExistingDeal,
+        canonicalDealUpdated: result.canonicalDealUpdated,
       });
     } catch (error: any) {
       console.error("[admin investment company deal POST] Error:", error);
@@ -16990,7 +17066,7 @@ RULES:
       const pendingAction = req.session?.[pendingActionKey] as {
         id: string;
         developerProfileId: string;
-        tool: "markDealPursuing" | "addContactTag" | "createPipelineOpportunity";
+        tool: string;
         args: Record<string, unknown>;
         expiresAt: number;
       } | undefined;
@@ -17007,12 +17083,14 @@ RULES:
 
       if (confirmActionId || cancelActionId) {
         const requestedActionId = confirmActionId || cancelActionId;
-        if (
-          !pendingAction
-          || pendingAction.id !== requestedActionId
-          || pendingAction.developerProfileId !== developerProfileId
-          || pendingAction.expiresAt < Date.now()
-        ) {
+        const decision = resolvePendingDeveloperAssistantAction({
+          action: pendingAction,
+          requestedActionId,
+          developerProfileId,
+          now: Date.now(),
+          cancel: Boolean(cancelActionId),
+        });
+        if (decision.kind === "expired") {
           if (pendingAction) {
             delete req.session[pendingActionKey];
             await saveSession();
@@ -17023,41 +17101,87 @@ RULES:
         delete req.session[pendingActionKey];
         await saveSession();
 
-        if (cancelActionId) {
+        if (decision.kind === "cancelled") {
           return res.json({ actionCancelled: true, answer: "Okay — I did not make that change." });
         }
+        const confirmedAction = decision.action;
 
         let actionResult: any = null;
-        switch (pendingAction.tool) {
+        switch (confirmedAction.tool) {
           case "markDealPursuing":
             actionResult = await markMyDealPursuing(
               developerProfileId,
-              String(pendingAction.args.dealId || ""),
+              String(confirmedAction.args.dealId || ""),
+            );
+            break;
+          case "markDealPassed":
+            actionResult = await markMyDealPassed(
+              developerProfileId,
+              String(confirmedAction.args.dealId || ""),
             );
             break;
           case "addContactTag":
             actionResult = await addMyContactTag(
               developerProfileId,
-              String(pendingAction.args.contactId || ""),
-              String(pendingAction.args.tag || ""),
+              String(confirmedAction.args.contactId || ""),
+              String(confirmedAction.args.tag || ""),
             );
             break;
           case "createPipelineOpportunity":
             actionResult = await createMyPipelineOpportunity(developerProfileId, {
-              contactId: String(pendingAction.args.contactId || ""),
-              stageId: typeof pendingAction.args.stageId === "string"
-                ? pendingAction.args.stageId
+              contactId: String(confirmedAction.args.contactId || ""),
+              stageId: typeof confirmedAction.args.stageId === "string"
+                ? confirmedAction.args.stageId
                 : undefined,
-              title: typeof pendingAction.args.title === "string"
-                ? pendingAction.args.title
+              title: typeof confirmedAction.args.title === "string"
+                ? confirmedAction.args.title
                 : undefined,
-              value: typeof pendingAction.args.value === "number"
-                ? pendingAction.args.value
+              value: typeof confirmedAction.args.value === "number"
+                ? confirmedAction.args.value
                 : undefined,
-              notes: typeof pendingAction.args.notes === "string"
-                ? pendingAction.args.notes
+              notes: typeof confirmedAction.args.notes === "string"
+                ? confirmedAction.args.notes
                 : undefined,
             });
+            break;
+          case "movePipelineOpportunityStage":
+            actionResult = await moveMyPipelineOpportunityStage(developerProfileId, {
+              opportunityId: String(confirmedAction.args.opportunityId || ""),
+              stageId: String(confirmedAction.args.stageId || ""),
+              expectedCurrentStageId: typeof confirmedAction.args.expectedCurrentStageId === "string"
+                ? confirmedAction.args.expectedCurrentStageId
+                : undefined,
+            });
+            break;
+          case "updateMyCampaignStatus":
+            actionResult = await updateMyCampaignStatus(
+              developerProfileId,
+              String(confirmedAction.args.campaignId || ""),
+              confirmedAction.args.status === "active" ? "active" : "paused",
+            );
+            break;
+          case "updateMyCampaignFrequency":
+            actionResult = await updateMyCampaignFrequency(
+              developerProfileId,
+              String(confirmedAction.args.campaignId || ""),
+              Number(confirmedAction.args.daysBetween),
+            );
+            break;
+          case "updateMyCampaignTriggerTag":
+            actionResult = await updateMyCampaignTriggerTag(
+              developerProfileId,
+              String(confirmedAction.args.campaignId || ""),
+              String(confirmedAction.args.tag || ""),
+            );
+            break;
+          case "updateMyCampaignStep":
+            actionResult = await updateMyCampaignStep(
+              developerProfileId,
+              String(confirmedAction.args.campaignId || ""),
+              Number(confirmedAction.args.stepNumber),
+              typeof confirmedAction.args.subject === "string" ? confirmedAction.args.subject : undefined,
+              typeof confirmedAction.args.content === "string" ? confirmedAction.args.content : undefined,
+            );
             break;
         }
 
@@ -17067,14 +17191,48 @@ RULES:
           });
         }
 
-        if (pendingAction.tool === "markDealPursuing") {
+        if (confirmedAction.tool === "markDealPursuing") {
           return res.json({ actionExecuted: true, answer: "The deal is now marked as Pursuing." });
         }
-        if (pendingAction.tool === "addContactTag") {
+        if (confirmedAction.tool === "markDealPassed") {
+          return res.json({ actionExecuted: true, answer: "The deal is now marked as Passed for your company." });
+        }
+        if (confirmedAction.tool === "addContactTag") {
           const name = [actionResult.first_name, actionResult.last_name].filter(Boolean).join(" ") || "the contact";
           return res.json({
             actionExecuted: true,
-            answer: `Added the “${String(pendingAction.args.tag)}” tag to ${name}.`,
+            answer: `Added the “${String(confirmedAction.args.tag)}” tag to ${name}.`,
+          });
+        }
+        if (confirmedAction.tool === "movePipelineOpportunityStage") {
+          return res.json({
+            actionExecuted: true,
+            answer: `Moved “${String(confirmedAction.args.opportunityTitle)}” to ${String(confirmedAction.args.targetStageName)}.`,
+          });
+        }
+        if (confirmedAction.tool === "updateMyCampaignStatus") {
+          const statusLabel = confirmedAction.args.status === "active" ? "activated" : "paused";
+          return res.json({
+            actionExecuted: true,
+            answer: `${String(confirmedAction.args.campaignName)} was ${statusLabel}.`,
+          });
+        }
+        if (confirmedAction.tool === "updateMyCampaignFrequency") {
+          return res.json({
+            actionExecuted: true,
+            answer: `Updated ${String(confirmedAction.args.campaignName)} to send steps every ${String(confirmedAction.args.daysBetween)} days.`,
+          });
+        }
+        if (confirmedAction.tool === "updateMyCampaignTriggerTag") {
+          return res.json({
+            actionExecuted: true,
+            answer: `Updated the trigger tag for ${String(confirmedAction.args.campaignName)} to “${String(confirmedAction.args.tag)}”.`,
+          });
+        }
+        if (confirmedAction.tool === "updateMyCampaignStep") {
+          return res.json({
+            actionExecuted: true,
+            answer: `Updated step ${String(confirmedAction.args.stepNumber)} in ${String(confirmedAction.args.campaignName)}.`,
           });
         }
         return res.json({
@@ -17104,7 +17262,21 @@ RULES:
         getMyPipelineSummary(developerProfileId),
       ]);
 
-      const plan = await planDeveloperAssistantQuestion(question, {
+      const mentionedEmails = question.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+      let plannerContacts = contactsForContext;
+      let contactEmailMatch: "not_requested" | "matched" | "unmatched" = "not_requested";
+      if (mentionedEmails.length) {
+        const exactMatches = mentionedEmails.length === 1
+          ? (await getMyContacts(developerProfileId, { search: mentionedEmails[0] }))
+            .filter((contact) => contact.email?.toLocaleLowerCase() === mentionedEmails[0].toLocaleLowerCase())
+          : [];
+        plannerContacts = exactMatches.length === 1 ? exactMatches : [];
+        contactEmailMatch = exactMatches.length === 1 ? "matched" : "unmatched";
+      }
+
+      let plan: Awaited<ReturnType<typeof planDeveloperAssistantQuestion>>;
+      try {
+        plan = await planDeveloperAssistantQuestion(question, {
         deals: dealsForContext.map((deal) => ({
           id: deal.id,
           address: deal.address,
@@ -17113,26 +17285,37 @@ RULES:
           status: deal.status,
         })),
          dealCount,
-        contacts: contactsForContext.map((contact) => ({
+        contacts: plannerContacts.map((contact) => ({
           id: contact.id,
           name: contact.name,
-          email: contact.email,
           brokerage: contact.brokerage,
         })),
          contactCount,
+        contactEmailMatch,
         pipelineStages: pipelineSummary.stages.map((stage) => ({
           id: stage.id,
           name: stage.name,
         })),
-      });
+        });
+      } catch (error) {
+        if (error instanceof UnsupportedDeveloperAssistantPlanError) {
+          return res.json({
+            answer: "I couldn’t map that request to a supported account question or confirmed action. Try asking about your deals, contacts, pipeline, campaigns, analytics, or investment criteria.",
+            tool: null,
+          });
+        }
+        throw error;
+      }
 
       const readOnlyTools = new Set([
         "getMyDeals",
-         "getMyDealCount",
+        "getMyDealCount",
         "getMyPipelineSummary",
         "getMyContacts",
-         "getMyContactCount",
-         "getNearbyDeals",
+        "getMyContactCount",
+        "getMyCampaigns",
+        "getMyAnalyticsSummary",
+        "getNearbyDeals",
         "getCompsForDeal",
         "getMyCriteria",
       ]);
@@ -17151,6 +17334,16 @@ RULES:
             }
             actionArgs = { dealId: deal.id };
             description = `Mark ${deal.address || "this deal"}${deal.city ? `, ${deal.city}` : ""} as Pursuing`;
+            break;
+          }
+          case "markDealPassed": {
+            const dealId = typeof args.dealId === "string" ? args.dealId.trim() : "";
+            const deal = dealsForContext.find((candidate) => candidate.id === dealId);
+            if (!deal) {
+              return res.status(400).json({ error: "I could not identify that deal in your company data." });
+            }
+            actionArgs = { dealId: deal.id };
+            description = `Mark ${deal.address || "this deal"}${deal.city ? `, ${deal.city}` : ""} as Passed for your company`;
             break;
           }
           case "addContactTag": {
@@ -17189,17 +17382,152 @@ RULES:
             description = `Create a pipeline opportunity for ${contact.name} in ${stage.name}`;
             break;
           }
+          case "movePipelineOpportunityStage": {
+            const opportunitySearch = typeof args.opportunitySearch === "string"
+              ? args.opportunitySearch.trim().slice(0, 200)
+              : "";
+            const requestedStageName = typeof args.stageName === "string"
+              ? args.stageName.trim().slice(0, 100)
+              : "";
+            if (opportunitySearch.length < 3 || !requestedStageName) {
+              return res.status(400).json({
+                error: "Please identify the pipeline opportunity by title and name the target stage.",
+              });
+            }
+            const exactStages = pipelineSummary.stages.filter((stage) =>
+              stage.name.trim().toLocaleLowerCase() === requestedStageName.toLocaleLowerCase()
+            );
+            const matchingStages = exactStages.length ? exactStages : pipelineSummary.stages.filter((stage) =>
+              stage.name.toLocaleLowerCase().includes(requestedStageName.toLocaleLowerCase())
+            );
+            if (matchingStages.length !== 1) {
+              return res.status(400).json({
+                error: matchingStages.length
+                  ? "More than one active stage matches. Please name the target stage exactly."
+                  : "I could not find that active stage in your company pipeline.",
+              });
+            }
+            const targetStage = matchingStages[0];
+            const opportunities = await db.execute(sql`
+              SELECT o.id, o.title, o.stage_id, s.name AS current_stage_name
+              FROM pipeline_opportunities o
+              LEFT JOIN pipeline_stages s
+                ON s.id = o.stage_id AND s.developer_profile_id = ${developerProfileId}
+              WHERE o.developer_profile_id = ${developerProfileId}
+                AND (
+                  LOWER(BTRIM(COALESCE(o.title, ''))) = LOWER(BTRIM(${opportunitySearch}))
+                  OR STRPOS(LOWER(COALESCE(o.title, '')), LOWER(${opportunitySearch})) > 0
+                )
+              ORDER BY o.created_at DESC, o.id
+              LIMIT 2
+            `).then((result) => result.rows as any[]);
+            if (opportunities.length !== 1) {
+              return res.status(400).json({
+                error: opportunities.length
+                  ? "More than one pipeline opportunity matches. Please provide a more specific title."
+                  : "I could not find a matching pipeline opportunity in your company account.",
+              });
+            }
+            const opportunity = opportunities[0];
+            const currentStageId = typeof opportunity.stage_id === "string" ? opportunity.stage_id : "";
+            if (currentStageId === targetStage.id) {
+              return res.status(400).json({ error: "That opportunity is already in the requested stage." });
+            }
+            actionArgs = {
+              opportunityId: String(opportunity.id),
+              opportunityTitle: String(opportunity.title || opportunitySearch),
+              ...(currentStageId ? { expectedCurrentStageId: currentStageId } : {}),
+              stageId: targetStage.id,
+              targetStageName: targetStage.name,
+              currentStageName: String(opportunity.current_stage_name || "Unassigned"),
+            };
+            description = `Move “${String(opportunity.title || opportunitySearch)}” from ${String(opportunity.current_stage_name || "Unassigned")} to ${targetStage.name}`;
+            break;
+          }
+          case "updateMyCampaignStatus":
+          case "updateMyCampaignFrequency":
+          case "updateMyCampaignTriggerTag":
+          case "updateMyCampaignStep": {
+            const requestedName = typeof args.campaignName === "string" ? args.campaignName.trim().slice(0, 200) : "";
+            if (!requestedName) {
+              return res.status(400).json({ error: "Please name the campaign you want to update." });
+            }
+            const campaigns = await getMyCampaigns(developerProfileId);
+            const normalizedName = requestedName.toLocaleLowerCase();
+            const exactMatches = campaigns.filter((campaign) => campaign.name.trim().toLocaleLowerCase() === normalizedName);
+            const matchingCampaigns = exactMatches.length ? exactMatches : campaigns.filter((campaign) =>
+              campaign.name.toLocaleLowerCase().includes(normalizedName)
+            );
+            if (matchingCampaigns.length !== 1) {
+              return res.status(400).json({
+                error: matchingCampaigns.length
+                  ? "More than one campaign matches. Please provide its exact name."
+                  : "I could not find a campaign with that name in your company account.",
+              });
+            }
+            const campaign = matchingCampaigns[0];
+            if (plan.tool === "updateMyCampaignStatus") {
+              const status = args.status;
+              if (status !== "active" && status !== "paused") {
+                return res.status(400).json({ error: "Campaign status must be active or paused." });
+              }
+              actionArgs = { campaignId: campaign.id, campaignName: campaign.name, status };
+              description = `${status === "active" ? "Activate" : "Pause"} the “${campaign.name}” campaign`;
+              break;
+            }
+            if (plan.tool === "updateMyCampaignFrequency") {
+              const daysBetween = Number(args.daysBetween);
+              if (!Number.isInteger(daysBetween) || daysBetween < 1 || daysBetween > 90) {
+                return res.status(400).json({ error: "Campaign spacing must be a whole number from 1 to 90 days." });
+              }
+              actionArgs = { campaignId: campaign.id, campaignName: campaign.name, daysBetween };
+              description = `Set the “${campaign.name}” campaign steps ${daysBetween} days apart`;
+              break;
+            }
+            if (plan.tool === "updateMyCampaignTriggerTag") {
+              const tag = typeof args.tag === "string" ? args.tag.trim() : "";
+              if (!tag || tag.length > 100) {
+                return res.status(400).json({ error: "Campaign trigger tags must be 1–100 characters." });
+              }
+              actionArgs = { campaignId: campaign.id, campaignName: campaign.name, tag };
+              description = `Set the “${campaign.name}” campaign trigger tag to “${tag}”`;
+              break;
+            }
+            const stepNumber = Number(args.stepNumber);
+            const subject = typeof args.subject === "string" ? args.subject.trim() : undefined;
+            const content = typeof args.content === "string" ? args.content.trim() : undefined;
+            if (
+              !Number.isInteger(stepNumber) || stepNumber < 1 ||
+              (!subject && subject !== "") || (subject !== undefined && subject.length > 255) ||
+              (!content && content !== "") || (content !== undefined && content.length > 5000) ||
+              (subject === undefined && content === undefined)
+            ) {
+              return res.status(400).json({ error: "Provide a valid campaign step number and subject or content (up to 255 and 5,000 characters)." });
+            }
+            if (!campaign.steps.some((step) => step.stepNumber === stepNumber)) {
+              return res.status(400).json({ error: `Step ${stepNumber} is not active in that campaign.` });
+            }
+            actionArgs = {
+              campaignId: campaign.id,
+              campaignName: campaign.name,
+              stepNumber,
+              ...(subject !== undefined ? { subject } : {}),
+              ...(content !== undefined ? { content } : {}),
+            };
+            description = `Update step ${stepNumber} in the “${campaign.name}” campaign`;
+            break;
+          }
           default:
             return res.status(400).json({ error: "That assistant action is not supported." });
         }
 
-        const action = {
+        const action = createPendingDeveloperAssistantAction({
           id: randomUUID(),
           developerProfileId,
           tool: plan.tool,
           args: actionArgs,
-          expiresAt: Date.now() + 5 * 60 * 1000,
-        };
+          now: Date.now(),
+        });
         req.session[pendingActionKey] = action;
         await saveSession();
         return res.json({
@@ -17210,7 +17538,10 @@ RULES:
       }
 
       if (plan.kind !== "answer" || !readOnlyTools.has(plan.tool)) {
-        return res.status(400).json({ error: "The assistant could not route that question safely." });
+        return res.json({
+          answer: "I couldn’t map that request to a supported account question. Try asking about your deals, contacts, pipeline, campaigns, analytics, or investment criteria.",
+          tool: null,
+        });
       }
 
       let result: unknown;
@@ -17245,18 +17576,45 @@ RULES:
           break;
         case "getMyContacts": {
           const search = typeof args.search === "string" ? args.search.trim().slice(0, 200) : "";
-          const contacts = await getMyContacts(developerProfileId, search);
-          result = Array.isArray(contacts) ? { items: contacts, count: contacts.length } : contacts;
+          const region = typeof args.region === "string" ? args.region.trim().slice(0, 100) : "";
+          const tag = typeof args.tag === "string" ? args.tag.trim().slice(0, 100) : "";
+          const contacts = await getMyContacts(developerProfileId, { search, region, tag });
+          const wantsEmail = /\bemail\b|\be-mail\b/i.test(question) ||
+            /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(question);
+          const wantsPhone = /\b(phone|telephone|mobile|cell)\b/i.test(question);
+          const wantsTags = /\b(tags?|labels?)\b/i.test(question);
+          const wantsLocation = /\b(state|county|city|region|location)\b/i.test(question);
+          result = Array.isArray(contacts) ? {
+            items: contacts.map((contact) => ({
+              name: contact.name,
+              ...(contact.brokerage ? { brokerage: contact.brokerage } : {}),
+              ...(wantsLocation && contact.state ? { state: contact.state } : {}),
+              ...(wantsTags && contact.tags.length ? { tags: contact.tags } : {}),
+              ...(wantsEmail && contact.email ? { email: contact.email } : {}),
+              ...(wantsPhone && contact.phone ? { phone: contact.phone } : {}),
+            })),
+            count: contacts.length,
+          } : contacts;
           break;
         }
          case "getMyContactCount": {
            const search = typeof args.search === "string" ? args.search.trim().slice(0, 200) : "";
+           const region = typeof args.region === "string" ? args.region.trim().slice(0, 100) : "";
+           const tag = typeof args.tag === "string" ? args.tag.trim().slice(0, 100) : "";
            result = {
-             count: await getMyContactCount(developerProfileId, search),
+             count: await getMyContactCount(developerProfileId, { search, region, tag }),
              search: search || null,
+             region: region || null,
+             tag: tag || null,
            };
            break;
          }
+        case "getMyCampaigns":
+          result = await getMyCampaigns(developerProfileId);
+          break;
+        case "getMyAnalyticsSummary":
+          result = await getMyAnalyticsSummary(developerProfileId);
+          break;
          case "getNearbyDeals": {
            const dealId = typeof args.dealId === "string" ? args.dealId.trim() : "";
            const search = typeof args.search === "string" ? args.search.trim().slice(0, 200) : "";
@@ -17281,10 +17639,60 @@ RULES:
           break;
       }
 
+      if (
+        plan.tool === "getMyDeals" &&
+        result && typeof result === "object" &&
+        Array.isArray((result as any).items) &&
+        (result as any).items.length === 0
+      ) {
+        return res.json({ answer: "No deals matched those filters in your company account.", tool: plan.tool });
+      }
+      if (
+        plan.tool === "getMyDealCount" &&
+        result && typeof result === "object" &&
+        Number((result as any).count) === 0
+      ) {
+        return res.json({ answer: "No deals matched those filters in your company account.", tool: plan.tool });
+      }
+      if (
+        plan.tool === "getMyContacts" &&
+        result && typeof result === "object" &&
+        Array.isArray((result as any).items) &&
+        (result as any).items.length === 0
+      ) {
+        return res.json({ answer: "No contacts matched those search, region, and tag filters. Try broadening one of them.", tool: plan.tool });
+      }
+      if (
+        plan.tool === "getMyContactCount" &&
+        result && typeof result === "object" &&
+        Number((result as any).count) === 0
+      ) {
+        return res.json({ answer: "No contacts matched those search, region, and tag filters. Try broadening one of them.", tool: plan.tool });
+      }
+      if (plan.tool === "getMyCampaigns" && Array.isArray(result) && result.length === 0) {
+        return res.json({ answer: "There are no active or paused campaigns in your company account.", tool: plan.tool });
+      }
+      if (
+        plan.tool === "getMyAnalyticsSummary" &&
+        result && typeof result === "object" &&
+        Number((result as any).totalDeals) === 0
+      ) {
+        return res.json({ answer: "There are no tenant-visible deals to summarize in your company analytics yet.", tool: plan.tool });
+      }
+      if (
+        plan.tool === "getMyPipelineSummary" &&
+        result && typeof result === "object" &&
+        Number((result as any).totalOpportunities) === 0
+      ) {
+        return res.json({ answer: "There are no pipeline opportunities in your company account yet.", tool: plan.tool });
+      }
+
       const answer = await answerDeveloperAssistantQuestion(question, plan.tool, result);
       return res.json({ answer, tool: plan.tool });
     } catch (error: any) {
-      console.error("[developer-profile/me/assistant/query] Error:", error);
+      console.error("[developer-profile/me/assistant/query] Error:", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
       return res.status(500).json({ error: "The assistant could not answer that question" });
     }
   });
@@ -18961,48 +19369,31 @@ RULES:
         },
       }));
 
-      const totalValue = dealRows.reduce((sum, row) => sum + (Number(row.asking_price) || 0), 0);
-      const statusCounts = dealRows.reduce((counts, row) => {
-        counts[row.developer_status] = (counts[row.developer_status] || 0) + 1;
-        return counts;
-      }, {} as Record<string, number>);
-      const cities = dealRows.reduce((result, row) => {
-        const city = row.city || "Unknown";
-        result[city] = result[city] || { count: 0, value: 0 };
-        result[city].count++;
-        result[city].value += Number(row.asking_price) || 0;
-        return result;
-      }, {} as Record<string, { count: number; value: number }>);
-      const brokerMap = dealRows.reduce((result, row) => {
-        const name = [row.broker_first_name, row.broker_last_name].filter(Boolean).join(" ") || "Unknown Broker";
-        result[name] = result[name] || { deals: 0, value: 0 };
-        result[name].deals++;
-        result[name].value += Number(row.asking_price) || 0;
-        return result;
-      }, {} as Record<string, { deals: number; value: number }>);
-      const statusBreakdown = ["Passed", "Review", "Pursuing"].map((status) => ({
+      const analyticsSummary = await getMyAnalyticsSummary(developerProfileId, dealRows);
+      const totalValue = analyticsSummary.totalAskingPrice;
+      const statusCounts = Object.fromEntries(
+        analyticsSummary.statusBreakdown.map(({ status, count }) => [status, count]),
+      ) as Record<string, number>;
+      const statusBreakdown = ["Passed", "Review", "Pursuing"].map((status) =>
+        analyticsSummary.statusBreakdown.find((entry) => entry.status === status) || {
           status,
-          count: statusCounts[status] || 0,
-          percentage: dealRows.length ? (statusCounts[status] || 0) / dealRows.length * 100 : 0,
-        }));
-      const cityDistribution = Object.entries(cities)
-        .map(([city, value]) => ({ city, count: value.count, avgValue: value.value / value.count }))
-        .sort((a, b) => b.count - a.count).slice(0, 10);
-      const brokerPerformance = Object.entries(brokerMap)
-        .map(([broker, value]) => ({ broker, deals: value.deals, totalValue: value.value, avgDays: 0 }))
-        .sort((a, b) => b.totalValue - a.totalValue).slice(0, 10);
-      const pursuingCount = statusCounts.Pursuing || 0;
-      const conversionRate = dealRows.length ? pursuingCount / dealRows.length * 100 : 0;
-
-      const trendMap = dealRows.reduce((result, row) => {
-        const date = row.created_at ? new Date(row.created_at) : null;
-        if (!date || Number.isNaN(date.getTime())) return result;
-        const month = date.toISOString().slice(0, 7);
-        result[month] = (result[month] || 0) + 1;
-        return result;
-      }, {} as Record<string, number>);
-      const monthlyTrends = Object.entries(trendMap).sort(([a], [b]) => a.localeCompare(b)).slice(-12)
-        .map(([month, submissions]) => ({ month, submissions, closings: 0, revenue: 0 }));
+          count: 0,
+          percentage: 0,
+        },
+      );
+      const cityDistribution = analyticsSummary.topCities.map(({ city, count, avgValue }) => ({
+        city,
+        count,
+        avgValue,
+      }));
+      const brokerPerformance = analyticsSummary.topBrokers.map(({ broker, count, totalValue }) => ({
+        broker,
+        deals: count,
+        totalValue,
+        avgDays: 0,
+      }));
+      const conversionRate = analyticsSummary.conversionRate;
+      const monthlyTrends = analyticsSummary.monthlyTrends;
 
       const engagementResult = await db.execute(sql`
         SELECT
@@ -19046,6 +19437,7 @@ RULES:
         deals: dealsForClient,
         totalDeals: dealRows.length,
         totalValue,
+        totalPipelineValue: analyticsSummary.totalPipelineValue,
         avgDealSize: dealRows.length ? totalValue / dealRows.length : 0,
         conversionRate,
         statusBreakdown,
@@ -20579,7 +20971,7 @@ RULES:
   // ── Broker Portal Deal Approval Routes ────────────────────────────────────
 
   // GET: debug — returns all approved deals + all broker accounts (admin only)
-  app.get('/api/admin/broker-portal/debug', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/broker-portal/debug', isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
     try {
       const deals = await db.execute(sql`
         SELECT id, address, city, state, msa_name, broker_portal_approved
@@ -20601,7 +20993,7 @@ RULES:
   });
 
   // GET: deals with YOC >= 6% (approval queue) — any classification, uses manual OR auto YOC
-  app.get('/api/admin/broker-portal/deal-queue', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/broker-portal/deal-queue', isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
     try {
       const rows = await db.execute(sql`
         SELECT d.id, d.address, d.city, d.state, d.zip, d.property_name, d.asking_price,
@@ -38705,8 +39097,29 @@ RULES:
   // therefore never scored — the UI must say so, not silently assume "no risk".
   const offMarketUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 200 * 1024 * 1024 },
+    limits: { fileSize: OFF_MARKET_MAX_UPLOAD_BYTES },
+    fileFilter: (_req, file, callback) => {
+      if (!isOffMarketFileNameAllowed(file.originalname)) {
+        return callback(new Error("Only CSV, XLS, and XLSX files are supported."));
+      }
+      callback(null, true);
+    },
   });
+
+  function receiveOffMarketUpload(req: any, res: any, next: any) {
+    offMarketUpload.single("file")(req, res, (error: any) => {
+      if (!error) return next();
+      if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({ error: "Upload exceeds the 50 MiB file-size limit." });
+      }
+      if (error instanceof multer.MulterError) {
+        return res.status(400).json({ error: error.message });
+      }
+      return res.status(415).json({
+        error: error.message || "Only CSV, XLS, and XLSX files are supported.",
+      });
+    });
+  }
 
   const GOVERNMENT_OWNER_PATTERN = /\b(COUNTY OF|CITY OF|STATE OF|SCHOOL|SCHOOLS|HOUSING AUTHORITY|DEPARTMENT OF|UNITED STATES|BOARD OF EDUCATION|MECKLENBURG COUNTY|WATER (AND|&) SEWER)\b/i;
   const ENTITY_OWNER_PATTERN = /\b(LLC|L\.L\.C|LLP|L\.P\b|\bLP\b|INC\b|INCORPORATED|CORP\b|CORPORATION|COMPANY|\bCO\.|PARTNERS|TRUST|LTD|PLLC)\b/i;
@@ -38800,9 +39213,11 @@ RULES:
   }
 
   // Preview a CSV/XLSX file: return headers + first rows so the client can map columns
-  app.post("/api/off-market/preview", isAuthenticated, offMarketUpload.single("file"), async (req, res) => {
+  app.post("/api/off-market/preview", isAuthenticated, receiveOffMarketUpload, async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const uploadError = validateOffMarketFileContents(req.file);
+      if (uploadError) return res.status(400).json({ error: uploadError });
       const XLSX = await import('xlsx');
       const workbook = XLSX.read(req.file.buffer, { type: "buffer", raw: true });
       const sheetName = workbook.SheetNames[0];
@@ -38812,14 +39227,16 @@ RULES:
       res.json({ headers, sampleRows: json.slice(0, 5), rowCount: json.length });
     } catch (error: any) {
       console.error("[off-market/preview] Error:", error.message);
-      res.status(500).json({ error: "Failed to parse file: " + error.message });
+      res.status(400).json({ error: "Unable to parse this file. Upload a valid CSV or Excel workbook." });
     }
   });
 
   // Confirm import: parse full file, apply column mapping, score, and store
-  app.post("/api/off-market/import", isAuthenticated, offMarketUpload.single("file"), async (req: any, res) => {
+  app.post("/api/off-market/import", isAuthenticated, receiveOffMarketUpload, async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const uploadError = validateOffMarketFileContents(req.file);
+      if (uploadError) return res.status(400).json({ error: uploadError });
       const { county, columnMapping: columnMappingRaw } = req.body;
       if (!county || !columnMappingRaw) {
         return res.status(400).json({ error: "county and columnMapping are required" });
@@ -38834,6 +39251,11 @@ RULES:
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       const json = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false }) as Record<string, any>[];
+      if (json.length > OFF_MARKET_MAX_IMPORT_ROWS) {
+        return res.status(413).json({
+          error: `Imports are limited to ${OFF_MARKET_MAX_IMPORT_ROWS.toLocaleString()} data rows per file.`,
+        });
+      }
 
       const importRecord = await storage.createOffMarketImport({
         county,
@@ -38941,13 +39363,28 @@ RULES:
       if (!rows || !Array.isArray(rows) || rows.length === 0) {
         return res.status(400).json({ error: "rows array is required and must not be empty" });
       }
-      if (!county || !filename) {
+      if (rows.length > OFF_MARKET_MAX_IMPORT_ROWS) {
+        return res.status(413).json({ error: `Imports are limited to ${OFF_MARKET_MAX_IMPORT_ROWS.toLocaleString()} rows per file.` });
+      }
+      if (typeof county !== "string" || !county.trim() || typeof filename !== "string" || !filename.trim()) {
         return res.status(400).json({ error: "county and filename are required" });
+      }
+      if (!isOffMarketFileNameAllowed(filename)) {
+        return res.status(415).json({ error: "Only CSV, XLS, and XLSX files are supported." });
+      }
+      const invalidRows = rows.some((row: unknown) =>
+        !row || typeof row !== "object" || Array.isArray(row) ||
+        Object.values(row as Record<string, unknown>).some((value) =>
+          value !== null && value !== undefined && typeof value !== "string",
+        ),
+      );
+      if (invalidRows) {
+        return res.status(400).json({ error: "Each imported row must contain only text values." });
       }
 
       const importRecord = await storage.createOffMarketImport({
-        county,
-        filename,
+        county: county.trim(),
+        filename: filename.trim().slice(0, 255),
         columnMapping: {},
         rowCount: rows.length,
         uploadedBy: req.user?.claims?.email || req.user?.email || null,
