@@ -3209,7 +3209,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
             (SELECT count(*)::int FROM pg_stat_activity WHERE datname = current_database()) AS active_connections
         `);
         const dbRow = (dbResult as any).rows?.[0] || {};
-        const managerStats = connectionPoolManager.getPoolStats();
+        const managerStats = await connectionPoolManager.getPoolStats();
         const managerMetrics = (connectionPoolManager as any).getMetrics?.() || {};
         const memory = process.memoryUsage();
         const cpu = process.cpuUsage();

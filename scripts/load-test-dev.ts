@@ -73,15 +73,22 @@ async function runWave(concurrency: number, label: string) {
   let sampling = true;
   const metricCookie = cookies[0];
 
+  const collectPoolSample = async () => {
+    try {
+      const { response, body } = await fetchJson("/api/dev/db-pool-metrics", metricCookie);
+      if (response.ok && body && typeof body === "object") {
+        poolSamples.push({ ...body, sampledAt: performance.now() });
+      }
+    } catch {
+      // The measured session-info requests remain the source of pass/fail.
+    }
+  };
+
+  await collectPoolSample();
   const sampler = (async () => {
     while (sampling) {
-      try {
-        const { response, body } = await fetchJson("/api/dev/db-pool-metrics", metricCookie);
-        if (response.ok && body && typeof body === "object") poolSamples.push(body);
-      } catch {
-        // The measured session-info requests remain the source of pass/fail.
-      }
-      await DELAY_MS(100);
+      await DELAY_MS(50);
+      if (sampling) await collectPoolSample();
     }
   })();
 
@@ -100,6 +107,7 @@ async function runWave(concurrency: number, label: string) {
   const elapsedMs = performance.now() - start;
   sampling = false;
   await sampler;
+  await collectPoolSample();
 
   const durations = responses.map((r) => r.durationMs);
   const statusCounts: Record<string, number> = {};
@@ -113,6 +121,17 @@ async function runWave(concurrency: number, label: string) {
   const managerErrors = Math.max(0, ...poolSamples.map((s) => Number(s.managerPool?.connectionsFailed || 0)));
   const databaseConnectionsPeak = Math.max(0, ...poolSamples.map((s) => Number(s.database?.activeConnections || 0)));
   const rssPeakBytes = Math.max(0, ...poolSamples.map((s) => Number(s.process?.rssBytes || 0)));
+  const firstCpuSample = poolSamples[0];
+  const lastCpuSample = poolSamples[poolSamples.length - 1];
+  const cpuSampleElapsedMs = Number(lastCpuSample?.sampledAt) - Number(firstCpuSample?.sampledAt);
+  const cpuUsedMicros =
+    Number(lastCpuSample?.process?.cpuUserMicros || 0) +
+    Number(lastCpuSample?.process?.cpuSystemMicros || 0) -
+    Number(firstCpuSample?.process?.cpuUserMicros || 0) -
+    Number(firstCpuSample?.process?.cpuSystemMicros || 0);
+  const processCpuPercent = cpuSampleElapsedMs > 0
+    ? Number((Math.max(0, cpuUsedMicros) / (cpuSampleElapsedMs * 1000) * 100).toFixed(1))
+    : null;
 
   return {
     label,
@@ -133,6 +152,7 @@ async function runWave(concurrency: number, label: string) {
     managerConnectionErrors: managerErrors,
     databaseConnectionsPeak,
     processRssPeakBytes: rssPeakBytes,
+    processCpuPercent,
   };
 }
 
