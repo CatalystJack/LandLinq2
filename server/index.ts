@@ -1055,26 +1055,6 @@ setTimeout(() => {
           await db.execute(sql`UPDATE outreach_senders SET hubspot_trigger_tags = array_replace(hubspot_trigger_tags, ${oldTag}, ${newTag}) WHERE ${oldTag} = ANY(hubspot_trigger_tags)`);
         }
 
-        // Ensure each sender has both their Known and Unknown trigger tags (idempotent array_append)
-        const senderTagEnsure: [string, string][] = [
-          ['Jack Berg', 'Jack - Known Sophisticated'],
-          ['Jack Berg', 'Jack - Unknown Sophisticated'],
-          ['Ted Hill',  'Ted - Known Sophisticated'],
-          ['Ted Hill',  'Ted - Unknown Sophisticated'],
-          ['AJ Klenk',  'AJ - Known Sophisticated'],
-          ['AJ Klenk',  'AJ - Unknown Sophisticated'],
-          ['Brian Ford','Brian - Known Sophisticated'],
-          ['Brian Ford','Brian - Unknown Sophisticated'],
-        ];
-        for (const [senderName, tag] of senderTagEnsure) {
-          await db.execute(sql`
-            UPDATE outreach_senders
-            SET hubspot_trigger_tags = array_append(hubspot_trigger_tags, ${tag})
-            WHERE name = ${senderName}
-              AND is_active = true
-              AND (hubspot_trigger_tags IS NULL OR NOT (${tag} = ANY(hubspot_trigger_tags)))
-          `);
-        }
         log("✅ Campaign trigger tags normalized (LandLinq prefix removed, sender tags synced)");
       } catch (err: any) {
         console.error("⚠️ Campaign trigger tag migration failed (non-fatal):", err.message);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { CheckCircle2, Edit3, Loader2, Mail, MapPin, MessageSquare, Paperclip, Plus, Rocket, Send, Sparkles, Tag, Trash2, Users } from "lucide-react";
+import { CheckCircle2, Edit3, Loader2, Mail, MapPin, MessageSquare, Paperclip, Rocket, Send, Sparkles, Tag, Trash2, Users } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import Footer from "@/components/footer";
@@ -55,22 +55,6 @@ type AiMessage = {
 };
 
 type SuggestedDraft = {
-  subject: string;
-  content: string;
-};
-
-type SequenceGenerationForm = {
-  name: string;
-  tone: "professional" | "casual";
-  length: "short" | "medium" | "long";
-  stepCount: number;
-  frequencyDays: number;
-  crmTagId: string;
-};
-
-type GeneratedSequenceStep = {
-  stepNumber: number;
-  dayNumber: number;
   subject: string;
   content: string;
 };
@@ -130,15 +114,6 @@ const emptyForm: CampaignForm = {
   status: "paused",
 };
 
-const emptySequenceForm: SequenceGenerationForm = {
-  name: "AI outreach sequence",
-  tone: "professional",
-  length: "medium",
-  stepCount: 3,
-  frequencyDays: 30,
-  crmTagId: "",
-};
-
 async function jsonRequest(url: string, options?: RequestInit) {
   const response = await fetch(url, { credentials: "include", ...options });
   const data = await response.json().catch(() => ({}));
@@ -159,10 +134,6 @@ export default function DeveloperOutreach() {
   const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
   const [aiInput, setAiInput] = useState("");
   const [aiSuggestedDraft, setAiSuggestedDraft] = useState<SuggestedDraft | null>(null);
-  const [newCampaignChoiceOpen, setNewCampaignChoiceOpen] = useState(false);
-  const [sequenceDialogOpen, setSequenceDialogOpen] = useState(false);
-  const [sequenceForm, setSequenceForm] = useState<SequenceGenerationForm>(emptySequenceForm);
-  const [generatedSteps, setGeneratedSteps] = useState<GeneratedSequenceStep[]>([]);
   const [stepsCampaign, setStepsCampaign] = useState<Campaign | null>(null);
   const [stepEditorOpen, setStepEditorOpen] = useState(false);
   const [stepDraft, setStepDraft] = useState<CampaignStep | null>(null);
@@ -180,10 +151,6 @@ export default function DeveloperOutreach() {
   const targetsQuery = useQuery<{ contacts: any[]; count: number; targetStates: string[]; targetCounties: string[] }>({
     queryKey: ["/api/developer-profile/me/outreach/targets"],
     queryFn: () => jsonRequest("/api/developer-profile/me/outreach/targets"),
-  });
-  const tagsQuery = useQuery<string[]>({
-    queryKey: ["/api/developer-profile/me/crm-tags"],
-    queryFn: () => jsonRequest("/api/developer-profile/me/crm-tags"),
   });
   const campaignStepsQuery = useQuery<CampaignStep[]>({
     queryKey: ["/api/developer-profile/me/outreach/campaigns/steps", stepsCampaign?.id],
@@ -273,38 +240,6 @@ export default function DeveloperOutreach() {
       setAiInput("");
     },
     onError: (error: Error) => toast({ title: "Assistant unavailable", description: error.message, variant: "destructive" }),
-  });
-
-  const sequenceGenerationMutation = useMutation({
-    mutationFn: () => jsonRequest("/api/developer-profile/me/outreach/campaigns/generate-sequence", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sequenceForm),
-    }),
-    onSuccess: (data: { steps: GeneratedSequenceStep[] }) => {
-      setGeneratedSteps(data.steps || []);
-      toast({ title: "Sequence generated", description: `${data.steps?.length || 0} draft steps are ready to review.` });
-    },
-    onError: (error: Error) => toast({ title: "Could not generate sequence", description: error.message, variant: "destructive" }),
-  });
-
-  const sequenceSaveMutation = useMutation({
-    mutationFn: () => jsonRequest("/api/developer-profile/me/outreach/campaigns/generate-sequence/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...sequenceForm,
-        steps: generatedSteps.map(({ subject, content }) => ({ subject, content })),
-      }),
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/outreach/campaigns"] });
-      setSequenceDialogOpen(false);
-      setGeneratedSteps([]);
-      setSequenceForm(emptySequenceForm);
-      toast({ title: "Campaign saved", description: "Your AI-generated campaign is ready in the campaign list." });
-    },
-    onError: (error: Error) => toast({ title: "Could not save campaign", description: error.message, variant: "destructive" }),
   });
 
   const updateStepMutation = useMutation({
