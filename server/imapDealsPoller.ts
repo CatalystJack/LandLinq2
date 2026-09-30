@@ -124,6 +124,42 @@ export function buildImapIntakeHash(mailbox: string, uid: number): string {
     .digest('hex');
 }
 
+/** Preserve the block/row boundaries Outlook uses in forwarded HTML emails. */
+export function htmlEmailBodyToText(html: string): string {
+  if (!html) return '';
+
+  return html
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<(script|style|head|title)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+    .replace(/<br\b[^>]*>/gi, '\n')
+    .replace(/<hr\b[^>]*>/gi, '\n\n')
+    .replace(/<li\b[^>]*>/gi, '\n• ')
+    .replace(/<t[dh]\b[^>]*>/gi, '\t')
+    .replace(/<\/t[dh]\s*>/gi, '\t')
+    .replace(/<\/(p|div|li|tr|table|section|article|h[1-6]|blockquote|pre)\s*>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;|&#160;|&#x0*a0;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;|&#39;/gi, "'")
+    .replace(/&#(\d+);/g, (_match, value: string) => {
+      const codePoint = Number(value);
+      return Number.isFinite(codePoint) && codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : '';
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_match, value: string) => {
+      const codePoint = Number.parseInt(value, 16);
+      return Number.isFinite(codePoint) && codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : '';
+    })
+    .replace(/\r/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 /** Convert raw MIME into the file shape accepted by EmailIntakeService. */
 export async function parseImapMessage(
   uid: number,
@@ -135,6 +171,15 @@ export async function parseImapMessage(
   const to = addressText(parsed.to);
   const cc = addressText(parsed.cc);
   const replyTo = addressText(parsed.replyTo);
+  const plainText = String(parsed.text || '').trim();
+  const htmlText = htmlEmailBodyToText(typeof parsed.html === 'string' ? parsed.html : '');
+  const plainHasForwardedFrom = /(?:^|\n)\s*From:\s*[^\n]*@[^\s>]+/i.test(plainText);
+  const htmlHasForwardedFrom = /(?:^|\n)\s*From:\s*[^\n]*@[^\s>]+/i.test(htmlText);
+  const text = htmlText && (
+    !plainText ||
+    htmlText.length > plainText.length ||
+    (htmlHasForwardedFrom && !plainHasForwardedFrom)
+  ) ? htmlText : plainText;
   const attachments: ImapAttachmentFile[] = (parsed.attachments || []).map((attachment: any, index: number) => {
     const filename = attachment.filename || `attachment-${index + 1}`;
     const contentType = attachment.contentType || 'application/octet-stream';
@@ -157,7 +202,7 @@ export async function parseImapMessage(
     cc,
     replyTo,
     subject: parsed.subject || '',
-    text: parsed.text || '',
+    text,
     html: typeof parsed.html === 'string' ? parsed.html : '',
     bodyPreview: String(parsed.text || '').slice(0, 255),
     receivedDateTime: parsed.date instanceof Date ? parsed.date.toISOString() : undefined,
