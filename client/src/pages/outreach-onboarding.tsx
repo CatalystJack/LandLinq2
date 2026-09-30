@@ -1194,6 +1194,29 @@ export default function OutreachOnboarding() {
     }
   };
 
+  const getSignatureImageSource = (imageTag: string): string =>
+    imageTag.match(/\bsrc\s*=\s*(["'])(.*?)\1/i)?.[2] || '';
+
+  const isAlreadyHostedSignatureImage = (source: string): boolean => {
+    if (!source) return false;
+    try {
+      const url = new URL(source, window.location.origin);
+      return url.origin === window.location.origin ||
+        url.pathname.startsWith('/api/public/storage/') ||
+        url.pathname.startsWith('/attached_assets/');
+    } catch {
+      return false;
+    }
+  };
+
+  const replaceSignatureImageSource = (markup: string, imageTag: string, imageUrl: string): string => {
+    const safeImageUrl = imageUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    const replacementTag = /\bsrc\s*=\s*(["'])[^"']*\1/i.test(imageTag)
+      ? imageTag.replace(/\bsrc\s*=\s*(["'])[^"']*\1/i, `src="${safeImageUrl}"`)
+      : imageTag.replace(/<img\b/i, `<img src="${safeImageUrl}"`);
+    return markup.replace(imageTag, replacementTag);
+  };
+
   // Helper to convert data URI to File
   const dataURItoFile = (dataURI: string, filename: string): File | null => {
     try {
@@ -1294,50 +1317,111 @@ export default function OutreachOnboarding() {
     if (imageFiles.length > 0 && !clipboardHtml.trim()) {
       e.preventDefault();
       setIsUploadingSignatureLogo(true);
-      
-      for (const file of imageFiles) {
-        const imageUrl = await uploadImageFile(file, senderId);
-        if (imageUrl) {
-          const img = document.createElement('img');
-          img.src = imageUrl;
-          img.alt = 'Logo';
-          insertNodeAtSelection(img);
+      let uploadedCount = 0;
+      try {
+        for (const file of imageFiles) {
+          const imageUrl = await uploadImageFile(file, senderId);
+          if (imageUrl) {
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.alt = 'Logo';
+            insertNodeAtSelection(img);
+            uploadedCount++;
+          }
         }
+      } finally {
+        setIsUploadingSignatureLogo(false);
       }
-      
-      setIsUploadingSignatureLogo(false);
-      toast({ title: "Image uploaded", description: "Pasted image saved to server" });
+      if (uploadedCount > 0) {
+        toast({
+          title: "Pasted images uploaded",
+          description: `${uploadedCount} image(s) saved to your storage.`,
+        });
+      }
+      if (uploadedCount < imageFiles.length) {
+        toast({
+          title: "Some pasted images couldn't be uploaded",
+          description: "Use 'Add Logo' to upload those images from your computer.",
+          variant: "destructive",
+        });
+      }
       return;
     }
     
     // Handle HTML paste (from Outlook, web pages, etc.)
     e.preventDefault();
     let html = clipboardHtml || clipboardData.getData('text/plain');
-    
-    console.log('[SIGNATURE-PASTE] Paste event triggered');
-    console.log('[SIGNATURE-PASTE] Raw HTML preview:', html.substring(0, 500));
 
-    // Outlook may provide the formatted HTML and the embedded logo as
-    // separate clipboard items. Re-host those files into the matching
-    // cid:/file:/blob: image tags instead of dropping the rest of the paste.
+    // Outlook may provide image bytes as separate clipboard items while its
+    // HTML points at external or cid:/file:/blob: sources. Prefer those local
+    // bytes when their count maps unambiguously to the pasted image tags.
     if (imageFiles.length > 0 && html) {
-      setIsUploadingSignatureLogo(true);
-      for (const file of imageFiles) {
-        const uploadedUrl = await uploadImageFile(file, senderId);
-        if (!uploadedUrl) continue;
+      const imageTags = [...html.matchAll(/<img\b[^>]*>/gi)].map((match) => match[0]);
+      const unusableSourceTags = imageTags.filter((imageTag) => {
+        const source = getSignatureImageSource(imageTag);
+        return !source || /^(?:cid|file|blob):/i.test(source) || /^about:blank$/i.test(source);
+      });
+      const externalSourceTags = imageTags.filter((imageTag) => {
+        const source = getSignatureImageSource(imageTag);
+        return /^https?:\/\//i.test(source) && !isAlreadyHostedSignatureImage(source);
+      });
 
-        const imageTagMatch = html.match(/<img\b[^>]*\bsrc=(["'])(?:(?:cid|file|blob):[^"']*|about:blank|)\1[^>]*>/i);
-        if (imageTagMatch) {
-          const replacementTag = imageTagMatch[0].replace(
-            /\bsrc=(["'])[^"']*\1/i,
-            `src="${uploadedUrl.replace(/"/g, '&quot;')}"`
-          );
-          html = html.replace(imageTagMatch[0], replacementTag);
-        } else {
-          html += `<img src="${uploadedUrl.replace(/"/g, '&quot;')}" alt="Logo">`;
+      let imageTagsToReplace: string[] = [];
+      if (imageFiles.length === imageTags.length) {
+        imageTagsToReplace = imageTags;
+      } else if (unusableSourceTags.length > 0 && imageFiles.length === unusableSourceTags.length) {
+        imageTagsToReplace = unusableSourceTags;
+      } else if (externalSourceTags.length > 0 && imageFiles.length === externalSourceTags.length) {
+        imageTagsToReplace = externalSourceTags;
+      } else if (unusableSourceTags.length > 0) {
+        imageTagsToReplace = unusableSourceTags.slice(0, imageFiles.length);
+      }
+
+      // If the clipboard contains a standalone image with formatted text but
+      // no <img> tag, append the hosted image rather than losing the file.
+      const filesToUpload = imageTagsToReplace.length > 0
+        ? imageTagsToReplace.length
+        : imageTags.length === 0 ? imageFiles.length : 0;
+      let clipboardUploadedCount = 0;
+      let clipboardFailedCount = 0;
+
+      if (filesToUpload > 0) {
+        setIsUploadingSignatureLogo(true);
+        try {
+          for (let index = 0; index < filesToUpload; index++) {
+            const uploadedUrl = await uploadImageFile(imageFiles[index], senderId);
+            if (!uploadedUrl) {
+              clipboardFailedCount++;
+              continue;
+            }
+
+            const targetTag = imageTagsToReplace[index];
+            if (targetTag) {
+              html = replaceSignatureImageSource(html, targetTag, uploadedUrl);
+            } else {
+              const safeImageUrl = uploadedUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+              html += `<img src="${safeImageUrl}" alt="Logo">`;
+            }
+            clipboardUploadedCount++;
+          }
+        } finally {
+          setIsUploadingSignatureLogo(false);
         }
       }
-      setIsUploadingSignatureLogo(false);
+
+      if (clipboardUploadedCount > 0) {
+        toast({
+          title: "Pasted images uploaded",
+          description: `${clipboardUploadedCount} image(s) saved to your storage.`,
+        });
+      }
+      if (clipboardFailedCount > 0) {
+        toast({
+          title: "Some pasted images couldn't be uploaded",
+          description: "Use 'Add Logo' to upload those images from your computer.",
+          variant: "destructive",
+        });
+      }
     }
     
     // Check for data: URI images and upload them
@@ -1362,10 +1446,9 @@ export default function OutreachOnboarding() {
     }
     
     // Check for cid: images (Outlook embedded images) - these can't be extracted
-    if (html.includes('src="cid:')) {
-      console.log('[SIGNATURE-PASTE] Detected cid: images - browser cannot access these');
+    if (/<img\b[^>]*\bsrc=(["'])cid:[^"']*\1[^>]*>/i.test(html)) {
       // Remove cid: images since browser cannot access their binary data
-      html = html.replace(/<img[^>]*src="cid:[^"]*"[^>]*>/gi, '');
+      html = html.replace(/<img\b[^>]*\bsrc=(["'])cid:[^"']*\1[^>]*>/gi, '');
       toast({ 
         title: "Outlook images not available", 
         description: "Please save logo images to your computer first, then use 'Add Logo' button to upload.",
@@ -1376,22 +1459,19 @@ export default function OutreachOnboarding() {
     // Check for external image URLs (http/https) and try to re-upload them
     // Handle both single and double quotes in src attributes
     const externalImgRegex = /<img[^>]*src=["'](https?:\/\/[^"']+)["'][^>]*>/gi;
-    const externalImgMatches = [...html.matchAll(externalImgRegex)];
-    
-    console.log('[SIGNATURE-PASTE] HTML content length:', html.length);
-    console.log('[SIGNATURE-PASTE] External image matches found:', externalImgMatches.length);
+    const externalImgMatches = [...html.matchAll(externalImgRegex)]
+      .filter((match) => !isAlreadyHostedSignatureImage(match[1]));
     
     if (externalImgMatches.length > 0) {
       setIsUploadingSignatureLogo(true);
       let uploadedCount = 0;
+      let failedCount = 0;
       
       for (const match of externalImgMatches) {
         const fullTag = match[0];
         const externalUrl = match[1];
         
         try {
-          // Try to fetch the external image via our proxy
-          console.log('[SIGNATURE-PASTE] Attempting to re-upload external image:', externalUrl);
           const response = await fetch('/api/upload-external-image', {
             method: 'POST',
             credentials: 'include',
@@ -1402,15 +1482,16 @@ export default function OutreachOnboarding() {
           if (response.ok) {
             const { url: uploadedUrl } = await response.json();
             if (uploadedUrl) {
-              html = html.replace(fullTag, fullTag.replace(externalUrl, uploadedUrl));
+              html = html.replace(fullTag, replaceSignatureImageSource(fullTag, fullTag, uploadedUrl));
               uploadedCount++;
-              console.log('[SIGNATURE-PASTE] Re-uploaded external image successfully');
+            } else {
+              failedCount++;
             }
           } else {
-            console.log('[SIGNATURE-PASTE] Could not re-upload external image:', externalUrl);
+            failedCount++;
           }
-        } catch (err) {
-          console.log('[SIGNATURE-PASTE] Error re-uploading external image:', err);
+        } catch {
+          failedCount++;
         }
       }
       
@@ -1421,10 +1502,11 @@ export default function OutreachOnboarding() {
           title: "Images uploaded", 
           description: `${uploadedCount} image(s) saved to your storage for reliable email delivery.`
         });
-      } else if (externalImgMatches.length > 0) {
+      }
+      if (failedCount > 0) {
         toast({ 
-          title: "Some images couldn't be uploaded", 
-          description: "You can manually add them using the 'Add Logo' button.",
+          title: "Some images couldn't be uploaded",
+          description: "Outlook may block access to linked images. Use 'Add Logo' to upload those image files.",
           variant: "destructive"
         });
       }
@@ -1817,7 +1899,7 @@ export default function OutreachOnboarding() {
   // Auto-save mutation for signature (uses dedicated endpoint, keeps the editing modal open)
   const autoSaveSignatureMutation = useMutation({
     mutationFn: async ({ id, signatureHtml, senderEmail }: { id: string; signatureHtml: string; senderEmail?: string }) => {
-      console.log('[SIGNATURE] Saving signature for sender:', id, 'email:', senderEmail, 'length:', signatureHtml?.length);
+      console.log('[SIGNATURE] Saving signature for sender:', id, 'length:', signatureHtml?.length);
       const res = await fetch(`/api/outreach/senders/${id}/signature`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1826,7 +1908,7 @@ export default function OutreachOnboarding() {
       });
       if (!res.ok) {
         const errorText = await res.text();
-        console.error('[SIGNATURE] Save failed:', res.status, errorText);
+        console.error('[SIGNATURE] Save failed with status:', res.status);
         // Parse error message if it's JSON
         let errorMessage = errorText;
         try {
@@ -1845,7 +1927,6 @@ export default function OutreachOnboarding() {
         throw new Error(errorMessage);
       }
       const result = await res.json();
-      console.log('[SIGNATURE] Save successful:', result);
       return result;
     },
     onSuccess: () => {
@@ -1854,7 +1935,7 @@ export default function OutreachOnboarding() {
       // Don't close the editing modal - user may continue editing other fields
     },
     onError: (error: any, variables) => {
-      console.error('[SIGNATURE] Mutation error:', error);
+      console.error('[SIGNATURE] Mutation failed');
       // Roll back the optimistic update so the badge stops showing "Configured"
       setEditingSender(prev => prev ? { ...prev, signatureHtml: '' } : null);
       toast({ title: "Failed to save signature", description: error.message, variant: "destructive" });
@@ -2650,23 +2731,14 @@ export default function OutreachOnboarding() {
                               let brokenCount = 0;
                               const brokenTypes: string[] = [];
                               
-                              console.log('[SIGNATURE] Found', imgs.length, 'images in editor');
-                              
                               for (const img of Array.from(imgs)) {
                                 const src = img.getAttribute('src') || '';
-                                console.log('[SIGNATURE] Image src:', src.substring(0, 80));
                                 
                                 // Skip already uploaded images (on our domain)
-                                if (src.includes('catalyst.landlinq.ai') || src.includes('/api/public/storage/')) {
-                                  console.log('[SIGNATURE] Already hosted, skipping');
-                                  continue;
-                                }
+                                if (isAlreadyHostedSignatureImage(src)) continue;
                                 
                                 // Skip data URIs (already handled/embedded)
-                                if (src.startsWith('data:')) {
-                                  console.log('[SIGNATURE] Data URI, skipping');
-                                  continue;
-                                }
+                                if (src.startsWith('data:')) continue;
                                 
                                 // Detect broken/unfixable images
                                 if (!src || src.startsWith('file://') || src.startsWith('cid:') || src.startsWith('blob:')) {
@@ -2675,15 +2747,13 @@ export default function OutreachOnboarding() {
                                   else if (src.startsWith('cid:')) brokenTypes.push('email attachment');
                                   else if (src.startsWith('blob:')) brokenTypes.push('temporary blob');
                                   else brokenTypes.push('empty source');
-                                  // Remove broken image from editor
-                                  img.remove();
+                                  // Preserve the image element so the user can replace it manually.
                                   continue;
                                 }
                                 
                                 // Try to re-upload external URLs
                                 if (src.startsWith('http://') || src.startsWith('https://')) {
                                   try {
-                                    console.log('[SIGNATURE] Re-uploading external image:', src.substring(0, 50));
                                     const response = await fetch('/api/upload-external-image', {
                                       method: 'POST',
                                       credentials: 'include',
@@ -2696,19 +2766,14 @@ export default function OutreachOnboarding() {
                                       if (url) {
                                         img.setAttribute('src', url);
                                         uploadedCount++;
-                                        console.log('[SIGNATURE] Image re-uploaded successfully');
                                       }
                                     } else {
-                                      // External URL failed to upload - remove it
                                       brokenCount++;
                                       brokenTypes.push('inaccessible URL');
-                                      img.remove();
                                     }
-                                  } catch (err) {
-                                    console.error('[SIGNATURE] Failed to re-upload:', err);
+                                  } catch {
                                     brokenCount++;
                                     brokenTypes.push('failed download');
-                                    img.remove();
                                   }
                                 }
                               }
@@ -2720,8 +2785,8 @@ export default function OutreachOnboarding() {
                               } else if (brokenCount > 0) {
                                 const uniqueTypes = [...new Set(brokenTypes)].join(', ');
                                 toast({ 
-                                  title: `Removed ${brokenCount} broken image(s)`, 
-                                  description: `These images can't be saved: ${uniqueTypes}. Use "Add Logo" to manually upload images from your computer.`,
+                                  title: `${brokenCount} image(s) still need replacement`,
+                                  description: `These images couldn't be fetched (${uniqueTypes}). Use "Add Logo" to upload the image files from your computer.`,
                                   variant: "destructive"
                                 });
                               } else {
@@ -2781,7 +2846,6 @@ export default function OutreachOnboarding() {
                                 // Replace the old img with the new one in the DOM
                                 targetImg.parentNode?.replaceChild(newImg, targetImg);
                                 
-                                console.log('[SIGNATURE] Image replaced with new element, src:', imageUrl);
                                 toast({ title: "Image replaced!", description: "Click Done to save your signature." });
                               }
                             }
@@ -2851,9 +2915,7 @@ export default function OutreachOnboarding() {
                             // Sync signature from ref and auto-save to database
                             if (signatureEditorRef.current && editingSender) {
                               const html = signatureEditorRef.current.innerHTML;
-                              console.log('[SIGNATURE-DEBUG] Raw HTML from editor:', html?.substring(0, 200), '... (length:', html?.length, ')');
                               const cleanedHtml = cleanSignatureHtml(html);
-                              console.log('[SIGNATURE-DEBUG] Cleaned HTML:', cleanedHtml?.substring(0, 200), '... (length:', cleanedHtml?.length, ')');
                               
                               // Check for broken images that need replacing
                               const brokenImageCount = (html.match(/src="(file:|cid:|blob:|data:image\/[^"]{50000,})"/gi) || []).length;
@@ -2870,10 +2932,8 @@ export default function OutreachOnboarding() {
                               if (cleanedHtml || editingSender.signatureHtml) {
                                 setEditingSender({ ...editingSender, signatureHtml: cleanedHtml });
                                 autoSaveSignatureMutation.mutate({ id: editingSender.id, signatureHtml: cleanedHtml, senderEmail: editingSender.email });
-                                console.log('[SIGNATURE-DEBUG] Saving signature to database');
                                 toast({ title: "Saving signature...", description: `${cleanedHtml.length} characters` });
                               } else {
-                                console.log('[SIGNATURE-DEBUG] No content to save, skipping');
                                 toast({ title: "No signature to save", description: "Paste your signature content first", variant: "destructive" });
                               }
                             } else {

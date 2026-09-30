@@ -25154,11 +25154,11 @@ RULES:
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
     fileFilter: function (req, file, cb) {
       // Validate file type - only images
-      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'];
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/svg+xml', 'image/webp'];
       if (allowedTypes.includes(file.mimetype)) {
         cb(null, true);
       } else {
-        cb(new Error('Invalid file type. Only PNG, JPG, JPEG, SVG, and WebP files are allowed.'));
+        cb(new Error('Invalid file type. Only PNG, JPG, JPEG, GIF, SVG, and WebP files are allowed.'));
       }
     }
   });
@@ -25223,7 +25223,7 @@ RULES:
       ];
       
       if (blockedPatterns.some(pattern => hostname.includes(pattern) || hostname === pattern.replace('.', ''))) {
-        console.log(`[SSRF-BLOCK] Blocked internal IP request: ${hostname}`);
+        console.log('[SSRF-BLOCK] Blocked internal image request');
         return res.status(400).json({ error: "Internal URLs are not allowed" });
       }
       
@@ -25298,8 +25298,6 @@ RULES:
         
         const publicUrl = `${baseUrl}/api/public/storage/${storagePath}`;
         
-        console.log(`✅ External image re-uploaded: ${imageUrl.substring(0, 50)}... -> ${publicUrl}`);
-        
         res.json({ url: publicUrl });
         
       } catch (fetchError: any) {
@@ -25307,12 +25305,12 @@ RULES:
         if (fetchError.name === 'AbortError') {
           return res.status(504).json({ error: "Request timed out" });
         }
-        console.error('Error fetching external image:', fetchError);
+        console.error('External signature image fetch failed');
         return res.status(502).json({ error: "Failed to fetch image" });
       }
       
     } catch (error) {
-      console.error("Error uploading external image:", error);
+      console.error("External signature image upload failed");
       res.status(500).json({ error: "Failed to upload image" });
     }
   });
@@ -25349,8 +25347,7 @@ RULES:
         
         const fullUrl = `${baseUrl}/api/public/storage/${storagePath}`;
         
-        console.log(`✅ [SIGNATURE-LOGO] Uploaded to Object Storage: ${storagePath}`);
-        console.log(`📧 [SIGNATURE-LOGO] Public URL for emails: ${fullUrl}`);
+        console.log('✅ [SIGNATURE-LOGO] Uploaded to Object Storage');
         
         res.json({ 
           path: fullUrl, // Full URL for emails (works across republishes)
@@ -25387,7 +25384,7 @@ RULES:
         const relativePath = `/attached_assets/${localFilename}`;
         const fullUrl = `${baseUrl}${relativePath}`;
         
-        console.log(`⚠️ [SIGNATURE-LOGO] Uploaded to LOCAL (will be lost on republish): ${relativePath}`);
+        console.log('⚠️ [SIGNATURE-LOGO] Uploaded to local storage (will be lost on republish)');
         
         res.json({ 
           path: fullUrl,
@@ -25400,7 +25397,7 @@ RULES:
         });
       }
     } catch (error) {
-      console.error("Error uploading logo:", error);
+      console.error("Error uploading signature logo");
       
       // Provide helpful error message
       const errorMessage = error instanceof Error ? error.message : "Failed to upload logo";
@@ -34174,23 +34171,19 @@ RULES:
   // Update sender signature only (simpler query to avoid SQL issues)
   app.patch('/api/outreach/senders/:senderId/signature', isAuthenticated, async (req: any, res) => {
     try {
-      const user = req.user as any;
-      const userEmail = (user?.claims?.email || user?.email || '').toLowerCase();
       const { senderId } = req.params;
       const scope = await getOutreachSenderScope(req, res, senderId);
       if (!scope) return;
       
       console.log(`📝 [SIGNATURE-SAVE] Request received:`, {
-        senderId: req.params.senderId,
-        userEmail,
+        senderId,
         isPlatformAdmin: scope.isPlatformAdmin,
-        hasUser: !!user,
         signatureLength: req.body?.signatureHtml?.length || 0
       });
       
       const { signatureHtml, senderEmail } = req.body;
 
-      console.log(`📝 [SIGNATURE-SAVE] Updating signature for sender ${senderId}, email fallback: ${senderEmail || 'none'}, length: ${signatureHtml?.length || 0}`);
+      console.log(`📝 [SIGNATURE-SAVE] Updating signature for sender ${senderId}, length: ${signatureHtml?.length || 0}`);
 
       // Try by ID first, then fall back to email (guards against stale UI IDs)
       let result = await db.execute(sql`
@@ -34202,7 +34195,7 @@ RULES:
       `);
 
       if (!result.rows?.length && senderEmail) {
-        console.log(`⚠️ [SIGNATURE-SAVE] ID not found, trying email fallback: ${senderEmail}`);
+        console.log('⚠️ [SIGNATURE-SAVE] ID not found; trying the provided email fallback');
         result = await db.execute(sql`
           UPDATE outreach_senders
           SET signature_html = ${signatureHtml || ''}, updated_at = now()
@@ -34213,14 +34206,14 @@ RULES:
       }
 
       if (!result.rows?.length) {
-        console.log(`❌ [SIGNATURE-SAVE] Sender not found by ID ${senderId} or email ${senderEmail}`);
+        console.log(`❌ [SIGNATURE-SAVE] Sender not found for ID ${senderId}`);
         return res.status(404).json({ error: 'Sender not found' });
       }
 
       console.log(`✅ [SIGNATURE-SAVE] Successfully saved signature for sender: ${senderId}`);
       res.json(result.rows[0]);
     } catch (error) {
-      console.error('❌ [SIGNATURE-SAVE] Error updating sender signature:', error);
+      console.error('❌ [SIGNATURE-SAVE] Error updating sender signature');
       res.status(500).json({ error: 'Failed to update signature' });
     }
   });
