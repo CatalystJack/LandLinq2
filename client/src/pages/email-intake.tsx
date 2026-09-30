@@ -44,6 +44,7 @@ interface IntakeItem {
   parsedBrokerPhone: string | null;
   parsedNotes: string | null;
   parsedZoning: string | null;
+  analystOverrides?: Record<string, any> | null;
   overallConfidence: string | null;
   fieldConfidences: Record<string, number> | null;
   status: "pending" | "approved" | "rejected";
@@ -113,22 +114,26 @@ function EditModal({ item, open, onClose, onApprove }: {
   item: IntakeItem; open: boolean; onClose: () => void;
   onApprove: (overrides: Record<string, any>) => void;
 }) {
+  const savedOverrides = item.analystOverrides || {};
+  const savedOrParsed = (key: string, parsedValue: unknown) =>
+    Object.prototype.hasOwnProperty.call(savedOverrides, key) ? savedOverrides[key] : parsedValue;
+  const displayValue = (value: unknown) => value == null ? "" : String(value);
   const [fields, setFields] = useState({
     dealType: item.parsedDealType ?? "unknown",
-    propertyName: item.parsedPropertyName ?? "",
-    address: item.parsedAddress ?? "",
-    city: item.parsedCity ?? "",
-    state: item.parsedState ?? "",
-    zip: item.parsedZip ?? "",
-    acres: item.parsedAcres ?? "",
-    price: item.parsedPrice ? String(item.parsedPrice) : "",
-    unitCount: item.parsedUnitCount ? String(item.parsedUnitCount) : "",
-    vintage: item.parsedVintage ? String(item.parsedVintage) : "",
-    brokerName: item.parsedBrokerName ?? "",
-    brokerEmail: item.parsedBrokerEmail ?? "",
-    brokerPhone: item.parsedBrokerPhone ?? "",
-    notes: item.parsedNotes ?? "",
-    zoning: item.parsedZoning ?? "",
+    propertyName: displayValue(savedOrParsed("propertyName", item.parsedPropertyName)),
+    address: displayValue(savedOrParsed("address", item.parsedAddress)),
+    city: displayValue(savedOrParsed("city", item.parsedCity)),
+    state: displayValue(savedOrParsed("state", item.parsedState)),
+    zip: displayValue(savedOrParsed("zip", item.parsedZip)),
+    acres: displayValue(savedOrParsed("acres", item.parsedAcres)),
+    price: displayValue(savedOrParsed("price", item.parsedPrice)),
+    unitCount: displayValue(savedOrParsed("unitCount", item.parsedUnitCount)),
+    vintage: displayValue(savedOrParsed("vintage", item.parsedVintage)),
+    brokerName: displayValue(savedOrParsed("brokerName", item.parsedBrokerName)),
+    brokerEmail: displayValue(savedOrParsed("brokerEmail", item.parsedBrokerEmail)),
+    brokerPhone: displayValue(savedOrParsed("brokerPhone", item.parsedBrokerPhone)),
+    notes: displayValue(savedOrParsed("notes", item.parsedNotes)),
+    zoning: displayValue(savedOrParsed("zoning", item.parsedZoning)),
   });
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>

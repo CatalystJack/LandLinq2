@@ -1241,6 +1241,7 @@ CRITICAL RULES:
     overrides: Record<string, any>
   ): Record<string, { ai: any; analyst: any }> {
     const fieldMap: Record<string, string> = {
+      propertyName: 'parsedPropertyName',
       address: 'parsedAddress',
       city: 'parsedCity',
       state: 'parsedState',
@@ -1282,26 +1283,35 @@ CRITICAL RULES:
     if (!item) throw new Error('Intake item not found');
     if (item.status !== 'pending') throw new Error('Item is no longer pending');
 
+    // Saved audit-page edits are the baseline; edits submitted at approval time
+    // take precedence if the reviewer made a last-minute change.
+    const effectiveOverrides = {
+      ...((item.analystOverrides && typeof item.analystOverrides === 'object') ? item.analystOverrides : {}),
+      ...overrides,
+    };
+    const valueWithOverride = (key: string, fallback: any) =>
+      Object.prototype.hasOwnProperty.call(effectiveOverrides, key) ? effectiveOverrides[key] : fallback;
+
     // Compute correction diff — this is our training signal
-    const correctionDiff = EmailIntakeService.computeCorrectionDiff(item, overrides);
+    const correctionDiff = EmailIntakeService.computeCorrectionDiff(item, effectiveOverrides);
     const correctionCount = Object.keys(correctionDiff).length;
 
     // Merge analyst edits over parsed fields
-    const propertyName = overrides.propertyName ?? item.parsedPropertyName ?? '';
-    const address    = overrides.address    ?? item.parsedAddress   ?? '';
-    const city       = overrides.city       ?? item.parsedCity      ?? '';
-    const state      = overrides.state      ?? item.parsedState     ?? '';
-    const zip        = overrides.zip        ?? item.parsedZip       ?? '';
-    const parcelId   = overrides.parcelId   ?? item.parsedParcelId  ?? '';
-    const acres      = overrides.acres      ?? (item.parsedAcres ? Number(item.parsedAcres) : null);
-    const price      = overrides.price      ?? item.parsedPrice     ?? null;
-    const unitCount  = overrides.unitCount  ?? item.parsedUnitCount ?? null;
-    const vintage    = overrides.vintage    ?? item.parsedVintage   ?? null;
-    const brokerName = overrides.brokerName ?? item.parsedBrokerName ?? '';
-    const brokerEmail = overrides.brokerEmail ?? item.parsedBrokerEmail ?? item.fromEmail;
-    const brokerPhone = overrides.brokerPhone ?? item.parsedBrokerPhone ?? '';
-    const notes      = overrides.notes      ?? item.parsedNotes     ?? '';
-    const zoning     = overrides.zoning     ?? item.parsedZoning    ?? '';
+    const propertyName = valueWithOverride('propertyName', item.parsedPropertyName ?? '') ?? '';
+    const address    = valueWithOverride('address', item.parsedAddress ?? '') ?? '';
+    const city       = valueWithOverride('city', item.parsedCity ?? '') ?? '';
+    const state      = valueWithOverride('state', item.parsedState ?? '') ?? '';
+    const zip        = valueWithOverride('zip', item.parsedZip ?? '') ?? '';
+    const parcelId   = valueWithOverride('parcelId', item.parsedParcelId ?? '') ?? '';
+    const acres      = valueWithOverride('acres', item.parsedAcres ? Number(item.parsedAcres) : null);
+    const price      = valueWithOverride('price', item.parsedPrice ?? null);
+    const unitCount  = valueWithOverride('unitCount', item.parsedUnitCount ?? null);
+    const vintage    = valueWithOverride('vintage', item.parsedVintage ?? null);
+    const brokerName = valueWithOverride('brokerName', item.parsedBrokerName ?? '') ?? '';
+    const brokerEmail = valueWithOverride('brokerEmail', item.parsedBrokerEmail ?? '') || item.fromEmail;
+    const brokerPhone = valueWithOverride('brokerPhone', item.parsedBrokerPhone ?? '') ?? '';
+    const notes      = valueWithOverride('notes', item.parsedNotes ?? '') ?? '';
+    const zoning     = valueWithOverride('zoning', item.parsedZoning ?? '') ?? '';
 
     // Find or create broker
     const { storage } = await import('./storage.js');
@@ -1371,6 +1381,7 @@ CRITICAL RULES:
     // (corrections are the most valuable signal — they teach the AI what it got wrong)
     try {
       const aiOutput = {
+        propertyName: item.parsedPropertyName,
         address: item.parsedAddress,
         city: item.parsedCity,
         state: item.parsedState,
@@ -1387,6 +1398,7 @@ CRITICAL RULES:
         zoning: item.parsedZoning,
       };
       const finalOutput = {
+        propertyName,
         address, city, state, zip, parcelId,
         acres: acres ? Number(acres) : null,
         price: price ? Number(price) : null,

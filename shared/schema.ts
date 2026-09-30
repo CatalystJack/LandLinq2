@@ -3900,6 +3900,9 @@ export const emailIntakeQueue = pgTable("email_intake_queue", {
   parsedBrokerPhone: varchar("parsed_broker_phone"),
   parsedNotes: text("parsed_notes"),
   parsedZoning: varchar("parsed_zoning"),
+  // Analyst edits remain separate from the original AI extraction for audit
+  // comparisons and correction-training data.
+  analystOverrides: jsonb("analyst_overrides").notNull().default(sql`'{}'::jsonb`),
 
   // Confidence
   overallConfidence: decimal("overall_confidence", { precision: 5, scale: 2 }),

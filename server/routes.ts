@@ -28618,6 +28618,129 @@ RULES:
     }
   });
 
+  // Save analyst edits without changing the original AI extraction or
+  // approving the intake record.
+  app.patch('/api/admin/intake-audit/:intakeId', isAuthenticated, generalApiLimiter, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+        return res.status(403).json({ message: 'Platform administrator access required.' });
+      }
+
+      const rawOverrides = req.body?.overrides;
+      if (!rawOverrides || typeof rawOverrides !== 'object' || Array.isArray(rawOverrides)) {
+        return res.status(400).json({ message: 'overrides must be an object.' });
+      }
+
+      const editableFields: Record<string, { maxLength: number; numeric?: 'decimal' | 'integer'; max?: number }> = {
+        propertyName: { maxLength: 300 },
+        address: { maxLength: 300 },
+        city: { maxLength: 200 },
+        state: { maxLength: 100 },
+        zip: { maxLength: 40 },
+        parcelId: { maxLength: 200 },
+        acres: { maxLength: 64, numeric: 'decimal', max: 100000000 },
+        price: { maxLength: 64, numeric: 'integer', max: 1000000000000 },
+        unitCount: { maxLength: 32, numeric: 'integer', max: 2000000 },
+        vintage: { maxLength: 32, numeric: 'integer', max: 3000 },
+        brokerName: { maxLength: 200 },
+        brokerEmail: { maxLength: 320 },
+        brokerPhone: { maxLength: 64 },
+        notes: { maxLength: 5000 },
+        zoning: { maxLength: 500 },
+      };
+      const overrides: Record<string, string | number | null> = {};
+      for (const [key, value] of Object.entries(rawOverrides)) {
+        const field = editableFields[key];
+        if (!field) return res.status(400).json({ message: 'An unsupported edit field was provided.' });
+        if (value === null) {
+          overrides[key] = null;
+        } else if (field.numeric) {
+          if (value === '') {
+            overrides[key] = null;
+            continue;
+          }
+          const numericValue = typeof value === 'number'
+            ? value
+            : typeof value === 'string' && value.length <= field.maxLength
+              ? Number(value)
+              : Number.NaN;
+          if (!Number.isFinite(numericValue) || numericValue < 0 ||
+              numericValue > (field.max ?? Number.MAX_SAFE_INTEGER) ||
+              (field.numeric === 'integer' && !Number.isInteger(numericValue))) {
+            return res.status(400).json({ message: `The ${key} value is invalid.` });
+          }
+          overrides[key] = numericValue;
+        } else if (typeof value !== 'string' || value.length > field.maxLength) {
+          return res.status(400).json({ message: `The ${key} value is invalid or too long.` });
+        } else if (key === 'brokerEmail' && value.trim() &&
+            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
+          return res.status(400).json({ message: 'The broker email value is invalid.' });
+        } else {
+          overrides[key] = value.trim();
+        }
+      }
+      if (Buffer.byteLength(JSON.stringify(overrides), 'utf8') > 16000) {
+        return res.status(400).json({ message: 'The edits exceed the allowed size.' });
+      }
+
+      const [updated] = await db.update(emailIntakeQueue)
+        .set({ analystOverrides: overrides })
+        .where(and(
+          eq(emailIntakeQueue.id, req.params.intakeId),
+          eq(emailIntakeQueue.status, 'pending'),
+        ))
+        .returning({ id: emailIntakeQueue.id });
+      if (!updated) {
+        const [existing] = await db.select({ id: emailIntakeQueue.id, status: emailIntakeQueue.status })
+          .from(emailIntakeQueue).where(eq(emailIntakeQueue.id, req.params.intakeId)).limit(1);
+        return existing
+          ? res.status(409).json({ message: 'Only pending intake records can be edited.' })
+          : res.status(404).json({ message: 'Intake record not found.' });
+      }
+      return res.json({ success: true, analystOverrides: overrides });
+    } catch {
+      return res.status(500).json({ message: 'Unable to save intake edits.' });
+    }
+  });
+
+  // Rejection retains the source email, extraction, edits, and review metadata.
+  app.post('/api/admin/intake-audit/:intakeId/reject', isAuthenticated, generalApiLimiter, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+        return res.status(403).json({ message: 'Platform administrator access required.' });
+      }
+      const notes = req.body?.notes;
+      if (notes !== undefined && (typeof notes !== 'string' || notes.length > 2000)) {
+        return res.status(400).json({ message: 'Review notes must be a string no longer than 2000 characters.' });
+      }
+      const reviewerEmail = String(user?.claims?.email || user?.email || 'unknown');
+      const [updated] = await db.update(emailIntakeQueue)
+        .set({
+          status: 'rejected',
+          reviewedAt: new Date(),
+          reviewedBy: reviewerEmail,
+          reviewNotes: typeof notes === 'string' && notes.trim() ? notes.trim() : null,
+        })
+        .where(and(
+          eq(emailIntakeQueue.id, req.params.intakeId),
+          eq(emailIntakeQueue.status, 'pending'),
+        ))
+        .returning({ id: emailIntakeQueue.id });
+      if (!updated) {
+        const [existing] = await db.select({ id: emailIntakeQueue.id, status: emailIntakeQueue.status })
+          .from(emailIntakeQueue).where(eq(emailIntakeQueue.id, req.params.intakeId)).limit(1);
+        return existing
+          ? res.status(409).json({ message: 'Only pending intake records can be rejected.' })
+          : res.status(404).json({ message: 'Intake record not found.' });
+      }
+      return res.json({ success: true });
+    } catch {
+      return res.status(500).json({ message: 'Unable to reject intake record.' });
+    }
+  });
+
   app.get('/api/admin/intake-audit', isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
@@ -28653,11 +28776,15 @@ RULES:
         subject: emailIntakeQueue.subject, emailBody: emailIntakeQueue.emailBody, emailHtml: emailIntakeQueue.emailHtml,
         attachmentCount: emailIntakeQueue.attachmentCount, attachmentNames: emailIntakeQueue.attachmentNames,
         parsedDealType: emailIntakeQueue.parsedDealType, parsedPropertyName: emailIntakeQueue.parsedPropertyName,
+        parsedParcelId: emailIntakeQueue.parsedParcelId,
+        parsedBrokerName: emailIntakeQueue.parsedBrokerName, parsedBrokerEmail: emailIntakeQueue.parsedBrokerEmail,
+        parsedBrokerPhone: emailIntakeQueue.parsedBrokerPhone, parsedNotes: emailIntakeQueue.parsedNotes,
         parsedAddress: emailIntakeQueue.parsedAddress,
         parsedCity: emailIntakeQueue.parsedCity, parsedState: emailIntakeQueue.parsedState,
         parsedZip: emailIntakeQueue.parsedZip, parsedAcres: emailIntakeQueue.parsedAcres,
         parsedPrice: emailIntakeQueue.parsedPrice, parsedUnitCount: emailIntakeQueue.parsedUnitCount,
         parsedVintage: emailIntakeQueue.parsedVintage, parsedZoning: emailIntakeQueue.parsedZoning,
+        analystOverrides: emailIntakeQueue.analystOverrides,
         status: emailIntakeQueue.status, routingReason: emailIntakeQueue.routingReason,
         dealId: emailIntakeQueue.dealId, groupId: emailIntakeQueue.groupId,
         groupIndex: emailIntakeQueue.groupIndex, groupTotal: emailIntakeQueue.groupTotal,
@@ -28720,7 +28847,9 @@ RULES:
       const isAdmin = isPlatformAdminEmail(user?.claims?.email || user?.email);
       // Queue metadata remains available to authenticated users, but raw email
       // content is restricted to platform administrators.
-      return res.json(isAdmin ? rows : rows.map(({ emailBody, emailHtml, ...row }) => row));
+      return res.json(isAdmin
+        ? rows
+        : rows.map(({ emailBody, emailHtml, analystOverrides, ...row }) => row));
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }
@@ -28782,7 +28911,7 @@ RULES:
       if (!row) return res.status(404).json({ message: 'Not found' });
       const user = req.user as any;
       if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
-        const { emailBody, emailHtml, ...safeRow } = row;
+        const { emailBody, emailHtml, analystOverrides, ...safeRow } = row;
         return res.json(safeRow);
       }
       return res.json(row);

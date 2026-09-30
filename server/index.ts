@@ -325,7 +325,8 @@ setTimeout(() => {
       await migrationPool.query(`
         ALTER TABLE email_intake_queue
           ADD COLUMN IF NOT EXISTS automation_processed_at timestamp,
-          ADD COLUMN IF NOT EXISTS parsed_parcel_id varchar;
+          ADD COLUMN IF NOT EXISTS parsed_parcel_id varchar,
+          ADD COLUMN IF NOT EXISTS analyst_overrides jsonb NOT NULL DEFAULT '{}'::jsonb;
         ALTER TABLE deals
           ADD COLUMN IF NOT EXISTS census_data_json jsonb,
           ADD COLUMN IF NOT EXISTS census_data_fetched_at timestamp,
