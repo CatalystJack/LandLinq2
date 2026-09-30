@@ -79,6 +79,7 @@ interface TrainingExample {
 
 interface PollHealth {
   state: "not_scheduled" | "disabled" | "starting" | "healthy" | "failed" | "stale";
+  emailAlertsEnabled: boolean;
   monitoringStartedAt: string | null;
   lastAttemptAt: string | null;
   lastSuccessfulPollAt: string | null;
@@ -1022,12 +1023,18 @@ export default function EmailIntakePage() {
                     <div className="grid gap-x-8 gap-y-1 mt-3 text-xs sm:grid-cols-2">
                       <p><span className="font-medium">Last poll attempt:</span> {formatHealthTimestamp(status.lastAttemptAt)}</p>
                       <p><span className="font-medium">Last successful poll:</span> {formatHealthTimestamp(status.lastSuccessfulPollAt)}</p>
-                      {status.state === "stale" && status.alertRaisedAt && (
+                      {status.state === "stale" && (
                         <p className="sm:col-span-2">
-                          <span className="font-medium">Stale alert:</span>{" "}
-                          {status.alertSentAt
-                            ? `Notification sent ${formatHealthTimestamp(status.alertSentAt)}`
-                            : `Notification queued ${formatHealthTimestamp(status.alertRaisedAt)}`}
+                          <span className="font-medium">
+                            {status.emailAlertsEnabled ? "Stale alert:" : "Email notifications:"}
+                          </span>{" "}
+                          {status.emailAlertsEnabled
+                            ? status.alertSentAt
+                              ? `Notification sent ${formatHealthTimestamp(status.alertSentAt)}`
+                              : status.alertRaisedAt
+                                ? `Notification queued ${formatHealthTimestamp(status.alertRaisedAt)}`
+                                : "Email alerting is enabled."
+                            : "Off. Check this screen for mailbox status."}
                         </p>
                       )}
                     </div>

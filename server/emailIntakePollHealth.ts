@@ -6,6 +6,8 @@ import { db } from './db.js';
 export const DEALS_IMAP_POLL_HEALTH_KEY = 'deals_mailbox';
 export const DEALS_IMAP_STALE_AFTER_MS = 15 * 60 * 1000;
 export const DEALS_IMAP_STALE_AFTER_MINUTES = 15;
+export const DEALS_IMAP_POLL_HEALTH_EMAIL_ALERTS_ENABLED =
+  process.env.DEALS_IMAP_POLL_HEALTH_EMAIL_ALERTS_ENABLED === 'true';
 
 export const DEALS_IMAP_FAILURE_CATEGORIES = [
   'authentication',
@@ -87,7 +89,7 @@ export function computeDealsImapPollHealthState(input: {
 }
 
 export function startDealsImapPollHealthWatchdog(intervalMs: number): void {
-  if (dealsImapPollHealthWatchdog) return;
+  if (!DEALS_IMAP_POLL_HEALTH_EMAIL_ALERTS_ENABLED || dealsImapPollHealthWatchdog) return;
 
   const checkHealth = async () => {
     try {
@@ -162,10 +164,11 @@ export async function recordDealsImapPollSuccess(
 }
 
 /**
- * Queue exactly one durable alert for each continuous stale period. A successful
- * poll ends that period; if polling later goes stale, it receives a new incident.
+ * Queue exactly one durable email alert for each continuous stale period when
+ * notifications are enabled. A successful poll ends that period.
  */
 export async function queueDealsImapPollHealthAlertIfStale(now = new Date()): Promise<boolean> {
+  if (!DEALS_IMAP_POLL_HEALTH_EMAIL_ALERTS_ENABLED) return false;
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${DEALS_IMAP_POLL_HEALTH_KEY}))`);
     await ensureStatusRow(tx, now);
@@ -215,7 +218,11 @@ export async function queueDealsImapPollHealthAlertIfStale(now = new Date()): Pr
   });
 }
 
-export async function processClaimedDealsImapPollHealthAlert(incidentId: string): Promise<{ sent: boolean; stale?: boolean }> {
+export async function processClaimedDealsImapPollHealthAlert(
+  incidentId: string,
+): Promise<{ sent: boolean; stale?: boolean; disabled?: boolean }> {
+  if (!DEALS_IMAP_POLL_HEALTH_EMAIL_ALERTS_ENABLED) return { sent: false, disabled: true };
+
   const [current] = await db.select().from(emailIntakePollHealth)
     .where(eq(emailIntakePollHealth.singletonKey, DEALS_IMAP_POLL_HEALTH_KEY)).limit(1);
   if (!current || current.alertIncidentId !== incidentId) return { sent: false, stale: true };
@@ -288,6 +295,7 @@ export async function getDealsImapPollHealthStatus(input: {
       schedulerActive: input.schedulerActive,
       schedulerExpected: input.schedulerExpected,
     }),
+    emailAlertsEnabled: DEALS_IMAP_POLL_HEALTH_EMAIL_ALERTS_ENABLED,
     monitoringStartedAt: current.monitoringStartedAt,
     lastAttemptAt: current.lastAttemptAt,
     lastSuccessfulPollAt: current.lastSuccessfulPollAt,
