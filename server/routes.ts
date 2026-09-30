@@ -17899,7 +17899,7 @@ RULES:
                 validationErrors.push(`Row ${rowNumber} has an invalid CRM tag.`);
                 return "";
               }
-              return readField(tag, "CRM tag", 160);
+              return readField(tag, "CRM tag", 1000);
             }).filter(Boolean);
             if (selectedTags.join(", ").length > 1000) {
               validationErrors.push(`Row ${rowNumber}: Tags exceeds 1,000 characters.`);
