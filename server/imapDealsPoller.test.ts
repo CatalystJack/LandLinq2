@@ -44,6 +44,41 @@ assert.match(parsed.text, /100 Main Street/);
 assert.equal(parsed.attachments[0].originalname, 'offering-memorandum.pdf');
 assert.equal(parsed.attachments[0].mimetype, 'application/pdf');
 assert.equal(parsed.attachments[0].buffer.toString(), 'fixture pdf');
+
+const outlookForwardFixture = [
+  'From: Alex Catalyst <alex@catalystcp.com>',
+  'To: deals@landlinq.ai',
+  'Subject: Fw: New Multifamily Listing in Jefferson City, TN | 16-Units',
+  'MIME-Version: 1.0',
+  'Content-Type: multipart/alternative; boundary="outlook-boundary"',
+  '',
+  '--outlook-boundary',
+  'Content-Type: text/plain; charset=utf-8',
+  '',
+  'Forwarded message. The plain-text alternative has no usable listing information. '.repeat(20),
+  '--outlook-boundary',
+  'Content-Type: text/html; charset=utf-8',
+  '',
+  '<html><body>',
+  '<div>From: Johnson, Harrison &lt;harrison.johnson@example.com&gt;</div>',
+  '<table>',
+  '<tr><td>Year Built</td><td>1996-1997</td></tr>',
+  '<tr><td>List Price</td><td>$2,043,000</td></tr>',
+  '<tr><td>Current Rents</td><td>$1,058</td></tr>',
+  '<tr><td>Pro-Forma Rents</td><td>$1,213</td></tr>',
+  '<tr><td>Current Cap Rate</td><td>6.34%</td></tr>',
+  '<tr><td>Pro-Forma Cap Rate</td><td>7.61%</td></tr>',
+  '</table>',
+  '<a href="https://www.marcusmillichap.com/properties/654321?source=email&amp;type=deal">Marcus &amp; Millichap Deal Room</a>',
+  '</body></html>',
+  '--outlook-boundary--',
+].join('\r\n');
+const parsedOutlookForward = await parseImapMessage(43, Buffer.from(outlookForwardFixture));
+assert.match(parsedOutlookForward.text, /From: Johnson, Harrison <harrison\.johnson@example\.com>/);
+assert.match(parsedOutlookForward.text, /Year Built\s*\|\s*1996-1997/);
+assert.match(parsedOutlookForward.text, /Current Rents\s*\|\s*\$1,058/);
+assert.match(parsedOutlookForward.text, /Marcus & Millichap Deal Room \(https:\/\/www\.marcusmillichap\.com\/properties\/654321\?source=email&type=deal\)/);
+
 assert.equal(buildImapMessageId('DEALS@LANDLINQ.AI', 42), 'imap:deals@landlinq.ai:uid:42');
 assert.equal(buildImapIntakeHash('deals@landlinq.ai', 42).length, 64);
 

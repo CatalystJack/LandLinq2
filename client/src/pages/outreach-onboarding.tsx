@@ -1840,10 +1840,14 @@ export default function OutreachOnboarding() {
   });
 
   const editingDeveloperProfileId = editingSender?.developerProfileId || null;
+  const isDeveloperUser = String(user?.role || "").toUpperCase() === "DEVELOPER";
   const { data: crmTags = [] } = useQuery<string[]>({
-    queryKey: editingDeveloperProfileId
-      ? ["/api/admin/investment-companies", editingDeveloperProfileId, "crm-tags"]
-      : ["/api/crm/tags"],
+    queryKey: isDeveloperUser
+      ? ["/api/developer-profile/me/crm-tags"]
+      : editingDeveloperProfileId
+        ? ["/api/admin/investment-companies", editingDeveloperProfileId, "crm-tags"]
+        : ["/api/crm/tags"],
+    enabled: !!user,
   });
   const safeSenders = Array.isArray(senders) ? senders : [];
   const teamMembers = (Array.isArray(usersData?.users) ? usersData.users : []).filter(u => 

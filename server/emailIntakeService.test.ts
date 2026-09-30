@@ -4,6 +4,8 @@ import {
   prioritizeFewShotExamples,
   processIntakeIdsIndependently,
   queueCorrectionToFewShotExample,
+  extractForwardedListingDetails,
+  normalizeForwardedBrokerName,
 } from './emailIntakeService.js';
 
 // A failed property must not prevent its grouped siblings from being routed.
@@ -47,6 +49,39 @@ import {
   assert.match(block, /"city": AI said "Wrong" → CORRECT is "Right"/);
   assert.match(block, /Never copy names, addresses, prices/);
   assert.match(block, /CORRECT JSON OUTPUT: {"acres":2}/);
+}
+
+// Forwarded Outlook listing facts survive HTML conversion and populate Broker Notes.
+{
+  const subject = 'Fw: New Multifamily Listing in Jefferson City, TN | 16-Units';
+  const text = [
+    'From: Johnson, Harrison <harrison.johnson@example.com>',
+    'Year Built | 1996-1997',
+    'List Price | $2,043,000',
+    'Current Rents | $1,058',
+    'Pro-Forma Rents | $1,213',
+    'Current Cap Rate | 6.34%',
+    'Pro-Forma Cap Rate | 7.61%',
+    'Marcus & Millichap Deal Room (https://www.marcusmillichap.com/properties/654321?source=email)',
+  ].join('\n');
+  const details = extractForwardedListingDetails(text, subject);
+  assert.deepEqual(details, {
+    city: 'Jefferson City',
+    state: 'TN',
+    unitCount: 16,
+    price: 2_043_000,
+    vintage: 1997,
+    dealType: 'existing_multifamily',
+    noteLines: [
+      'Year built: 1996-1997',
+      'Deal room: https://www.marcusmillichap.com/properties/654321?source=email',
+      'Current rents: $1,058',
+      'Pro-forma rents: $1,213',
+      'Current cap rate: 6.34%',
+      'Pro-forma cap rate: 7.61%',
+    ],
+  });
+  assert.equal(normalizeForwardedBrokerName('Johnson, Harrison'), 'Harrison Johnson');
 }
 
 console.log('emailIntakeService fixture assertions passed');

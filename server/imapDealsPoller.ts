@@ -131,6 +131,13 @@ export function htmlEmailBodyToText(html: string): string {
   return html
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<(script|style|head|title)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+    .replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (_match, attributes: string, label: string) => {
+      const hrefMatch = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes);
+      const href = hrefMatch?.[1] || hrefMatch?.[2] || hrefMatch?.[3] || '';
+      if (!/^https?:\/\//i.test(href)) return label;
+      const labelText = label.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      return labelText && labelText !== href ? `${labelText} (${href})` : href;
+    })
     .replace(/<br\b[^>]*>/gi, '\n')
     .replace(/<hr\b[^>]*>/gi, '\n\n')
     .replace(/<li\b[^>]*>/gi, '\n• ')
@@ -152,10 +159,12 @@ export function htmlEmailBodyToText(html: string): string {
       const codePoint = Number.parseInt(value, 16);
       return Number.isFinite(codePoint) && codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : '';
     })
+    .replace(/[ \t]*\t+[ \t]*/g, ' | ')
     .replace(/\r/g, '')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n[ \t]+/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/^[ \t]*\|[ \t]*|[ \t]*\|[ \t]*$/gm, '')
+    .replace(/ {2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -175,9 +184,12 @@ export async function parseImapMessage(
   const htmlText = htmlEmailBodyToText(typeof parsed.html === 'string' ? parsed.html : '');
   const plainHasForwardedFrom = /(?:^|\n)\s*From:\s*[^\n]*@[^\s>]+/i.test(plainText);
   const htmlHasForwardedFrom = /(?:^|\n)\s*From:\s*[^\n]*@[^\s>]+/i.test(htmlText);
+  const countListingMarkers = (value: string) =>
+    value.match(/year built|list price|asking price|current rents?|pro[- ]?forma rents?|cap rate|deal room|https?:\/\//gi)?.length || 0;
   const text = htmlText && (
     !plainText ||
     htmlText.length > plainText.length ||
+    countListingMarkers(htmlText) > countListingMarkers(plainText) ||
     (htmlHasForwardedFrom && !plainHasForwardedFrom)
   ) ? htmlText : plainText;
   const attachments: ImapAttachmentFile[] = (parsed.attachments || []).map((attachment: any, index: number) => {
