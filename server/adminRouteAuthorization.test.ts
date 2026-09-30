@@ -69,6 +69,16 @@ test("email automation toggle GET and PATCH routes authenticate and check analys
   }
 });
 
+test("email intake poll health API authenticates and restricts status to platform admins", () => {
+  const routes = readFileSync(new URL("./routes.ts", import.meta.url), "utf8");
+  const routeStart = routes.indexOf("app.get('/api/email-intake/poll-health'");
+  assert.notEqual(routeStart, -1, "poll health route must exist");
+  const nextRouteStart = routes.indexOf("\n  app.", routeStart + 1);
+  const routeBody = routes.slice(routeStart, nextRouteStart === -1 ? undefined : nextRouteStart);
+  assert.match(routeBody, /isAuthenticated/);
+  assert.match(routeBody, /isPlatformAdminEmail/);
+});
+
 test("profile-scoped CRM tag routes exclude removed and demo shared contacts", () => {
   const routes = readFileSync(new URL("./routes.ts", import.meta.url), "utf8");
   assert.match(routes, /developer_broker_crm AS shared_crm[\s\S]{0,900}shared_crm\.is_removed = false/);

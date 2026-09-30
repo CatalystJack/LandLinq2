@@ -3958,6 +3958,20 @@ export const emailIntakeVolumeAlertState = pgTable("email_intake_volume_alert_st
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Durable health and alert state for the production deals mailbox poller.
+export const emailIntakePollHealth = pgTable("email_intake_poll_health", {
+  singletonKey: varchar("singleton_key", { length: 64 }).primaryKey(),
+  monitoringStartedAt: timestamp("monitoring_started_at").notNull().defaultNow(),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  lastSuccessfulPollAt: timestamp("last_successful_poll_at"),
+  failureCategory: varchar("failure_category"),
+  alertIncidentId: varchar("alert_incident_id"),
+  alertRaisedAt: timestamp("alert_raised_at"),
+  alertClaimed: boolean("alert_claimed").notNull().default(false),
+  alertSentAt: timestamp("alert_sent_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // ── Email Intake Training Examples ────────────────────────────────────────────
 // Curated input-output pairs used as few-shot context in the AI prompt.
 // Built automatically from analyst-corrected approvals.

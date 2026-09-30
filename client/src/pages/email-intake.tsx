@@ -77,6 +77,20 @@ interface TrainingExample {
   createdAt: string;
 }
 
+interface PollHealth {
+  state: "not_scheduled" | "disabled" | "starting" | "healthy" | "failed" | "stale";
+  monitoringStartedAt: string | null;
+  lastAttemptAt: string | null;
+  lastSuccessfulPollAt: string | null;
+  failureCategory: string | null;
+  staleAfterMinutes: number;
+  alertRaisedAt: string | null;
+  alertSentAt: string | null;
+  schedulerActive: boolean;
+  schedulerExpected: boolean;
+  automationEnabled: boolean;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function confidenceBadge(score: number | string | null | undefined) {
@@ -106,6 +120,24 @@ function timeAgo(iso: string) {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function formatHealthTimestamp(value: string | null) {
+  if (!value) return "Never";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "Unknown" : `${parsed.toLocaleString()} (${timeAgo(value)})`;
+}
+
+function pollFailureLabel(category: string | null) {
+  switch (category) {
+    case "authentication": return "Mailbox authentication failed";
+    case "connection": return "Could not connect to the mailbox";
+    case "mailbox_access": return "Could not read the mailbox";
+    case "message_processing": return "One or more emails could not be fully processed";
+    case "automation_disabled": return "Email automation is turned off";
+    case "unknown": return "Unexpected poller error (details withheld)";
+    default: return "No failure category recorded";
+  }
 }
 
 // ── Edit Modal ───────────────────────────────────────────────────────────────
@@ -844,6 +876,17 @@ export default function EmailIntakePage() {
     refetchInterval: 30000,
   });
 
+  const pollHealth = useQuery<PollHealth>({
+    queryKey: ["/api/email-intake/poll-health"],
+    queryFn: async () => {
+      const res = await fetch("/api/email-intake/poll-health", { credentials: "include" });
+      if (!res.ok) throw new Error("Poll health is only available to platform administrators.");
+      return res.json();
+    },
+    refetchInterval: 30000,
+    retry: false,
+  });
+
   const approveMutation = useMutation({
     mutationFn: async ({ id, overrides }: { id: string; overrides: Record<string, any> }) => {
       setActionItem(id);
@@ -941,6 +984,60 @@ export default function EmailIntakePage() {
 
       {/* Main content */}
       <div className="flex-1 max-w-5xl w-full mx-auto px-6 py-6">
+        {pollHealth.data && (() => {
+          const status = pollHealth.data;
+          const isWarning = status.state === "stale" || status.state === "failed";
+          const colors = isWarning
+            ? "border-red-300 bg-red-50 text-red-900"
+            : status.state === "healthy"
+              ? "border-green-200 bg-green-50 text-green-900"
+              : "border-amber-200 bg-amber-50 text-amber-900";
+          const heading = {
+            not_scheduled: "Mailbox poller is not scheduled in this environment",
+            disabled: "Mailbox polling is paused",
+            starting: "Waiting for the first mailbox poll",
+            healthy: "Mailbox polling is healthy",
+            failed: "Mailbox poll needs attention",
+            stale: "Mailbox polling is stale",
+          }[status.state];
+          const description = {
+            not_scheduled: "This environment does not run the production mailbox poller.",
+            disabled: "Email automation is turned off.",
+            starting: "The poller has not completed its first attempt yet.",
+            healthy: "The mailbox was checked recently.",
+            failed: status.schedulerExpected && !status.schedulerActive
+              ? "The production mailbox poller is expected but is not scheduled."
+              : pollFailureLabel(status.failureCategory),
+            stale: `No successful mailbox poll in ${status.staleAfterMinutes} minutes. New deal emails may not appear in the queue.`,
+          }[status.state];
+
+          return (
+            <Card className={`mb-5 border ${colors}`} role={isWarning ? "alert" : "status"} data-testid="card-email-intake-poll-health">
+              <CardContent className="py-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <h2 className="font-semibold">{heading}</h2>
+                    <p className="text-sm mt-1">{description}</p>
+                    <div className="grid gap-x-8 gap-y-1 mt-3 text-xs sm:grid-cols-2">
+                      <p><span className="font-medium">Last poll attempt:</span> {formatHealthTimestamp(status.lastAttemptAt)}</p>
+                      <p><span className="font-medium">Last successful poll:</span> {formatHealthTimestamp(status.lastSuccessfulPollAt)}</p>
+                      {status.state === "stale" && status.alertRaisedAt && (
+                        <p className="sm:col-span-2">
+                          <span className="font-medium">Stale alert:</span>{" "}
+                          {status.alertSentAt
+                            ? `Notification sent ${formatHealthTimestamp(status.alertSentAt)}`
+                            : `Notification queued ${formatHealthTimestamp(status.alertRaisedAt)}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
         <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
           <TabsList className="mb-5">
             <TabsTrigger value="pending" className="gap-1.5">

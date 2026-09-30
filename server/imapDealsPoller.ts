@@ -14,6 +14,15 @@ import { db } from './db.js';
 import { emailIntakeQueue } from '../shared/schema.js';
 import { eq } from 'drizzle-orm';
 import { getEmailScrapingEnabled } from './emailAutomationConfig.js';
+import {
+  classifyDealsImapPollFailure,
+  initializeDealsImapPollHealth,
+  startDealsImapPollHealthWatchdog,
+  recordDealsImapPollAttempt,
+  recordDealsImapPollDisabled,
+  recordDealsImapPollFailure,
+  recordDealsImapPollSuccess,
+} from './emailIntakePollHealth.js';
 
 export const DEALS_IMAP_MAILBOX = 'deals@landlinq.ai';
 export const DEALS_IMAP_HOST = 'imap.secureserver.net';
@@ -187,11 +196,14 @@ export function createImapDealsPoller(
     if (running) return emptyResult(true);
     running = true;
     const result = emptyResult();
-    const client = createClient();
+    let client: ImapMailboxClient | undefined;
     let lock: { release(): void } | undefined;
+    let stage: 'connect' | 'mailbox' = 'connect';
 
     try {
+      client = createClient();
       await client.connect();
+      stage = 'mailbox';
       lock = await client.getMailboxLock('INBOX');
       const unseen = await client.search({ seen: false }, { uid: true });
       const uids = Array.isArray(unseen) ? unseen : [];
@@ -218,10 +230,16 @@ export function createImapDealsPoller(
         }
       }
       return result;
+    } catch (error) {
+      const sanitizedError = new Error('Deals mailbox polling failed') as Error & {
+        pollFailureCategory: string;
+      };
+      sanitizedError.pollFailureCategory = classifyDealsImapPollFailure(error, stage);
+      throw sanitizedError;
     } finally {
       lock?.release();
       try {
-        await client.logout();
+        await client?.logout();
       } catch {
         // A dead connection is already unusable; preserve the original poll error.
       }
@@ -301,9 +319,42 @@ export function pollDealsMailboxImap(): Promise<ImapDealsPollResult> {
 export async function runDealsImapPollCycle(
   readEnabled: () => Promise<boolean> = getEmailScrapingEnabled,
   pollMailbox: () => Promise<ImapDealsPollResult> = pollDealsMailboxImap,
+  health = {
+    recordAttempt: recordDealsImapPollAttempt,
+    recordDisabled: recordDealsImapPollDisabled,
+    recordFailure: recordDealsImapPollFailure,
+    recordSuccess: recordDealsImapPollSuccess,
+  },
 ): Promise<ImapDealsPollResult | null> {
-  if (!(await readEnabled())) return null;
-  return pollMailbox();
+  const now = new Date();
+  if (!(await readEnabled())) {
+    try {
+      await health.recordDisabled(now);
+    } catch {
+      console.error('[IMAP-DEALS] Unable to record the disabled poll status.');
+    }
+    return null;
+  }
+
+  try {
+    await health.recordAttempt(now);
+  } catch {
+    console.error('[IMAP-DEALS] Unable to record the poll attempt.');
+  }
+  try {
+    const result = await pollMailbox();
+    if (!result.skippedBecauseRunning) {
+      await health.recordSuccess(result, new Date());
+    }
+    return result;
+  } catch (error) {
+    try {
+      await health.recordFailure(error, new Date());
+    } catch {
+      console.error('[IMAP-DEALS] Unable to record the poll failure.');
+    }
+    throw error;
+  }
 }
 
 /** Start one delayed, non-overlapping production schedule. */
@@ -322,12 +373,21 @@ export function startDealsImapPoller(intervalMs = DEFAULT_IMAP_INTERVAL_MS): voi
         `manual/deferred=${result.deferred}, errors=${result.errors}, readFailures=${result.markReadFailures}`,
       );
     } catch (error) {
-      console.error('[IMAP-DEALS] Poll failed; messages remain unseen:', error);
+      const category = classifyDealsImapPollFailure(error);
+      console.error(`[IMAP-DEALS] Poll failed (${category}); messages remain unseen.`);
     }
   };
 
+  void initializeDealsImapPollHealth(new Date()).catch(() => {
+    console.error('[IMAP-DEALS] Unable to initialize the poll health status.');
+  });
+  startDealsImapPollHealthWatchdog(intervalMs);
   pollSchedule = setInterval(run, intervalMs);
   pollSchedule.unref?.();
   // Intentionally no immediate run: startup must finish before the first poll.
   console.log(`[IMAP-DEALS] Poller scheduled every ${Math.round(intervalMs / 1000)} seconds`);
+}
+
+export function isDealsImapPollerScheduled(): boolean {
+  return Boolean(pollSchedule);
 }

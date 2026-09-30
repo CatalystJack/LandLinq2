@@ -320,6 +320,14 @@ class BackgroundJobProcessor {
             break;
           }
 
+          case 'email_intake_poll_health_alert': {
+            const { processClaimedDealsImapPollHealthAlert } = await import('./emailIntakePollHealth');
+            result = await processClaimedDealsImapPollHealthAlert(
+              String((job.payload as any)?.incidentId || ''),
+            );
+            break;
+          }
+
           default:
             throw new Error(`Unknown job type: ${job.jobType}`);
         }
@@ -374,6 +382,10 @@ class BackgroundJobProcessor {
           if (job.jobType === 'email_intake_volume_alert') {
             const { releaseEmailIntakeVolumeAlertClaim } = await import('./emailIntakeVolumeAlert');
             await releaseEmailIntakeVolumeAlertClaim(String((job.payload as any)?.spikeId || ''));
+          }
+          if (job.jobType === 'email_intake_poll_health_alert') {
+            const { releaseDealsImapPollHealthAlertClaim } = await import('./emailIntakePollHealth');
+            await releaseDealsImapPollHealthAlertClaim(String((job.payload as any)?.incidentId || ''));
           }
 
           // Send admin notification for failed job

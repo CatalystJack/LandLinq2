@@ -28823,6 +28823,28 @@ RULES:
 
   // ── Email Intake Queue API ─────────────────────────────────────────────────
 
+  // GET /api/email-intake/poll-health — platform administrators only
+  app.get('/api/email-intake/poll-health', isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (!isPlatformAdminEmail(user?.claims?.email || user?.email)) {
+      return res.status(403).json({ message: 'Platform administrator access required.' });
+    }
+
+    try {
+      const { getDealsImapPollHealthStatus } = await import('./emailIntakePollHealth.js');
+      const { isDealsImapPollerScheduled } = await import('./imapDealsPoller.js');
+      const automationEnabled = await getEmailScrapingEnabledFromDatabase();
+      const status = await getDealsImapPollHealthStatus({
+        automationEnabled,
+        schedulerActive: isDealsImapPollerScheduled(),
+        schedulerExpected: process.env.NODE_ENV === 'production',
+      });
+      return res.json(status);
+    } catch {
+      return res.status(500).json({ message: 'Unable to read mailbox poll health.' });
+    }
+  });
+
   // GET /api/email-intake?status=pending|approved|rejected
   app.get('/api/email-intake', isAuthenticated, async (req, res) => {
     try {

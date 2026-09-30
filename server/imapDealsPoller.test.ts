@@ -6,6 +6,11 @@ import {
   parseImapMessage,
   runDealsImapPollCycle,
 } from './imapDealsPoller';
+import {
+  classifyDealsImapPollFailure,
+  computeDealsImapPollHealthState,
+  DEALS_IMAP_STALE_AFTER_MS,
+} from './emailIntakePollHealth';
 
 const fixture = [
   'From: Jane Broker <jane@example.com>',
@@ -76,6 +81,22 @@ assert.deepEqual(marked, [7, 8]);
 assert.equal(releaseCount, 1);
 assert.equal(logoutCount, 1);
 
+const failingPoll = createImapDealsPoller({
+  createClient: () => ({
+    ...fakeClient,
+    async connect() {
+      throw new Error('Login failed for jane@example.com using mailbox-password');
+    },
+  }),
+  processMessage: async () => true,
+});
+await assert.rejects(failingPoll(), (error: any) => {
+  assert.equal(error.message, 'Deals mailbox polling failed');
+  assert.equal(error.pollFailureCategory, 'authentication');
+  assert.doesNotMatch(error.message, /jane@example\.com|mailbox-password/);
+  return true;
+});
+
 let deferredMarkCount = 0;
 const deferredPoll = createImapDealsPoller({
   createClient: () => ({
@@ -109,10 +130,65 @@ const fakeMailboxPoll = async () => {
   livePollCount++;
   return pollCycleResult;
 };
+const healthEvents: string[] = [];
+const fakeHealth = {
+  recordAttempt: async () => { healthEvents.push('attempt'); },
+  recordDisabled: async () => { healthEvents.push('disabled'); },
+  recordFailure: async () => { healthEvents.push('failure'); },
+  recordSuccess: async () => { healthEvents.push('success'); },
+};
 
-assert.equal(await runDealsImapPollCycle(readEnabled, fakeMailboxPoll), null);
+assert.equal(await runDealsImapPollCycle(readEnabled, fakeMailboxPoll, fakeHealth), null);
 assert.equal(livePollCount, 0);
+assert.deepEqual(healthEvents, ['disabled']);
 enabled = true;
-assert.equal(await runDealsImapPollCycle(readEnabled, fakeMailboxPoll), pollCycleResult);
+assert.equal(await runDealsImapPollCycle(readEnabled, fakeMailboxPoll, fakeHealth), pollCycleResult);
 assert.equal(livePollCount, 1);
+assert.deepEqual(healthEvents, ['disabled', 'attempt', 'success']);
+
+assert.equal(
+  classifyDealsImapPollFailure(new Error('Authentication failed for jane@example.com with password secret')),
+  'authentication',
+);
+assert.equal(
+  classifyDealsImapPollFailure({ code: 'ETIMEDOUT', message: 'socket timeout to private-host' }),
+  'connection',
+);
+assert.equal(classifyDealsImapPollFailure(new Error('Mailbox closed'), 'mailbox'), 'mailbox_access');
+
+const now = new Date('2026-09-30T12:00:00.000Z');
+const freshSuccess = new Date(now.getTime() - DEALS_IMAP_STALE_AFTER_MS + 1000);
+const commonHealth = {
+  now,
+  monitoringStartedAt: new Date(now.getTime() - DEALS_IMAP_STALE_AFTER_MS * 2),
+  lastAttemptAt: new Date(now.getTime() - 10_000),
+  lastSuccessfulPollAt: freshSuccess,
+  failureCategory: null,
+  automationEnabled: true,
+  schedulerActive: true,
+  schedulerExpected: true,
+};
+assert.equal(computeDealsImapPollHealthState(commonHealth), 'healthy');
+assert.equal(computeDealsImapPollHealthState({
+  ...commonHealth,
+  lastSuccessfulPollAt: new Date(now.getTime() - DEALS_IMAP_STALE_AFTER_MS),
+}), 'stale');
+assert.equal(computeDealsImapPollHealthState({
+  ...commonHealth,
+  failureCategory: 'authentication',
+}), 'failed');
+assert.equal(computeDealsImapPollHealthState({
+  ...commonHealth,
+  automationEnabled: false,
+}), 'disabled');
+assert.equal(computeDealsImapPollHealthState({
+  ...commonHealth,
+  schedulerActive: false,
+  schedulerExpected: false,
+}), 'not_scheduled');
+assert.equal(computeDealsImapPollHealthState({
+  ...commonHealth,
+  schedulerActive: false,
+  schedulerExpected: true,
+}), 'failed');
 console.log('imapDealsPoller fixture assertions passed');
