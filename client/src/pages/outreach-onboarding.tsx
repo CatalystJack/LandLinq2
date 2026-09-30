@@ -1310,6 +1310,14 @@ export default function OutreachOnboarding() {
         if (file) imageFiles.push(file);
       }
     }
+
+    // Outlook desktop may expose clipboard images through files instead of
+    // image-typed DataTransferItems. Use that representation when needed.
+    if (imageFiles.length === 0) {
+      for (const file of Array.from(clipboardData.files || [])) {
+        if (file.type.startsWith('image/')) imageFiles.push(file);
+      }
+    }
     
     // If the clipboard only contains image files (for example, a screenshot),
     // upload and insert them. Outlook can expose both an image file and rich
@@ -2642,6 +2650,9 @@ export default function OutreachOnboarding() {
                   )}
                 </div>
                 <Popover open={signaturePopoverOpen} onOpenChange={(open) => {
+                  // Keep the editor mounted until pasted image uploads finish;
+                  // otherwise their completed HTML can no longer be inserted.
+                  if (!open && isUploadingSignatureLogo) return;
                   if (!open) {
                     // Sync signature from ref to state when popover closes
                     syncSignatureToState();
@@ -2654,7 +2665,7 @@ export default function OutreachOnboarding() {
                       {editingSender.signatureHtml ? 'Edit Signature' : 'Add Signature'}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[500px] p-4" align="end">
+                  <PopoverContent className="w-[calc(100vw-2rem)] max-w-[500px] max-h-[85vh] overflow-y-auto p-4" align="end">
                     <div className="space-y-3">
                       <div className="flex items-start justify-between">
                         <div>
@@ -2809,6 +2820,11 @@ export default function OutreachOnboarding() {
                           </Button>
                         </div>
                       </div>
+                      {isUploadingSignatureLogo && (
+                        <p className="text-xs text-blue-700" role="status">
+                          Preparing signature images. Keep this editor open until it finishes.
+                        </p>
+                      )}
                       <input
                         ref={(el) => { (window as any).__signatureReplaceInput = el; }}
                         type="file"
@@ -2945,9 +2961,11 @@ export default function OutreachOnboarding() {
                             }
                             setSignaturePopoverOpen(false);
                           }}
-                          disabled={autoSaveSignatureMutation.isPending}
+                          disabled={autoSaveSignatureMutation.isPending || isUploadingSignatureLogo}
                         >
-                          {autoSaveSignatureMutation.isPending ? 'Saving...' : 'Done'}
+                          {isUploadingSignatureLogo
+                            ? 'Preparing images...'
+                            : autoSaveSignatureMutation.isPending ? 'Saving...' : 'Done'}
                         </Button>
                         {editingSender.signatureHtml && (
                           <Button 
@@ -2962,7 +2980,7 @@ export default function OutreachOnboarding() {
                               // Auto-save cleared signature to database (keeps modal open)
                               autoSaveSignatureMutation.mutate({ id: editingSender.id, signatureHtml: '', senderEmail: editingSender.email });
                             }}
-                            disabled={autoSaveSignatureMutation.isPending}
+                            disabled={autoSaveSignatureMutation.isPending || isUploadingSignatureLogo}
                           >
                             {autoSaveSignatureMutation.isPending ? 'Clearing...' : 'Clear Signature'}
                           </Button>
