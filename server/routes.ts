@@ -34186,7 +34186,7 @@ RULES:
       console.log(`📝 [SIGNATURE-SAVE] Request received:`, {
         senderId: req.params.senderId,
         userEmail,
-        isAnalyst,
+        isPlatformAdmin: scope.isPlatformAdmin,
         hasUser: !!user,
         signatureLength: req.body?.signatureHtml?.length || 0
       });
