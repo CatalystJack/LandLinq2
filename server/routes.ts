@@ -25187,12 +25187,10 @@ RULES:
   // SECURITY: SSRF protection with URL validation
   app.post("/api/upload-external-image", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
-      const isAdmin = isPlatformAdminEmail(user?.email);
-      
-      if (!isAdmin) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
+      const senderId = typeof req.body?.senderId === "string" ? req.body.senderId.trim() : "";
+      if (!senderId) return res.status(400).json({ error: "senderId is required" });
+      const scope = await getOutreachSenderScope(req, res, senderId, 403);
+      if (!scope) return;
       
       const { imageUrl } = req.body;
       
@@ -25321,13 +25319,10 @@ RULES:
 
   app.post("/api/upload-logo", isAuthenticated, logoUpload.single('logo'), async (req, res) => {
     try {
-      // Check admin permissions
-      const user = req.user as any;
-      const isAdmin = isPlatformAdminEmail(user?.email);
-      
-      if (!isAdmin) {
-        return res.status(403).json({ error: "Admin access required to upload logo" });
-      }
+      const senderId = typeof req.body?.senderId === "string" ? req.body.senderId.trim() : "";
+      if (!senderId) return res.status(400).json({ error: "senderId is required" });
+      const scope = await getOutreachSenderScope(req, res, senderId, 403);
+      if (!scope) return;
       
       if (!req.file) {
         return res.status(400).json({ error: "No file provided" });
@@ -33906,7 +33901,7 @@ RULES:
 
   // Shared sender records (NULL developer_profile_id) are internal-only.
   // A developer may access only sender records owned by its active profile.
-  const getOutreachSenderScope = async (req: any, res: any, senderId: string) => {
+  const getOutreachSenderScope = async (req: any, res: any, senderId: string, deniedStatus: 403 | 404 = 404) => {
     const user = req.user as any;
     const email = String(user?.claims?.email || user?.email || "").toLowerCase();
     if (isPlatformAdminEmail(email)) return { isPlatformAdmin: true, developerProfileId: null };
@@ -33919,7 +33914,9 @@ RULES:
       LIMIT 1
     `);
     if (!owned.rows?.length) {
-      res.status(404).json({ error: "Sender not found" });
+      res.status(deniedStatus).json({
+        error: deniedStatus === 403 ? "Sender access denied" : "Sender not found",
+      });
       return null;
     }
     return { isPlatformAdmin: false, developerProfileId };

@@ -1170,9 +1170,10 @@ export default function OutreachOnboarding() {
   };
 
   // Helper to upload an image file and return the URL
-  const uploadImageFile = async (file: File): Promise<string | null> => {
+  const uploadImageFile = async (file: File, senderId: string): Promise<string | null> => {
     try {
       const formData = new FormData();
+      formData.append('senderId', senderId);
       formData.append('logo', file);
       
       const response = await fetch('/api/upload-logo', {
@@ -1214,6 +1215,8 @@ export default function OutreachOnboarding() {
 
   // Handler for paste events - auto-uploads pasted images
   const handleSignaturePaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const senderId = editingSender?.id;
+    if (!senderId) return;
     const clipboardData = e.clipboardData;
     const editor = signatureEditorRef.current;
     const selection = window.getSelection();
@@ -1293,7 +1296,7 @@ export default function OutreachOnboarding() {
       setIsUploadingSignatureLogo(true);
       
       for (const file of imageFiles) {
-        const imageUrl = await uploadImageFile(file);
+        const imageUrl = await uploadImageFile(file, senderId);
         if (imageUrl) {
           const img = document.createElement('img');
           img.src = imageUrl;
@@ -1320,7 +1323,7 @@ export default function OutreachOnboarding() {
     if (imageFiles.length > 0 && html) {
       setIsUploadingSignatureLogo(true);
       for (const file of imageFiles) {
-        const uploadedUrl = await uploadImageFile(file);
+        const uploadedUrl = await uploadImageFile(file, senderId);
         if (!uploadedUrl) continue;
 
         const imageTagMatch = html.match(/<img\b[^>]*\bsrc=(["'])(?:(?:cid|file|blob):[^"']*|about:blank|)\1[^>]*>/i);
@@ -1348,7 +1351,7 @@ export default function OutreachOnboarding() {
         const dataUri = match[2];
         const file = dataURItoFile(dataUri, `pasted-image-${Date.now()}.png`);
         if (file) {
-          const uploadedUrl = await uploadImageFile(file);
+          const uploadedUrl = await uploadImageFile(file, senderId);
           if (uploadedUrl) {
             // Replace the data URI with the uploaded URL
             html = html.replace(fullTag, fullTag.replace(dataUri, uploadedUrl));
@@ -1393,7 +1396,7 @@ export default function OutreachOnboarding() {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageUrl: externalUrl })
+            body: JSON.stringify({ imageUrl: externalUrl, senderId })
           });
           
           if (response.ok) {
@@ -1500,7 +1503,8 @@ export default function OutreachOnboarding() {
   // Handler to upload logo image and insert into signature editor
   const handleSignatureLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    const senderId = editingSender?.id;
+    if (!file || !senderId) return;
     
     // Validate file type
     if (!file.type.startsWith('image/')) {
@@ -1518,6 +1522,7 @@ export default function OutreachOnboarding() {
     
     try {
       const formData = new FormData();
+      formData.append('senderId', senderId);
       formData.append('logo', file);
       
       const response = await fetch('/api/upload-logo', {
@@ -2636,7 +2641,8 @@ export default function OutreachOnboarding() {
                             variant="outline"
                             size="sm"
                             onClick={async () => {
-                              if (!signatureEditorRef.current) return;
+                              const senderId = editingSender?.id;
+                              if (!signatureEditorRef.current || !senderId) return;
                               
                               setIsUploadingSignatureLogo(true);
                               const imgs = signatureEditorRef.current.querySelectorAll('img');
@@ -2682,7 +2688,7 @@ export default function OutreachOnboarding() {
                                       method: 'POST',
                                       credentials: 'include',
                                       headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ imageUrl: src })
+                                      body: JSON.stringify({ imageUrl: src, senderId })
                                     });
                                     
                                     if (response.ok) {
@@ -2742,11 +2748,13 @@ export default function OutreachOnboarding() {
                         onChange={async (e) => {
                           const file = e.target.files?.[0];
                           const targetImg = (window as any).__signatureReplaceTarget as HTMLImageElement | null;
-                          if (!file || !targetImg) return;
+                          const senderId = editingSender?.id;
+                          if (!file || !targetImg || !senderId) return;
                           
                           setIsUploadingSignatureLogo(true);
                           try {
                             const formData = new FormData();
+                            formData.append('senderId', senderId);
                             formData.append('logo', file);
                             const response = await fetch('/api/upload-logo', {
                               method: 'POST',
