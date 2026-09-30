@@ -2671,7 +2671,7 @@ export default function OutreachOnboarding() {
                         <div>
                           <Label className="text-sm font-medium">Personal Email Signature</Label>
                           <p className="text-xs text-gray-500">
-                            Copy your signature from Outlook's settings and paste it here. Bold text, links, and logos are preserved.
+                            Copy your Outlook desktop signature and paste it here. Formatting and links are preserved; images are saved automatically when Outlook includes them in the clipboard.
                           </p>
                         </div>
                         <div className="flex gap-1 flex-wrap justify-end">
