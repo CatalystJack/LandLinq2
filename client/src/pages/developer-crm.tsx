@@ -88,7 +88,6 @@ const createEmptyCompanyContactDraft = () => ({
   stateRegion: "",
   postalCode: "",
   assignedTo: "",
-  tags: "",
 });
 
 function normalizeContactCategory(value: unknown) {
@@ -253,6 +252,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [importOpen, setImportOpen] = useState(false);
   const [createContactOpen, setCreateContactOpen] = useState(false);
   const [contactDraft, setContactDraft] = useState(createEmptyCompanyContactDraft);
+  const [selectedContactTags, setSelectedContactTags] = useState<string[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -460,7 +460,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           stateRegion: contactDraft.stateRegion.trim(),
           postalCode: contactDraft.postalCode.trim(),
           assignedTo: contactDraft.assignedTo.trim(),
-          tags: contactDraft.tags.trim(),
+          tags: selectedContactTags,
         }],
       }),
     }),
@@ -470,6 +470,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/crm-tags"] });
       setCreateContactOpen(false);
       setContactDraft(createEmptyCompanyContactDraft());
+      setSelectedContactTags([]);
       if (Number(data.updated || 0) > 0) {
         toast({
           title: "Existing contact updated",
@@ -720,6 +721,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                   onClick={() => {
                     createCompanyContactMutation.reset();
                     setContactDraft(createEmptyCompanyContactDraft());
+                    setSelectedContactTags([]);
                     setCreateContactOpen(true);
                   }}
                 >
@@ -1177,7 +1179,10 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       <Dialog open={createContactOpen} onOpenChange={(open) => {
         if (!open && createCompanyContactMutation.isPending) return;
         setCreateContactOpen(open);
-        if (!open) setContactDraft(createEmptyCompanyContactDraft());
+        if (!open) {
+          setContactDraft(createEmptyCompanyContactDraft());
+          setSelectedContactTags([]);
+        }
       }}>
         <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto">
           <DialogHeader>
@@ -1314,14 +1319,74 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                   />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="company-contact-tags">CRM tags</Label>
-                  <Input
-                    id="company-contact-tags"
-                    maxLength={1000}
-                    placeholder="Separate tags with commas"
-                    value={contactDraft.tags}
-                    onChange={(event) => setContactDraft((current) => ({ ...current, tags: event.target.value }))}
-                  />
+                  <Label htmlFor="company-contact-tags-trigger">CRM tags</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        id="company-contact-tags-trigger"
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between font-normal"
+                      >
+                        <span className={selectedContactTags.length ? "truncate text-[#405a70]" : "text-[#8195a5]"}>
+                          {selectedContactTags.length
+                            ? `${selectedContactTags.length} tag${selectedContactTags.length === 1 ? "" : "s"} selected`
+                            : "Choose company CRM tags"}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-[#8195a5]" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className="max-h-60 w-72 max-w-[calc(100vw-3rem)] overflow-y-auto"
+                    >
+                      <DropdownMenuLabel>Organization-specific tags</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {tagsQuery.isLoading ? (
+                        <div className="px-2 py-2 text-xs text-[#7b8d9b]">Loading company tags…</div>
+                      ) : tagsQuery.isError ? (
+                        <div className="px-2 py-2 text-xs text-red-600">Could not load company tags. Close and try again.</div>
+                      ) : availableTags.length ? (
+                        availableTags.map((tag) => (
+                          <DropdownMenuCheckboxItem
+                            key={tag}
+                            checked={selectedContactTags.includes(tag)}
+                            onSelect={(event) => event.preventDefault()}
+                            onCheckedChange={(checked) => setSelectedContactTags((current) => {
+                              if (checked) return current.includes(tag) ? current : [...current, tag];
+                              return current.filter((value) => value !== tag);
+                            })}
+                          >
+                            <span className="max-w-[220px] truncate">{tag}</span>
+                          </DropdownMenuCheckboxItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-2 text-xs text-[#7b8d9b]">
+                          No company CRM tags yet. Create tags from the CRM tag manager.
+                        </div>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  {selectedContactTags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1" aria-label="Selected CRM tags">
+                      {selectedContactTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex max-w-full items-center gap-1 rounded-full border border-[#d7e2e9] bg-[#f4f8fb] py-1 pl-2.5 pr-1 text-xs text-[#405a70]"
+                        >
+                          <span className="max-w-[220px] truncate">{tag}</span>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${tag} tag`}
+                            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-[#e3edf5]"
+                            onClick={() => setSelectedContactTags((current) => current.filter((value) => value !== tag))}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </fieldset>

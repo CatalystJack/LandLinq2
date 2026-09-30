@@ -17891,7 +17891,22 @@ RULES:
         const stateRegion = readField(row.stateRegion, "State / region", 100);
         const postalCode = readField(row.postalCode, "Postal code", 24);
         const assignedTo = readField(row.assignedTo, "Assigned to", 120);
-        const tags = readField(row.tags, "Tags", 1000);
+        const tags = Array.isArray(row.tags)
+          ? (() => {
+            if (row.tags.length > 100) validationErrors.push(`Row ${rowNumber} has more than 100 CRM tags.`);
+            const selectedTags = row.tags.slice(0, 100).map((tag: unknown) => {
+              if (typeof tag !== "string") {
+                validationErrors.push(`Row ${rowNumber} has an invalid CRM tag.`);
+                return "";
+              }
+              return readField(tag, "CRM tag", 160);
+            }).filter(Boolean);
+            if (selectedTags.join(", ").length > 1000) {
+              validationErrors.push(`Row ${rowNumber}: Tags exceeds 1,000 characters.`);
+            }
+            return selectedTags;
+          })()
+          : readField(row.tags, "Tags", 1000);
         const rawCategory = readField(row.contactCategory, "Contact category", 40).toLowerCase().replace(/[\s/-]+/g, "_");
         const contactCategory = ["lawyer", "attorney_lawyer"].includes(rawCategory)
           ? "attorney"
@@ -17938,10 +17953,12 @@ RULES:
         const brokerage = String(row.brokerage || '').trim() || null;
         const stateRegion = String(row.stateRegion || '').trim() || null;
         const assignedTo = String(row.assignedTo || '').trim() || null;
-        const rawTags = String(row.tags || '')
-          .split(/[;,]/)
-          .map((tag: string) => tag.trim())
-          .filter(Boolean);
+        const rawTags = Array.isArray(row.tags)
+          ? row.tags.map((tag: string) => tag.trim()).filter(Boolean)
+          : String(row.tags || '')
+            .split(/[;,]/)
+            .map((tag: string) => tag.trim())
+            .filter(Boolean);
 
         if (!firstName && !lastName && !email) continue;
 
