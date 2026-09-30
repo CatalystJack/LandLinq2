@@ -76,6 +76,21 @@ const FIELDS = [
 
 const MAX_CONTACT_IMPORT_ROWS = 2500;
 
+const createEmptyCompanyContactDraft = () => ({
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  brokerage: "",
+  contactCategory: "other",
+  mailingAddress: "",
+  city: "",
+  stateRegion: "",
+  postalCode: "",
+  assignedTo: "",
+  tags: "",
+});
+
 function normalizeContactCategory(value: unknown) {
   const normalized = String(value || "").trim().toLowerCase().replace(/[\s/-]+/g, "_");
   if (["attorney", "lawyer", "attorney_lawyer"].includes(normalized)) return "attorney";
@@ -236,6 +251,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [renameNewTag, setRenameNewTag] = useState("");
   const [createTagValue, setCreateTagValue] = useState("");
   const [importOpen, setImportOpen] = useState(false);
+  const [createContactOpen, setCreateContactOpen] = useState(false);
+  const [contactDraft, setContactDraft] = useState(createEmptyCompanyContactDraft);
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -255,6 +272,12 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const stagedImportRows = rows
     .map((row) => Object.fromEntries(FIELDS.map(({ key }) => [key, mapping[key] ? row[mapping[key]] : ""])))
     .filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
+  const hasContactNameOrEmail = Boolean(
+    contactDraft.firstName.trim() || contactDraft.lastName.trim() || contactDraft.email.trim(),
+  );
+  const contactDraftEmailIsValid = !contactDraft.email.trim() ||
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactDraft.email.trim());
+  const canCreateCompanyContact = hasContactNameOrEmail && contactDraftEmailIsValid;
   const importValidationErrors: string[] = [];
   if (stagedImportRows.length > MAX_CONTACT_IMPORT_ROWS) {
     importValidationErrors.push(`The limit is ${MAX_CONTACT_IMPORT_ROWS.toLocaleString()} non-empty rows per import.`);
@@ -417,6 +440,50 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       toast({ title: "Contacts imported", description: `${data.inserted} inserted, ${data.updated} updated.` });
     },
     onError: (error: Error) => toast({ title: "Import failed", description: error.message, variant: "destructive" }),
+  });
+
+  const createCompanyContactMutation = useMutation({
+    mutationFn: () => requestJson("/api/developer-profile/me/import-contacts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        entryMode: "manual",
+        contacts: [{
+          ...contactDraft,
+          firstName: contactDraft.firstName.trim(),
+          lastName: contactDraft.lastName.trim(),
+          email: contactDraft.email.trim(),
+          phone: contactDraft.phone.trim(),
+          brokerage: contactDraft.brokerage.trim(),
+          mailingAddress: contactDraft.mailingAddress.trim(),
+          city: contactDraft.city.trim(),
+          stateRegion: contactDraft.stateRegion.trim(),
+          postalCode: contactDraft.postalCode.trim(),
+          assignedTo: contactDraft.assignedTo.trim(),
+          tags: contactDraft.tags.trim(),
+        }],
+      }),
+    }),
+    onSuccess: (data: { inserted?: number; updated?: number }) => {
+      queryClient.invalidateQueries({ queryKey: [contactsQueryKey] });
+      queryClient.invalidateQueries({ queryKey: [contactsQueryKey, "filter-options"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/crm-tags"] });
+      setCreateContactOpen(false);
+      setContactDraft(createEmptyCompanyContactDraft());
+      if (Number(data.updated || 0) > 0) {
+        toast({
+          title: "Existing contact updated",
+          description: "An email match in your company CRM was updated instead of creating a duplicate.",
+        });
+      } else {
+        toast({ title: "Contact added", description: "The contact was added to your company CRM." });
+      }
+    },
+    onError: (error: Error) => toast({
+      title: "Could not add contact",
+      description: error.message,
+      variant: "destructive",
+    }),
   });
 
   const tagMutation = useMutation({
@@ -645,9 +712,24 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           title="Company contacts"
           eyebrow={adminMode ? "Relationship management" : undefined}
           actions={
-            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" />{isGeneralSales ? "Import company contacts" : "Import contacts"}
-            </Button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              {!adminMode && (
+                <Button
+                  size="sm"
+                  className="border border-[#498EDE] bg-[#498EDE] text-white hover:border-[#9dcaf2] hover:bg-white hover:text-[#498EDE]"
+                  onClick={() => {
+                    createCompanyContactMutation.reset();
+                    setContactDraft(createEmptyCompanyContactDraft());
+                    setCreateContactOpen(true);
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />Add contact
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />{isGeneralSales ? "Import company contacts" : "Import contacts"}
+              </Button>
+            </div>
           }
         />
 
@@ -897,7 +979,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           ) : contactsQuery.isError ? (
             <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center"><p className="text-sm font-medium text-[#9b4545]">{(contactsQuery.error as Error).message}</p><Button variant="outline" className="mt-4 h-9" onClick={() => contactsQuery.refetch()}><RefreshCw className="mr-2 h-3.5 w-3.5" />Try again</Button></div>
            ) : filteredContacts.length === 0 ? (
-              <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search.trim() || hasActiveFilters ? "No matching contacts" : adminMode ? "No contacts in this company CRM" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search.trim() || hasActiveFilters ? "Try clearing a filter or broadening your search." : adminMode ? "This company has no visible CRM contacts. Shared directory additions can still appear based on its access settings." : "Import a contact list to get started."}</p>{(search.trim() || hasActiveFilters) && <Button variant="outline" onClick={() => { setSearch(""); clearFilters(); }} className="mt-4 h-9">Clear search and filters</Button>}</div>
+              <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Users className="h-5 w-5" /></div><h3 className="font-semibold text-[#243b4e]">{search.trim() || hasActiveFilters ? "No matching contacts" : adminMode ? "No contacts in this company CRM" : "No contacts yet"}</h3><p className="mt-1 text-sm text-[#7b8d9b]">{search.trim() || hasActiveFilters ? "Try clearing a filter or broadening your search." : adminMode ? "This company has no visible CRM contacts. Shared directory additions can still appear based on its access settings." : "Add a contact individually or import a contact list to get started."}</p>{(search.trim() || hasActiveFilters) && <Button variant="outline" onClick={() => { setSearch(""); clearFilters(); }} className="mt-4 h-9">Clear search and filters</Button>}</div>
           ) : (
             <>
             <div className="divide-y divide-[#e8edf1] xl:hidden">
@@ -1091,6 +1173,179 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
         }}
         isRemoving={removeContactsMutation.isPending}
       />
+
+      <Dialog open={createContactOpen} onOpenChange={(open) => {
+        if (!open && createCompanyContactMutation.isPending) return;
+        setCreateContactOpen(open);
+        if (!open) setContactDraft(createEmptyCompanyContactDraft());
+      }}>
+        <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add a contact</DialogTitle>
+            <DialogDescription>
+              Add one contact to your company CRM. Provide a name or email. If the email already belongs to a contact in your company CRM, that record will be updated.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (canCreateCompanyContact) createCompanyContactMutation.mutate();
+            }}
+          >
+            <fieldset disabled={createCompanyContactMutation.isPending} className="min-w-0 space-y-4 border-0 p-0">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="company-contact-first-name">First name</Label>
+                  <Input
+                    id="company-contact-first-name"
+                    autoComplete="given-name"
+                    maxLength={120}
+                    value={contactDraft.firstName}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, firstName: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-contact-last-name">Last name</Label>
+                  <Input
+                    id="company-contact-last-name"
+                    autoComplete="family-name"
+                    maxLength={120}
+                    value={contactDraft.lastName}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, lastName: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-contact-email">Email</Label>
+                  <Input
+                    id="company-contact-email"
+                    type="email"
+                    autoComplete="email"
+                    maxLength={254}
+                    value={contactDraft.email}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, email: event.target.value }))}
+                  />
+                  {contactDraft.email.trim() && !contactDraftEmailIsValid && (
+                    <p className="text-xs text-red-600" role="alert">Enter a valid email address.</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-contact-phone">Phone</Label>
+                  <Input
+                    id="company-contact-phone"
+                    type="tel"
+                    autoComplete="tel"
+                    maxLength={40}
+                    value={contactDraft.phone}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, phone: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-contact-company">Company / brokerage</Label>
+                  <Input
+                    id="company-contact-company"
+                    autoComplete="organization"
+                    maxLength={200}
+                    value={contactDraft.brokerage}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, brokerage: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-contact-category">Contact category</Label>
+                  <select
+                    id="company-contact-category"
+                    value={contactDraft.contactCategory}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, contactCategory: event.target.value }))}
+                    className="h-10 w-full rounded-md border border-[#d7e2e9] bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#498EDE]"
+                  >
+                    <option value="broker">Broker</option>
+                    <option value="attorney">Attorney / lawyer</option>
+                    <option value="general_contractor">General contractor</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="company-contact-address">Mailing address</Label>
+                  <Input
+                    id="company-contact-address"
+                    autoComplete="street-address"
+                    maxLength={300}
+                    value={contactDraft.mailingAddress}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, mailingAddress: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-contact-city">City</Label>
+                  <Input
+                    id="company-contact-city"
+                    autoComplete="address-level2"
+                    maxLength={120}
+                    value={contactDraft.city}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, city: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-contact-state">State / region</Label>
+                  <Input
+                    id="company-contact-state"
+                    autoComplete="address-level1"
+                    maxLength={100}
+                    value={contactDraft.stateRegion}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, stateRegion: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-contact-postal-code">Postal code</Label>
+                  <Input
+                    id="company-contact-postal-code"
+                    autoComplete="postal-code"
+                    maxLength={24}
+                    value={contactDraft.postalCode}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, postalCode: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-contact-assigned-to">Assigned to</Label>
+                  <Input
+                    id="company-contact-assigned-to"
+                    maxLength={120}
+                    value={contactDraft.assignedTo}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, assignedTo: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="company-contact-tags">CRM tags</Label>
+                  <Input
+                    id="company-contact-tags"
+                    maxLength={1000}
+                    placeholder="Separate tags with commas"
+                    value={contactDraft.tags}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, tags: event.target.value }))}
+                  />
+                </div>
+              </div>
+            </fieldset>
+            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCreateContactOpen(false)}
+                disabled={createCompanyContactMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="border border-[#498EDE] bg-[#498EDE] text-white hover:border-[#9dcaf2] hover:bg-white hover:text-[#498EDE]"
+                disabled={!canCreateCompanyContact || createCompanyContactMutation.isPending}
+              >
+                {createCompanyContactMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {createCompanyContactMutation.isPending ? "Adding…" : "Add contact"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(removeConfirmationIds)} onOpenChange={(open) => { if (!open) setRemoveConfirmationIds(null); }}>
         <DialogContent className="max-w-md">

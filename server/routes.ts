@@ -17828,6 +17828,7 @@ RULES:
   });
 
   const contactImportRateLimits = new Map<string, { count: number; resetAt: number }>();
+  const manualContactEntryRateLimits = new Map<string, { count: number; resetAt: number }>();
   app.post("/api/developer-profile/me/import-contacts", isAuthenticated, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
@@ -17837,23 +17838,34 @@ RULES:
       if (Number.isFinite(contentLength) && contentLength > 10 * 1024 * 1024) {
         return res.status(413).json({ message: "Contact imports are limited to 10 MB" });
       }
-      const now = Date.now();
-      const currentWindow = contactImportRateLimits.get(developerProfileId);
-      const activeWindow = currentWindow && currentWindow.resetAt > now ? currentWindow : null;
-      if (activeWindow && activeWindow.count >= 5) {
-        res.setHeader("Retry-After", String(Math.max(1, Math.ceil((activeWindow.resetAt - now) / 1000))));
-        return res.status(429).json({ message: "Import limit reached. Try again later." });
-      }
-      contactImportRateLimits.set(developerProfileId, activeWindow
-        ? { ...activeWindow, count: activeWindow.count + 1 }
-        : { count: 1, resetAt: now + 10 * 60 * 1000 });
       const { contacts: rows } = req.body || {};
+      const isManualEntry = req.body?.entryMode === "manual";
       if (!Array.isArray(rows) || rows.length === 0) {
         return res.status(400).json({ message: 'contacts array required' });
+      }
+      if (isManualEntry && rows.length !== 1) {
+        return res.status(400).json({ message: "Manual entry accepts exactly one contact." });
       }
       if (rows.length > 2500) {
         return res.status(413).json({ message: 'A single import is limited to 2,500 contact rows' });
       }
+
+      const now = Date.now();
+      const rateLimitStore = isManualEntry ? manualContactEntryRateLimits : contactImportRateLimits;
+      const requestLimit = isManualEntry ? 30 : 5;
+      const currentWindow = rateLimitStore.get(developerProfileId);
+      const activeWindow = currentWindow && currentWindow.resetAt > now ? currentWindow : null;
+      if (activeWindow && activeWindow.count >= requestLimit) {
+        res.setHeader("Retry-After", String(Math.max(1, Math.ceil((activeWindow.resetAt - now) / 1000))));
+        return res.status(429).json({
+          message: isManualEntry
+            ? "Contact entry limit reached. Try again later."
+            : "Import limit reached. Try again later.",
+        });
+      }
+      rateLimitStore.set(developerProfileId, activeWindow
+        ? { ...activeWindow, count: activeWindow.count + 1 }
+        : { count: 1, resetAt: now + 10 * 60 * 1000 });
 
       const validationErrors: string[] = [];
       const seenEmails = new Set<string>();
