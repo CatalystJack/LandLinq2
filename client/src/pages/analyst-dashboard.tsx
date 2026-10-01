@@ -608,6 +608,7 @@ export default function AnalystDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const isDeveloperUser = String((user as any)?.role || "").toUpperCase() === "DEVELOPER";
   const [filterClassifications, setFilterClassifications] = useState<string[]>([]);
   const [filterPriorities, setFilterPriorities] = useState<string[]>([]);
   const [filterDealTypes, setFilterDealTypes] = useState<string[]>([]);
@@ -5593,7 +5594,7 @@ export default function AnalystDashboard() {
             }
           />
 
-          <DeveloperOnboardingChecklist />
+          {isDeveloperUser && <DeveloperOnboardingChecklist />}
 
           {/* API Safety System Status Banner */}
           <ApiSafetyBanner />

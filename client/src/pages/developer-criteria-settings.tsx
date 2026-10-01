@@ -1327,7 +1327,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
           <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader className="cursor-pointer" onClick={() => setTeamOpen((open) => !open)}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3"><div className="rounded-xl bg-slate-100 p-2 text-slate-600"><Users className="h-5 w-5" /></div><div><CardTitle>Team</CardTitle><CardDescription>LandLinq/Apex approves and creates all company accounts.</CardDescription></div></div>
+                <div className="flex items-center gap-3"><div className="rounded-xl bg-slate-100 p-2 text-slate-600"><Users className="h-5 w-5" /></div><div><CardTitle>Team</CardTitle><CardDescription>LandLinq approves and creates all company accounts.</CardDescription></div></div>
                 {teamOpen ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
               </div>
             </CardHeader>

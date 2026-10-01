@@ -16021,7 +16021,7 @@ RULES:
       if (!developerProfileId) return;
       const currentUserId = String(req.user?.id || req.user?.claims?.sub || "");
 
-      const [profile, activeProductTypes, connectedSenders, teamCount] = await Promise.all([
+      const [profile, activeProductTypes, connectedSenders, teamCount, contactCount, activePipelineStages] = await Promise.all([
         db.select({
           profileType: developerProfiles.profileType,
           companyName: developerProfiles.companyName,

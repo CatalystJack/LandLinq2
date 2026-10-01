@@ -42,7 +42,7 @@ function readSkippedSteps(storageKey: string): string[] {
 
 export default function DeveloperOnboardingChecklist() {
   const [, navigate] = useLocation();
-  const { data: status } = useQuery<OnboardingStatus>({
+  const { data: status, isError, isFetching, refetch } = useQuery<OnboardingStatus>({
     queryKey: ["/api/developer-profile/me/onboarding-status"],
     queryFn: async () => {
       const response = await fetch("/api/developer-profile/me/onboarding-status", { credentials: "include" });
@@ -127,6 +127,17 @@ export default function DeveloperOnboardingChecklist() {
           },
     ];
   }, [isGeneralSales, status]);
+
+  if (isError) {
+    return (
+      <Card className="mb-6 flex flex-col gap-3 border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
+        <p className="text-sm text-amber-950">Company setup steps could not be loaded.</p>
+        <Button type="button" size="sm" variant="outline" className="h-10" onClick={() => void refetch()} disabled={isFetching}>
+          {isFetching ? "Retrying..." : "Try again"}
+        </Button>
+      </Card>
+    );
+  }
 
   if (!status || loadedProfileId !== status.profileId || !storageKey) return null;
 

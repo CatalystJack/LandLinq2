@@ -44,6 +44,7 @@ async function fetchQuickLinks(): Promise<{ links: DeveloperQuickLink[] }> {
 export default function DeveloperHome() {
   const { user } = useAuth();
   const profile = (user as any)?.developerProfile;
+  const showMarketRates = profile?.profileType === "real_estate";
   const firstName = String((user as any)?.firstName || "").trim() || "there";
   const companyName = profile?.companyName || "Investment Company";
   const primaryColor = profile?.primaryColor || "#0A2B4A";
@@ -59,6 +60,7 @@ export default function DeveloperHome() {
   } = useQuery<MarketMetrics>({
     queryKey: ["/api/market-metrics"],
     refetchInterval: 1000 * 60 * 15,
+    enabled: showMarketRates,
   });
   const {
     data: pipelineStats,
@@ -100,6 +102,7 @@ export default function DeveloperHome() {
           </h1>
         </div>
 
+        {showMarketRates && (
         <section className="mb-8" aria-labelledby="market-rates-heading">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 id="market-rates-heading" className="text-lg font-semibold text-slate-900">Market Rates</h2>
@@ -169,6 +172,7 @@ export default function DeveloperHome() {
           </div>
           {!metricsError && marketMetrics?.note && <p className="mt-2 text-xs text-slate-500">{marketMetrics.note}</p>}
         </section>
+        )}
 
         <section className="mb-8" aria-labelledby="pipeline-heading">
           <h2 id="pipeline-heading" className="mb-4 text-lg font-semibold text-slate-900">Pipeline Overview</h2>

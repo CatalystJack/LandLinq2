@@ -54,7 +54,7 @@ export default function DeveloperUserManagement() {
               <Badge variant="secondary" className="ml-1">{team.length}</Badge>
             </CardTitle>
             <CardDescription>
-              Only users assigned to your current company are shown here. LandLinq/Apex approves and creates all accounts.
+              Only users assigned to your current company are shown here. LandLinq approves and creates all accounts.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -68,7 +68,7 @@ export default function DeveloperUserManagement() {
               <div className="px-6 py-14 text-center">
                 <ShieldCheck className="mx-auto h-9 w-9 text-slate-300" />
                 <p className="mt-3 text-sm font-medium text-slate-700">No other users yet</p>
-                <p className="mt-1 text-sm text-slate-500">Request an addition and LandLinq/Apex will review and create the account.</p>
+                <p className="mt-1 text-sm text-slate-500">Request an addition and LandLinq will review and create the account.</p>
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
