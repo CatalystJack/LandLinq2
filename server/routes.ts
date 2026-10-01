@@ -16024,6 +16024,7 @@ RULES:
       const [profile, activeProductTypes, connectedSenders, teamCount] = await Promise.all([
         db.select({
           profileType: developerProfiles.profileType,
+          companyName: developerProfiles.companyName,
           targetStates: developerProfiles.targetStates,
           targetCounties: developerProfiles.targetCounties,
         }).from(developerProfiles).where(and(
@@ -16043,6 +16044,37 @@ RULES:
           eq(users.role, "DEVELOPER"),
           currentUserId ? ne(users.id, currentUserId) : sql`true`,
         )),
+        db.execute(sql`
+          SELECT COUNT(*)::int AS count
+          FROM (
+            SELECT b.id
+            FROM brokers AS b
+            WHERE b.owner_developer_profile_id = ${developerProfileId}
+              AND b.archived_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM users AS demo_owner
+                WHERE demo_owner.id = b.user_id
+                  AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+              )
+            UNION
+            SELECT b.id
+            FROM developer_broker_crm AS company_contact
+            INNER JOIN brokers AS b ON b.id = company_contact.broker_id
+            WHERE company_contact.developer_profile_id = ${developerProfileId}
+              AND company_contact.is_removed = false
+              AND b.owner_developer_profile_id IS NULL
+              AND b.archived_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM users AS demo_owner
+                WHERE demo_owner.id = b.user_id
+                  AND LOWER(demo_owner.email) = 'demo@catalystcp.com'
+              )
+          ) AS visible_contacts
+        `),
+        db.select({ id: pipelineStages.id }).from(pipelineStages).where(and(
+          eq(pipelineStages.developerProfileId, developerProfileId),
+          eq(pipelineStages.isActive, true),
+        )).limit(1),
       ]);
 
       if (!profile[0]) return res.status(404).json({ error: "Investment Company profile not found" });
@@ -16053,14 +16085,21 @@ RULES:
           ((profile[0].targetStates || []).length > 0 || (profile[0].targetCounties || []).length > 0);
       const teamInvited = Number(teamCount[0]?.count || 0);
       const checks = {
+        profileReady: Boolean(profile[0].companyName?.trim()),
+        contactsAdded: Number(contactCount.rows?.[0]?.count || 0) > 0,
         criteriaSet,
+        pipelineConfigured: activePipelineStages.length > 0,
         emailConnected: connectedSenders.length > 0,
         teamInvited,
       };
 
       return res.json({
+        profileId: developerProfileId,
+        profileType: profile[0].profileType,
         checks,
-        complete: checks.criteriaSet && checks.emailConnected && checks.teamInvited > 0,
+        complete: checks.profileReady && checks.contactsAdded && checks.emailConnected &&
+          checks.teamInvited > 0 &&
+          (profile[0].profileType === "general_sales" ? checks.pipelineConfigured : checks.criteriaSet),
       });
     } catch (error: any) {
       console.error("[developer-profile/me/onboarding-status] Error:", error);

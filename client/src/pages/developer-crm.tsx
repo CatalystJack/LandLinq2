@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
 import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, Pencil, Plus, X, Trash2 } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
+import DeveloperOnboardingChecklist from "@/components/developer-onboarding-checklist";
 import { PageHeader } from "@/components/ui/page-header";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
@@ -780,6 +781,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
             </div>
           }
         />
+
+        {!adminMode && isGeneralSales && <DeveloperOnboardingChecklist />}
 
         <Card className="overflow-hidden rounded-2xl border-[#dce5eb] bg-[#fbfcfd] shadow-sm">
           <div className="flex flex-col gap-4 border-b border-[#e3e9ee] bg-[#f8fafb] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
