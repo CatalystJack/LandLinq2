@@ -1,0 +1,72 @@
+In client/src/pages/developer-crm.tsx, the "Manage CRM tags" dialog (around line 1674-1736) has sections to create a tag and rename a tag, but no way to delete one — even though the backend already fully supports it: POST /api/developer-profile/me/crm-tags/delete (server/routes.ts:16851) takes { name: string } and removes the tag from owned contacts (brokers.crm_tags), shared contacts (developer_broker_crm.crm_tags), and the tag registry (developer_crm_tags), all scoped to the caller's developerProfileId. No backend changes are needed — this is purely a missing UI wiring.
+
+1. Add state for the delete flow near the other tag-dialog state (createTagValue ~line 251, renameOldTag/renameNewTag nearby):
+   const [deleteTagName, setDeleteTagName] = useState("");
+   const [deleteTagConfirmOpen, setDeleteTagConfirmOpen] = useState(false);
+
+2. Add a mutation next to createTagMutation (~line 601) and renameMutation (~line 529), following the same requestJson/onSuccess/onError pattern:
+   const deleteTagMutation = useMutation({
+     mutationFn: (name: string) => requestJson("/api/developer-profile/me/crm-tags/delete", {
+       method: "POST",
+       headers: { "Content-Type": "application/json" },
+       body: JSON.stringify({ name }),
+     }),
+     onSuccess: (data) => {
+       queryClient.invalidateQueries({ queryKey: [contactsQueryKey] });
+       queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/crm-tags"] });
+       setDeleteTagConfirmOpen(false);
+       setDeleteTagName("");
+       setSelectedTags((current) => current.filter((tag) => tag !== data.name));
+       toast({ title: "Tag deleted", description: `Removed "${data.name}" from ${data.removedCount} ${data.removedCount === 1 ? "contact" : "contacts"}.` });
+     },
+     onError: (error: Error) => toast({ title: "Tag deletion failed", description: error.message, variant: "destructive" }),
+   });
+
+3. In the "Manage CRM tags" Dialog (the one with DialogTitle "Manage CRM tags", ~line 1674-1736), add a third section after the rename section (after the closing </div> of the rename block, before the DialogFooter at line 1723), matching the existing visual style (the rename section's amber warning box is the pattern to follow, same border/bg pattern but use a red/destructive tone instead):
+
+   <div className="border-t border-slate-200 pt-4">
+     <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs leading-relaxed text-red-900">
+       Deleting is company-wide and permanent. The tag will be removed from every contact in this company that has it.
+     </div>
+     <div className="mt-3">
+       <Label htmlFor="crm-delete-tag">Delete a tag</Label>
+       <select id="crm-delete-tag" value={deleteTagName} onChange={(event) => setDeleteTagName(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-[#d7e2e9] bg-white px-3 text-sm text-[#405a70] outline-none">
+         <option value="">Choose a tag</option>
+         {availableTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+       </select>
+     </div>
+     <Button
+       variant="outline"
+       className="mt-2 w-full border-red-300 text-red-700 hover:bg-red-50"
+       disabled={!deleteTagName.trim()}
+       onClick={() => setDeleteTagConfirmOpen(true)}
+     >
+       Delete tag
+     </Button>
+   </div>
+
+4. Add a small confirmation Dialog right after the existing rename Dialog closes (after line 1736's closing </Dialog>), following the same Dialog/DialogContent/DialogFooter structure used elsewhere in this file (e.g. the clearCompanyCrmOpen dialog ~line 1445 is a good reference for a destructive-confirmation dialog):
+
+   <Dialog open={deleteTagConfirmOpen} onOpenChange={(open) => { if (!open && !deleteTagMutation.isPending) setDeleteTagConfirmOpen(false); }}>
+     <DialogContent className="max-w-md">
+       <DialogHeader>
+         <DialogTitle>Delete "{deleteTagName}"?</DialogTitle>
+         <DialogDescription>
+           This removes the tag from every contact in your company CRM that has it. This cannot be undone.
+         </DialogDescription>
+       </DialogHeader>
+       <DialogFooter>
+         <Button variant="outline" onClick={() => setDeleteTagConfirmOpen(false)} disabled={deleteTagMutation.isPending}>Cancel</Button>
+         <Button
+           variant="destructive"
+           onClick={() => deleteTagMutation.mutate(deleteTagName.trim())}
+           disabled={deleteTagMutation.isPending}
+         >
+           {deleteTagMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+           Delete tag
+         </Button>
+       </DialogFooter>
+     </DialogContent>
+   </Dialog>
+
+After the fix, verify: (1) deleting a tag removes it from the "Existing tags" list and from every contact that had it, (2) a contact that had other tags keeps those other tags, (3) if the tag is currently active in the Tags filter, it's cleared from the filter rather than silently filtering on a tag that no longer exists, (4) a tag cannot be deleted from another company's CRM (confirm the existing developerProfileId scoping in the backend route is untouched). Report which lines changed.

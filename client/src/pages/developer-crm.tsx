@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import * as XLSX from "xlsx";
 import { Building2, ChevronDown, FileSpreadsheet, Loader2, Search, Upload, Users, RefreshCw, UserRound, Pencil, Plus, X, Trash2 } from "lucide-react";
@@ -24,6 +24,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 type ContactAvatarPerson = {
   label: string;
   role: string;
+};
+
+type TeamMember = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
 };
 
 const AVATAR_COLORS = ["#498EDE", "#081729"];
@@ -375,6 +382,22 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     queryFn: () => requestJson("/api/developer-profile/me/crm-tags"),
     enabled: !adminMode,
   });
+
+  const teamQuery = useQuery<{ team: TeamMember[] }>({
+    queryKey: ["/api/developer-profile/me/team"],
+    queryFn: () => requestJson("/api/developer-profile/me/team"),
+    enabled: createContactOpen && !adminMode,
+  });
+  const teamMembers = useMemo(
+    () => (Array.isArray(teamQuery.data?.team) ? teamQuery.data.team : []).map((member) => {
+      const fullName = [member.firstName, member.lastName]
+        .map((name) => name?.trim())
+        .filter(Boolean)
+        .join(" ");
+      return { id: member.id, value: fullName || member.email, label: fullName || member.email };
+    }),
+    [teamQuery.data?.team],
+  );
 
   const importMutation = useMutation({
     mutationFn: async () => {
@@ -1311,12 +1334,17 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="company-contact-assigned-to">Assigned to</Label>
-                  <Input
+                  <select
                     id="company-contact-assigned-to"
-                    maxLength={120}
                     value={contactDraft.assignedTo}
                     onChange={(event) => setContactDraft((current) => ({ ...current, assignedTo: event.target.value }))}
-                  />
+                    className="h-10 w-full rounded-md border border-[#d7e2e9] bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#498EDE]"
+                  >
+                    <option value="">Unassigned</option>
+                    {teamMembers.map((member) => (
+                      <option key={member.id} value={member.value}>{member.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="company-contact-tags-trigger">CRM tags</Label>

@@ -1,0 +1,50 @@
+In client/src/pages/developer-crm.tsx, the new "Add a contact" dialog (the manual single-contact form, around line 1312-1320) has "Assigned to" as a free-text <Input>:
+
+  <div className="space-y-2">
+    <Label htmlFor="company-contact-assigned-to">Assigned to</Label>
+    <Input
+      id="company-contact-assigned-to"
+      maxLength={120}
+      value={contactDraft.assignedTo}
+      onChange={(event) => setContactDraft((current) => ({ ...current, assignedTo: event.target.value }))}
+    />
+  </div>
+
+This should be a dropdown of the organization's actual users, same as the "Assigned to" field already fixed in client/src/components/contact-detail-dialog.tsx. Use that exact pattern as the reference:
+
+1. Fetch team members the same way contact-detail-dialog.tsx does:
+   const teamQuery = useQuery<{ team: TeamMember[] }>({
+     queryKey: ["/api/developer-profile/me/team"],
+     queryFn: () => requestJson("/api/developer-profile/me/team"),
+   });
+   (Define or import a TeamMember type matching {id, email, firstName, lastName} if developer-crm.tsx doesn't already have one. useQuery/useMutation/useQueryClient are already imported in this file.)
+
+2. Derive display names the same way:
+   const teamMembers = useMemo(
+     () => (Array.isArray(teamQuery.data?.team) ? teamQuery.data.team : []).map((member) => {
+       const fullName = [member.firstName, member.lastName].map((n) => n?.trim()).filter(Boolean).join(" ");
+       return { id: member.id, value: fullName || member.email, label: fullName || member.email };
+     }),
+     [teamQuery.data?.team],
+   );
+   (Import useMemo from "react" if not already imported.)
+
+3. Replace the Input with a <select>, matching contact-detail-dialog.tsx's structure:
+   <select
+     id="company-contact-assigned-to"
+     value={contactDraft.assignedTo}
+     onChange={(event) => setContactDraft((current) => ({ ...current, assignedTo: event.target.value }))}
+     className="h-10 w-full rounded-md border border-[#d7e2e9] bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#498EDE]"
+   >
+     <option value="">Unassigned</option>
+     {teamMembers.map((member) => (
+       <option key={member.id} value={member.value}>{member.label}</option>
+     ))}
+   </select>
+   (This new-contact form never has a pre-existing assignedTo value to preserve, so the "current assignment" fallback option from contact-detail-dialog.tsx isn't needed here — unlike that dialog's edit case.)
+
+4. Keep contactDraft.assignedTo stored as a plain string exactly as it is today — no changes needed to createCompanyContactMutation or the API payload, since the backend already expects assignedTo as a name string.
+
+Don't touch the "Assigned to" filter dropdown that already exists elsewhere on this page (the assignedToFilter state, ~line 240) — that's a separate, already-correct control for filtering the contact list, not this form.
+
+After the fix, verify: opening "Add a contact" shows a dropdown populated with the org's real users (not free text), selecting one and submitting saves that name on the new contact, and "Unassigned" is the default/empty option. Report which lines changed.
