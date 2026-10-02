@@ -89,7 +89,7 @@ import { generateDealMemoPdf, resolveDealMemoLogo } from "./dealMemoPdf";
 import { getAutomaticRouting, formatRoutingAssignments } from "./dealRouting";
 import { OpenAIService } from "./openaiService";
 import OpenAI from "openai";
-import { dealSubmissionLimiter, generalApiLimiter, authLimiter, webhookRateLimit } from "./rateLimiter";
+import { dealSubmissionLimiter, generalApiLimiter, authLimiter, webhookRateLimit, publicDataEnrichmentLimiter } from "./rateLimiter";
 import { sanitizeDealData, sanitizeStringArray } from "./inputSanitizer";
 import { analyzeAgainstCriteria, classifyDealByExactCriteria, classifyAllDevelopmentTypes, TARGET_MARKETS } from "./businessRules";
 // Teams service integration removed
@@ -137,6 +137,7 @@ import {
 import { sendDripEmailViaMicrosoft } from "./microsoftAuth";
 import { lookupHudDataForDeal } from "./hudService";
 import {
+  geocodeAddressWithCensus,
   getAcsDataForTract,
   getFipsForCoordinates,
   getRecentBuildingPermits,
@@ -196,6 +197,7 @@ const DEFAULT_PIPELINE_STAGES = [
 ] as const;
 
 const CENSUS_DATA_REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
+const CENSUS_DATA_RETRY_MS = 6 * 60 * 60 * 1000;
 const DEALS_WITH_BROKERS_PAGE_SIZE = 200;
 
 function parseDealsPageOptions(query: any, defaultLimit = 100): { limit: number; offset: number } {
@@ -233,56 +235,136 @@ async function forEachDealsWithBrokersPage(
   }
 }
 
-function validCoordinate(value: unknown): number | null {
+function validCoordinate(
+  value: unknown,
+  axis: "latitude" | "longitude",
+): number | null {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return null;
+  }
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  const min = axis === "latitude" ? -90 : -180;
+  const max = axis === "latitude" ? 90 : 180;
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max
+    ? parsed
+    : null;
 }
 
-async function refreshCensusDataIfStale(deal: any): Promise<void> {
+async function refreshCensusDataIfStale(deal: any, force = false): Promise<void> {
   try {
     const fetchedAt = deal.censusDataFetchedAt
       ? new Date(deal.censusDataFetchedAt)
       : null;
+    const cachedCensusData = deal.censusDataJson &&
+      typeof deal.censusDataJson === "object"
+      ? deal.censusDataJson as Record<string, unknown>
+      : {};
+    const hasCoordinates = validCoordinate(deal.latitude, "latitude") !== null
+      && validCoordinate(deal.longitude, "longitude") !== null;
+    const hasSourceStatuses = typeof cachedCensusData.acsStatus === "string"
+      && typeof cachedCensusData.permitStatus === "string";
+    const cacheableLocationState = hasCoordinates
+      ? hasSourceStatuses
+      : cachedCensusData.locationStatus === "unresolved";
+    const lastCheckUnavailable = cachedCensusData.acsStatus === "unavailable"
+      || cachedCensusData.permitStatus === "unavailable"
+      || cachedCensusData.locationStatus === "unresolved";
+    const refreshWindow = lastCheckUnavailable
+      ? CENSUS_DATA_RETRY_MS
+      : CENSUS_DATA_REFRESH_MS;
     if (
+      !force &&
       fetchedAt &&
       !Number.isNaN(fetchedAt.getTime()) &&
-      Date.now() - fetchedAt.getTime() < CENSUS_DATA_REFRESH_MS
+      Date.now() - fetchedAt.getTime() < refreshWindow &&
+      cacheableLocationState
     ) {
       return;
     }
 
-    let latitude = validCoordinate(deal.latitude);
-    let longitude = validCoordinate(deal.longitude);
+    let latitude = validCoordinate(deal.latitude, "latitude");
+    let longitude = validCoordinate(deal.longitude, "longitude");
+    let locationSource = "existing_coordinates";
 
     if (latitude === null || longitude === null) {
-      const address = [
-        deal.address,
-        deal.city,
-        deal.county,
-        deal.state,
-        deal.zip,
-      ].filter(Boolean).join(", ");
-      if (!address) return;
-
+      locationSource = "U.S. Census Geocoder";
       try {
-        const geocoded = await geocodioService.geocodeAddress(address);
-        latitude = validCoordinate((geocoded as any)?.lat ?? (geocoded as any)?.latitude);
-        longitude = validCoordinate((geocoded as any)?.lng ?? (geocoded as any)?.longitude);
+        const geocoded = await geocodeAddressWithCensus({
+          address: String(deal.address || ""),
+          city: String(deal.city || ""),
+          state: String(deal.state || ""),
+          county: deal.county ? String(deal.county) : null,
+          zip: deal.zip ? String(deal.zip) : null,
+        });
+        latitude = validCoordinate(geocoded?.latitude, "latitude");
+        longitude = validCoordinate(geocoded?.longitude, "longitude");
+        if (latitude !== null && longitude !== null) {
+          await storage.updateDeal(deal.id, {
+            latitude: String(latitude),
+            longitude: String(longitude),
+          } as any);
+          Object.assign(deal, {
+            latitude: String(latitude),
+            longitude: String(longitude),
+          });
+        }
       } catch (error) {
-        console.warn(`[CENSUS-DATA] Address geocode failed for deal ${deal.id}:`, error instanceof Error ? error.message : error);
+        console.warn(`[CENSUS-DATA] Census address geocode failed for deal ${deal.id}:`, error instanceof Error ? error.message : error);
       }
     }
 
-    if (latitude === null || longitude === null) return;
+    const censusMetadata = {
+      acsSource: "U.S. Census ACS 5-year",
+      acsVintage: 2024,
+      acsDataType: "survey_estimate",
+      permitMetric: "Census BPS county-level authorized units in the published year-to-date file",
+    };
+
+    if (latitude === null || longitude === null) {
+      const censusDataJson = {
+        ...censusMetadata,
+        locationStatus: "unresolved",
+        locationSource,
+        acsStatus: "unavailable",
+        permitStatus: "unavailable",
+      };
+      const censusDataFetchedAt = new Date();
+      await storage.updateDeal(deal.id, { censusDataJson, censusDataFetchedAt } as any);
+      Object.assign(deal, { censusDataJson, censusDataFetchedAt });
+      return;
+    }
 
     const fips = await getFipsForCoordinates(latitude, longitude);
-    if (!fips) return;
+    if (!fips) {
+      const censusDataJson = {
+        ...censusMetadata,
+        locationStatus: "resolved",
+        locationSource,
+        geographyStatus: "unavailable",
+        acsStatus: "unavailable",
+        permitStatus: "unavailable",
+      };
+      const censusDataFetchedAt = new Date();
+      await storage.updateDeal(deal.id, { censusDataJson, censusDataFetchedAt } as any);
+      Object.assign(deal, { censusDataJson, censusDataFetchedAt });
+      return;
+    }
 
     const [acsResult, permitsResult] = await Promise.allSettled([
       getAcsDataForTract(fips.stateFips, fips.countyFips, fips.tractFips),
       getRecentBuildingPermits(fips.stateFips, fips.countyFips),
     ]);
     const acs = acsResult.status === "fulfilled" ? acsResult.value : null;
+    const acsAvailable = Boolean(acs && [
+      acs.population,
+      acs.medianHouseholdIncome,
+      acs.renterOccupiedUnits,
+      acs.ownerOccupiedUnits,
+      acs.renterOccupiedPct,
+      acs.ownerOccupiedPct,
+      acs.medianAge,
+      acs.populationGrowthPct,
+    ].some((value) => value !== null));
     const permits = permitsResult.status === "fulfilled" ? permitsResult.value : null;
 
     const censusDataJson = {
@@ -292,17 +374,23 @@ async function refreshCensusDataIfStale(deal: any): Promise<void> {
       ownerOccupiedPct: acs?.ownerOccupiedPct ?? null,
       medianAge: acs?.medianAge ?? null,
       populationGrowthPct: acs?.populationGrowthPct ?? null,
-      permitsTrailing12Mo: permits,
+      ...censusMetadata,
+      locationStatus: "resolved",
+      locationSource,
+      permitsYearToDate: permits,
+      permitStatus: permits !== null ? "available" : "unavailable",
+      acsStatus: acsAvailable ? "available" : "unavailable",
       stateFips: fips.stateFips,
       countyFips: fips.countyFips,
       tractFips: fips.tractFips,
     };
 
+    const censusDataFetchedAt = new Date();
     await storage.updateDeal(deal.id, {
       censusDataJson,
-      censusDataFetchedAt: new Date(),
+      censusDataFetchedAt,
     } as any);
-    Object.assign(deal, { censusDataJson, censusDataFetchedAt: new Date() });
+    Object.assign(deal, { censusDataJson, censusDataFetchedAt });
   } catch (error) {
     console.warn(`[CENSUS-DATA] Enrichment failed for deal ${deal.id}:`, error instanceof Error ? error.message : error);
   }
@@ -319,6 +407,100 @@ async function refreshCensusDataForDeals(dealsToRefresh: any[]): Promise<void> {
       await refreshCensusDataIfStale(deal);
     }
   }));
+}
+
+async function refreshFreePublicDataForDeal(
+  deal: any,
+  forceCensusRefresh = false,
+): Promise<{
+  locationResolved: boolean;
+  government: unknown | null;
+  nearbyPermits: unknown | null;
+}> {
+  await refreshCensusDataIfStale(deal, forceCensusRefresh);
+  const latitude = validCoordinate(deal.latitude, "latitude");
+  const longitude = validCoordinate(deal.longitude, "longitude");
+  if (latitude === null || longitude === null) {
+    return { locationResolved: false, government: null, nearbyPermits: null };
+  }
+
+  const [governmentResult, permitResult] = await Promise.allSettled([
+    import("./governmentDataEnrichment.js").then(({ enrichDealWithGovernmentData }) =>
+      enrichDealWithGovernmentData({ dealId: deal.id, latitude, longitude }),
+    ),
+    import("./nearbyPermitsService.js").then(({ lookupNearbyPermits }) =>
+      lookupNearbyPermits(deal.city, latitude, longitude),
+    ),
+  ]);
+
+  if (governmentResult.status === "rejected") {
+    console.warn(
+      `[DEAL-PUBLIC-DATA] Government enrichment failed for ${deal.id}:`,
+      governmentResult.reason instanceof Error
+        ? governmentResult.reason.message
+        : governmentResult.reason,
+    );
+  }
+
+  const nearbyPermits = permitResult.status === "fulfilled"
+    ? permitResult.value
+    : null;
+  if (nearbyPermits) {
+    try {
+      const nearbyPermitsFetchedAt = new Date();
+      await storage.updateDeal(deal.id, {
+        nearbyPermitCount: nearbyPermits.count,
+        nearbyPermitsStatus: nearbyPermits.status,
+        nearbyPermitsFetchedAt,
+      } as any);
+      Object.assign(deal, {
+        nearbyPermitCount: nearbyPermits.count,
+        nearbyPermitsStatus: nearbyPermits.status,
+        nearbyPermitsFetchedAt,
+      });
+    } catch (error) {
+      console.warn(
+        `[DEAL-PUBLIC-DATA] Local permit results could not be saved for ${deal.id}:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  } else {
+    const nearbyPermitsStatus = permitResult.status === "rejected"
+      ? "error"
+      : "not_available";
+    try {
+      const nearbyPermitsFetchedAt = new Date();
+      await storage.updateDeal(deal.id, {
+        nearbyPermitCount: null,
+        nearbyPermitsStatus,
+        nearbyPermitsFetchedAt,
+      } as any);
+      Object.assign(deal, {
+        nearbyPermitCount: null,
+        nearbyPermitsStatus,
+        nearbyPermitsFetchedAt,
+      });
+    } catch (error) {
+      console.warn(
+        `[DEAL-PUBLIC-DATA] Local permit status could not be saved for ${deal.id}:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+    if (permitResult.status === "rejected") {
+      console.warn(
+        `[DEAL-PUBLIC-DATA] Local permit lookup failed for ${deal.id}:`,
+        permitResult.reason instanceof Error
+          ? permitResult.reason.message
+          : permitResult.reason,
+      );
+    }
+  }
+
+  return {
+    locationResolved: true,
+    government: governmentResult.status === "fulfilled" ? governmentResult.value : null,
+    nearbyPermits,
+  };
 }
 
 // Demo contacts are intentionally stored in the shared-contact shape so the
@@ -9821,7 +10003,7 @@ Provide your analysis in this exact JSON format:
   let rerunAnalysisLock: string | null = null;
 
   // Re-run analysis for a single deal (comparables, classification, etc.)
-  app.post("/api/deals/:id/rerun-analysis", isAuthenticated, async (req, res) => {
+  app.post("/api/deals/:id/rerun-analysis", isAuthenticated, publicDataEnrichmentLimiter, async (req, res) => {
     try {
       const { id } = req.params;
       const user = req.user as any;
@@ -9830,7 +10012,7 @@ Provide your analysis in this exact JSON format:
       console.log('🔄 [RERUN-ANALYSIS] RE-RUN ANALYSIS REQUEST RECEIVED');
       console.log('='.repeat(100));
       console.log(`📋 Deal ID: ${id}`);
-      console.log(`👤 User: ${user?.email || 'unknown'}`);
+      console.log(`👤 Authenticated role: ${String(user?.role || 'unknown')}`);
       console.log(`🕐 Timestamp: ${new Date().toISOString()}`);
       
       // Strict analyst email validation - must end with approved domains
@@ -9866,6 +10048,7 @@ Provide your analysis in this exact JSON format:
         return res.status(404).json({ message: "Deal not found" });
       }
       let rerunDeveloperProfileId: string | undefined;
+      let canRefreshCanonicalPublicData = isAnalyst;
       let rerunProfileCriteria: {
         compSearchRadiusMiles: string | null;
         compMinVintageYear: number | null;
@@ -9904,17 +10087,33 @@ Provide your analysis in this exact JSON format:
         if (!visibleDealIds.has(id)) {
           return res.status(404).json({ message: "Deal not found" });
         }
+        const { partnerDeveloperSends: developerSendsTable } = await import("@shared/schema");
+        const [ownedSend] = await db.select({ id: developerSendsTable.id })
+          .from(developerSendsTable)
+          .where(and(
+            eq(developerSendsTable.developerProfileId, developerProfileId),
+            eq(developerSendsTable.dealId, id),
+          ))
+          .limit(1);
+        canRefreshCanonicalPublicData = Boolean(ownedSend);
       }
 
       console.log(`📊 [RERUN-ANALYSIS] CURRENT DEAL STATE BEFORE RE-ANALYSIS:`);
-      console.log(`   Address: ${deal.address}`);
-      console.log(`   ZIP: ${deal.zip || 'N/A'}`);
       console.log(`   Size: ${deal.sizeAcres} acres`);
       console.log(`   Deal Type: ${(deal as any).dealType || 'land'} ← CRITICAL: determines classification path`);
       console.log(`   Current Classification: ${deal.classification || 'unclassified'}`);
       console.log(`   Current Status: ${deal.status}`);
       console.log(`   Current Rejection Reason: ${deal.rejectionReason || 'none'}`);
       console.log(`   Comparable Count: ${deal.comparableCount || 0}`);
+
+      if (canRefreshCanonicalPublicData) {
+        const publicDataRefresh = await refreshFreePublicDataForDeal(deal, true);
+        console.log(
+          `[RERUN-ANALYSIS] Free public data refresh complete for ${id}: location ${publicDataRefresh.locationResolved ? "resolved" : "unresolved"}, city permit status ${String((publicDataRefresh.nearbyPermits as any)?.status || "not available")}`,
+        );
+      } else {
+        console.log(`[RERUN-ANALYSIS] Public-data persistence skipped for linked shared deal ${id}`);
+      }
 
       console.log(`\n🔍 [RERUN-ANALYSIS] Starting comparable search and classification...`);
       console.log(`📊 [RERUN-ANALYSIS] Warehouse-first refresh: use a newer warehouse result, otherwise call HelloData`);
@@ -19500,7 +19699,7 @@ RULES:
     }
   });
 
-  app.post("/api/developer-profile/me/deals", isAuthenticated, async (req: any, res) => {
+  app.post("/api/developer-profile/me/deals", isAuthenticated, publicDataEnrichmentLimiter, async (req: any, res) => {
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
@@ -19649,6 +19848,14 @@ RULES:
         } catch (yocError) {
           console.error("[developer-profile/me/deals POST] YOC recompute failed:", yocError);
         }
+
+        const submittedDeal = { ...result.deal };
+        void refreshFreePublicDataForDeal(submittedDeal).catch((error) => {
+          console.warn(
+            `[DEVELOPER-DEAL-DATA] Automatic enrichment stopped for ${submittedDeal.id}:`,
+            error instanceof Error ? error.message : error,
+          );
+        });
       }
 
       return res.status(result.reusedExistingDeal ? 200 : 201).json({
@@ -19750,10 +19957,51 @@ RULES:
       const totalPages = Math.max(1, Math.ceil(total / limit));
       const selectedRows = includeAll ? matchingRows : matchingRows.slice((page - 1) * limit, page * limit);
 
+      const ownedSelectedDeals = selectedRows
+        .filter(({ send }) => send.developerProfileId === developerProfileId)
+        .map(({ deal }) => deal);
+      if (ownedSelectedDeals.length) {
+        void refreshCensusDataForDeals(ownedSelectedDeals);
+      }
+
+      const publicDataByDealId = new Map<string, {
+        environmentalConstraints: Record<string, any> | null;
+        updatedAt: Date | null;
+      }>();
+      if (selectedRows.length) {
+        const propertyRows = await db.select({
+          dealId: propertyData.dealId,
+          environmentalConstraints: propertyData.environmentalConstraints,
+          updatedAt: propertyData.updatedAt,
+        }).from(propertyData).where(inArray(
+          propertyData.dealId,
+          selectedRows.map(({ deal }) => deal.id),
+        ));
+        for (const row of propertyRows) {
+          if (!row.dealId) continue;
+          const constraints = row.environmentalConstraints &&
+            typeof row.environmentalConstraints === "object"
+            ? row.environmentalConstraints as Record<string, unknown>
+            : null;
+          publicDataByDealId.set(row.dealId, {
+            environmentalConstraints: constraints
+              ? {
+                  fema: constraints.fema ?? null,
+                  wetlands: constraints.wetlands ?? null,
+                  epa: constraints.epa ?? null,
+                  sourceChecks: constraints.sourceChecks ?? null,
+                }
+              : null,
+            updatedAt: row.updatedAt,
+          });
+        }
+      }
+
       const enrichedDeals = await Promise.all(selectedRows.map(async ({ send, deal }) => ({
         ...send,
         deal: {
           ...deal,
+          publicData: publicDataByDealId.get(deal.id) || null,
           hudData: await lookupHudDataForDeal({
             state: deal.state,
             county: deal.county,
@@ -36420,6 +36668,78 @@ RULES:
       // Return information about the government APIs integrated into the platform
       const apiSources = [
         {
+          id: 'census-geocoder',
+          name: 'U.S. Census Geocoder',
+          description: 'Free nationwide address matching used to locate submitted deals before public-data lookups.',
+          type: 'Geocoding',
+          cost: 'Free',
+          endpoint: 'https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress',
+          dataPoints: ['Matched address', 'Latitude / longitude', 'Census geography'],
+          usedIn: ['Automatic industrial and multifamily deal enrichment'],
+          coverage: 'United States; unmatched or ambiguous addresses remain unresolved',
+          freshness: 'Current Census geocoder benchmark; query time is recorded.'
+        },
+        {
+          id: 'census-acs-5year',
+          name: 'U.S. Census ACS 5-year estimates',
+          description: 'Tract-level population, income, and housing context. These are survey estimates, not current property operating data.',
+          type: 'Demographics / Housing Context',
+          cost: 'Free',
+          endpoint: 'https://api.census.gov/data/2024/acs/acs5',
+          dataPoints: ['Population', 'Median household income', 'Renter / owner occupied units'],
+          usedIn: ['Automatic industrial and multifamily area context'],
+          coverage: 'Nationwide Census tracts',
+          freshness: '2024 ACS 5-year vintage; label as estimates, not observed property values.'
+        },
+        {
+          id: 'hud-fmr-income-limits',
+          name: 'HUD Fair Market Rent and Income Limits',
+          description: 'HUD program benchmarks and income limits; not observed rents, rent comps, or current occupancy.',
+          type: 'Housing Benchmarks',
+          cost: 'Free',
+          endpoint: 'https://www.huduser.gov/portal/dataset/fmr-api.html',
+          dataPoints: ['Fair Market Rent', 'Median family income', 'Income limits'],
+          usedIn: ['On-demand multifamily deal context'],
+          coverage: 'HUD-defined areas; availability varies by location',
+          freshness: 'Annual benchmark vintage; shown separately from submitted property rent.'
+        },
+        {
+          id: 'usfws-nwi',
+          name: 'USFWS National Wetlands Inventory',
+          description: 'Public wetlands mapping used for proximity screening around a deal location.',
+          type: 'Environmental',
+          cost: 'Free',
+          endpoint: 'https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/rest/services/Wetlands/MapServer/0/query',
+          dataPoints: ['Mapped wetland presence', 'Nearby mapped features', 'Wetland classifications'],
+          usedIn: ['Automatic industrial and multifamily deal enrichment'],
+          coverage: 'Nationwide mapped inventory; mapping is not a field delineation',
+          freshness: 'Map inventory can lag field conditions; screening result requires site diligence.'
+        },
+        {
+          id: 'epa-echo',
+          name: 'EPA ECHO Facility Search',
+          description: 'Nearby regulated-facility screening from EPA ECHO; not an environmental clearance or contamination finding.',
+          type: 'Environmental',
+          cost: 'Free',
+          endpoint: 'https://echo.epa.gov/tools/web-services',
+          dataPoints: ['Nearby regulated facilities', 'Facility categories', 'Search results'],
+          usedIn: ['Automatic industrial and multifamily deal enrichment'],
+          coverage: 'United States; result depends on EPA facility records and search radius',
+          freshness: 'Live query; facility records can be incomplete or delayed.'
+        },
+        {
+          id: 'municipal-permits-limited',
+          name: 'Municipal Building Permit Records',
+          description: 'Live local permit queries are available only in selected cities; other permit portals remain discovery references.',
+          type: 'Building Permits',
+          cost: 'Free',
+          endpoint: 'City ArcGIS and open-data feeds',
+          dataPoints: ['Permit count near site', 'Permit issue dates where supplied'],
+          usedIn: ['Automatic deal enrichment in supported cities'],
+          coverage: 'Currently Nashville, Raleigh, and Atlanta only',
+          freshness: 'City feed coverage and update cadence vary; absence outside supported cities means unavailable, not zero.'
+        },
+        {
           id: 'fema-nfhl',
           name: 'FEMA National Flood Hazard Layer',
           description: 'Flood zone detection for Special Flood Hazard Areas',
@@ -36673,6 +36993,73 @@ RULES:
         }
       ];
 
+      const integrationBySourceId: Record<string, {
+        status: "automatic" | "on_demand" | "limited" | "catalog_only";
+        details: string;
+      }> = {
+        "fema-nfhl": {
+          status: "automatic",
+          details: "Runs for located manual submissions and supported intake flows in both asset classes. A point screen is not parcel-level flood certification.",
+        },
+        "epa-envirofacts": {
+          status: "on_demand",
+          details: "Used in selected LIHTC/site analyses. Automatic deal enrichment uses the separate EPA ECHO source listed here.",
+        },
+        "epa-echo": {
+          status: "automatic",
+          details: "Runs for located manual submissions and supported intake flows in both asset classes. Nearby facilities are screening context only.",
+        },
+        "usfws-nwi": {
+          status: "automatic",
+          details: "Runs for located manual submissions and supported intake flows in both asset classes; it is not a wetlands delineation.",
+        },
+        "usgs-elevation": {
+          status: "on_demand",
+          details: "Available in selected LIHTC/site-scoring flows. Point elevation does not establish industrial parcel slope.",
+        },
+        "google-places": {
+          status: "on_demand",
+          details: "Used in selected LIHTC/site-scoring flows and may incur usage charges; not used by free-source deal enrichment.",
+        },
+        "geocodio": {
+          status: "on_demand",
+          details: "Still used by other existing geocoding paths. New deal enrichment uses the free Census Geocoder first.",
+        },
+        "hellodata": {
+          status: "on_demand",
+          details: "Subscription-based multifamily comparable data; it is not part of the free-source enrichment.",
+        },
+        "census-geocoder": {
+          status: "automatic",
+          details: "Geocodes new manual submissions and records missing coordinates during Census context refresh, for both asset classes.",
+        },
+        "census-acs-5year": {
+          status: "automatic",
+          details: "Adds tract-level survey estimates to deal context. It is not property-level rent, occupancy, or demographic data.",
+        },
+        "census-building-permits": {
+          status: "automatic",
+          details: "Adds county-level Census BPS year-to-date authorized-unit totals. These are not nearby property permits.",
+        },
+        "hud-fmr-income-limits": {
+          status: "on_demand",
+          details: "Looked up for multifamily deal views. HUD FMR is a program benchmark, not an observed rent or rent comp.",
+        },
+        "municipal-permits-limited": {
+          status: "limited",
+          details: "Automatic nearby permit queries currently cover Nashville, Raleigh, and Atlanta. Other cities are unavailable, not zero.",
+        },
+      };
+      const sourcesWithStatus = apiSources.map((source) => {
+        const integration = integrationBySourceId[source.id];
+        return {
+          ...source,
+          integrationStatus: integration?.status || "catalog_only",
+          integrationDetails: integration?.details
+            || "Listed for discovery; no automatic connection to this source is confirmed.",
+        };
+      });
+
       // Get usage stats from API call logs if available
       let apiUsageStats: any[] = [];
       try {
@@ -36697,8 +37084,8 @@ RULES:
       }
 
       res.json({
-        totalSources: apiSources.length,
-        sources: apiSources,
+        totalSources: sourcesWithStatus.length,
+        sources: sourcesWithStatus,
         freeApis: apiSources.filter(s => s.cost.toLowerCase().startsWith('free')).length,
         paidApis: apiSources.filter(s => !s.cost.toLowerCase().startsWith('free')).length,
         apiUsageStats

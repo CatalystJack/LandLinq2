@@ -74,6 +74,8 @@ interface ApiSource {
   usedIn: string[];
   coverage?: string;
   freshness?: string;
+  integrationStatus?: "automatic" | "on_demand" | "limited" | "catalog_only";
+  integrationDetails?: string;
 }
 
 interface ApiSourcesData {
@@ -88,6 +90,21 @@ function displaySourceCost(cost: string): string {
   return cost === 'Free (portal viewing; copy fees vary)'
     ? 'Free to view; copies may cost extra'
     : cost;
+}
+
+function connectionStatusLabel(status?: ApiSource["integrationStatus"]): string {
+  switch (status) {
+    case "automatic": return "Automatic";
+    case "on_demand": return "On demand";
+    case "limited": return "Limited coverage";
+    default: return "Catalog listing only";
+  }
+}
+
+function connectionStatusVariant(status?: ApiSource["integrationStatus"]): "default" | "secondary" | "outline" {
+  if (status === "automatic") return "default";
+  if (status === "limited") return "secondary";
+  return "outline";
 }
 
 type LoopNetListing = {
@@ -731,16 +748,18 @@ export default function DataHub() {
                         <Globe className="h-5 w-5" />
                         Data API Sources
                       </CardTitle>
-                      <CardDescription>Government and commercial APIs integrated into the platform</CardDescription>
+                      <CardDescription>
+                        Sources include live connections, on-demand lookups, and catalog references. Check each connection status.
+                      </CardDescription>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Badge variant="outline" className="bg-green-50 text-green-700">
                         <CheckCircle className="h-3 w-3 mr-1" />
-                        {apiSources?.freeApis || 0} Free APIs
+                        {apiSources?.freeApis || 0} free sources
                       </Badge>
                       <Badge variant="outline" className="bg-blue-50 text-blue-700">
                         <Zap className="h-3 w-3 mr-1" />
-                        {apiSources?.paidApis || 0} Paid APIs
+                        {apiSources?.paidApis || 0} paid / usage-based
                       </Badge>
                     </div>
                   </div>
@@ -764,6 +783,17 @@ export default function DataHub() {
                             <CardDescription>{source.description}</CardDescription>
                           </CardHeader>
                           <CardContent className="space-y-3">
+                            <div className="rounded-md bg-slate-50 p-3">
+                              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs font-medium text-gray-600">App connection</p>
+                                <Badge variant={connectionStatusVariant(source.integrationStatus)}>
+                                  {connectionStatusLabel(source.integrationStatus)}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-700">
+                                {source.integrationDetails || "Connection status has not been verified."}
+                              </p>
+                            </div>
                             {source.coverage && (
                               <div>
                                 <p className="text-xs text-gray-500 mb-1">Coverage</p>

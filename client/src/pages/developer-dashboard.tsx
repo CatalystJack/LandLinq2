@@ -41,6 +41,25 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import DeveloperManualDealDialog from "@/components/developer-manual-deal-dialog";
 
+type PublicSourceCheck = {
+  status?: "available" | "unavailable";
+  checkedAt?: string;
+};
+
+type PublicEnvironmentalData = {
+  fema?: { zoneCode?: string | null } | null;
+  wetlands?: { isWetland?: boolean; nearbyCount?: number } | null;
+  epa?: {
+    counts?: { regulatedFacilities?: number };
+    nearbySites?: unknown[];
+  } | null;
+  sourceChecks?: {
+    fema?: PublicSourceCheck;
+    wetlands?: PublicSourceCheck;
+    epa?: PublicSourceCheck;
+  } | null;
+};
+
 type DealRecord = {
   id: string;
   address: string;
@@ -70,6 +89,15 @@ type DealRecord = {
   censusTractFips?: string | null;
   censusMedianIncome?: number | null;
   censusRenterRate?: string | number | null;
+  censusDataJson?: Record<string, unknown> | null;
+  censusDataFetchedAt?: string | Date | null;
+  nearbyPermitCount?: number | null;
+  nearbyPermitsStatus?: "available" | "not_available" | "error" | null;
+  nearbyPermitsFetchedAt?: string | Date | null;
+  publicData?: {
+    environmentalConstraints: PublicEnvironmentalData | null;
+    updatedAt: string | Date | null;
+  } | null;
   hudData?: {
     status: "matched" | "not_configured" | "location_unresolved" | "unavailable";
     areaName: string | null;
@@ -81,6 +109,79 @@ type DealRecord = {
     lookedUpAt: string;
   };
 };
+
+function publicDataDate(value: string | Date | null | undefined): string {
+  if (!value) return "not checked";
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime())
+    ? "not checked"
+    : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function publicScreeningSummary(deal: DealRecord): { lines: string[]; updated: string } {
+  const environmental = deal.publicData?.environmentalConstraints;
+  const checks = environmental?.sourceChecks;
+  const environmentalCheckDates = [
+    checks?.fema?.checkedAt,
+    checks?.wetlands?.checkedAt,
+    checks?.epa?.checkedAt,
+  ].filter((value): value is string => typeof value === "string");
+  environmentalCheckDates.sort();
+  const environmentalCheckedAt = environmentalCheckDates.length
+    ? environmentalCheckDates[environmentalCheckDates.length - 1]
+    : deal.publicData?.updatedAt;
+  const hasLocation = deal.latitude != null && String(deal.latitude).trim() !== ""
+    && deal.longitude != null && String(deal.longitude).trim() !== "";
+  const missing = (status?: string) =>
+    status === "unavailable" ? "unavailable" : hasLocation ? "Not checked" : "location unresolved";
+
+  const fema = environmental?.fema;
+  const wetlands = environmental?.wetlands;
+  const epa = environmental?.epa;
+  const epaCount = Number(epa?.counts?.regulatedFacilities ?? epa?.nearbySites?.length);
+  const census = deal.censusDataJson;
+  const acsStatus = String(census?.acsStatus || "");
+  const permitStatus = String(census?.permitStatus || "");
+  const permitUnits = Number(census?.permitsYearToDate);
+  const femaValue = checks?.fema?.status === "unavailable"
+    ? "unavailable"
+    : fema
+      ? fema.zoneCode ? `Zone ${fema.zoneCode}` : "no zone returned"
+      : missing(checks?.fema?.status);
+  const wetlandsValue = checks?.wetlands?.status === "unavailable"
+    ? "unavailable"
+    : wetlands
+      ? wetlands.isWetland === true
+        ? `${wetlands.nearbyCount ?? "Mapped"} nearby`
+        : wetlands.isWetland === false ? "none mapped" : "result returned"
+      : missing(checks?.wetlands?.status);
+  const epaValue = checks?.epa?.status === "unavailable"
+    ? "unavailable"
+    : epa
+      ? Number.isFinite(epaCount) ? `${epaCount} facilities` : "screened"
+      : missing(checks?.epa?.status);
+  const censusUnavailable = census?.locationStatus === "unresolved"
+    ? "location unresolved"
+    : acsStatus === "unavailable" || permitStatus === "unavailable"
+      ? "unavailable"
+      : hasLocation ? "pending" : "location unresolved";
+  const localPermitValue = deal.nearbyPermitsStatus === "available"
+    ? `${deal.nearbyPermitCount ?? 0} records`
+    : deal.nearbyPermitsStatus === "not_available"
+      ? "unavailable here"
+      : deal.nearbyPermitsStatus === "error"
+        ? "lookup failed"
+        : missing();
+
+  return {
+    lines: [
+      `FEMA ${femaValue} · Wetlands ${wetlandsValue}`,
+      `EPA ECHO ${epaValue} · City permits ${localPermitValue}`,
+      `ACS ${acsStatus === "available" ? "2024 survey estimate" : censusUnavailable} · Census BPS ${permitStatus === "available" && Number.isFinite(permitUnits) ? `${permitUnits.toLocaleString()} authorized units YTD` : censusUnavailable}`,
+    ],
+    updated: `Updated: environmental ${publicDataDate(environmentalCheckedAt)} · Census ${publicDataDate(deal.censusDataFetchedAt)} · city permits ${publicDataDate(deal.nearbyPermitsFetchedAt)}`,
+  };
+}
 
 type DeveloperDeal = {
   id: string;
@@ -728,6 +829,7 @@ export default function DeveloperDashboard() {
                   <TableRow className="border-slate-300 hover:bg-slate-50">
                     <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Property</TableHead>
                     <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Market</TableHead>
+                    <TableHead className="hidden h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:table-cell">Public screening</TableHead>
                     <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Acreage</TableHead>
                     {isIndustrial ? (
                       <>
@@ -740,7 +842,7 @@ export default function DeveloperDashboard() {
                     ) : (
                       <>
                         <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Rent</TableHead>
-                        {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">HUD FMR</TableHead>}
+                        {showColumns && <TableHead title="HUD Fair Market Rent is a program benchmark, not actual property rent or a rent comparable." className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">HUD FMR benchmark</TableHead>}
                         {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">HUD Income Limit</TableHead>}
                         {showColumns && <TableHead className="h-9 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-500">Programs</TableHead>}
                       </>
@@ -761,6 +863,23 @@ export default function DeveloperDashboard() {
                           <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                           {[row.deal.county, row.deal.state].filter(Boolean).join(", ") || "—"}
                         </div>
+                        <div className="mt-1 space-y-0.5 text-[11px] leading-4 text-slate-500 lg:hidden">
+                          {publicScreeningSummary(row.deal).lines.map((line, index) => <div key={`mobile-screening-${index}`}>{line}</div>)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden py-2.5 lg:table-cell">
+                        {(() => {
+                          const summary = publicScreeningSummary(row.deal);
+                          return (
+                            <div
+                              className="min-w-48 max-w-56 space-y-0.5 text-[11px] leading-4 text-slate-600"
+                              title="Public screening results do not replace parcel-level or field diligence. Census ACS is a survey estimate, Census BPS is county-level, and local permits are limited to supported cities."
+                            >
+                              {summary.lines.map((line, index) => <div key={index}>{line}</div>)}
+                              <div className="pt-0.5 text-[9px] leading-3 text-slate-400">{summary.updated}</div>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.sizeAcres ? `${Number(row.deal.sizeAcres).toLocaleString()} ac` : "—"}</TableCell>
                       {isIndustrial ? (

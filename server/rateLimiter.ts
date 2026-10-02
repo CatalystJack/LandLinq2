@@ -88,6 +88,12 @@ export const dealSubmissionLimiter = createRateLimit({
   skipSuccessfulRequests: true
 });
 
+export const publicDataEnrichmentLimiter = createRateLimit({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 12,
+  message: 'Too many deal data refreshes or submissions. Please wait before trying again.'
+});
+
 export const authLimiter = createRateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   maxRequests: 10, // 10 login attempts per 15 minutes

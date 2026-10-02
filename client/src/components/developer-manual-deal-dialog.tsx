@@ -114,6 +114,15 @@ export default function DeveloperManualDealDialog({ open, onOpenChange, onSucces
                 An existing shared deal was linked to your company. Its shared details were left unchanged.
               </p>
             )}
+            {result.canonicalDealUpdated === false ? (
+              <p className="text-sm text-slate-600">
+                This shared deal was not changed. Any existing public-data checks remain visible, but this submission did not rerun them.
+              </p>
+            ) : (
+              <p className="text-sm text-slate-600">
+                Free Census location and area checks, plus FEMA, wetlands, and EPA screening, will run when the address can be located. Census and HUD values are estimates or program benchmarks, not actual property rent. Local permit records are currently available only in Nashville, Raleigh, and Atlanta. Use Refresh data to rerun these checks.
+              </p>
+            )}
             <DialogFooter><Button onClick={() => onOpenChange(false)}>Done</Button></DialogFooter>
           </div>
         ) : optionsQuery.isLoading ? (

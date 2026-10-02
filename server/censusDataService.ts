@@ -4,6 +4,7 @@
  * Every public function is deliberately failure-tolerant. Census data is
  * enrichment only and must never prevent a deal from loading or being edited.
  */
+import { normalizeUsStateCode } from "@shared/us-states";
 
 export interface CensusFips {
   stateFips: string;
@@ -40,6 +41,107 @@ let permitCachePromise: Promise<Map<string, number> | null> | null = null;
 function cleanFips(value: unknown, length: number): string | null {
   const digits = String(value ?? "").replace(/\D/g, "");
   return digits ? digits.padStart(length, "0").slice(-length) : null;
+}
+
+function normalizeCountyName(value: unknown): string {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/\b(city and borough|county|parish|borough|census area|municipality)\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export interface CensusGeocodeResult {
+  latitude: number;
+  longitude: number;
+  matchedAddress: string;
+  source: "U.S. Census Geocoder";
+  queriedAt: string;
+}
+
+export async function geocodeAddressWithCensus(input: {
+  address: string;
+  city: string;
+  state: string;
+  county?: string | null;
+  zip?: string | null;
+}): Promise<CensusGeocodeResult | null> {
+  const expectedState = normalizeUsStateCode(input.state);
+  if (!input.address.trim() || !expectedState) return null;
+
+  const address = [input.address, input.city, input.state, input.zip]
+    .filter(Boolean)
+    .join(", ");
+  const expectedZip = String(input.zip || "").replace(/\D/g, "").slice(0, 5);
+  const url = new URL(
+    "https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress",
+  );
+  url.searchParams.set("address", address);
+  url.searchParams.set("benchmark", "Public_AR_Current");
+  url.searchParams.set("vintage", "Current_Current");
+  url.searchParams.set("format", "json");
+
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return null;
+
+    const payload = await response.json() as any;
+    const matches = payload?.result?.addressMatches;
+    if (!Array.isArray(matches)) return null;
+
+    const candidates = matches.filter((match: any) => {
+      const matchedState = normalizeUsStateCode(
+        match?.addressComponents?.state
+          || match?.geographies?.States?.[0]?.STUSAB
+          || match?.geographies?.States?.[0]?.NAME,
+      );
+      const matchedCounty = normalizeCountyName(
+        match?.geographies?.Counties?.[0]?.BASENAME
+          || match?.geographies?.Counties?.[0]?.NAME,
+      );
+      const expectedCounty = normalizeCountyName(input.county);
+      const matchedZip = String(match?.addressComponents?.zip || "")
+        .replace(/\D/g, "")
+        .slice(0, 5);
+      const latitude = Number(match?.coordinates?.y);
+      const longitude = Number(match?.coordinates?.x);
+      return matchedState === expectedState
+        && (!expectedCounty || expectedCounty === matchedCounty)
+        && (!expectedZip || expectedZip === matchedZip)
+        && Boolean(match?.matchedAddress)
+        && Number.isFinite(latitude)
+        && Number.isFinite(longitude)
+        && latitude >= -90 && latitude <= 90
+        && longitude >= -180 && longitude <= 180;
+    });
+
+    const uniqueCandidates = new Map<string, any>();
+    for (const match of candidates) {
+      uniqueCandidates.set(
+        `${match.coordinates.y},${match.coordinates.x}`,
+        match,
+      );
+    }
+    if (uniqueCandidates.size !== 1) return null;
+
+    const match = Array.from(uniqueCandidates.values())[0];
+    return {
+      latitude: Number(match.coordinates.y),
+      longitude: Number(match.coordinates.x),
+      matchedAddress: String(match.matchedAddress),
+      source: "U.S. Census Geocoder",
+      queriedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.warn(
+      "[CENSUS-DATA] Address geocoder failed:",
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
 }
 
 function round(value: number, decimals = 1): number {
@@ -170,7 +272,7 @@ export async function getAcsDataForTract(
     if (!process.env.CENSUS_API_KEY) return null;
 
     const [current, prior] = await Promise.all([
-      fetchAcsVintage(2023, stateFips, countyFips, tractFips),
+      fetchAcsVintage(2024, stateFips, countyFips, tractFips),
       fetchAcsVintage(2019, stateFips, countyFips, tractFips),
     ]);
     return buildAcsData(current, prior);

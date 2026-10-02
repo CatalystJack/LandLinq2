@@ -52,44 +52,50 @@ export async function enrichDealWithGovernmentData(
   if (wetlandsResult.status === 'rejected' || (wetlandsResult.status === 'fulfilled' && !wetlands)) failures.push('wetlands');
   if (epaResult.status === 'rejected' || (epaResult.status === 'fulfilled' && !epa)) failures.push('epa');
 
-  if (fema || wetlands || epa) {
-    try {
-      const [existing] = await db.select().from(propertyData)
-        .where(eq(propertyData.dealId, input.dealId))
-        .limit(1);
-      const existingConstraints = existing?.environmentalConstraints &&
-        typeof existing.environmentalConstraints === 'object'
-        ? existing.environmentalConstraints as Record<string, unknown>
-        : {};
-      const updates: Record<string, unknown> = {
-        coordinates: { lat: latitude, lng: longitude },
-        environmentalConstraints: {
-          ...existingConstraints,
-          ...(fema ? { fema } : {}),
-          ...(wetlands ? { wetlands } : {}),
-          ...(epa ? { epa } : {}),
-        },
-        updatedAt: new Date(),
-      };
-      if (fema) updates.floodZone = fema.zoneCode;
-      if (wetlands) updates.wetlands = wetlands.isWetland;
+  try {
+    const [existing] = await db.select().from(propertyData)
+      .where(eq(propertyData.dealId, input.dealId))
+      .limit(1);
+    const existingConstraints = existing?.environmentalConstraints &&
+      typeof existing.environmentalConstraints === 'object'
+      ? existing.environmentalConstraints as Record<string, unknown>
+      : {};
+    const checkedAt = new Date().toISOString();
+    const sourceChecks = {
+      fema: { status: fema ? 'available' : 'unavailable', checkedAt },
+      wetlands: { status: wetlands ? 'available' : 'unavailable', checkedAt },
+      epa: { status: epa ? 'available' : 'unavailable', checkedAt },
+    };
+    const environmentalConstraints = {
+      ...existingConstraints,
+      ...(fema ? { fema } : {}),
+      ...(wetlands ? { wetlands } : {}),
+      ...(epa ? { epa } : {}),
+      sourceChecks,
+    };
+    const updates: Record<string, unknown> = {
+      coordinates: { lat: latitude, lng: longitude },
+      environmentalConstraints,
+      updatedAt: new Date(),
+    };
+    if (fema) updates.floodZone = fema.zoneCode;
+    if (wetlands) updates.wetlands = wetlands.isWetland;
 
-      if (existing) {
-        await db.update(propertyData).set(updates as any)
-          .where(eq(propertyData.id, existing.id));
-      } else {
-        await db.insert(propertyData).values({
-          dealId: input.dealId,
-          coordinates: { lat: latitude, lng: longitude },
-          floodZone: fema?.zoneCode || null,
-          wetlands: wetlands?.isWetland ?? false,
-          environmentalConstraints: updates.environmentalConstraints,
-        });
-      }
-    } catch (error) {
-      failures.push('persistence');
-      console.warn(`⚠️ [GOVERNMENT-ENRICHMENT] Deal ${input.dealId} could not save results:`, error instanceof Error ? error.message : error);
+    if (existing) {
+      await db.update(propertyData).set(updates as any)
+        .where(eq(propertyData.id, existing.id));
+    } else {
+      await db.insert(propertyData).values({
+        dealId: input.dealId,
+        coordinates: { lat: latitude, lng: longitude },
+        floodZone: fema?.zoneCode || null,
+        wetlands: wetlands?.isWetland ?? false,
+        environmentalConstraints,
+      });
     }
+  } catch (error) {
+    failures.push('persistence');
+    console.warn(`⚠️ [GOVERNMENT-ENRICHMENT] Deal ${input.dealId} could not save results:`, error instanceof Error ? error.message : error);
   }
 
   if (failures.length) {

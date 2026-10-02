@@ -178,7 +178,7 @@ const ALL_COLUMNS = [
   { key: 'pricePerUnit', label: 'Price/Unit', defaultVisible: false },
   { key: 'sewer', label: 'Sewer', defaultVisible: false },
   { key: 'areaDemographics', label: 'Area Demographics', defaultVisible: false },
-  { key: 'nearbyPermits', label: 'Nearby Permits (12mo)', defaultVisible: false },
+  { key: 'nearbyPermits', label: 'Census County Units (YTD)', defaultVisible: false },
   { key: 'publicParcelId', label: 'Public Parcel ID', defaultVisible: false },
   { key: 'publicOwner', label: 'Record Owner', defaultVisible: false },
   { key: 'publicAssessedValue', label: 'Assessed Values', defaultVisible: false },
@@ -4853,7 +4853,7 @@ export default function AnalystDashboard() {
       case 'pricePerUnit': return <th key={key} className={`${thBase} min-w-[50px]`} style={{display: vis?'':'none'}}>{headerLabel('Price/Unit')}</th>;
       case 'sewer': return <th key={key} className={`${thBase} min-w-[70px]`} style={{display: vis?'':'none'}}>{headerLabel('Sewer')}</th>;
       case 'areaDemographics': return <th key={key} className={`${thBase} min-w-[170px]`} style={{display: vis?'':'none'}}>{headerLabel('Area Demographics')}</th>;
-      case 'nearbyPermits': return <th key={key} className={`${thBase} min-w-[115px]`} style={{display: vis?'':'none'}}>{headerLabel('Nearby Permits (12mo)')}</th>;
+      case 'nearbyPermits': return <th key={key} className={`${thBase} min-w-[150px]`} style={{display: vis?'':'none'}}>{headerLabel('Census County Units (YTD)')}</th>;
       case 'publicParcelId': return <th key={key} className={`${thBase} min-w-[120px]`} style={{display: vis?'':'none'}}>{headerLabel('Public Parcel ID')}</th>;
       case 'publicOwner': return <th key={key} className={`${thBase} min-w-[130px]`} style={{display: vis?'':'none'}}>{headerLabel('Record Owner')}</th>;
       case 'publicAssessedValue': return <th key={key} className={`${thBase} min-w-[180px]`} style={{display: vis?'':'none'}}>{headerLabel('Assessed Values')}</th>;
@@ -5413,7 +5413,7 @@ export default function AnalystDashboard() {
                 <TooltipTrigger asChild>
                   <span className="cursor-help whitespace-nowrap" title={detail}>{parts.join(' · ')}</span>
                 </TooltipTrigger>
-                <TooltipContent className="max-w-xs text-xs">{detail || 'Census area demographics'}</TooltipContent>
+                <TooltipContent className="max-w-xs text-xs">{detail || 'U.S. Census ACS 5-year tract-level survey estimates; not current property operating data.'}</TooltipContent>
               </Tooltip>
             );
           })()}
@@ -5425,10 +5425,20 @@ export default function AnalystDashboard() {
             const census = d.censusDataJson && typeof d.censusDataJson === 'object'
               ? d.censusDataJson
               : null;
-            const permits = Number(census?.permitsTrailing12Mo);
-            return Number.isFinite(permits) && isFreshPublicRecordDate(d.censusDataFetchedAt)
-              ? <span title={`U.S. Census area-level estimate · data fetched ${formatDateEST(new Date(d.censusDataFetchedAt))}`}>{permits.toLocaleString()} permits</span>
-              : <EmptyCell />;
+            const units = Number(census?.permitsYearToDate);
+            if (!isFreshPublicRecordDate(d.censusDataFetchedAt)) return <EmptyCell />;
+            if (census?.locationStatus === 'unresolved') {
+              return <span title="The Census geocoder could not verify this deal location on the last refresh.">Location unresolved</span>;
+            }
+            if (census?.permitStatus === 'unavailable') {
+              return <span title="Census Building Permits Survey county data was unavailable on the last refresh.">Unavailable</span>;
+            }
+            if (census?.permitStatus !== 'available' || !Number.isFinite(units)) return <EmptyCell />;
+            return (
+              <span title={`U.S. Census Building Permits Survey county-level authorized housing units year-to-date in the latest published file; fetched ${formatDateEST(new Date(d.censusDataFetchedAt))}.`}>
+                {units.toLocaleString()} units YTD
+              </span>
+            );
           })()}
         </td>
       );

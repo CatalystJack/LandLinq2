@@ -48,6 +48,7 @@
 - [Table scrollbar consolidation](table-scrollbar-consolidation.md) — wide tables need one shared class with a nonzero horizontal scrollbar height; zero-height WebKit scrollbars hide usable overflow.
 - [Google font CSP allowlist](google-font-csp.md) — font links need every active CSP middleware path to allow both the stylesheet and font hosts.
 - [HUD API response envelopes](hud-api-response-envelopes.md) — HUD list endpoints may return raw arrays while data endpoints may wrap payloads in data; normalize both shapes.
+- [Census geocoding verification](census-geocoding-verification.md) — require submitted state, county, and ZIP to match; reject ambiguous Census matches rather than guessing coordinates.
 - [City permit source migration](city-permit-source-migration.md) — Nashville and Raleigh permit portals migrated from Socrata to ArcGIS; Atlanta's published permit item is a historical CSV.
 - [YOC coastal county basis](yoc-coastal-county-basis.md) — NOAA ENOW includes inland watershed rows; retain FL/SC statewide behavior until team confirms SC county-only treatment.
 - [Shared automated YOC baseline](shared-yoc-baseline.md) — persisted automated underwriting fields are platform-default shared values; profile-specific calculations must not overwrite them.
