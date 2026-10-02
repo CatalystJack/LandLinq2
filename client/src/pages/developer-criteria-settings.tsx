@@ -496,6 +496,10 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
       industrialCriteria: {
         ...form.industrialCriteria,
         stateOverrides: removeStateOverrides(form.industrialCriteria.stateOverrides),
+        productTypes: form.industrialCriteria.productTypes.map((productType) => ({
+          ...productType,
+          stateOverrides: removeStateOverrides(productType.stateOverrides as CriteriaOverrideValue),
+        })),
       },
     });
   };

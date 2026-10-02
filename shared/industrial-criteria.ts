@@ -51,6 +51,44 @@ export const DEFAULT_INDUSTRIAL_CRITERIA: IndustrialCriteria = {
   ],
 };
 
+export function updateIndustrialProductTypeCriteria(
+  criteria: IndustrialCriteria,
+  productTypeKey: string,
+  updates: Partial<IndustrialProductTypeCriteria>,
+): IndustrialCriteria {
+  const productTypes = criteria.productTypes.map((productType) =>
+    productType.key === productTypeKey ? { ...productType, ...updates } : productType,
+  );
+  const singleLoad = productTypes.find((productType) => productType.key === "single-load");
+  const crossDock = productTypes.find((productType) => productType.key === "cross-dock");
+  const stateOverrides: Record<string, IndustrialCriteriaOverride> = {};
+
+  for (const [productType, field] of [
+    [singleLoad, "minSingleLoadAcres"],
+    [crossDock, "minCrossDockAcres"],
+  ] as const) {
+    if (!productType) continue;
+    for (const [state, override] of Object.entries(productType.stateOverrides)) {
+      if (override.minAcres === undefined) continue;
+      stateOverrides[state] = {
+        ...stateOverrides[state],
+        [field]: override.minAcres,
+      };
+    }
+  }
+
+  return {
+    ...criteria,
+    default: {
+      ...criteria.default,
+      minSingleLoadAcres: singleLoad?.minAcres ?? criteria.default.minSingleLoadAcres,
+      minCrossDockAcres: crossDock?.minAcres ?? criteria.default.minCrossDockAcres,
+    },
+    stateOverrides,
+    productTypes,
+  };
+}
+
 function parseOptionalAcres(value: unknown, label: string): number | null {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
@@ -128,10 +166,10 @@ export function normalizeIndustrialCriteria(value: unknown, allowedStates?: read
   const singleLoad = productTypes.find((type) => type.key === "single-load") || productTypes[0];
   const crossDock = productTypes.find((type) => type.key === "cross-dock") || productTypes[1] || singleLoad;
   const stateOverrides: Record<string, IndustrialCriteriaOverride> = { ...legacyStateOverrides };
-  for (const state of new Set([
+  for (const state of Array.from(new Set([
     ...Object.keys(singleLoad?.stateOverrides || {}),
     ...Object.keys(crossDock?.stateOverrides || {}),
-  ])) {
+  ]))) {
     stateOverrides[state] = {
       ...(stateOverrides[state] || {}),
       ...(singleLoad?.stateOverrides[state]?.minAcres !== undefined
@@ -191,10 +229,10 @@ export function validateIndustrialCriteria(criteria: IndustrialCriteria): Indust
     throw new Error("Cross-dock minimum acreage cannot be lower than single-load minimum acreage");
   }
   if (singleLoad && crossDock) {
-    for (const state of new Set([
+    for (const state of Array.from(new Set([
       ...Object.keys(singleLoad.stateOverrides),
       ...Object.keys(crossDock.stateOverrides),
-    ])) {
+    ]))) {
       const singleMinimum = singleLoad.stateOverrides[state]?.minAcres ?? singleLoad.minAcres!;
       const crossMinimum = crossDock.stateOverrides[state]?.minAcres ?? crossDock.minAcres!;
       if (crossMinimum < singleMinimum) {

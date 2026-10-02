@@ -68,6 +68,7 @@ import {
 import { isUsStateCode, normalizeUsStateCode } from "@shared/us-states";
 import { getBrokerStateCodes, getOutOfStateCodeFromCounty } from "@shared/broker-location";
 import { countyTargetMatchesDeal, parseCountyTarget } from "@shared/county-targets";
+import { isProtectedWorkspacePath } from "@shared/auth-route-guards";
 import {
   OFF_MARKET_MAX_IMPORT_ROWS,
   OFF_MARKET_MAX_UPLOAD_BYTES,
@@ -2239,6 +2240,30 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   setupSecurity(app);
   // Load the session and Passport identity before applying the general limiter.
   setupAuthMiddleware(app);
+  // Temporary-password accounts may only check their own session, log out,
+  // or complete the one-time reset flow until the password has been changed.
+  app.use((req: any, res: any, next: any) => {
+    if (
+      !req.path.startsWith('/api/') ||
+      !req.isAuthenticated?.() ||
+      req.user?.mustResetPassword !== true
+    ) {
+      return next();
+    }
+
+    if (
+      req.path === '/api/user' ||
+      req.path === '/api/logout' ||
+      req.path.startsWith('/api/password-reset/')
+    ) {
+      return next();
+    }
+
+    return res.status(403).json({
+      message: "Password reset required before accessing this service",
+      resetRequired: true,
+    });
+  });
   setupGlobalRateLimit(app);
   
   // Public Twilio inbound route; signature validation is handled by SMSInboundService.
@@ -3066,17 +3091,21 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       !req.path.startsWith('/@');
     if (req.isAuthenticated?.()) {
       const role = String(req.user?.role || '').toUpperCase();
-      const isDeveloperLoginPath = /^\/developer\/[^/]+\/login$/.test(req.path);
+      const isDeveloperLoginPath = /^\/developer\/[^/]+\/login\/?$/.test(req.path);
       // Static assets are not page navigations and must never be redirected
       // through the developer page allowlist. Otherwise an authenticated
       // browser receives the dashboard HTML for JS/CSS requests and fails
       // strict MIME checking.
       if (!isDocumentRequest) return next();
-      if (req.user?.mustResetPassword === true && req.path !== '/reset-password') {
+      if (req.user?.mustResetPassword === true) {
         try {
           const { passwordResetService } = await import('./passwordReset');
           const token = await passwordResetService.generateForcedResetToken(req.user.email);
-          if (token) {
+          if (!token) {
+            return res.status(503).send('Password reset is temporarily unavailable. Please try again later.');
+          }
+          const requestedToken = typeof req.query?.token === 'string' ? req.query.token : '';
+          if (req.path !== '/reset-password' || requestedToken !== token) {
             return res.redirect(`/reset-password?token=${encodeURIComponent(token)}`);
           }
         } catch (error) {
@@ -3106,12 +3135,15 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     ];
     const isPublicPath =
       publicPaths.includes(req.path) ||
-      /^\/developer\/[^/]+\/login$/.test(req.path) ||
+      /^\/developer\/[^/]+\/login\/?$/.test(req.path) ||
       req.path === '/deals' ||
       req.path.startsWith('/deals/') ||
       req.path.startsWith('/shared-deal/');
 
     if (isPublicPath) return next();
+    // Let the client render sign-in for workspace URLs instead of sending
+    // an expired developer session to the unrelated public landing page.
+    if (isProtectedWorkspacePath(req.path)) return next();
 
     if (isDocumentRequest) return res.redirect('/');
 
@@ -3485,7 +3517,10 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       }));
       
       // The people page needs account status, not password hashes.
-      const safeUsers = enrichedUsers.map(({ password: _password, ...safeUser }) => safeUser);
+      const safeUsers = enrichedUsers.map(({ password, ...safeUser }) => ({
+        ...safeUser,
+        hasLocalPassword: Boolean(password),
+      }));
       res.json({ users: safeUsers });
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -3664,6 +3699,55 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     } catch (error) {
       console.error("[resend initial login] Error:", error);
       return res.status(500).json({ message: "Failed to resend initial login email" });
+    }
+  });
+
+  app.post('/api/users/:userId/temporary-password', isAuthenticated, authLimiter, requirePlatformAdmin, async (req: any, res) => {
+    try {
+      const password = req.body?.password;
+      if (typeof password !== "string" || password.length < 12 || password.length > 128) {
+        return res.status(400).json({ message: "Temporary password must be between 12 and 128 characters" });
+      }
+
+      const [target] = await db.select({
+        id: users.id,
+        email: users.email,
+        role: users.role,
+        password: users.password,
+      }).from(users).where(eq(users.id, req.params.userId)).limit(1);
+      if (!target) return res.status(404).json({ message: "User not found" });
+      if (target.id === req.user?.id) {
+        return res.status(400).json({ message: "You cannot set a temporary password for your own account" });
+      }
+      if (isPlatformAdminEmail(target.email) || String(target.role || "").toUpperCase() === "SUPER_ADMIN") {
+        return res.status(403).json({ message: "Platform administrator passwords cannot be changed here" });
+      }
+      if (!target.password) {
+        return res.status(409).json({ message: "This account does not use a local password" });
+      }
+
+      const passwordHash = await hashPassword(password);
+      const [updated] = await db.update(users).set({
+        password: passwordHash,
+        mustResetPassword: true,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(users.id, target.id),
+        eq(users.password, target.password),
+      )).returning({ id: users.id });
+
+      if (!updated) {
+        return res.status(409).json({ message: "The account changed. Refresh the page and try again." });
+      }
+
+      console.info("[admin temporary password] Password reset requested", {
+        adminUserId: req.user?.id,
+        targetUserId: target.id,
+      });
+      return res.json({ message: "Temporary password set. The user must choose a new password at next sign-in." });
+    } catch (error) {
+      console.error("[admin temporary password] Failed to set password");
+      return res.status(500).json({ message: "Failed to set temporary password" });
     }
   });
 
@@ -33440,6 +33524,25 @@ RULES:
   app.get('/api/outreach/campaign-templates', isAuthenticated, async (req: any, res) => {
     try {
       const { hubspotTriggerTag } = req.query;
+      const hideRetiredJackCampaigns = sql`
+        NOT (
+          is_active = false
+          AND (
+            LOWER(BTRIM(name)) IN (
+              'jack - known sophisticated',
+              'jack - unknown sophisticated',
+              'landlinq - jack known sophisticated',
+              'landlinq - jack unknown sophisticated'
+            )
+            OR LOWER(BTRIM(hubspot_trigger_tag)) IN (
+              'jack - known sophisticated',
+              'jack - unknown sophisticated',
+              'landlinq - jack known sophisticated',
+              'landlinq - jack unknown sophisticated'
+            )
+          )
+        )
+      `;
       
       // Support filtering by hubspotTriggerTag query parameter
       let result;
@@ -33454,6 +33557,7 @@ RULES:
             updated_at as "updatedAt"
           FROM outreach_campaign_templates
           WHERE LOWER(hubspot_trigger_tag) = LOWER(${hubspotTriggerTag})
+            AND ${hideRetiredJackCampaigns}
           ORDER BY created_at DESC
         `);
       } else {
@@ -33466,6 +33570,7 @@ RULES:
             created_at as "createdAt",
             updated_at as "updatedAt"
           FROM outreach_campaign_templates
+          WHERE ${hideRetiredJackCampaigns}
           ORDER BY created_at DESC
         `);
       }

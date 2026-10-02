@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { DevLogin } from "./components/dev-login";
 import { useAuth, UserRole } from "@/hooks/useAuth";
+import { isProtectedWorkspacePath } from "@shared/auth-route-guards";
 import { useScrollToTop } from "@/hooks/useScrollToTop";
 import ErrorBoundary from "@/components/error-boundary";
 import { Loader2 } from "lucide-react";
@@ -181,6 +182,12 @@ function Router() {
         </div>
       </div>
     );
+  }
+
+  // A timed-out session on a developer workspace URL must return to sign-in,
+  // not fall through to the public LandLinq shell.
+  if (!isAuthenticated && isProtectedWorkspacePath(location)) {
+    return <AuthPage />;
   }
 
   // ── DEMO MODE — locked to deal dashboard only, no internal tools ──────────

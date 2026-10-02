@@ -1117,6 +1117,50 @@ setTimeout(() => {
           await db2.execute(sql2`UPDATE outreach_campaign_templates SET name = ${newName} WHERE name = ${oldName}`);
         }
 
+        // Retire only the two legacy Jack campaigns. Keep their templates,
+        // steps, and enrollment rows so historical reporting remains intact.
+        await db2.execute(sql2`
+          UPDATE outreach_campaign_templates
+          SET is_active = false, updated_at = NOW()
+          WHERE LOWER(BTRIM(name)) IN (
+              'jack - known sophisticated',
+              'jack - unknown sophisticated',
+              'landlinq - jack known sophisticated',
+              'landlinq - jack unknown sophisticated'
+            )
+            OR LOWER(BTRIM(hubspot_trigger_tag)) IN (
+              'jack - known sophisticated',
+              'jack - unknown sophisticated',
+              'landlinq - jack known sophisticated',
+              'landlinq - jack unknown sophisticated'
+            )
+        `);
+        await db2.execute(sql2`
+          UPDATE outreach_senders
+          SET hubspot_trigger_tags = ARRAY(
+            SELECT sender_tag.tag
+            FROM unnest(COALESCE(hubspot_trigger_tags, ARRAY[]::text[])) AS sender_tag(tag)
+            WHERE LOWER(BTRIM(sender_tag.tag)) NOT IN (
+              'jack - known sophisticated',
+              'jack - unknown sophisticated',
+              'landlinq - jack known sophisticated',
+              'landlinq - jack unknown sophisticated'
+            )
+          ),
+          updated_at = NOW()
+          WHERE EXISTS (
+            SELECT 1
+            FROM unnest(COALESCE(hubspot_trigger_tags, ARRAY[]::text[])) AS sender_tag(tag)
+            WHERE LOWER(BTRIM(sender_tag.tag)) IN (
+              'jack - known sophisticated',
+              'jack - unknown sophisticated',
+              'landlinq - jack known sophisticated',
+              'landlinq - jack unknown sophisticated'
+            )
+          )
+        `);
+        log("✅ Retired the two legacy Jack campaigns and removed their sender triggers");
+
         // Fix enrollments that were marked completed/failed before actually sending
         // total_steps_sent=0 is a safe guard — no email was ever sent, so resetting is always correct.
         // No time window restriction: any contact with 0 sends should get their first email.
@@ -1164,6 +1208,7 @@ setTimeout(() => {
             SELECT t.id, t.name
             FROM outreach_campaign_templates t
             WHERE t.name ILIKE ${`${sender} - Known%`}
+              AND t.is_active = true
               AND NOT EXISTS (
                 SELECT 1 FROM outreach_campaign_template_steps s WHERE s.template_id = t.id
               )
@@ -1175,6 +1220,7 @@ setTimeout(() => {
               SELECT t.id
               FROM outreach_campaign_templates t
               WHERE t.name ILIKE ${`${sender} - Unknown%`}
+                AND t.is_active = true
                 AND EXISTS (
                   SELECT 1 FROM outreach_campaign_template_steps s WHERE s.template_id = t.id
                 )

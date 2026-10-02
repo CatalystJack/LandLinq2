@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
+  normalizeIndustrialCriteria,
+  updateIndustrialProductTypeCriteria,
   type IndustrialCriteria,
 } from "@shared/industrial-criteria";
-import StateCriteriaOverrides from "@/components/state-criteria-overrides";
+import StateCriteriaOverrides, { type CriteriaOverrideValue } from "@/components/state-criteria-overrides";
 
 type Props = {
   value?: Partial<IndustrialCriteria> | null;
@@ -15,108 +17,170 @@ type Props = {
   compact?: boolean;
 };
 
-const INDUSTRIAL_PRODUCT_TYPES = [
-  { value: "single-load", label: "Single Load", minimumKey: "minSingleLoadAcres" },
-  { value: "cross-dock", label: "Cross-dock", minimumKey: "minCrossDockAcres" },
-] as const;
+function numberOrNull(value: string): number | null {
+  if (value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function toNumericStateOverrides(value: CriteriaOverrideValue): IndustrialCriteria["productTypes"][number]["stateOverrides"] {
+  const result: IndustrialCriteria["productTypes"][number]["stateOverrides"] = {};
+  for (const [state, fields] of Object.entries(value)) {
+    const normalized: { minAcres?: number; maxAcres?: number } = {};
+    for (const field of ["minAcres", "maxAcres"] as const) {
+      const raw = fields[field];
+      if (raw === null || raw === undefined || raw === "") continue;
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed >= 0) normalized[field] = parsed;
+    }
+    if (Object.keys(normalized).length > 0) result[state] = normalized;
+  }
+  return result;
+}
 
 export default function IndustrialCriteriaFields({ value, onChange, targetStates = [], compact = false }: Props) {
-  const [selectedProductType, setSelectedProductType] = useState<(typeof INDUSTRIAL_PRODUCT_TYPES)[number]["value"]>("single-load");
-  const criteria: IndustrialCriteria = {
-    ...DEFAULT_INDUSTRIAL_CRITERIA,
-    ...(value || {}),
-    default: {
-      ...DEFAULT_INDUSTRIAL_CRITERIA.default,
-      ...((value as IndustrialCriteria | null)?.default || {}),
-    },
-    stateOverrides: (value as IndustrialCriteria | null)?.stateOverrides || {},
-  };
-  const activeProductType = INDUSTRIAL_PRODUCT_TYPES.find((productType) => productType.value === selectedProductType)
-    || INDUSTRIAL_PRODUCT_TYPES[0];
+  const criteria = normalizeIndustrialCriteria(value || DEFAULT_INDUSTRIAL_CRITERIA);
+  const updateProductType = (
+    key: string,
+    updates: Partial<IndustrialCriteria["productTypes"][number]>,
+  ) => onChange(updateIndustrialProductTypeCriteria(criteria, key, updates));
 
-  const update = (key: keyof IndustrialCriteria["default"], nextValue: unknown) => {
-    onChange({ ...criteria, default: { ...criteria.default, [key]: nextValue } });
+  const addProductType = () => {
+    const existingKeys = new Set(criteria.productTypes.map((productType) => productType.key));
+    let suffix = criteria.productTypes.length + 1;
+    while (existingKeys.has(`industrial-product-${suffix}`)) suffix += 1;
+    onChange({
+      ...criteria,
+      productTypes: [
+        ...criteria.productTypes,
+        {
+          key: `industrial-product-${suffix}`,
+          name: "",
+          minAcres: 0,
+          maxAcres: null,
+          stateOverrides: {},
+        },
+      ],
+    });
   };
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="font-semibold text-slate-900">Product types</h3>
-            <p className="mt-1 text-sm text-slate-500">Set the minimum parcel acreage for each industrial product type.</p>
-          </div>
-          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Normal (Default)</span>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="font-semibold text-slate-900">Industrial product types</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            A site meets the acreage screen when it matches at least one product type.
+          </p>
         </div>
-        <div className={`mt-4 grid gap-4 ${compact ? "sm:grid-cols-2" : "md:grid-cols-2"}`}>
-          <div>
-            <Label htmlFor="industrial-product-type">Product type <span className="text-red-500">*</span></Label>
-            <Select
-              value={selectedProductType}
-              onValueChange={(nextValue) => setSelectedProductType(nextValue as typeof selectedProductType)}
-            >
-              <SelectTrigger id="industrial-product-type" className="mt-1 bg-white">
-                <SelectValue placeholder="Choose product type" />
-              </SelectTrigger>
-              <SelectContent>
-                {INDUSTRIAL_PRODUCT_TYPES.map((productType) => (
-                  <SelectItem key={productType.value} value={productType.value}>{productType.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="industrial-minimum-acres">Min acres <span className="text-red-500">*</span></Label>
-            <div className="relative mt-1">
-              <Input
-                id="industrial-minimum-acres"
-                type="number"
-                min="0"
-                step="0.1"
-                value={String(criteria.default[activeProductType.minimumKey] ?? "")}
-                onChange={(event) => {
-                  const raw = event.target.value;
-                  if (raw === "") return;
-                  const parsed = Number.parseFloat(raw);
-                  if (!Number.isFinite(parsed) || parsed < 0) return;
-                  update(activeProductType.minimumKey, parsed);
-                }}
-                className="bg-white pr-16"
-              />
-              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-slate-400">acres</span>
+        <Button type="button" variant="outline" className="min-h-10 w-full gap-2 sm:w-auto" onClick={addProductType}>
+          <Plus className="h-4 w-4" />
+          Add product type
+        </Button>
+      </div>
+
+      {criteria.productTypes.map((productType, index) => {
+        const isBuiltIn = productType.key === "single-load" || productType.key === "cross-dock";
+        return (
+          <section key={productType.key} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor={`industrial-product-name-${productType.key}`}>
+                    Product type name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id={`industrial-product-name-${productType.key}`}
+                    value={productType.name}
+                    onChange={(event) => updateProductType(productType.key, { name: event.target.value })}
+                    placeholder="e.g. Single Load"
+                    className="mt-1 bg-white"
+                  />
+                </div>
+                <div className={`grid gap-3 ${compact ? "grid-cols-1" : "grid-cols-2"}`}>
+                  <div>
+                    <Label htmlFor={`industrial-minimum-${productType.key}`}>
+                      Min acres <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id={`industrial-minimum-${productType.key}`}
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={productType.minAcres === null ? "" : String(productType.minAcres)}
+                      onChange={(event) => updateProductType(productType.key, { minAcres: numberOrNull(event.target.value) })}
+                      className="mt-1 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`industrial-maximum-${productType.key}`}>Max acres</Label>
+                    <Input
+                      id={`industrial-maximum-${productType.key}`}
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={productType.maxAcres === null ? "" : String(productType.maxAcres)}
+                      onChange={(event) => updateProductType(productType.key, { maxAcres: numberOrNull(event.target.value) })}
+                      placeholder="No maximum"
+                      className="mt-1 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+              {!isBuiltIn && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="min-h-10 w-full gap-2 text-red-700 sm:w-auto"
+                  onClick={() => onChange({
+                    ...criteria,
+                    productTypes: criteria.productTypes.filter((candidate) => candidate.key !== productType.key),
+                  })}
+                  aria-label={`Remove ${productType.name || `product type ${index + 1}`}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Remove
+                </Button>
+              )}
             </div>
-          </div>
-        </div>
-        <div className="mt-4 border-t border-slate-200 pt-4">
-          <StateCriteriaOverrides
-            targetStates={targetStates}
-            value={criteria.stateOverrides}
-            fields={[{ key: activeProductType.minimumKey, label: "Minimum acreage", suffix: "acres" }]}
-            onChange={(stateOverrides) => onChange({ ...criteria, stateOverrides })}
-          />
-        </div>
-      </section>
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              <StateCriteriaOverrides
+                targetStates={targetStates}
+                value={productType.stateOverrides}
+                fields={[
+                  { key: "minAcres", label: "Minimum acreage", suffix: "acres" },
+                  { key: "maxAcres", label: "Maximum acreage", suffix: "acres" },
+                ]}
+                onChange={(stateOverrides) => updateProductType(
+                  productType.key,
+                  { stateOverrides: toNumericStateOverrides(stateOverrides) },
+                )}
+              />
+            </div>
+          </section>
+        );
+      })}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
           <h4 className="font-semibold text-red-950">Passed outcome (red)</h4>
           <p className="mt-1 text-xs leading-5 text-red-900">
-            Industrial sites remain passed unless both review conditions below are met.
+            The site is outside the configured market, has no verified acreage, or misses every product-type range.
           </p>
           <ul className="mt-3 space-y-2 text-sm leading-5 text-red-950">
-            <li>• Outside the configured target state or county</li>
-            <li>• Acreage is missing or below the minimum industrial acreage</li>
+            <li>• Outside the company's target states and counties</li>
+            <li>• Missing acreage or acreage outside all configured ranges</li>
           </ul>
         </div>
 
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
           <h4 className="font-semibold text-amber-950">Review outcome (yellow)</h4>
           <p className="mt-1 text-xs leading-5 text-amber-900">
-            Yellow/review is reserved for sites that meet both minimum industrial screening conditions.
+            In-market sites that meet at least one product-type range receive review, not automatic approval.
           </p>
           <ul className="mt-3 space-y-2 text-sm leading-5 text-amber-950">
             <li>• Site is in a configured target state or county</li>
-            <li>• Acreage meets the single-load minimum</li>
+            <li>• Acreage fits at least one configured product type</li>
           </ul>
         </div>
       </div>
@@ -134,8 +198,11 @@ export default function IndustrialCriteriaFields({ value, onChange, targetStates
         <Label htmlFor="industrial-criteria-notes">Additional industrial screening notes</Label>
         <textarea
           id="industrial-criteria-notes"
-           value={criteria.default.notes}
-           onChange={(event) => update("notes", event.target.value)}
+          value={criteria.default.notes}
+          onChange={(event) => onChange({
+            ...criteria,
+            default: { ...criteria.default, notes: event.target.value },
+          })}
           placeholder="Add criteria the team will review manually, such as truck courts, rail, building height, or utility capacity."
           className="mt-2 min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-300"
         />

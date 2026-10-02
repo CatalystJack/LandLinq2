@@ -96,6 +96,8 @@ export function clearLocalAuthState() {
 
 const RETRY_DELAYS_MS = [250, 500, 1000, 2000];
 const RETRY_LATER_MS = 30_000;
+const AUTH_REVALIDATE_INTERVAL_MS = 60_000;
+let lastAuthRevalidationAt = 0;
 
 function isRetryableAuthFailure(status?: number) {
   return status === undefined || status === 408 || status === 429 || (status >= 500 && status <= 599);
@@ -304,6 +306,20 @@ export function useAuth() {
   useEffect(() => {
     const listener = () => forceUpdate({});
     authListeners.add(listener);
+
+    const refreshAfterReturn = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastAuthRevalidationAt < AUTH_REVALIDATE_INTERVAL_MS) return;
+      lastAuthRevalidationAt = now;
+      if (authRetryTimer) {
+        clearTimeout(authRetryTimer);
+        authRetryTimer = null;
+      }
+      void fetchUserOnce(true);
+    };
+    window.addEventListener("focus", refreshAfterReturn);
+    document.addEventListener("visibilitychange", refreshAfterReturn);
     
     // Only fetch once globally
     if (!globalAuthState.isInitialized) {
@@ -312,6 +328,8 @@ export function useAuth() {
     
     return () => {
       authListeners.delete(listener);
+      window.removeEventListener("focus", refreshAfterReturn);
+      document.removeEventListener("visibilitychange", refreshAfterReturn);
     };
   }, []);
 

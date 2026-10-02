@@ -236,3 +236,45 @@ test("developer CRM list keeps tenant visibility and filters in SQL before a bou
     });
   });
 });
+
+test("shared broker directory remains opt-in and never exposes other tenant-owned contacts", async () => {
+  await withCapturedQueries(async (queries) => {
+    await getDeveloperCrmContacts({
+      developerProfileId: "profile-private",
+      visibility: {
+        sectors: [],
+        states: [],
+        counties: [],
+        sourceTags: [],
+        allowSharedDirectory: false,
+      },
+      page: 1,
+      limit: 25,
+      search: "",
+      tag: "",
+      tagFilters: [],
+      sourceTagFilter: "",
+      crmStateFilter: "",
+      stateFilter: "",
+      msaFilter: "",
+      countyFilter: "",
+      market: "",
+      smsFilter: "",
+      assignedToFilter: "",
+      brokerageFilter: "",
+      multiCampaignTagFilter: false,
+      contactCategoryFilter: "",
+      includeFilterOptions: false,
+      includeContactEnrichment: false,
+    });
+
+    const pageQuery = queries.find((query) => /FROM filtered_brokers AS f/i.test(query.sql));
+    assert.ok(pageQuery);
+    assert.match(
+      pageQuery.sql,
+      /brokers\.owner_developer_profile_id = \$\d+\s+OR\s+\(FALSE\)/i,
+      "without opt-in the shared-directory branch is a literal false condition",
+    );
+    assert.ok(pageQuery.params.includes("profile-private"), "the company's own contacts remain tenant-scoped");
+  });
+});

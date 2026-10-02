@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Users, Shield, Settings, Edit, Trash2, Mail, Calendar, UserCheck, Crown, Building, MapPin } from "lucide-react";
+import { Search, Plus, Users, Shield, Settings, Edit, Trash2, Mail, Calendar, UserCheck, Crown, Building, MapPin, KeyRound } from "lucide-react";
 import { formatDateEST } from "@/utils/timezone";
 import Footer from "@/components/footer";
 import Navigation from "@/components/navigation";
@@ -28,6 +28,7 @@ interface User {
   states?: string[];
   lastLogin?: string;
   isActive?: boolean;
+  hasLocalPassword?: boolean;
   mustResetPassword?: boolean;
   phone?: string;
   marketsCovered?: string[];
@@ -47,11 +48,15 @@ interface NewUser {
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
   const isCurrentUserSuperAdmin = isSuperAdminEmail(currentUser?.email);
+  const isCurrentUserPlatformAdmin = isPlatformAdminEmail(currentUser?.email);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState("all");
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [resendingUser, setResendingUser] = useState<User | null>(null);
+  const [passwordUser, setPasswordUser] = useState<User | null>(null);
+  const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [confirmTemporaryPassword, setConfirmTemporaryPassword] = useState("");
   const [newUser, setNewUser] = useState<NewUser>({
     email: "",
     firstName: "",
@@ -174,6 +179,39 @@ export default function UserManagement() {
     onError: (error: Error) => {
       toast({
         title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const setTemporaryPasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
+      const response = await fetch(`/api/users/${userId}/temporary-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to set temporary password");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setPasswordUser(null);
+      setTemporaryPassword("");
+      setConfirmTemporaryPassword("");
+      toast({
+        title: "Temporary password set",
+        description: "The user must choose a new password the next time they sign in.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Could not set temporary password",
         description: error.message,
         variant: "destructive",
       });
@@ -499,10 +537,10 @@ export default function UserManagement() {
                     {filteredUsers.map((user: User) => (
                       <div 
                         key={user.id} 
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                        className="flex flex-col gap-4 rounded-lg border p-4 transition-colors hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between"
                         data-testid={`user-${user.id}`}
                       >
-                        <div className="flex items-center space-x-4">
+                        <div className="flex min-w-0 items-center space-x-4">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                             isSuperAdminEmail(user.email) ? "bg-red-500" :
                             isPlatformAdminEmail(user.email) ? "bg-blue-500" :
@@ -555,7 +593,7 @@ export default function UserManagement() {
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center space-x-3">
+                        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:space-x-3">
                         <Badge variant={getRoleBadgeVariant(user)}>
                           {getRoleLabel(user)}
                           </Badge>
@@ -563,7 +601,27 @@ export default function UserManagement() {
                             <UserCheck className="h-3 w-3 mr-1" />
                             Active
                           </Badge>
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            {isCurrentUserPlatformAdmin &&
+                              user.id !== currentUser?.id &&
+                              user.hasLocalPassword &&
+                              !isPlatformAdminEmail(user.email) &&
+                              String(user.role || "").toUpperCase() !== "SUPER_ADMIN" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1"
+                                  onClick={() => {
+                                    setPasswordUser(user);
+                                    setTemporaryPassword("");
+                                    setConfirmTemporaryPassword("");
+                                  }}
+                                  data-testid={`set-user-password-${user.id}`}
+                                >
+                                  <KeyRound className="h-3 w-3" />
+                                  Set password
+                                </Button>
+                              )}
                             {isCurrentUserSuperAdmin && user.mustResetPassword && user.id !== currentUser?.id && (
                               <Button
                                 variant="outline"
@@ -719,6 +777,92 @@ export default function UserManagement() {
                   </div>
                 </div>
               )}
+            </DialogContent>
+          </Dialog>
+          <Dialog
+            open={passwordUser !== null}
+            onOpenChange={(open) => {
+              if (!open && !setTemporaryPasswordMutation.isPending) {
+                setPasswordUser(null);
+                setTemporaryPassword("");
+                setConfirmTemporaryPassword("");
+              }
+            }}
+          >
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Set Temporary Password</DialogTitle>
+                <DialogDescription>
+                  {passwordUser
+                    ? `Set a temporary password for ${passwordUser.firstName} ${passwordUser.lastName}. They must choose a new password at their next sign-in.`
+                    : "Set a temporary password for this user."}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label htmlFor="admin-temporary-password">Temporary password</Label>
+                  <Input
+                    id="admin-temporary-password"
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={12}
+                    maxLength={128}
+                    value={temporaryPassword}
+                    onChange={(event) => setTemporaryPassword(event.target.value)}
+                    data-testid="admin-temporary-password"
+                  />
+                  <p className="text-xs text-slate-500">Use at least 12 characters. This password is not emailed or shown again.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="admin-confirm-temporary-password">Confirm temporary password</Label>
+                  <Input
+                    id="admin-confirm-temporary-password"
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={12}
+                    maxLength={128}
+                    value={confirmTemporaryPassword}
+                    onChange={(event) => setConfirmTemporaryPassword(event.target.value)}
+                    data-testid="admin-confirm-temporary-password"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="flex-col gap-2 sm:flex-row">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    setPasswordUser(null);
+                    setTemporaryPassword("");
+                    setConfirmTemporaryPassword("");
+                  }}
+                  disabled={setTemporaryPasswordMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="w-full border border-transparent hover:border-[#4A90E2] hover:bg-white hover:text-[#4A90E2] sm:w-auto"
+                  disabled={
+                    !passwordUser ||
+                    temporaryPassword.length < 12 ||
+                    temporaryPassword.length > 128 ||
+                    temporaryPassword !== confirmTemporaryPassword ||
+                    setTemporaryPasswordMutation.isPending
+                  }
+                  onClick={() => {
+                    if (!passwordUser || temporaryPassword !== confirmTemporaryPassword) return;
+                    setTemporaryPasswordMutation.mutate({
+                      userId: passwordUser.id,
+                      password: temporaryPassword,
+                    });
+                  }}
+                  data-testid="admin-set-temporary-password"
+                >
+                  {setTemporaryPasswordMutation.isPending ? "Setting password..." : "Set temporary password"}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
 

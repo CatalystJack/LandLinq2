@@ -45,15 +45,40 @@ test("each requested admin-only route is registered behind platform-admin middle
     "/api/admin/broker-portal/debug",
     "/api/admin/broker-portal/deal-queue",
     "/api/admin/investment-companies/:profileId/crm-tags",
+    "/api/users/:userId/temporary-password",
   ];
 
   for (const routePath of protectedPaths) {
     const escapedPath = routePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const route = new RegExp(
-      `app\\.(?:get|post)\\(\\s*['"]${escapedPath}['"]\\s*,\\s*isAuthenticated\\s*,\\s*requirePlatformAdmin\\s*,`,
+      `app\\.(?:get|post)\\(\\s*['"]${escapedPath}['"]\\s*,\\s*isAuthenticated\\s*,\\s*(?:authLimiter\\s*,\\s*)?requirePlatformAdmin\\s*,`,
     );
     assert.match(routes, route, `${routePath} must enforce login and platform-admin authorization`);
   }
+});
+
+test("temporary password endpoint hashes the value, forces a reset, and never returns it", () => {
+  const routes = readFileSync(new URL("./routes.ts", import.meta.url), "utf8");
+  const routeStart = routes.indexOf("app.post('/api/users/:userId/temporary-password'");
+  assert.notEqual(routeStart, -1, "temporary password route must exist");
+  const nextRouteStart = routes.indexOf("\n  app.", routeStart + 1);
+  const routeBody = routes.slice(routeStart, nextRouteStart === -1 ? undefined : nextRouteStart);
+
+  assert.match(routeBody, /authLimiter/);
+  assert.match(routeBody, /requirePlatformAdmin/);
+  assert.match(routeBody, /hashPassword\(password\)/);
+  assert.match(routeBody, /mustResetPassword:\s*true/);
+  assert.match(routeBody, /target\.password/);
+  assert.doesNotMatch(routeBody, /json\(\{[^}]*password\s*[,}]/i);
+});
+
+test("people list exposes only a local-password eligibility flag, not password hashes", () => {
+  const routes = readFileSync(new URL("./routes.ts", import.meta.url), "utf8");
+  const userManagement = readFileSync(new URL("../client/src/pages/user-management.tsx", import.meta.url), "utf8");
+
+  assert.match(routes, /hasLocalPassword:\s*Boolean\(password\)/);
+  assert.match(userManagement, /user\.hasLocalPassword\s*&&/);
+  assert.match(userManagement, /user\.id !== currentUser\?\.id/);
 });
 
 test("email automation toggle GET and PATCH routes authenticate and check analyst access", () => {
