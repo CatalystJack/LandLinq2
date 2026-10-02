@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, UserRole } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import Navigation from "@/components/navigation";
 import DeveloperNavigation from "@/components/developer-navigation";
@@ -604,11 +604,11 @@ async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 export default function AnalystDashboard() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, userRole } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
-  const isDeveloperUser = String((user as any)?.role || "").toUpperCase() === "DEVELOPER";
+  const isDeveloperUser = userRole === UserRole.DEVELOPER;
   const [filterClassifications, setFilterClassifications] = useState<string[]>([]);
   const [filterPriorities, setFilterPriorities] = useState<string[]>([]);
   const [filterDealTypes, setFilterDealTypes] = useState<string[]>([]);
@@ -5555,7 +5555,7 @@ export default function AnalystDashboard() {
         url="https://landlinq.ai/analyst-dashboard"
       />
       <div className="min-h-screen bg-warm">
-        {String((user as any)?.role || "").toUpperCase() === "DEVELOPER" ? (
+        {isDeveloperUser ? (
           <DeveloperNavigation />
         ) : (
           <Navigation />

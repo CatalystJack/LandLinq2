@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, UserRole } from "@/hooks/useAuth";
 import { Cell, Pie, PieChart as RechartsPieChart } from "recharts";
 import {
   Activity, ArrowDownRight, ArrowUpRight, BriefcaseBusiness, Building, DollarSign, Download, Filter, MapPin,
@@ -104,10 +104,9 @@ const statusChartConfig = {
 };
 
 export default function DeveloperAnalytics() {
-  const { isAuthenticated, user } = useAuth();
-  const role = String((user as any)?.role || "").toUpperCase();
-  const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN";
-  const hasAnalyticsAccess = role === "DEVELOPER" || isAdmin;
+  const { isAuthenticated, userRole } = useAuth();
+  const isAdmin = userRole === UserRole.SUPER_ADMIN || userRole === UserRole.ADMIN;
+  const hasAnalyticsAccess = userRole === UserRole.DEVELOPER || isAdmin;
   const { data, isLoading, isError } = useQuery<AnalyticsData>({
     queryKey: [isAdmin ? "/api/admin/company-analytics" : "/api/developer-profile/me/analytics"],
     queryFn: isAdmin ? loadPlatformAnalytics : loadAnalytics,
