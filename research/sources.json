@@ -1,0 +1,268 @@
+{
+  "regrid-parcel-tile": {
+    "title": "Regrid USA Nationwide Parcel Boundaries",
+    "url": "https://www.arcgis.com/home/item.html?id=a2050b09baff493aa4ad7848ba2fac00",
+    "publicationDate": "Updated 2026-07-28",
+    "tier": "Tier 3, first-party product listing",
+    "evidencePath": "research/sources/physical-01-parcels-regrid-tile.md"
+  },
+  "usgs-3dep": {
+    "title": "About 3DEP Products & Services",
+    "url": "https://www.usgs.gov/3d-elevation-program/about-3dep-products-services",
+    "publicationDate": "Not stated; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Geological Survey",
+    "evidencePath": "research/sources/physical-04-usgs-3dep.md"
+  },
+  "usgs-3dhp": {
+    "title": "Access 3DHP Data Products",
+    "url": "https://www.usgs.gov/3d-hydrography-program/access-3dhp-data-products",
+    "publicationDate": "Product update July 2026",
+    "tier": "Tier 1, U.S. Geological Survey",
+    "evidencePath": "research/sources/physical-05-usgs-3dhp.md"
+  },
+  "fws-nwi-rest": {
+    "title": "Wetland Web Mapping Services",
+    "url": "https://www.fws.gov/program/national-wetlands-inventory/web-mapping-services",
+    "publicationDate": "Not stated; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Fish and Wildlife Service",
+    "evidencePath": "research/sources/physical-06-fws-nwi-rest.md"
+  },
+  "fws-nwi-download": {
+    "title": "Download Seamless Wetlands Data",
+    "url": "https://www.fws.gov/program/national-wetlands-inventory/data-download",
+    "publicationDate": "Not stated; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Fish and Wildlife Service",
+    "evidencePath": "research/sources/physical-02-wetlands-fws-nwi.md"
+  },
+  "census-tiger-roads": {
+    "title": "Census TIGER/Line Roads",
+    "url": "https://catalog.data.gov/dataset/census-tiger-line-roads",
+    "publicationDate": "Released 2026-05-28",
+    "tier": "Tier 1, U.S. Census Bureau",
+    "evidencePath": "research/sources/physical-03-roads-census-tiger.md"
+  },
+  "ors-free-plan": {
+    "title": "openrouteservice Plans",
+    "url": "https://openrouteservice.org/plans/",
+    "publicationDate": "Not stated; accessed 2026-10-02",
+    "tier": "Tier 3, first-party service plan",
+    "evidencePath": "research/sources/labor-05-ors-free-plan.md"
+  },
+  "ors-restrictions": {
+    "title": "openrouteservice API Restrictions",
+    "url": "https://openrouteservice.org/restrictions/",
+    "publicationDate": "Not stated; accessed 2026-10-02",
+    "tier": "Tier 3, first-party API documentation",
+    "evidencePath": "research/sources/labor-01-openrouteservice-limits.md"
+  },
+  "census-acs-2024": {
+    "title": "ACS 2024 5-Year API Dataset",
+    "url": "https://api.census.gov/data/2024/acs/acs5.html",
+    "publicationDate": "2024 data vintage",
+    "tier": "Tier 1, U.S. Census Bureau",
+    "evidencePath": "research/sources/labor-04-census-acs-2024.md"
+  },
+  "census-acs-geographies": {
+    "title": "ACS 2024 5-Year API Geography List",
+    "url": "https://api.census.gov/data/2024/acs/acs5/geography.html",
+    "publicationDate": "2024 data vintage",
+    "tier": "Tier 1, U.S. Census Bureau",
+    "evidencePath": "research/sources/labor-07-census-acs-geographies.md"
+  },
+  "bls-laus": {
+    "title": "Local Area Unemployment Statistics",
+    "url": "https://www.bls.gov/lau/home.htm",
+    "publicationDate": "Current program page; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Bureau of Labor Statistics",
+    "evidencePath": "research/sources/labor-06-bla-laus-geography.md"
+  },
+  "bls-api-v2": {
+    "title": "BLS Public Data API FAQs",
+    "url": "https://www.bls.gov/developers/api_faqs.htm",
+    "publicationDate": "Not stated; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Bureau of Labor Statistics",
+    "evidencePath": "research/sources/labor-02-bls-api.md"
+  },
+  "college-scorecard": {
+    "title": "College Scorecard API Documentation",
+    "url": "https://collegescorecard.ed.gov/data/api-documentation",
+    "publicationDate": "Not stated; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Department of Education",
+    "evidencePath": "research/sources/labor-03-scorecard-api.md"
+  },
+  "nza-terms": {
+    "title": "National Zoning Atlas Terms of Use",
+    "url": "https://www.zoningatlas.org/terms",
+    "publicationDate": "Current terms; accessed 2026-10-02",
+    "tier": "Tier 3, first-party terms",
+    "evidencePath": "research/sources/entitlement-01-nza-terms.md"
+  },
+  "nza-data-access": {
+    "title": "National Zoning Atlas Frequently Asked Questions",
+    "url": "https://www.zoningatlas.org/faqs",
+    "publicationDate": "Current FAQ; licensing announced for 2026",
+    "tier": "Tier 3, first-party data-access information",
+    "evidencePath": "research/sources/entitlement-04-nza-faq.md"
+  },
+  "doe-hosting-capacity": {
+    "title": "U.S. Atlas of Electric Distribution System Hosting Capacity Maps",
+    "url": "https://www.energy.gov/cmei/vehicles/us-atlas-electric-distribution-system-hosting-capacity-maps",
+    "publicationDate": "Coverage snapshot dated 2024-05",
+    "tier": "Tier 1, U.S. Department of Energy",
+    "evidencePath": "research/sources/entitlement-02-doe-hosting-capacity.md"
+  },
+  "eia-electricity-data": {
+    "title": "EIA Electricity Data",
+    "url": "https://www.eia.gov/electricity/data.php",
+    "publicationDate": "Monthly data page showed release 2026-09-24; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Energy Information Administration",
+    "evidencePath": "research/sources/entitlement-03-eia-electricity-data.md"
+  },
+  "regrid-api": {
+    "title": "Regrid Property API",
+    "url": "https://regrid.com/api",
+    "publicationDate": "Not stated; accessed 2026-10-02",
+    "tier": "Tier 3, first-party product page",
+    "evidencePath": "research/sources/physical-07-regrid-api.md"
+  },
+  "nys-tax-parcels": {
+    "title": "NYS Tax Parcels Public FeatureServer",
+    "url": "https://services6.arcgis.com/EbVsqZ18sv1kVJ3k/arcgis/rest/services/NYS_Tax_Parcels_Public/FeatureServer",
+    "publicationDate": "Data vintage varies by county; accessed 2026-10-02",
+    "tier": "Tier 1, New York State GIS",
+    "evidencePath": "research/sources/physical-08-nys-parcels.md"
+  },
+  "usgs-1m-dem": {
+    "title": "USGS 1-Meter 3DEP DEM Collection",
+    "url": "https://data.usgs.gov/datacatalog/data/USGS%3A77ae0551-c61e-4979-aedd-d797abdcde0e",
+    "publicationDate": "Collection; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Geological Survey",
+    "evidencePath": "research/sources/physical-09-usgs-1m-dem.md"
+  },
+  "usgs-10m-dem": {
+    "title": "USGS 1/3 Arc-Second 3DEP DEM",
+    "url": "https://data.usgs.gov/datacatalog/data/USGS%3A3a81321b-c153-416f-98b7-cc8e5f0e17c3",
+    "publicationDate": "Collection; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Geological Survey",
+    "evidencePath": "research/sources/physical-10-usgs-10m-dem.md"
+  },
+  "fhwa-interstate-access": {
+    "title": "FHWA Interstate System Access Policy",
+    "url": "https://www.fhwa.dot.gov/design/interstate/170522.cfm",
+    "publicationDate": "Policy page; accessed 2026-10-02",
+    "tier": "Tier 1, Federal Highway Administration",
+    "evidencePath": "research/sources/physical-11-fhwa-interstate-access.md"
+  },
+  "usgs-3dhp-news": {
+    "title": "USGS National Geospatial Program News",
+    "url": "https://www.usgs.gov/programs/national-geospatial-program/news",
+    "publicationDate": "Relevant 3DHP item dated 2026-04-27",
+    "tier": "Tier 1, U.S. Geological Survey",
+    "evidencePath": "research/sources/physical-12-usgs-3dhp-news.md"
+  },
+  "fws-wetlands-data": {
+    "title": "National Wetlands Inventory Wetlands Data",
+    "url": "https://www.fws.gov/program/national-wetlands-inventory/wetlands-data",
+    "publicationDate": "Not stated; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Fish and Wildlife Service",
+    "evidencePath": "research/sources/physical-13-fws-wetlands-data.md"
+  },
+  "usgs-3dhp-download": {
+    "title": "USGS 3DHP Downloadable Data Collection",
+    "url": "https://catalog.data.gov/dataset/usgs-3d-hydrography-program-3dhp-downloadable-data-collection",
+    "publicationDate": "Collection record; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Geological Survey / Data.gov",
+    "evidencePath": "research/sources/physical-14-3dhp-data-gov.md"
+  },
+  "nza-atlas": {
+    "title": "National Zoning Atlas Public Map",
+    "url": "https://www.zoningatlas.org/atlas",
+    "publicationDate": "Current page; accessed 2026-10-02",
+    "tier": "Tier 3, first-party map",
+    "evidencePath": "research/sources/entitlement-05-nza-public-map.md"
+  },
+  "nza-method": {
+    "title": "How the National Zoning Atlas Is Made",
+    "url": "https://www.zoningatlas.org/how",
+    "publicationDate": "Current page; accessed 2026-10-02",
+    "tier": "Tier 3, first-party methodology",
+    "evidencePath": "research/sources/entitlement-06-nza-method.md"
+  },
+  "eia-861": {
+    "title": "EIA Form 861 Detailed Data Files",
+    "url": "https://www.eia.gov/electricity/data/eia861",
+    "publicationDate": "Annual; release varies by data year",
+    "tier": "Tier 1, U.S. Energy Information Administration",
+    "evidencePath": "research/sources/entitlement-07-eia-861.md"
+  },
+  "eia-api": {
+    "title": "EIA Open Data API Documentation",
+    "url": "https://www.eia.gov/opendata/documentation.php",
+    "publicationDate": "Current documentation; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Energy Information Administration",
+    "evidencePath": "research/sources/entitlement-08-eia-api.md"
+  },
+  "census-data-api": {
+    "title": "ACS Data via API",
+    "url": "https://www.census.gov/programs-surveys/acs/data/data-via-api.html",
+    "publicationDate": "Current guidance; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Census Bureau",
+    "evidencePath": "research/sources/labor-11-census-data-api.md"
+  },
+  "census-api-guide": {
+    "title": "Census Data API User Guide",
+    "url": "https://www.census.gov/data/developers/guidance/api-user-guide.html",
+    "publicationDate": "Current guide; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Census Bureau",
+    "evidencePath": "research/sources/labor-12-census-api-guide.md"
+  },
+  "nces-ipeds-institutions": {
+    "title": "IPEDS Data Center Institution List",
+    "url": "https://nces.ed.gov/ipeds/datacenter/InstitutionList.aspx",
+    "publicationDate": "Data vintages vary; accessed 2026-10-02",
+    "tier": "Tier 1, National Center for Education Statistics",
+    "evidencePath": "research/sources/labor-13-ipeds-institutions.md"
+  },
+  "nces-ipeds-rest": {
+    "title": "IPEDS ArcGIS REST MapServer",
+    "url": "https://nces.ed.gov/arcgis/rest/services/IPEDS",
+    "publicationDate": "Current service; accessed 2026-10-02",
+    "tier": "Tier 1, National Center for Education Statistics",
+    "evidencePath": "research/sources/labor-08-nces-ipeds-rest.md"
+  },
+  "nces-ipeds-data-files": {
+    "title": "IPEDS Data Files",
+    "url": "https://nces.ed.gov/ipeds/datacenter/DataFiles.aspx?rtid=1&year=2023",
+    "publicationDate": "Files vary by survey year",
+    "tier": "Tier 1, National Center for Education Statistics",
+    "evidencePath": "research/sources/labor-14-ipeds-data-files.md"
+  },
+  "valhalla-isochrone": {
+    "title": "Valhalla Isochrone API Reference",
+    "url": "https://valhalla.github.io/valhalla/api/isochrone/",
+    "publicationDate": "Current documentation; accessed 2026-10-02",
+    "tier": "Tier 3, open-source project documentation",
+    "evidencePath": "research/sources/labor-15-valhalla-isochrone.md"
+  },
+  "bls-metro-release": {
+    "title": "BLS Metropolitan Area Employment and Unemployment",
+    "url": "https://www.bls.gov/news.release/metro.htm",
+    "publicationDate": "Monthly; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Bureau of Labor Statistics",
+    "evidencePath": "research/sources/labor-16-bls-metro.md"
+  },
+  "ors-deprecation-announcement": {
+    "title": "openrouteservice Deprecated API Quota and Migration Notice",
+    "url": "https://ask.openrouteservice.org/t/reducing-the-quota-of-deprecated-api-api-openrouteservice-org/8013",
+    "publicationDate": "2026-08-27 quota change; accessed 2026-10-02",
+    "tier": "Tier 3, first-party service announcement",
+    "evidencePath": "research/sources/labor-10-ors-deprecated-api.md"
+  },
+  "census-release-calendar": {
+    "title": "Census Bureau 2026 Latest Releases",
+    "url": "https://www.census.gov/data/what-is-data-census-gov/latest-releases/2026.html",
+    "publicationDate": "2026 release calendar; accessed 2026-10-02",
+    "tier": "Tier 1, U.S. Census Bureau",
+    "evidencePath": "research/sources/labor-09-census-release-calendar.md"
+  }
+}

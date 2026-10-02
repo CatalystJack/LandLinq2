@@ -231,3 +231,31 @@ mtime_ms = 1789756702116
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/8a8b10d4-279d-441b-9f11-75fca46ec3f1/596d0747-e75f-465f-b71f-a62738417d23"
 storage_version_token = "1789756716312850"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "HAZP0sYOIa7rx5HNCtcWj"
+uri = "file://research/notes.md"
+type = "text"
+title = "Research Notes: Free Industrial Screening APIs"
+description = "A live research outline covering free parcel, GIS, utility, zoning, and labor data sources."
+logical_id = "d857f8d5-a2ae-4ed0-ba63-79dbf93e621e"
+content_hash = "sha256:62bf7797239de9d5196d3c4c4d768c98f9056385a2a8fedab51cbf44d9f6a772"
+size = 1961
+mtime_ms = 1790970073471
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/d857f8d5-a2ae-4ed0-ba63-79dbf93e621e/2616ca4d-0d36-4558-99a9-fb12a31cd659"
+storage_version_token = "1790970078987556"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "KvsphumGETWduKuqgioTf"
+uri = "file://research/free-industrial-screening-apis.md"
+type = "text"
+title = "Free APIs and Public GIS for Industrial Site Screening"
+description = "Sourced assessment of free parcel, terrain, hydrography, routing, population, labor, college, zoning, and utility data, with practical limits and recommendations."
+logical_id = "bd270495-5052-4a4a-93c3-614e20ff6b10"
+content_hash = "sha256:d98b2e8c850339c541d5729b74ed75875f34726cfc20368b380b109e3505feee"
+size = 19731
+mtime_ms = 1790971049307
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/bd270495-5052-4a4a-93c3-614e20ff6b10/b04b9be4-b0c1-44e2-8b4e-50570e05e044"
+storage_version_token = "1790971072181349"
+content_type = "text/markdown"

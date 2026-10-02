@@ -62,3 +62,4 @@
 - [Admin CRM cleanup scope](admin-crm-cleanup-scope.md) — clear only one profile’s current CRM visibility and private state; preserve shared identities, deals, and other companies.
 - [Broker directory cursor precision](broker-directory-cursor-precision.md) — keyset cursors must retain PostgreSQL timestamp microseconds; JavaScript Date rounding can repeat or skip records.
 - [Drizzle array interpolation](drizzle-array-interpolation.md) — build raw SQL `IN` lists with `sql.join` rather than casting interpolated JavaScript arrays.
+- [Multifamily data quality](multifamily-data-quality.md) — prioritize free, current, authoritative records; label estimates and proxies instead of presenting them as observed data.
