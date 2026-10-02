@@ -12,6 +12,7 @@
 - [Protected route auth bootstrap](protected-route-auth-bootstrap.md) — resolve auth loading before selecting role-specific route tables; direct protected URLs need an explicit unauthenticated fallback.
 - [Developer role authority](developer-role-authority.md) — Investment Company portal access must come only from the persisted DEVELOPER role, never email/name inference.
 - [Developer forced password reset](developer-forced-password-reset.md) — temporary-password users must complete a tokenized reset before any developer-shell page is reachable.
+- [Admin-set password boundary](admin-temporary-password-boundary.md) — never allow temporary-password resets for any platform-admin account.
 - [Per-profile deal classification](per-profile-deal-classification.md) — partner send labels are computed independently per developer profile; both passed and review remain visible.
 - [Developer import address dedup](developer-import-address-dedup.md) — reuse global address matches, but only mutate canonical deal fields when the importing profile already owns that deal relationship.
 - [Broker contact tenant identity](broker-contact-tenant-identity.md) — developer contacts dedupe within their owner profile; legacy email/phone lookups must only resolve shared NULL-owner brokers.
