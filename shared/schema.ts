@@ -46,7 +46,7 @@ export const developerProfiles = pgTable("developer_profiles", {
   outreachTestModeEnabled: boolean("outreach_test_mode_enabled").default(false).notNull(),
   emailUnsubscribeEnabled: boolean("email_unsubscribe_enabled").default(false).notNull(),
   knownEmailDomains: text("known_email_domains").array(),
-  crmSharedContactsEnabled: boolean("crm_shared_contacts_enabled").default(true).notNull(),
+  crmSharedContactsEnabled: boolean("crm_shared_contacts_enabled").default(false).notNull(),
   // Shared LandLinq broker directory visibility. An empty filter means all
   // shared contacts; non-empty filters are applied together.
   crmContactSectors: text("crm_contact_sectors").array().default(sql`ARRAY[]::text[]`).notNull(),

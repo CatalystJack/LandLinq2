@@ -14119,6 +14119,14 @@ RULES:
       if (typeof body[field] !== "boolean") throw new Error(`${field} must be true or false`);
       payload[field] = body[field];
     }
+    if (body.crmSharedContactsEnabled !== undefined) {
+      if (typeof body.crmSharedContactsEnabled !== "boolean") {
+        throw new Error("CRM shared contacts setting must be true or false");
+      }
+      payload.crmSharedContactsEnabled = !isGeneralSales && body.crmSharedContactsEnabled;
+    } else if (!partial) {
+      payload.crmSharedContactsEnabled = false;
+    }
     if (isGeneralSales) {
       payload.targetStates = [];
       payload.targetCounties = [];
@@ -15241,7 +15249,7 @@ RULES:
       sourceTags: Array.isArray(profile?.sourceTags)
         ? profile.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
         : [],
-      allowSharedDirectory: profile?.profileType === "real_estate" && profile.sharedContactsEnabled !== false,
+      allowSharedDirectory: profile?.profileType === "real_estate" && profile.sharedContactsEnabled === true,
     };
   }
 
@@ -15265,7 +15273,7 @@ RULES:
   ): boolean {
     if (broker.ownerDeveloperProfileId === developerProfileId) return true;
     if (broker.ownerDeveloperProfileId !== null && broker.ownerDeveloperProfileId !== undefined) return false;
-    if (visibility.allowSharedDirectory === false) return false;
+    if (visibility.allowSharedDirectory !== true) return false;
     if (broker.userId === '20974d7b-e103-4fc7-b42f-7a13d41041fb') return false;
     const sector = String(broker.contactSector || '').trim().toLowerCase();
     const counties = new Set(

@@ -316,7 +316,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
         crmContactCounties: profile.crmContactCounties || [],
         crmContactProductTypes: profile.crmContactProductTypes || [],
         crmContactSourceTags: profile.crmContactSourceTags || [],
-        crmSharedContactsEnabled: profile.profileType === "real_estate" && profile.crmSharedContactsEnabled !== false,
+        crmSharedContactsEnabled: profile.profileType === "real_estate" && profile.crmSharedContactsEnabled === true,
         compSearchRadiusMiles: profile.compSearchRadiusMiles || "3",
         compMinVintageYear: profile.compMinVintageYear == null ? "" : String(profile.compMinVintageYear),
         compMinUnits: profile.compMinUnits == null ? "" : String(profile.compMinUnits),
@@ -700,7 +700,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
               <CardHeader>
                 <CardTitle>Shared broker contacts</CardTitle>
                 <CardDescription>
-                  Browse the shared broker directory by state. Company-owned contacts, CRM tags, notes, assignments, and outreach history remain private.
+                  New groups start opted out. A group must enable the shared directory before those broker contacts appear in its CRM.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5 border-t border-slate-100 pt-5">
@@ -711,8 +711,8 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
                     className="mt-0.5"
                   />
                   <span>
-                    <span className="block text-sm font-medium text-slate-800">Show shared broker directory in this CRM</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">Turn this off to show only contacts owned by your company. Your selected state filters are saved.</span>
+                    <span className="block text-sm font-medium text-slate-800">Opt in to shared broker contacts</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">When enabled, members can browse matching shared contacts. Company-owned contacts, CRM tags, notes, assignments, and outreach history remain private.</span>
                   </span>
                 </label>
                 {form.crmSharedContactsEnabled ? (

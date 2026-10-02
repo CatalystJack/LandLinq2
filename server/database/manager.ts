@@ -123,7 +123,9 @@ export class DatabaseManager {
 
   async ensureApplicationSchemas(): Promise<void> {
     await db.execute(sql`ALTER TABLE developer_profiles
-      ADD COLUMN IF NOT EXISTS crm_shared_contacts_enabled BOOLEAN NOT NULL DEFAULT TRUE`);
+      ADD COLUMN IF NOT EXISTS crm_shared_contacts_enabled BOOLEAN NOT NULL DEFAULT FALSE`);
+    await db.execute(sql`ALTER TABLE developer_profiles
+      ALTER COLUMN crm_shared_contacts_enabled SET DEFAULT FALSE`);
     await db.execute(sql`ALTER TABLE developer_profiles
       ADD COLUMN IF NOT EXISTS crm_contact_sectors TEXT[] NOT NULL DEFAULT ARRAY[]::text[]`);
     await db.execute(sql`ALTER TABLE developer_profiles

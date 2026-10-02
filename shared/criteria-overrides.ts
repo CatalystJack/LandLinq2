@@ -10,6 +10,8 @@ export type MultifamilyCriteriaOverride = Partial<{
 export type IndustrialCriteriaOverride = Partial<{
   minSingleLoadAcres: number;
   minCrossDockAcres: number;
+  minAcres: number;
+  maxAcres: number;
 }>;
 
 export type StateOverrideMap<T extends object> = Record<string, Partial<T>>;

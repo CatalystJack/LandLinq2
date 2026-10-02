@@ -128,7 +128,7 @@ function makeAccessibleCte(developerProfileId: string, visibility: ContactVisibi
     sharedVisibility.push(sql`COALESCE(brokers.source_tags, ARRAY[]::text[]) && ${textArray(visibility.sourceTags.map((value) => value.toLowerCase()))}`);
   }
 
-  const sharedContactConditions = visibility.allowSharedDirectory === false
+  const sharedContactConditions = visibility.allowSharedDirectory !== true
     ? [sql`FALSE`]
     : [
         sql`brokers.owner_developer_profile_id IS NULL`,

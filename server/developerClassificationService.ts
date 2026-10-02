@@ -103,11 +103,6 @@ export function classifyDealForProfile(
   const dealState = deal?.state;
   if (profile.assetClass === "industrial") {
     const industrialCriteria = normalizeIndustrialCriteria(profile.industrialCriteria);
-    const effectiveIndustrialCriteria = resolveStateAwareCriteria(
-      industrialCriteria.default,
-      industrialCriteria.stateOverrides,
-      dealState,
-    );
     if (!countyMatch) {
       return {
         classification: "red",
@@ -122,26 +117,36 @@ export function classifyDealForProfile(
       };
     }
 
-    if (dealAcreage < effectiveIndustrialCriteria.minSingleLoadAcres) {
+    const matchedProductTypes = industrialCriteria.productTypes
+      .filter((productType) => productType.name && productType.minAcres !== null)
+      .filter((productType) => {
+        const criteria = resolveStateAwareCriteria(
+          { minAcres: productType.minAcres!, maxAcres: productType.maxAcres },
+          productType.stateOverrides,
+          dealState,
+        );
+        return dealAcreage >= criteria.minAcres &&
+          (criteria.maxAcres === null || dealAcreage <= criteria.maxAcres);
+      })
+      .map((productType) => `${productType.name} candidate`);
+
+    if (!matchedProductTypes.length) {
       return {
         classification: "red",
-        matchedProductTypes: [`Passed: below ${effectiveIndustrialCriteria.minSingleLoadAcres} acre minimum`],
+        matchedProductTypes: ["Passed: acreage does not meet any industrial product type"],
       };
     }
-
-    const matchedProductTypes = [
-      "Review: target market and acreage minimum met",
-      ...(dealAcreage >= effectiveIndustrialCriteria.minSingleLoadAcres ? ["Single-load candidate"] : []),
-      ...(dealAcreage >= effectiveIndustrialCriteria.minCrossDockAcres ? ["Cross-dock candidate"] : []),
-      "Review: industrial site diligence required",
-    ];
 
     // Market and acreage are the only current gates for yellow/review.
     // Geometry, slope, wetlands, access, utilities, entitlement, and labor
     // catchments remain review notes rather than additional classification gates.
     return {
       classification: "yellow",
-      matchedProductTypes,
+      matchedProductTypes: [
+        "Review: target market and acreage criteria met",
+        ...matchedProductTypes,
+        "Review: industrial site diligence required",
+      ],
     };
   }
   const dealRent = profile.rentMetric === "psf"
