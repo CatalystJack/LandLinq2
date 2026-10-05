@@ -38,7 +38,7 @@ import {
 
 interface DealInsights {
   totalDeals: number;
-  deals: any[];
+  deals: Array<any>;
   returnedCount: number;
   truncated: boolean;
   offset: number;
@@ -48,6 +48,13 @@ interface DealInsights {
   productTypeCounts?: any[];
 }
 
+type LocalSiteCheckStatus =
+  | "available"
+  | "no_match"
+  | "ambiguous"
+  | "not_covered"
+  | "not_checked"
+  | "error";
 interface MarketData {
   uniqueMarkets: number;
   markets: any[];
@@ -105,6 +112,18 @@ function connectionStatusVariant(status?: ApiSource["integrationStatus"]): "defa
   if (status === "automatic") return "default";
   if (status === "limited") return "secondary";
   return "outline";
+}
+
+function localSiteStatusLabel(status?: LocalSiteCheckStatus): string {
+  switch (status) {
+    case "available": return "matched";
+    case "no_match": return "no match";
+    case "ambiguous": return "ambiguous";
+    case "not_covered": return "outside coverage";
+    case "not_checked": return "not checked";
+    case "error": return "lookup failed";
+    default: return "not checked";
+  }
 }
 
 type LoopNetListing = {
@@ -450,6 +469,7 @@ export default function DataHub() {
                             <TableHead>Location</TableHead>
                             <TableHead>Product Type</TableHead>
                             <TableHead className="text-right">Acreage</TableHead>
+                            <TableHead>Wake/Raleigh site checks</TableHead>
                             <TableHead className="text-right">Price/Acre</TableHead>
                             <TableHead className="text-right">Units</TableHead>
                             <TableHead>Classification</TableHead>
@@ -473,6 +493,41 @@ export default function DataHub() {
                                 <Badge variant="outline">{deal.productType || 'N/A'}</Badge>
                               </TableCell>
                               <TableCell className="text-right">{formatNumber(deal.acreage, 2)}</TableCell>
+                              <TableCell>
+                                {(() => {
+                                  const local = deal.localSiteData as DataHubLocalSiteData | null | undefined;
+                                  const parcel = local?.parcel;
+                                  const zoning = local?.zoning;
+                                  const parcelValue = parcel?.status === "available"
+                                    ? `${parcel.parcelId || "matched"}${parcel.acreage == null ? "" : ` · ${formatNumber(parcel.acreage, 3)} ac`}`
+                                    : localSiteStatusLabel(parcel?.status);
+                                  const zoningValue = zoning?.status === "available"
+                                    ? zoning.districts?.map((district) =>
+                                        district.effectiveDate
+                                          ? `${district.code} (${district.effectiveDate})`
+                                          : district.code,
+                                      ).join(", ") || "no district returned"
+                                    : localSiteStatusLabel(zoning?.status);
+                                  const sourceMessages = [
+                                    parcel?.message,
+                                    zoning?.message,
+                                    local?.utilities?.message,
+                                  ].filter(Boolean).join(" ");
+                                  return (
+                                    <div
+                                      className="min-w-56 space-y-0.5 text-xs"
+                                      title={sourceMessages || "Local parcel and zoning sources have not been checked."}
+                                    >
+                                      <div><span className="font-medium">Parcel:</span> {parcelValue}</div>
+                                      <div><span className="font-medium">Zoning:</span> {zoningValue}</div>
+                                      <div><span className="font-medium">Utilities:</span> unknown</div>
+                                      <div className="text-[10px] text-gray-500">
+                                        Checked {local?.checkedAt ? new Date(local.checkedAt).toLocaleDateString() : "not checked"}
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </TableCell>
                               <TableCell className="text-right">
                                 {deal.pricePerAcre ? `$${formatNumber(deal.pricePerAcre)}` : '-'}
                               </TableCell>
@@ -1120,3 +1175,20 @@ export default function DataHub() {
     </>
   );
 }
+
+type DataHubLocalSiteData = {
+  checkedAt?: string;
+  parcel?: {
+    status: LocalSiteCheckStatus;
+    message?: string;
+    parcelId?: string | null;
+    acreage?: number | null;
+    siteAddress?: string | null;
+  };
+  zoning?: {
+    status: LocalSiteCheckStatus;
+    message?: string;
+    districts?: Array<{ code: string; effectiveDate?: string | null }>;
+  };
+  utilities?: { status: "unknown"; message?: string };
+};

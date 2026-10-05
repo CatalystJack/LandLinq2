@@ -60,21 +60,24 @@ type PublicEnvironmentalData = {
   } | null;
 };
 
-type LocalLookupRecord = {
-  status?: "available" | "not_available" | "error";
-  reason?: string;
-  sourceUrl?: string | null;
+type LocalSiteCheck = {
+  status?: "available" | "no_match" | "ambiguous" | "not_covered" | "not_checked" | "error";
+  message?: string;
+  checkedAt?: string;
   parcelId?: string | null;
-  reid?: string | null;
-  code?: string | null;
-  description?: string | null;
-  effectiveDate?: string | null;
+  acreage?: number | null;
+  districts?: Array<{
+    code: string;
+    districtType?: string | null;
+    effectiveDate?: string | null;
+  }>;
 };
 
-type LocalParcelZoningLookup = {
+type LocalSiteData = {
   checkedAt?: string;
-  parcel?: LocalLookupRecord | null;
-  zoning?: LocalLookupRecord | null;
+  parcel?: LocalSiteCheck | null;
+  zoning?: LocalSiteCheck | null;
+  utilities?: { status?: "unknown"; message?: string } | null;
 };
 
 type DealRecord = {
@@ -113,7 +116,7 @@ type DealRecord = {
   nearbyPermitsFetchedAt?: string | Date | null;
   publicData?: {
     environmentalConstraints: PublicEnvironmentalData | null;
-    localParcelZoning?: LocalParcelZoningLookup | null;
+    localSiteData?: LocalSiteData | null;
     updatedAt: string | Date | null;
   } | null;
   hudData?: {
@@ -136,32 +139,34 @@ function publicDataDate(value: string | Date | null | undefined): string {
     : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function isRaleighPilotDeal(deal: DealRecord): boolean {
+function isWakeCountyDeal(deal: DealRecord): boolean | null {
+  const county = (deal.county || "").trim().toLowerCase().replace(/\s+county$/, "");
+  const state = (deal.state || "").trim().toUpperCase();
+  if (!county || !state) return null;
+  return county === "wake" && (state === "NC" || state === "NORTH CAROLINA");
+}
+
+function isRaleighPilotDeal(deal: DealRecord): boolean | null {
   const city = (deal.city || "")
     .trim()
     .toLowerCase()
     .replace(/^(city|town|village)\s+of\s+/, "")
     .replace(/\s+/g, " ");
   const state = (deal.state || "").trim().toUpperCase();
+  if (!city || !state) return null;
   return city === "raleigh" && (state === "NC" || state === "NORTH CAROLINA");
 }
 
-function localLookupSummary(
-  record: LocalLookupRecord | null | undefined,
-  value: string | null,
-  applicable: boolean,
-  hasLocation: boolean,
+function localSiteStatus(
+  status: LocalSiteCheck["status"],
+  covered: boolean | null,
+  uncoveredLabel: string,
 ): string {
-  if (record?.status === "available") return value || "matched";
-  if (record?.status === "error") return "lookup failed";
-  if (record?.reason === "outside_raleigh_pilot" || !applicable) return "outside Raleigh pilot";
-  if (!hasLocation || record?.reason === "location_unresolved") return "location unresolved";
-  if (
-    record?.reason?.startsWith("ambiguous") ||
-    record?.reason === "coordinate_on_parcel_boundary"
-  ) return "ambiguous location match";
-  if (record?.reason === "coordinate_not_inside_parcel") return "no parcel at point";
-  if (record?.status === "not_available") return "no mapped record";
+  if (status === "available") return "matched";
+  if (status === "error") return "lookup failed";
+  if (status === "ambiguous") return "ambiguous match";
+  if (status === "no_match") return "no exact match";
+  if (status === "not_covered" || covered === false) return uncoveredLabel;
   return "not checked";
 }
 
@@ -219,39 +224,95 @@ function publicScreeningSummary(deal: DealRecord): { lines: string[]; updated: s
       : deal.nearbyPermitsStatus === "error"
         ? "lookup failed"
         : missing();
-  const localLookup = deal.publicData?.localParcelZoning;
-  const pilotMarket = isRaleighPilotDeal(deal);
-  const parcelValue = localLookupSummary(
-    localLookup?.parcel,
-    localLookup?.parcel?.parcelId ? `PIN ${localLookup.parcel.parcelId}` : null,
-    pilotMarket,
-    hasLocation,
-  );
-  const zoningValue = localLookupSummary(
-    localLookup?.zoning,
-    localLookup?.zoning?.code || null,
-    pilotMarket,
-    hasLocation,
-  );
-  const zoningEffectiveDate = localLookup?.zoning?.effectiveDate
-    ? ` (effective ${new Date(localLookup.zoning.effectiveDate).getFullYear()})`
+  const localSiteData = deal.publicData?.localSiteData;
+  const wakeCountyCovered = isWakeCountyDeal(deal);
+  const raleighCovered = wakeCountyCovered === false
+    ? false
+    : wakeCountyCovered === true
+      ? isRaleighPilotDeal(deal)
+      : null;
+  const parcelValue = localSiteData?.parcel?.status === "available"
+    ? `PIN ${localSiteData.parcel.parcelId || "matched"}`
+    : localSiteStatus(
+        localSiteData?.parcel?.status,
+        wakeCountyCovered,
+        "outside Wake County pilot",
+      );
+  const zoningValue = localSiteData?.zoning?.status === "available"
+    ? localSiteData.zoning.districts?.map((district) => district.code).filter(Boolean).join(", ") || "matched"
+    : localSiteStatus(
+        localSiteData?.zoning?.status,
+        raleighCovered,
+        wakeCountyCovered === true ? "outside Raleigh zoning coverage" : "outside Wake County pilot",
+      );
+  const zoningEffectiveDates = localSiteData?.zoning?.districts
+    ?.map((district) => district.effectiveDate)
+    .filter((value): value is string => Boolean(value))
+    .sort() || [];
+  const zoningEffectiveDate = zoningEffectiveDates.length
+    ? ` (effective ${new Date(zoningEffectiveDates[zoningEffectiveDates.length - 1]).getFullYear()})`
     : "";
-  const localLookupDate = localLookup?.checkedAt
-    ? ` · local parcel/zoning ${publicDataDate(localLookup.checkedAt)}`
-    : pilotMarket
-      ? " · local parcel/zoning not checked"
-      : "";
+  const localLookupDate = localSiteData?.checkedAt
+    ? ` · local parcel/zoning ${publicDataDate(localSiteData.checkedAt)}`
+    : " · local parcel/zoning not checked";
 
   return {
     lines: [
       `FEMA ${femaValue} · Wetlands ${wetlandsValue}`,
       `EPA ECHO ${epaValue} · City permits ${localPermitValue}`,
       `ACS ${acsStatus === "available" ? "2024 survey estimate" : censusUnavailable} · Census BPS ${permitStatus === "available" && Number.isFinite(permitUnits) ? `${permitUnits.toLocaleString()} authorized units YTD` : censusUnavailable}`,
-      ...(pilotMarket || localLookup
-        ? [`Wake County parcel ${parcelValue} · Raleigh zoning ${zoningValue}${zoningEffectiveDate}`]
-        : []),
+      `Wake County parcel ${parcelValue} · Raleigh zoning ${zoningValue}${zoningEffectiveDate}`,
     ],
     updated: `Updated: environmental ${publicDataDate(environmentalCheckedAt)} · Census ${publicDataDate(deal.censusDataFetchedAt)} · city permits ${publicDataDate(deal.nearbyPermitsFetchedAt)}${localLookupDate}`,
+  };
+}
+
+function localParcelCell(deal: DealRecord): { value: string; title?: string } {
+  const site = deal.publicData?.localSiteData;
+  if (site?.parcel?.status === "available") {
+    return {
+      value: site.parcel.parcelId ? `PIN ${site.parcel.parcelId}` : "Matched",
+      title: site.parcel.message || "Matched to a Wake County parcel by exact PIN or unique exact situs address.",
+    };
+  }
+  return {
+    value: localSiteStatus(
+      site?.parcel?.status,
+      isWakeCountyDeal(deal),
+      "Outside Wake County pilot",
+    ),
+    title: site?.parcel?.message || undefined,
+  };
+}
+
+function localZoningCell(deal: DealRecord): { value: string; title?: string } {
+  const site = deal.publicData?.localSiteData;
+  if (site?.zoning?.status === "available") {
+    const codes = Array.from(new Set(site.zoning.districts?.map((district) => district.code).filter(Boolean) || []));
+    return {
+      value: codes.join(", ") || "Matched",
+      title: [
+        site.zoning.message,
+        ...((site.zoning.districts || []).map((district) =>
+          [district.code, district.districtType, district.effectiveDate ? `effective ${district.effectiveDate}` : null]
+            .filter(Boolean).join(" · "),
+        )),
+      ].filter(Boolean).join("\n"),
+    };
+  }
+  const wakeCountyCovered = isWakeCountyDeal(deal);
+  const covered = wakeCountyCovered === false
+    ? false
+    : wakeCountyCovered === true
+      ? isRaleighPilotDeal(deal)
+      : null;
+  return {
+    value: localSiteStatus(
+      site?.zoning?.status,
+      covered,
+      wakeCountyCovered === true ? "Outside Raleigh zoning coverage" : "Outside Wake County pilot",
+    ),
+    title: site?.zoning?.message || undefined,
   };
 }
 
@@ -945,7 +1006,7 @@ export default function DeveloperDashboard() {
                           return (
                             <div
                               className="min-w-48 max-w-56 space-y-0.5 text-[11px] leading-4 text-slate-600"
-                              title="Public screening results do not replace parcel-level or field diligence. Census ACS is a survey estimate, Census BPS is county-level, and Raleigh parcel/zoning matches are point-based screening context, not an entitlement determination."
+                              title="Wake County parcels require an exact PIN or unique exact situs-address match; Raleigh zoning is spatially checked against the matched parcel polygon. Missing or ambiguous local evidence is not a pass, zoning is not entitlement, and utility service remains unknown."
                             >
                               {summary.lines.map((line, index) => <div key={index}>{line}</div>)}
                               <div className="pt-0.5 text-[9px] leading-3 text-slate-400">{summary.updated}</div>
@@ -957,10 +1018,10 @@ export default function DeveloperDashboard() {
                       {isIndustrial ? (
                         <>
                           <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.askingPrice ? money(row.deal.askingPrice) : "—"}</TableCell>
-                          <TableCell className="max-w-36 truncate py-2.5 text-xs" title={row.deal.parcelId || undefined}>{row.deal.parcelId || "—"}</TableCell>
-                          <TableCell className="max-w-32 truncate py-2.5 text-xs" title={row.deal.zoning || undefined}>{row.deal.zoning || "—"}</TableCell>
-                          <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.hasEntitlements == null ? "Unknown" : row.deal.hasEntitlements ? "Yes" : "No"}</TableCell>
-                          <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.sewerAvailable == null ? "Unknown" : row.deal.sewerAvailable ? "Yes" : "No"}</TableCell>
+                          <TableCell className="max-w-36 truncate py-2.5 text-xs" title={localParcelCell(row.deal).title}>{localParcelCell(row.deal).value}</TableCell>
+                          <TableCell className="max-w-32 truncate py-2.5 text-xs" title={localZoningCell(row.deal).title}>{localZoningCell(row.deal).value}</TableCell>
+                          <TableCell className="whitespace-nowrap py-2.5 text-xs" title="Deal-supplied entitlement status; not verified by the local zoning source.">{row.deal.hasEntitlements == null ? "Unknown" : row.deal.hasEntitlements ? "Reported yes" : "Reported no"}</TableCell>
+                          <TableCell className="whitespace-nowrap py-2.5 text-xs" title={row.deal.publicData?.localSiteData?.utilities?.message || "No parcel-level utility connection or capacity source is verified."}>Unknown</TableCell>
                         </>
                       ) : (
                         <>

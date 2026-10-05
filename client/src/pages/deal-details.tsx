@@ -41,27 +41,39 @@ import {
   Link as LinkIcon
 } from "lucide-react";
 
-type LocalLookupRecord = {
-  status?: "available" | "not_available" | "error";
-  reason?: string;
+type LocalSiteCheck = {
+  status?: "available" | "no_match" | "ambiguous" | "not_covered" | "not_checked" | "error";
+  message?: string;
   sourceUrl?: string | null;
+  checkedAt?: string;
   parcelId?: string | null;
-  reid?: string | null;
-  code?: string | null;
-  description?: string | null;
-  effectiveDate?: string | null;
+  siteAddress?: string | null;
+  acreage?: number | null;
+  districts?: Array<{
+    code: string;
+    districtType?: string | null;
+    effectiveDate?: string | null;
+    ordinance?: string | null;
+    caseNumber?: string | null;
+    conditional?: string | null;
+  }>;
 };
 
-type LocalParcelZoningLookup = {
+type LocalSiteData = {
+  pilotRegion?: string;
   checkedAt?: string;
-  parcel?: LocalLookupRecord | null;
-  zoning?: LocalLookupRecord | null;
-  note?: string;
+  parcel?: LocalSiteCheck | null;
+  zoning?: LocalSiteCheck | null;
+  utilities?: {
+    status?: "unknown";
+    message?: string;
+    sourceUrl?: string;
+  } | null;
 };
 
 interface DealWithBroker extends Deal {
   publicData?: {
-    localParcelZoning?: LocalParcelZoningLookup | null;
+    localSiteData?: LocalSiteData | null;
   } | null;
   broker?: {
     id: string;
@@ -73,32 +85,15 @@ interface DealWithBroker extends Deal {
   };
 }
 
-function isRaleighPilotMarket(city: string | null | undefined, state: string | null | undefined): boolean {
-  const normalizedCity = (city || "")
-    .trim()
-    .toLowerCase()
-    .replace(/^(city|town|village)\s+of\s+/, "")
-    .replace(/\s+/g, " ");
-  const normalizedState = (state || "").trim().toUpperCase();
-  return normalizedCity === "raleigh" &&
-    (normalizedState === "NC" || normalizedState === "NORTH CAROLINA");
-}
-
-function localLookupStatus(
-  record: LocalLookupRecord | null | undefined,
-  pilotMarket: boolean,
-): string {
-  if (record?.status === "available") return "Matched";
-  if (record?.status === "error") return "Lookup failed";
-  if (record?.reason === "outside_raleigh_pilot" || !pilotMarket) return "Outside Raleigh pilot";
-  if (record?.reason === "location_unresolved") return "Location unresolved";
-  if (
-    record?.reason?.startsWith("ambiguous") ||
-    record?.reason === "coordinate_on_parcel_boundary"
-  ) return "Ambiguous location match";
-  if (record?.reason === "coordinate_not_inside_parcel") return "No parcel at coordinate";
-  if (record?.status === "not_available") return "No mapped record";
-  return "Not checked";
+function localSiteStatus(record: LocalSiteCheck | null | undefined): string {
+  switch (record?.status) {
+    case "available": return "Matched";
+    case "no_match": return "No exact match";
+    case "ambiguous": return "Ambiguous match";
+    case "not_covered": return "Outside coverage";
+    case "error": return "Lookup failed";
+    default: return "Not checked";
+  }
 }
 
 function localLookupDate(value: string | undefined): string {
@@ -774,25 +769,27 @@ export default function DealDetails() {
                       <Separator />
                       <section className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4" data-testid="section-public-parcel-zoning">
                         <div>
-                          <h3 className="font-semibold text-catalyst-navy">Public parcel and zoning lookup</h3>
+                          <h3 className="font-semibold text-catalyst-navy">Local parcel and zoning screening</h3>
                           <p className="mt-1 text-sm text-catalyst-gray-600">
-                            Point-matched public GIS context only. Confirm parcel boundaries and legal zoning with the county and city; this is not an entitlement or utility determination.
+                            Wake County parcels match by exact PIN or unique exact situs address. Raleigh zoning is checked against the matched parcel polygon. Mapped zoning is not an entitlement decision, and water/sewer service remains unknown.
                           </p>
                         </div>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                           <div>
                             <label className="text-sm font-medium text-catalyst-gray-600">Wake County parcel PIN</label>
                             <p className="font-mono text-sm text-catalyst-navy">
-                              {deal.publicData.localParcelZoning?.parcel?.status === "available"
-                                ? deal.publicData.localParcelZoning.parcel.parcelId || "Matched"
-                                : localLookupStatus(
-                                    deal.publicData.localParcelZoning?.parcel,
-                                    isRaleighPilotMarket(deal.city, deal.state),
-                                  )}
+                              {deal.publicData.localSiteData?.parcel?.status === "available"
+                                ? deal.publicData.localSiteData.parcel.parcelId || "Matched"
+                                : localSiteStatus(deal.publicData.localSiteData?.parcel)}
                             </p>
-                            {deal.publicData.localParcelZoning?.parcel?.sourceUrl && (
+                            {deal.publicData.localSiteData?.parcel?.siteAddress && (
+                              <p className="text-xs text-catalyst-gray-600">
+                                {deal.publicData.localSiteData.parcel.siteAddress}
+                              </p>
+                            )}
+                            {deal.publicData.localSiteData?.parcel?.sourceUrl && (
                               <a
-                                href={deal.publicData.localParcelZoning.parcel.sourceUrl}
+                                href={deal.publicData.localSiteData.parcel.sourceUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs text-blue-700 underline"
@@ -804,24 +801,26 @@ export default function DealDetails() {
                           <div>
                             <label className="text-sm font-medium text-catalyst-gray-600">Raleigh mapped zoning</label>
                             <p className="text-catalyst-navy">
-                              {deal.publicData.localParcelZoning?.zoning?.status === "available"
-                                ? [
-                                    deal.publicData.localParcelZoning.zoning.code,
-                                    deal.publicData.localParcelZoning.zoning.description,
-                                  ].filter(Boolean).join(" · ")
-                                : localLookupStatus(
-                                    deal.publicData.localParcelZoning?.zoning,
-                                    isRaleighPilotMarket(deal.city, deal.state),
-                                  )}
+                              {deal.publicData.localSiteData?.zoning?.status === "available"
+                                ? Array.from(new Set(
+                                    (deal.publicData.localSiteData.zoning.districts || [])
+                                      .map((district) => [district.code, district.districtType].filter(Boolean).join(" · "))
+                                      .filter(Boolean),
+                                  )).join(", ") || "Matched"
+                                : localSiteStatus(deal.publicData.localSiteData?.zoning)}
                             </p>
-                            {deal.publicData.localParcelZoning?.zoning?.effectiveDate && (
+                            {deal.publicData.localSiteData?.zoning?.districts?.some((district) => district.effectiveDate) && (
                               <p className="text-xs text-catalyst-gray-600">
-                                Effective {new Date(deal.publicData.localParcelZoning.zoning.effectiveDate).toLocaleDateString()}
+                                Effective {Array.from(new Set(
+                                  deal.publicData.localSiteData.zoning.districts
+                                    .map((district) => district.effectiveDate)
+                                    .filter((date): date is string => Boolean(date)),
+                                )).join(", ")}
                               </p>
                             )}
-                            {deal.publicData.localParcelZoning?.zoning?.sourceUrl && (
+                            {deal.publicData.localSiteData?.zoning?.sourceUrl && (
                               <a
-                                href={deal.publicData.localParcelZoning.zoning.sourceUrl}
+                                href={deal.publicData.localSiteData.zoning.sourceUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs text-blue-700 underline"
@@ -830,9 +829,37 @@ export default function DealDetails() {
                               </a>
                             )}
                           </div>
+                          <div>
+                            <label className="text-sm font-medium text-catalyst-gray-600">Water and sewer service</label>
+                            <p className="text-catalyst-navy">Unknown</p>
+                            <p className="text-xs text-catalyst-gray-600">
+                              {deal.publicData.localSiteData?.utilities?.message ||
+                                "No parcel-level connection or capacity source is verified."}
+                            </p>
+                            {deal.publicData.localSiteData?.utilities?.sourceUrl && (
+                              <a
+                                href={deal.publicData.localSiteData.utilities.sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-700 underline"
+                              >
+                                Raleigh Water map reference
+                              </a>
+                            )}
+                          </div>
                         </div>
+                        {deal.publicData.localSiteData?.parcel?.message && (
+                          <p className="text-xs text-catalyst-gray-500">
+                            Parcel: {deal.publicData.localSiteData.parcel.message}
+                          </p>
+                        )}
+                        {deal.publicData.localSiteData?.zoning?.message && (
+                          <p className="text-xs text-catalyst-gray-500">
+                            Zoning: {deal.publicData.localSiteData.zoning.message}
+                          </p>
+                        )}
                         <p className="text-xs text-catalyst-gray-500">
-                          Checked {localLookupDate(deal.publicData.localParcelZoning?.checkedAt)}
+                          Checked {localLookupDate(deal.publicData.localSiteData?.checkedAt)}
                         </p>
                       </section>
                     </>

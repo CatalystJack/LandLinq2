@@ -54,6 +54,7 @@
 - [Shared automated YOC baseline](shared-yoc-baseline.md) — persisted automated underwriting fields are platform-default shared values; profile-specific calculations must not overwrite them.
 - [Automated return independence](automated-return-independence.md) — an uncomputable IRR must clear only Auto IRR; preserve a valid Auto-YOC result.
 - [Industrial site scoring data boundaries](industrial-site-scoring-data-boundaries.md) — acreage, point slope, tract population, and generic zoning proxies cannot establish geometry, drive-time, utilities, or entitlement.
+- [Wake/Raleigh parcel pilot](wake-raleigh-local-data.md) — local parcel checks use exact Wake County matches and Raleigh-only zoning geometry; utility service and capacity remain unknown.
 - [Industrial asset-class onboarding](industrial-asset-class-onboarding.md) — industrial profiles store screening criteria separately and never use automatic multifamily YOC assumptions.
 - [Organization unsubscribe policy](organization-unsubscribe-policy.md) — one-click unsubscribe applies to developer-owned recipient mail; platform account and internal transactional mail remain excluded.
 - [Shared broker CRM boundary](shared-broker-crm-boundary.md) — shared broker identity is filtered by company settings; tags, notes, assignments, and outreach state are profile-scoped.
@@ -64,4 +65,4 @@
 - [Broker directory cursor precision](broker-directory-cursor-precision.md) — keyset cursors must retain PostgreSQL timestamp microseconds; JavaScript Date rounding can repeat or skip records.
 - [Drizzle array interpolation](drizzle-array-interpolation.md) — build raw SQL `IN` lists with `sql.join` rather than casting interpolated JavaScript arrays.
 - [Multifamily data quality](multifamily-data-quality.md) — prioritize free, current, authoritative records; label estimates and proxies instead of presenting them as observed data.
-- [Raleigh parcel and zoning sources](raleigh-parcel-zoning-sources.md) — require polygon containment for parcel matches; distinguish lookup time, parcel record vintage, and zoning effective date.
+- [Raleigh parcel and zoning sources](raleigh-parcel-zoning-sources.md) — use exact PIN or unique address matches and verify the county ArcGIS service separately from the similarly named city map.
