@@ -64,3 +64,4 @@
 - [Broker directory cursor precision](broker-directory-cursor-precision.md) — keyset cursors must retain PostgreSQL timestamp microseconds; JavaScript Date rounding can repeat or skip records.
 - [Drizzle array interpolation](drizzle-array-interpolation.md) — build raw SQL `IN` lists with `sql.join` rather than casting interpolated JavaScript arrays.
 - [Multifamily data quality](multifamily-data-quality.md) — prioritize free, current, authoritative records; label estimates and proxies instead of presenting them as observed data.
+- [Raleigh parcel and zoning sources](raleigh-parcel-zoning-sources.md) — require polygon containment for parcel matches; distinguish lookup time, parcel record vintage, and zoning effective date.

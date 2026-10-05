@@ -416,21 +416,33 @@ async function refreshFreePublicDataForDeal(
   locationResolved: boolean;
   government: unknown | null;
   nearbyPermits: unknown | null;
+  localParcelZoning: unknown | null;
 }> {
   await refreshCensusDataIfStale(deal, forceCensusRefresh);
   const latitude = validCoordinate(deal.latitude, "latitude");
   const longitude = validCoordinate(deal.longitude, "longitude");
   if (latitude === null || longitude === null) {
-    return { locationResolved: false, government: null, nearbyPermits: null };
+    return { locationResolved: false, government: null, nearbyPermits: null, localParcelZoning: null };
   }
 
-  const [governmentResult, permitResult] = await Promise.allSettled([
+  const [governmentResult, permitResult, localPropertyResult] = await Promise.allSettled([
     import("./governmentDataEnrichment.js").then(({ enrichDealWithGovernmentData }) =>
       enrichDealWithGovernmentData({ dealId: deal.id, latitude, longitude }),
     ),
     import("./nearbyPermitsService.js").then(({ lookupNearbyPermits }) =>
       lookupNearbyPermits(deal.city, latitude, longitude),
     ),
+    import("./raleighPropertyDataService.js").then(async ({
+      isRaleighPropertyPilot,
+      lookupRaleighPropertyData,
+    }) => isRaleighPropertyPilot(deal.city, deal.state)
+      ? lookupRaleighPropertyData({
+          city: deal.city,
+          state: deal.state,
+          latitude,
+          longitude,
+        })
+      : null),
   ]);
 
   if (governmentResult.status === "rejected") {
@@ -445,6 +457,24 @@ async function refreshFreePublicDataForDeal(
   const nearbyPermits = permitResult.status === "fulfilled"
     ? permitResult.value
     : null;
+  const localParcelZoning = localPropertyResult.status === "fulfilled"
+    ? localPropertyResult.value
+    : null;
+  if (localParcelZoning) {
+    try {
+      const { persistRaleighPropertyData } = await import("./raleighPropertyDataService.js");
+      await persistRaleighPropertyData({
+        dealId: deal.id,
+        latitude,
+        longitude,
+        lookup: localParcelZoning,
+      });
+    } catch {
+      console.warn("[DEAL-PUBLIC-DATA] Raleigh parcel/zoning result could not be saved");
+    }
+  } else if (localPropertyResult.status === "rejected") {
+    console.warn("[DEAL-PUBLIC-DATA] Raleigh parcel/zoning lookup failed");
+  }
   if (nearbyPermits) {
     try {
       const nearbyPermitsFetchedAt = new Date();
@@ -500,6 +530,7 @@ async function refreshFreePublicDataForDeal(
     locationResolved: true,
     government: governmentResult.status === "fulfilled" ? governmentResult.value : null,
     nearbyPermits,
+    localParcelZoning,
   };
 }
 
@@ -9256,7 +9287,22 @@ Provide your analysis in this exact JSON format:
 
       const deal = await getFullDeal(id);
       if (!deal) return res.status(404).json({ message: "Deal not found" });
-      return res.json(deal);
+      const [publicProperty] = await db.select({
+        environmentalConstraints: propertyData.environmentalConstraints,
+      }).from(propertyData)
+        .where(eq(propertyData.dealId, id))
+        .limit(1);
+      const constraints = publicProperty?.environmentalConstraints &&
+        typeof publicProperty.environmentalConstraints === "object"
+        ? publicProperty.environmentalConstraints as Record<string, unknown>
+        : {};
+      return res.json({
+        ...deal,
+        publicData: {
+          ...(deal as any).publicData,
+          localParcelZoning: constraints.localParcelZoning ?? null,
+        },
+      });
     } catch (error) {
       console.error("Error fetching full deal:", error);
       return res.status(500).json({ message: "Failed to fetch deal" });
@@ -19966,6 +20012,7 @@ RULES:
 
       const publicDataByDealId = new Map<string, {
         environmentalConstraints: Record<string, any> | null;
+        localParcelZoning: Record<string, any> | null;
         updatedAt: Date | null;
       }>();
       if (selectedRows.length) {
@@ -19992,6 +20039,7 @@ RULES:
                   sourceChecks: constraints.sourceChecks ?? null,
                 }
               : null,
+            localParcelZoning: (constraints?.localParcelZoning as Record<string, any> | undefined) ?? null,
             updatedAt: row.updatedAt,
           });
         }
@@ -36812,6 +36860,30 @@ RULES:
           freshness: 'County vintages vary. Display only deal-level records with a verified source date within 90 days.'
         },
         {
+          id: 'wake-county-parcels-raleigh',
+          name: 'Wake County GIS Parcels',
+          description: 'Official Wake County parcel polygons queried by point location for the Raleigh pilot.',
+          type: 'Property Records',
+          cost: 'Free',
+          endpoint: 'https://maps.wake.gov/arcgis/rest/services/Property/Parcels/FeatureServer/0',
+          dataPoints: ['Parcel PIN', 'Wake County REID', 'Parcel geometry match'],
+          usedIn: ['Raleigh deal enrichment', 'Public deal screening'],
+          coverage: 'Wake County parcel layer; automatic deal lookup currently limited to Raleigh, NC.',
+          freshness: 'Queried live at enrichment time. The service does not expose a per-parcel record update date; lookup time is not the parcel vintage.'
+        },
+        {
+          id: 'raleigh-zoning',
+          name: 'City of Raleigh Zoning GIS',
+          description: 'Official Raleigh zoning district map queried at the property coordinate.',
+          type: 'Zoning and Land Use',
+          cost: 'Free',
+          endpoint: 'https://maps.raleighnc.gov/arcgis/rest/services/Planning/Zoning/MapServer/0',
+          dataPoints: ['Mapped zoning code', 'Zone description', 'Zoning effective date where published', 'Zoning case'],
+          usedIn: ['Raleigh deal enrichment', 'Public deal screening'],
+          coverage: 'Raleigh zoning map extent only; no automatic entitlement or permitted-unit determination.',
+          freshness: 'Queried live at enrichment time. The mapped zoning feature includes its effective date where available.'
+        },
+        {
           id: 'tn-comptroller-parcels',
           name: 'Tennessee Comptroller Parcel Data',
           description: 'Official statewide parcel-data download assembled from county assessors; the state page documents county exceptions.',
@@ -37048,6 +37120,14 @@ RULES:
         "municipal-permits-limited": {
           status: "limited",
           details: "Automatic nearby permit queries currently cover Nashville, Raleigh, and Atlanta. Other cities are unavailable, not zero.",
+        },
+        "wake-county-parcels-raleigh": {
+          status: "limited",
+          details: "Automatic point-in-polygon parcel lookup runs for located Raleigh, NC deals only. The county layer has no per-parcel update date, so the displayed lookup time is not a record vintage.",
+        },
+        "raleigh-zoning": {
+          status: "limited",
+          details: "Automatic point lookup runs for located Raleigh, NC deals only. The mapped code and effective date are screening context, not a legal entitlement determination.",
         },
       };
       const sourcesWithStatus = apiSources.map((source) => {

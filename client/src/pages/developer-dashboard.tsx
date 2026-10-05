@@ -60,6 +60,23 @@ type PublicEnvironmentalData = {
   } | null;
 };
 
+type LocalLookupRecord = {
+  status?: "available" | "not_available" | "error";
+  reason?: string;
+  sourceUrl?: string | null;
+  parcelId?: string | null;
+  reid?: string | null;
+  code?: string | null;
+  description?: string | null;
+  effectiveDate?: string | null;
+};
+
+type LocalParcelZoningLookup = {
+  checkedAt?: string;
+  parcel?: LocalLookupRecord | null;
+  zoning?: LocalLookupRecord | null;
+};
+
 type DealRecord = {
   id: string;
   address: string;
@@ -96,6 +113,7 @@ type DealRecord = {
   nearbyPermitsFetchedAt?: string | Date | null;
   publicData?: {
     environmentalConstraints: PublicEnvironmentalData | null;
+    localParcelZoning?: LocalParcelZoningLookup | null;
     updatedAt: string | Date | null;
   } | null;
   hudData?: {
@@ -116,6 +134,35 @@ function publicDataDate(value: string | Date | null | undefined): string {
   return Number.isNaN(parsed.getTime())
     ? "not checked"
     : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function isRaleighPilotDeal(deal: DealRecord): boolean {
+  const city = (deal.city || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^(city|town|village)\s+of\s+/, "")
+    .replace(/\s+/g, " ");
+  const state = (deal.state || "").trim().toUpperCase();
+  return city === "raleigh" && (state === "NC" || state === "NORTH CAROLINA");
+}
+
+function localLookupSummary(
+  record: LocalLookupRecord | null | undefined,
+  value: string | null,
+  applicable: boolean,
+  hasLocation: boolean,
+): string {
+  if (record?.status === "available") return value || "matched";
+  if (record?.status === "error") return "lookup failed";
+  if (record?.reason === "outside_raleigh_pilot" || !applicable) return "outside Raleigh pilot";
+  if (!hasLocation || record?.reason === "location_unresolved") return "location unresolved";
+  if (
+    record?.reason?.startsWith("ambiguous") ||
+    record?.reason === "coordinate_on_parcel_boundary"
+  ) return "ambiguous location match";
+  if (record?.reason === "coordinate_not_inside_parcel") return "no parcel at point";
+  if (record?.status === "not_available") return "no mapped record";
+  return "not checked";
 }
 
 function publicScreeningSummary(deal: DealRecord): { lines: string[]; updated: string } {
@@ -172,14 +219,39 @@ function publicScreeningSummary(deal: DealRecord): { lines: string[]; updated: s
       : deal.nearbyPermitsStatus === "error"
         ? "lookup failed"
         : missing();
+  const localLookup = deal.publicData?.localParcelZoning;
+  const pilotMarket = isRaleighPilotDeal(deal);
+  const parcelValue = localLookupSummary(
+    localLookup?.parcel,
+    localLookup?.parcel?.parcelId ? `PIN ${localLookup.parcel.parcelId}` : null,
+    pilotMarket,
+    hasLocation,
+  );
+  const zoningValue = localLookupSummary(
+    localLookup?.zoning,
+    localLookup?.zoning?.code || null,
+    pilotMarket,
+    hasLocation,
+  );
+  const zoningEffectiveDate = localLookup?.zoning?.effectiveDate
+    ? ` (effective ${new Date(localLookup.zoning.effectiveDate).getFullYear()})`
+    : "";
+  const localLookupDate = localLookup?.checkedAt
+    ? ` · local parcel/zoning ${publicDataDate(localLookup.checkedAt)}`
+    : pilotMarket
+      ? " · local parcel/zoning not checked"
+      : "";
 
   return {
     lines: [
       `FEMA ${femaValue} · Wetlands ${wetlandsValue}`,
       `EPA ECHO ${epaValue} · City permits ${localPermitValue}`,
       `ACS ${acsStatus === "available" ? "2024 survey estimate" : censusUnavailable} · Census BPS ${permitStatus === "available" && Number.isFinite(permitUnits) ? `${permitUnits.toLocaleString()} authorized units YTD` : censusUnavailable}`,
+      ...(pilotMarket || localLookup
+        ? [`Wake County parcel ${parcelValue} · Raleigh zoning ${zoningValue}${zoningEffectiveDate}`]
+        : []),
     ],
-    updated: `Updated: environmental ${publicDataDate(environmentalCheckedAt)} · Census ${publicDataDate(deal.censusDataFetchedAt)} · city permits ${publicDataDate(deal.nearbyPermitsFetchedAt)}`,
+    updated: `Updated: environmental ${publicDataDate(environmentalCheckedAt)} · Census ${publicDataDate(deal.censusDataFetchedAt)} · city permits ${publicDataDate(deal.nearbyPermitsFetchedAt)}${localLookupDate}`,
   };
 }
 
@@ -873,7 +945,7 @@ export default function DeveloperDashboard() {
                           return (
                             <div
                               className="min-w-48 max-w-56 space-y-0.5 text-[11px] leading-4 text-slate-600"
-                              title="Public screening results do not replace parcel-level or field diligence. Census ACS is a survey estimate, Census BPS is county-level, and local permits are limited to supported cities."
+                              title="Public screening results do not replace parcel-level or field diligence. Census ACS is a survey estimate, Census BPS is county-level, and Raleigh parcel/zoning matches are point-based screening context, not an entitlement determination."
                             >
                               {summary.lines.map((line, index) => <div key={index}>{line}</div>)}
                               <div className="pt-0.5 text-[9px] leading-3 text-slate-400">{summary.updated}</div>
