@@ -1,3 +1,4 @@
+- [LandLinq acquisitions messaging](landlinq-acquisition-positioning.md) — preserve the user's positioning on inbox-driven outreach, deal screening, and lean acquisition teams.
 - [Shared transactional email rendering](email-rendering-conversion.md) — render one inline branded shell before Microsoft Graph or authenticated mailbox SMTP delivery; do not use SendGrid.
 - [Email delivery failure handling](email-delivery-failure-handling.md) — sendNotificationEmail can resolve false; callers must check it before reporting delivery success.
 - [Developer notification sender boundary](developer-notification-sender-boundary.md) — connected Outlook is for tenant outreach campaigns; broker deal-status notifications use shared transactional delivery unless explicitly overridden.

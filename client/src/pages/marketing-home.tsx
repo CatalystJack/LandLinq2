@@ -800,6 +800,36 @@ export default function MarketingHome() {
 
         <HeroStats />
 
+        <section
+          aria-labelledby="acquisitions-autopilot-title"
+          data-reveal
+          data-testid="section-acquisitions-autopilot"
+          className="ll-scroll-reveal border-b border-[#E5EAF0] bg-[#F7F9FC] px-4 py-16 sm:px-8 sm:py-20 lg:px-10"
+        >
+          <div className="mx-auto grid max-w-7xl gap-6 sm:gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center">
+            <div className="max-w-xl">
+              <span className="ll-eyebrow">ACQUISITIONS ON AUTOPILOT</span>
+              <h2
+                id="acquisitions-autopilot-title"
+                className="mt-4 text-balance text-3xl font-semibold leading-tight tracking-[-0.05em] sm:text-5xl"
+              >
+                You get a bigger acquisitions team without the headcount.
+              </h2>
+            </div>
+            <div className="max-w-2xl space-y-4 text-base leading-7 text-[#455467] sm:text-lg sm:leading-8">
+              <p>
+                LandLinq plugs into your inbox and runs your acquisitions outreach on autopilot. It sends
+                personalized drip campaigns to every broker in the states you pick, and to anyone else you
+                want to stay top of mind with: GCs, engineers, architects.
+              </p>
+              <p>
+                When deals come back in, it screens them right away against your criteria, like county,
+                minimum acreage and minimum rents, so your team only spends time on the ones that fit.
+              </p>
+            </div>
+          </div>
+        </section>
+
          <section className="ll-journey px-4 py-20 sm:px-8 sm:py-28 lg:px-10 lg:py-36" aria-labelledby="platform-journey-title">
            <div className="mx-auto max-w-7xl">
              <div className="ll-journey-intro">
