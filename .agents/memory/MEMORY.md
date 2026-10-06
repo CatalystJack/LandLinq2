@@ -34,6 +34,7 @@
 - [Microsoft deals mailbox](microsoft-deals-mailbox.md) — Graph intake must stay disabled until deals@landlinq.ai exists in the configured Microsoft tenant or its real mailbox identity is known.
 - [GoDaddy Microsoft Graph mailbox alignment](godaddy-microsoft-graph-mailbox.md) — GoDaddy login does not prove the mailbox is in the Graph app's configured tenant; verify tenant and alias alignment first.
 - [Developer Microsoft OAuth authority](developer-microsoft-oauth-authority.md) — developer-owned Microsoft connections use the organizations authority; internal Catalyst connections remain tenant-specific.
+- [Truthful Outlook connection status](outlook-connection-status.md) — green requires persisted mailbox-match proof; unverifiable legacy records remain amber, and saved authorization is not a live token check.
 - [Outreach sender tenant identity](outreach-sender-tenant-identity.md) — sender email uniqueness is profile-scoped; legacy shared senders may coexist without crossing developer tenants.
  - [Email intake routing audit](email-intake-routing-audit.md) — every automated intake outcome must persist its routing reason so platform admins can reconstruct how a deal entered the system.
  - [Transactional email mailbox verification](transactional-email-mailbox-verification.md) — only a newly approved post-fix message proves the current renderer/transport; older mailbox messages are not evidence.

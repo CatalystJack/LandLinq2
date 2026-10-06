@@ -5,6 +5,7 @@ import { indexOptimizer } from './indexOptimizer';
 import { archivingManager, archivePolicyManager } from './archiving';
 import { sql } from 'drizzle-orm';
 import { db } from '../db';
+import { ensureOutlookVerificationSchema } from '../outlookVerificationSchema';
 
 interface DatabaseHealth {
   overall: 'healthy' | 'degraded' | 'critical';
@@ -122,6 +123,7 @@ export class DatabaseManager {
   }
 
   async ensureApplicationSchemas(): Promise<void> {
+    await ensureOutlookVerificationSchema();
     await db.execute(sql`ALTER TABLE developer_profiles
       ADD COLUMN IF NOT EXISTS crm_shared_contacts_enabled BOOLEAN NOT NULL DEFAULT FALSE`);
     await db.execute(sql`ALTER TABLE developer_profiles

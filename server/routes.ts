@@ -56,6 +56,11 @@ import { setupAuthMiddleware, setupAuthRoutes, isAuthenticated, hashPassword, co
 import { requirePlatformAdmin } from "./requirePlatformAdmin";
 import { isAnalyticsAuthorized } from "@shared/admin-auth";
 import {
+  getAccountOutlookConnectionStatus,
+  isVerifiedMicrosoftMailbox,
+} from "@shared/outlook-connection";
+import { ensureOutlookVerificationSchema } from "./outlookVerificationSchema";
+import {
   DEFAULT_INDUSTRIAL_CRITERIA,
   normalizeIndustrialCriteria,
   validateIndustrialCriteria,
@@ -3689,10 +3694,55 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         return res.status(401).json({ message: "Unauthorized - Platform admin access required" });
       }
 
+      await ensureOutlookVerificationSchema();
       const allUsers = await storage.getAllUsers();
       const users = req.query.view === "people"
         ? allUsers.filter((candidate) => String(candidate.role || "").toUpperCase() !== "BROKER")
         : allUsers;
+
+      const senderEmails = Array.from(new Set(
+        users
+          .map((candidate) => String(candidate.email || "").trim().toLowerCase())
+          .filter(Boolean),
+      ));
+      let outlookSenderRows: Array<{
+        email: string;
+        developerProfileId: string | null;
+        outlookConnected: boolean;
+        hasAccessToken: boolean;
+        hasRefreshToken: boolean;
+        microsoftUserId: string | null;
+        microsoftIdentityVerified: boolean;
+      }> = [];
+      if (senderEmails.length) {
+        const emailPredicates = sql.join(
+          senderEmails.map((email) => sql`LOWER(email) = ${email}`),
+          sql` OR `,
+        );
+        const senderResult = await db.execute(sql`
+          SELECT
+            LOWER(email) AS email,
+            developer_profile_id AS "developerProfileId",
+            COALESCE(outlook_connected, false) AS "outlookConnected",
+            microsoft_access_token IS NOT NULL AS "hasAccessToken",
+            microsoft_refresh_token IS NOT NULL AS "hasRefreshToken",
+            microsoft_user_id AS "microsoftUserId",
+            COALESCE(microsoft_identity_verified, false) AS "microsoftIdentityVerified"
+          FROM outreach_senders
+          WHERE ${emailPredicates}
+        `);
+        outlookSenderRows = (senderResult.rows || []) as typeof outlookSenderRows;
+      }
+
+      const outlookStatusByUserId = new Map<string, ReturnType<typeof getAccountOutlookConnectionStatus>>();
+      for (const candidate of users) {
+        const outlookConnectionStatus = getAccountOutlookConnectionStatus({
+          email: candidate.email,
+          role: candidate.role,
+          developerProfileId: candidate.developerProfileId,
+        }, outlookSenderRows);
+        outlookStatusByUserId.set(candidate.id, outlookConnectionStatus);
+      }
 
       const developerProfileIds = Array.from(new Set(
         users
@@ -3715,10 +3765,15 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       
       // Enrich users with broker-specific fields if they have broker profiles
       const enrichedUsers = await Promise.all(users.map(async (u) => {
+        const outlookConnectionStatus = outlookStatusByUserId.get(u.id) || "not_connected";
         if (String(u.role || "").toUpperCase() === "DEVELOPER" && u.developerProfileId) {
           const developerProfile = developerProfilesById.get(u.developerProfileId);
           if (developerProfile) {
-            return { ...u, companyName: developerProfile.companyName };
+            return {
+              ...u,
+              companyName: developerProfile.companyName,
+              outlookConnectionStatus,
+            };
           }
         }
         if (u.role === 'BROKER') {
@@ -3728,11 +3783,12 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
               ...u,
               phone: broker.phone,
               marketsCovered: broker.marketsCovered,
-              brokerage: broker.brokerage
+              brokerage: broker.brokerage,
+              outlookConnectionStatus,
             };
           }
         }
-        return u;
+        return { ...u, outlookConnectionStatus };
       }));
       
       // The people page needs account status, not password hashes.
@@ -34608,10 +34664,17 @@ RULES:
       // PostgreSQL array literal format: {"item1","item2"}
       const safeTriggerTags = filteredTags ? `{${filteredTags.map((t: string) => `"${t.replace(/"/g, '\\"')}"`).join(',')}}` : null;
 
+      await ensureOutlookVerificationSchema();
       const result = await db.execute(sql`
         UPDATE outreach_senders
         SET 
           name = COALESCE(${name}, name),
+          microsoft_identity_verified = CASE
+            WHEN ${email}::text IS NOT NULL
+              AND LOWER(BTRIM(${email}::text)) <> LOWER(BTRIM(email))
+            THEN FALSE
+            ELSE microsoft_identity_verified
+          END,
           email = COALESCE(${email}, email),
           role = COALESCE(${role}, role),
           sms_followup_enabled = COALESCE(${smsFollowupEnabled}, sms_followup_enabled),
@@ -35796,14 +35859,11 @@ RULES:
 
   // Microsoft OAuth callback (will be used when Azure app is registered)
   app.get('/api/oauth/microsoft/callback', isAuthenticated, async (req: any, res) => {
-    console.log('🔑 [OAUTH-CALLBACK] Microsoft OAuth callback hit!');
-    console.log('🔑 [OAUTH-CALLBACK] Query params:', JSON.stringify(req.query));
-    console.log('🔑 [OAUTH-CALLBACK] Host:', req.headers['host']);
     try {
       const { code, state, error, error_description } = req.query;
 
       if (error) {
-        console.error('Microsoft OAuth error:', error, error_description);
+        console.warn("[OAUTH-CALLBACK] Microsoft authorization was not completed");
         const msError = encodeURIComponent(String(error));
         const msDesc = encodeURIComponent(String(error_description || 'none'));
         return res.redirect(`/outreach-onboarding?error=oauth_failed&ms_error=${msError}&ms_desc=${msDesc}`);
@@ -35863,6 +35923,7 @@ RULES:
       const tokenResponse = await fetch(`https://login.microsoftonline.com/${oauthAuthority}/oauth2/v2.0/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        signal: AbortSignal.timeout(15_000),
         body: new URLSearchParams({
           client_id: clientId!,
           client_secret: clientSecret!,
@@ -35873,19 +35934,34 @@ RULES:
       });
 
       if (!tokenResponse.ok) {
-        console.error('Token exchange failed:', await tokenResponse.text());
+        console.warn(`[OAUTH-CALLBACK] Token exchange failed with HTTP ${tokenResponse.status}`);
         return res.redirect('/outreach-onboarding?error=token_exchange_failed');
       }
 
       const tokens = await tokenResponse.json();
       const { access_token, refresh_token, expires_in } = tokens;
+      if (
+        typeof access_token !== "string" ||
+        !access_token ||
+        typeof refresh_token !== "string" ||
+        !refresh_token ||
+        !Number.isFinite(Number(expires_in)) ||
+        Number(expires_in) <= 0
+      ) {
+        return res.redirect(`${callbackReturnUrl}?error=token_exchange_incomplete`);
+      }
 
       // Get user info from Microsoft Graph
       const userInfoResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
         headers: { Authorization: `Bearer ${access_token}` },
+        signal: AbortSignal.timeout(15_000),
       });
 
-      const userInfo = userInfoResponse.ok ? await userInfoResponse.json() : null;
+      if (!userInfoResponse.ok) {
+        console.warn(`[OAUTH-CALLBACK] Microsoft identity check failed with HTTP ${userInfoResponse.status}`);
+        return res.redirect(`${callbackReturnUrl}?error=identity_verification_failed`);
+      }
+      const userInfo = await userInfoResponse.json();
       
       // Get the sender's configured email to verify it matches the Microsoft account
       const senderResult = await db.execute(sql`
@@ -35901,40 +35977,51 @@ RULES:
       if (developerProfileId && senderRecord.developer_profile_id !== developerProfileId) {
         return res.redirect(`${callbackReturnUrl}?error=sender_not_owned`);
       }
-      const senderEmail = senderRecord?.email?.toLowerCase() || '';
-      const senderName = senderRecord?.name || 'Unknown';
-      
-      // Microsoft Graph returns email in 'mail' or 'userPrincipalName' field
-      const microsoftEmail = (userInfo?.mail || userInfo?.userPrincipalName || '').toLowerCase();
-      const microsoftDisplayName = userInfo?.displayName || 'Unknown';
-      
-      // SECURITY CHECK: Verify Microsoft account matches sender's configured email
-      if (senderEmail && microsoftEmail && senderEmail !== microsoftEmail) {
-        console.error(`❌ [OAUTH-MISMATCH] Microsoft account email (${microsoftEmail}) does not match sender email (${senderEmail})`);
-        console.error(`   Microsoft user: ${microsoftDisplayName}, Sender: ${senderName}`);
-        return res.redirect(`${callbackReturnUrl}?error=email_mismatch&expected=${encodeURIComponent(senderEmail)}&actual=${encodeURIComponent(microsoftEmail)}`);
+      const senderEmail = typeof senderRecord?.email === "string" ? senderRecord.email : null;
+      const microsoftEmail = typeof userInfo?.mail === "string" && userInfo.mail.trim()
+        ? userInfo.mail
+        : typeof userInfo?.userPrincipalName === "string"
+          ? userInfo.userPrincipalName
+          : null;
+      const microsoftUserId = typeof userInfo?.id === "string" ? userInfo.id : null;
+
+      if (!isVerifiedMicrosoftMailbox({
+        configuredEmail: senderEmail,
+        microsoftEmail,
+        microsoftUserId,
+      })) {
+        console.warn("[OAUTH-CALLBACK] Microsoft mailbox did not match the configured sender");
+        return res.redirect(`${callbackReturnUrl}?error=email_mismatch`);
       }
 
+      await ensureOutlookVerificationSchema();
+      const verifiedMicrosoftEmail = microsoftEmail!.trim().toLowerCase();
       // Update sender with tokens
-      await db.execute(sql`
+      const updatedSender = await db.execute(sql`
         UPDATE outreach_senders
         SET 
           outlook_connected = true,
           microsoft_access_token = ${access_token},
           microsoft_refresh_token = ${refresh_token},
           microsoft_token_expiry = ${new Date(Date.now() + expires_in * 1000)},
-          microsoft_user_id = ${userInfo?.id || null},
+          microsoft_user_id = ${microsoftUserId},
+          microsoft_identity_verified = true,
           updated_at = now()
         WHERE id = ${senderId}
           AND (${developerProfileId || null}::text IS NULL OR developer_profile_id = ${developerProfileId || null})
+          AND LOWER(BTRIM(email)) = ${verifiedMicrosoftEmail}
+        RETURNING id
       `);
+      if (!updatedSender.rows?.length) {
+        return res.redirect(`${callbackReturnUrl}?error=sender_changed`);
+      }
 
-      console.log(`✅ Microsoft Outlook connected for sender: ${senderId} (${microsoftEmail})`);
+      console.log(`✅ Microsoft Outlook connection verified for sender: ${senderId}`);
       // Always add success parameter to the redirect URL
       const successUrl = `${callbackReturnUrl}?success=outlook_connected`;
       res.redirect(successUrl);
     } catch (error) {
-      console.error('Error in Microsoft OAuth callback:', error);
+      console.error("[OAUTH-CALLBACK] Callback processing failed");
       res.redirect('/outreach-onboarding?error=callback_failed');
     }
   });

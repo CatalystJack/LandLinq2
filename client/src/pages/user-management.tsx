@@ -15,6 +15,7 @@ import Footer from "@/components/footer";
 import Navigation from "@/components/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { isPlatformAdminEmail, isSuperAdminEmail } from "@shared/admin-auth";
+import type { OutlookConnectionStatus } from "@shared/outlook-connection";
 
 interface User {
   id: string;
@@ -34,6 +35,7 @@ interface User {
   marketsCovered?: string[];
   brokerage?: string;
   companyName?: string;
+  outlookConnectionStatus?: OutlookConnectionStatus;
 }
 
 
@@ -295,6 +297,32 @@ export default function UserManagement() {
     return "secondary";
   };
 
+  const outlookStatusPresentation = (status?: OutlookConnectionStatus) => {
+    switch (status) {
+      case "connected":
+        return {
+          label: "Outlook connected",
+          dotClass: "bg-emerald-600",
+          textClass: "text-emerald-700",
+          description: "Microsoft confirmed this sender's mailbox email during sign-in, and its account ID and refresh token are saved. Microsoft can still revoke access later.",
+        };
+      case "not_connected":
+        return {
+          label: "Outlook not connected",
+          dotClass: "bg-red-600",
+          textClass: "text-red-700",
+          description: "No matching Outlook connection is saved for this account.",
+        };
+      default:
+        return {
+          label: "Outlook needs verification",
+          dotClass: "bg-amber-500",
+          textClass: "text-amber-800",
+          description: "The connection is incomplete or predates mailbox email verification. Reconnect Outlook to verify it.",
+        };
+    }
+  };
+
   const handleCreateUser = () => {
     if (!newUser.email || !newUser.firstName || !newUser.lastName) {
       toast({
@@ -514,6 +542,9 @@ export default function UserManagement() {
                   <Users className="h-5 w-5" />
                   All Users ({filteredUsers.length})
                 </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Green means Microsoft confirmed the configured mailbox email during sign-in. It is not a live check for later token revocation.
+                </p>
               </CardHeader>
               <CardContent>
                 {usersLoading ? (
@@ -597,6 +628,23 @@ export default function UserManagement() {
                         <Badge variant={getRoleBadgeVariant(user)}>
                           {getRoleLabel(user)}
                           </Badge>
+                          {(() => {
+                            const outlookStatus = outlookStatusPresentation(user.outlookConnectionStatus);
+                            return (
+                              <div
+                                className={`inline-flex items-center gap-1.5 text-xs font-medium ${outlookStatus.textClass}`}
+                                title={outlookStatus.description}
+                                aria-label={outlookStatus.label}
+                                data-testid={`outlook-connection-${user.id}`}
+                              >
+                                <span
+                                  aria-hidden="true"
+                                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${outlookStatus.dotClass}`}
+                                />
+                                <span>{outlookStatus.label}</span>
+                              </div>
+                            );
+                          })()}
                           <Badge variant="default" className="bg-green-100 text-green-800">
                             <UserCheck className="h-3 w-3 mr-1" />
                             Active
