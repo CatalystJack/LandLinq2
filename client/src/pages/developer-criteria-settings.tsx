@@ -137,6 +137,7 @@ type NotificationSender = {
   name: string;
   email: string;
   outlookConnected: boolean;
+  connectionStatus: "connected" | "not_connected" | "needs_verification";
   hasMicrosoftToken?: boolean;
   isNotificationSender?: boolean;
   isActive?: boolean;
@@ -265,7 +266,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
   });
 
   const connectedNotificationSenders = (senderListQuery.data?.senders || []).filter(
-    (sender) => sender.outlookConnected && sender.hasMicrosoftToken && sender.isActive !== false,
+    (sender) => sender.connectionStatus === "connected" && sender.isActive !== false,
   );
   const selectedNotificationSender =
     connectedNotificationSenders.find((sender) => sender.isNotificationSender) ||
@@ -763,7 +764,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
                 <div>
                   <CardTitle>Outreach notifications</CardTitle>
                   <CardDescription>
-                    Deal received, approved, and rejected messages use your connected Outlook sender.
+                    Verified company Outlook sends these messages when available; otherwise they use the platform sender.
                   </CardDescription>
                 </div>
               </div>
@@ -811,14 +812,22 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
                       <p className="mt-1 font-semibold text-slate-900">{senderQuery.data.effectiveSender.email}</p>
                       <p className="mt-1 text-xs text-slate-500">{senderQuery.data.effectiveSender.name}</p>
                     </div>
-                    <Badge
-                      variant="secondary"
-                      className={senderQuery.data.effectiveSender.source === "company_outlook"
-                        ? "w-fit bg-emerald-50 text-emerald-700"
-                        : "w-fit bg-amber-50 text-amber-700"}
-                    >
-                      {senderQuery.data.effectiveSender.source === "company_outlook" ? "Outlook connected" : "Platform fallback"}
-                    </Badge>
+                    <div className="flex w-fit flex-wrap items-center gap-2">
+                      {senderQuery.data.effectiveSender.source === "platform_fallback" &&
+                        senderQuery.data.sender?.connectionStatus === "needs_verification" && (
+                          <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                            Outlook needs verification
+                          </Badge>
+                        )}
+                      <Badge
+                        variant="secondary"
+                        className={senderQuery.data.effectiveSender.source === "company_outlook"
+                          ? "w-fit bg-emerald-50 text-emerald-700"
+                          : "w-fit bg-amber-50 text-amber-700"}
+                      >
+                        {senderQuery.data.effectiveSender.source === "company_outlook" ? "Outlook connected" : "Platform fallback"}
+                      </Badge>
+                    </div>
                   </div>
                 )
               ) : (
@@ -828,9 +837,11 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
               )}
               {senderQuery.data?.effectiveSender?.source === "platform_fallback" && (
                 <p className="mt-3 text-xs text-amber-700">
-                  {senderQuery.data.sender
-                    ? "Your company Outlook sender is not connected, so broker notifications currently come from the platform address above."
-                    : "No company Outlook sender is configured, so broker notifications currently come from the platform address above."}
+                  {senderQuery.data.sender?.connectionStatus === "needs_verification"
+                    ? `Outlook for ${senderQuery.data.sender.email} needs verification. Reconnect it in Outreach. Until then, broker notifications use the platform address above.`
+                    : senderQuery.data.sender
+                      ? "No verified company Outlook sender is available, so broker notifications currently come from the platform address above."
+                      : "No company Outlook sender is configured, so broker notifications currently come from the platform address above."}
                 </p>
               )}
               {connectedNotificationSenders.length <= 1 ? (

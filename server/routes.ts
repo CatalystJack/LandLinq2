@@ -57,6 +57,7 @@ import { requirePlatformAdmin } from "./requirePlatformAdmin";
 import { isAnalyticsAuthorized } from "@shared/admin-auth";
 import {
   getAccountOutlookConnectionStatus,
+  getOutlookConnectionStatus,
   isVerifiedMicrosoftMailbox,
 } from "@shared/outlook-connection";
 import { ensureOutlookVerificationSchema } from "./outlookVerificationSchema";
@@ -152,6 +153,20 @@ import { enrichDealWithWakeCountySiteData } from "./wakeCountySiteDataService.js
 
 const LANDLINQ_PUBLIC_ORIGIN = "https://landlinq.ai";
 const PUBLIC_RECORD_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+function isDatabaseTrue(value: unknown): boolean {
+  return value === true || value === "t" || value === "true" || value === 1;
+}
+
+function getSenderOutlookStatus(sender: any) {
+  return getOutlookConnectionStatus({
+    outlookConnected: isDatabaseTrue(sender?.outlookConnected),
+    hasAccessToken: isDatabaseTrue(sender?.hasAccessToken),
+    hasRefreshToken: isDatabaseTrue(sender?.hasRefreshToken),
+    hasMicrosoftUserId: isDatabaseTrue(sender?.hasMicrosoftUserId),
+    hasVerifiedMailboxMatch: isDatabaseTrue(sender?.microsoftIdentityVerified),
+  });
+}
 
 const PUBLIC_RECORD_FIELD_ALIASES: Record<string, string[]> = {
   parcelId: ["parcelid", "parcelnumber", "taxparcelid", "apn", "pin"],
@@ -18565,24 +18580,44 @@ RULES:
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
       if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      await ensureOutlookVerificationSchema();
       const result = await db.execute(sql`
         SELECT id, name, email, outlook_connected as "outlookConnected",
           microsoft_token_expiry as "microsoftTokenExpiry",
           (microsoft_access_token IS NOT NULL OR microsoft_refresh_token IS NOT NULL) as "hasMicrosoftToken",
+          microsoft_access_token IS NOT NULL as "hasAccessToken",
           microsoft_refresh_token IS NOT NULL as "hasRefreshToken",
+          (microsoft_user_id IS NOT NULL AND BTRIM(microsoft_user_id) <> '') as "hasMicrosoftUserId",
+          COALESCE(microsoft_identity_verified, false) as "microsoftIdentityVerified",
           signature_html as "signatureHtml", is_active as "isActive",
           is_notification_sender as "isNotificationSender"
         FROM outreach_senders
         WHERE developer_profile_id = ${developerProfileId}
         ORDER BY created_at DESC
       `);
-      const senders = (result.rows || []) as any[];
-      const senderIsUsable = (sender: any) => Boolean(sender?.outlookConnected && sender?.hasMicrosoftToken);
-      const designatedSender = senders.find(sender => sender.isNotificationSender && senderIsUsable(sender));
+      const senders = ((result.rows || []) as any[]).map((sender) => {
+        const {
+          hasAccessToken,
+          hasRefreshToken,
+          hasMicrosoftUserId,
+          microsoftIdentityVerified,
+          ...publicSender
+        } = sender;
+        return {
+          ...publicSender,
+          connectionStatus: getSenderOutlookStatus(sender),
+        };
+      });
+      const senderIsUsable = (sender: any) =>
+        sender?.connectionStatus === "connected" && sender.isActive !== false;
+      const designatedSender = senders.find(sender => sender.isNotificationSender);
+      const usableDesignatedSender = designatedSender && senderIsUsable(designatedSender)
+        ? designatedSender
+        : null;
       const fallbackSender = senders.find(sender => senderIsUsable(sender));
-      const effectiveCompanySender = designatedSender || fallbackSender || null;
+      const effectiveCompanySender = usableDesignatedSender || fallbackSender || null;
       return res.json({
-        sender: effectiveCompanySender || senders[0] || null,
+        sender: designatedSender || effectiveCompanySender || senders[0] || null,
         effectiveSender: effectiveCompanySender
           ? { email: effectiveCompanySender.email, name: effectiveCompanySender.name, source: "company_outlook" }
           : { email: PUBLIC_TRANSACTIONAL_EMAIL, name: PUBLIC_TRANSACTIONAL_NAME, source: "platform_fallback" },
@@ -18598,16 +18633,34 @@ RULES:
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
       if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      await ensureOutlookVerificationSchema();
       const result = await db.execute(sql`
         SELECT id, name, email, outlook_connected as "outlookConnected",
           (microsoft_access_token IS NOT NULL OR microsoft_refresh_token IS NOT NULL) as "hasMicrosoftToken",
+          microsoft_access_token IS NOT NULL as "hasAccessToken",
+          microsoft_refresh_token IS NOT NULL as "hasRefreshToken",
+          (microsoft_user_id IS NOT NULL AND BTRIM(microsoft_user_id) <> '') as "hasMicrosoftUserId",
+          COALESCE(microsoft_identity_verified, false) as "microsoftIdentityVerified",
           is_notification_sender as "isNotificationSender",
           is_active as "isActive"
         FROM outreach_senders
         WHERE developer_profile_id = ${developerProfileId}
         ORDER BY created_at DESC
       `);
-      return res.json({ senders: result.rows || [] });
+      const senders = ((result.rows || []) as any[]).map((sender) => {
+        const {
+          hasAccessToken,
+          hasRefreshToken,
+          hasMicrosoftUserId,
+          microsoftIdentityVerified,
+          ...publicSender
+        } = sender;
+        return {
+          ...publicSender,
+          connectionStatus: getSenderOutlookStatus(sender),
+        };
+      });
+      return res.json({ senders });
     } catch (error) {
       console.error('[developer outreach senders] Error:', error);
       return res.status(500).json({ error: 'Failed to load email connections' });
@@ -18619,12 +18672,17 @@ RULES:
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
       if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      await ensureOutlookVerificationSchema();
       const senderId = typeof req.body?.senderId === "string" ? req.body.senderId.trim() : "";
       if (!senderId) return res.status(400).json({ error: "senderId is required" });
 
       const senderResult = await db.execute(sql`
         SELECT id, name, email, outlook_connected as "outlookConnected",
           (microsoft_access_token IS NOT NULL OR microsoft_refresh_token IS NOT NULL) as "hasMicrosoftToken",
+          microsoft_access_token IS NOT NULL as "hasAccessToken",
+          microsoft_refresh_token IS NOT NULL as "hasRefreshToken",
+          (microsoft_user_id IS NOT NULL AND BTRIM(microsoft_user_id) <> '') as "hasMicrosoftUserId",
+          COALESCE(microsoft_identity_verified, false) as "microsoftIdentityVerified",
           is_notification_sender as "isNotificationSender",
           is_active as "isActive"
         FROM outreach_senders
@@ -18633,8 +18691,13 @@ RULES:
       `);
       const sender = senderResult.rows?.[0] as any;
       if (!sender) return res.status(404).json({ error: "Sender not found for this company" });
-      if (!sender.outlookConnected || !sender.hasMicrosoftToken || sender.isActive === false) {
-        return res.status(400).json({ error: "Selected sender must have a connected, usable Outlook account" });
+      const connectionStatus = getSenderOutlookStatus(sender);
+      if (connectionStatus !== "connected" || sender.isActive === false) {
+        return res.status(400).json({
+          error: connectionStatus === "needs_verification"
+            ? "Selected sender needs Outlook mailbox verification. Reconnect it before using it for notifications."
+            : "Selected sender must have a connected, usable Outlook account.",
+        });
       }
 
       await db.transaction(async (tx) => {
@@ -18652,7 +18715,13 @@ RULES:
 
       return res.json({
         sender: {
-          ...sender,
+          id: sender.id,
+          name: sender.name,
+          email: sender.email,
+          outlookConnected: sender.outlookConnected,
+          hasMicrosoftToken: sender.hasMicrosoftToken,
+          isActive: sender.isActive,
+          connectionStatus,
           isNotificationSender: true,
         },
       });
@@ -34501,6 +34570,7 @@ RULES:
         if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
       }
 
+      await ensureOutlookVerificationSchema();
       // Prevent caching of sender data to avoid stale IDs
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       res.set('Pragma', 'no-cache');
@@ -34510,10 +34580,12 @@ RULES:
           id, name, email, role,
           developer_profile_id as "developerProfileId",
           outlook_connected as "outlookConnected",
-          microsoft_user_id as "microsoftUserId",
+          (microsoft_user_id IS NOT NULL AND BTRIM(microsoft_user_id) <> '') as "hasMicrosoftUserId",
           microsoft_token_expiry as "microsoftTokenExpiry",
-          microsoft_access_token IS NOT NULL as "hasMicrosoftToken",
+          (microsoft_access_token IS NOT NULL OR microsoft_refresh_token IS NOT NULL) as "hasMicrosoftToken",
+          microsoft_access_token IS NOT NULL as "hasAccessToken",
           microsoft_refresh_token IS NOT NULL as "hasRefreshToken",
+          COALESCE(microsoft_identity_verified, false) as "microsoftIdentityVerified",
           hubspot_owner_id as "hubspotOwnerId",
           hubspot_owner_name as "hubspotOwnerName",
           sms_followup_enabled as "smsFollowupEnabled",
@@ -34536,7 +34608,6 @@ RULES:
       // Ensure boolean fields are properly converted (PostgreSQL may return 'f'/'t' strings)
       // Also explicitly map hubspotOwnerId since Drizzle may lowercase the key
       console.log(`[SENDER-DEBUG] Raw query result keys:`, result.rows?.length > 0 ? Object.keys(result.rows[0]) : 'no rows');
-      console.log(`[SENDER-DEBUG] First raw row:`, result.rows?.length > 0 ? JSON.stringify(result.rows[0]) : 'no rows');
       
       const senders = (result.rows || []).map((row: any) => {
         // Check for both camelCase and lowercase versions of the key
@@ -34544,13 +34615,15 @@ RULES:
         
         // EXPLICIT boolean conversion - PostgreSQL may return booleans as true/false or 't'/'f' strings
         const rawOutlookConnected = row.outlookConnected ?? row.outlookconnected ?? row.outlook_connected ?? false;
-        const outlookConnected = rawOutlookConnected === true || rawOutlookConnected === 't' || rawOutlookConnected === 'true' || rawOutlookConnected === 1;
+        const persistedOutlookConnected = isDatabaseTrue(rawOutlookConnected);
+        const connectionStatus = getSenderOutlookStatus(row);
+        const outlookConnected = connectionStatus === "connected";
         
         const rawSmsFollowupEnabled = row.smsFollowupEnabled ?? row.smsfollowupenabled ?? row.sms_followup_enabled ?? false;
-        const smsFollowupEnabled = rawSmsFollowupEnabled === true || rawSmsFollowupEnabled === 't' || rawSmsFollowupEnabled === 'true' || rawSmsFollowupEnabled === 1;
+        const smsFollowupEnabled = isDatabaseTrue(rawSmsFollowupEnabled);
         
         const rawIsActive = row.isActive ?? row.isactive ?? row.is_active ?? true;
-        const isActive = rawIsActive === true || rawIsActive === 't' || rawIsActive === 'true' || rawIsActive === 1;
+        const isActive = isDatabaseTrue(rawIsActive);
         
         // Compute token expiry status so the UI can warn when reconnection is needed.
         //
@@ -34560,8 +34633,8 @@ RULES:
         //   1. No refresh token stored at all, OR
         //   2. Refresh token is almost certainly expired (access token > 85 days stale)
         const tokenExpiry = row.microsoftTokenExpiry ?? row.microsofttokenexpiry ?? null;
-        const hasMicrosoftToken = row.hasMicrosoftToken ?? row.hasmicrosofttoken ?? false;
-        const hasRefreshToken = row.hasRefreshToken ?? row.hasrefreshtoken ?? false;
+        const hasMicrosoftToken = isDatabaseTrue(row.hasMicrosoftToken ?? row.hasmicrosofttoken ?? false);
+        const hasRefreshToken = isDatabaseTrue(row.hasRefreshToken ?? row.hasrefreshtoken ?? false);
         const accessTokenAge = tokenExpiry
           ? (Date.now() - new Date(tokenExpiry).getTime()) / (1000 * 60 * 60 * 24) // days since expiry
           : null;
@@ -34573,7 +34646,7 @@ RULES:
         const refreshTokenExpiringSoon = !refreshTokenDead && (accessTokenAge !== null && accessTokenAge > 75);
         // Also treat "connected but token missing from DB" as expired — drip worker
         // silently skips senders with no access token, so the UI must warn them.
-        const tokenMissing = outlookConnected && !hasMicrosoftToken;
+        const tokenMissing = persistedOutlookConnected && !hasMicrosoftToken;
         const tokenExpired = tokenMissing || (hasMicrosoftToken && tokenExpiry
           ? refreshTokenDead && new Date(tokenExpiry) <= new Date()
           : false);
@@ -34581,10 +34654,17 @@ RULES:
           ? refreshTokenExpiringSoon
           : false;
 
+        const {
+          hasAccessToken,
+          hasMicrosoftUserId,
+          microsoftIdentityVerified,
+          ...publicRow
+        } = row;
         const converted = {
-          ...row,
+          ...publicRow,
           hubspotOwnerId: hubspotOwnerId,
           outlookConnected: outlookConnected,
+          connectionStatus,
           smsFollowupEnabled: smsFollowupEnabled,
           isActive: isActive,
           tokenExpired: tokenExpired,
@@ -34592,7 +34672,7 @@ RULES:
           microsoftTokenExpiry: tokenExpiry,
         };
         console.log(`[SENDER-DEBUG] ${row.name}: hubspotTriggerTags=${JSON.stringify(row.hubspotTriggerTags)} type=${typeof row.hubspotTriggerTags} isArray=${Array.isArray(row.hubspotTriggerTags)}`);
-        console.log(`[SENDER-DEBUG] ${row.name}: outlookConnected raw=${rawOutlookConnected} (type: ${typeof rawOutlookConnected}), converted=${outlookConnected}`);
+        console.log(`[SENDER-DEBUG] sender=${row.id}: connectionStatus=${connectionStatus}`);
         return converted;
       });
       

@@ -22,6 +22,7 @@ type SenderAccount = {
   name: string;
   email: string;
   outlookConnected: boolean;
+  connectionStatus: "connected" | "not_connected" | "needs_verification";
   signatureHtml?: string | null;
   hasRefreshToken?: boolean;
   microsoftTokenExpiry?: string | null;
@@ -365,7 +366,7 @@ export default function DeveloperOutreach() {
           <Card className="lg:col-span-2 rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-lg"><div className="rounded-xl bg-[#498EDE]/15 p-2 text-[#498EDE]"><Mail className="h-4 w-4" /></div>Sending account</CardTitle></CardHeader>
             <CardContent>
-              {senderQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : sender?.outlookConnected ? (
+              {senderQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : sender?.connectionStatus === "connected" ? (
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                   <div>
                     <div className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-emerald-600" /><p className="font-semibold text-slate-900">{sender.name || "Connected Outlook account"}</p></div>
@@ -381,6 +382,19 @@ export default function DeveloperOutreach() {
                   <Button variant="outline" onClick={() => navigate("/outreach-onboarding")}>
                     <Edit3 className="mr-2 h-4 w-4" />
                     Edit
+                  </Button>
+                </div>
+              ) : sender?.connectionStatus === "needs_verification" ? (
+                <div className="flex flex-col justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center">
+                  <div>
+                    <p className="font-semibold text-amber-900">Outlook needs verification</p>
+                    <p className="mt-1 text-sm text-amber-800">
+                      Reconnect {sender.email} in Outreach before launching campaigns from this mailbox.
+                    </p>
+                  </div>
+                  <Button variant="outline" onClick={() => navigate("/outreach-onboarding")}>
+                    <Edit3 className="mr-2 h-4 w-4" />
+                    Verify Outlook
                   </Button>
                 </div>
               ) : (
@@ -401,7 +415,7 @@ export default function DeveloperOutreach() {
           <CardHeader className="border-b border-slate-100"><CardTitle className="flex items-center gap-2 text-lg"><div className="rounded-xl bg-[#498EDE]/15 p-2 text-[#498EDE]"><Send className="h-4 w-4" /></div>Your campaigns</CardTitle></CardHeader>
           <CardContent className="p-0">
             {campaignsQuery.isLoading ? <div className="flex min-h-52 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div> : campaigns.length === 0 ? (
-               <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><Send className="mb-3 h-10 w-10 text-slate-300" /><p className="font-semibold text-slate-800">No campaigns available</p><p className="mt-1 text-sm text-slate-500">{sender?.outlookConnected ? "Campaigns will appear here when they are configured." : "Connect Outlook to get started."}</p></div>
+               <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 px-6 text-center"><Send className="mb-3 h-10 w-10 text-slate-300" /><p className="font-semibold text-slate-800">No campaigns available</p><p className="mt-1 text-sm text-slate-500">{sender?.connectionStatus === "connected" ? "Campaigns will appear here when they are configured." : sender?.connectionStatus === "needs_verification" ? "Verify Outlook before launching campaigns." : "Connect Outlook to get started."}</p></div>
             ) : (
               <div className="divide-y divide-slate-100">{campaigns.map((campaign) => (
                 <div key={campaign.id} className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center">
@@ -410,7 +424,7 @@ export default function DeveloperOutreach() {
                     <p className="mt-1 text-sm text-slate-500">{campaign.subject}</p>
                     <p className="mt-2 text-xs text-slate-400">{campaign.enrollmentCount || 0} enrolled · starts {campaign.dayNumber ? `after ${campaign.dayNumber} day${campaign.dayNumber === 1 ? "" : "s"}` : "immediately"}</p>
                   </div>
-                   <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => openEdit(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Campaign</Button><Button variant="outline" size="sm" onClick={() => openSteps(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Steps</Button><Button variant="brand" size="sm" onClick={() => launchMutation.mutate(campaign.id)} disabled={launchMutation.isPending || !sender?.outlookConnected}><Rocket className="mr-1.5 h-4 w-4" />Launch</Button></div>
+                    <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => openEdit(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Campaign</Button><Button variant="outline" size="sm" onClick={() => openSteps(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Steps</Button><Button variant="brand" size="sm" onClick={() => launchMutation.mutate(campaign.id)} disabled={launchMutation.isPending || sender?.connectionStatus !== "connected"}><Rocket className="mr-1.5 h-4 w-4" />Launch</Button></div>
                 </div>
               ))}</div>
             )}

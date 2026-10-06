@@ -4,6 +4,8 @@ import { storage } from './storage';
 async function resolveDealOutlookSender(dealId: string) {
   const { db } = await import('./db');
   const { sql } = await import('drizzle-orm');
+  const { ensureOutlookVerificationSchema } = await import('./outlookVerificationSchema');
+  await ensureOutlookVerificationSchema();
   const result = await db.execute(sql`
     SELECT
       os.id,
@@ -20,7 +22,10 @@ async function resolveDealOutlookSender(dealId: string) {
       AND pds.developer_profile_id IS NOT NULL
       AND os.is_active = true
       AND os.outlook_connected = true
-      AND (os.microsoft_access_token IS NOT NULL OR os.microsoft_refresh_token IS NOT NULL)
+      AND os.microsoft_identity_verified = true
+      AND os.microsoft_user_id IS NOT NULL
+      AND BTRIM(os.microsoft_user_id) <> ''
+      AND os.microsoft_refresh_token IS NOT NULL
     ORDER BY os.created_at DESC NULLS LAST, pds.matched_at DESC NULLS LAST
     LIMIT 1
   `);

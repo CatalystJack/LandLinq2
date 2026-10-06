@@ -7,4 +7,4 @@ Show Outlook as connected only when a successful Microsoft sign-in verified that
 
 **Why:** The user explicitly required the indicator to be truthful. The former OAuth callback could mark a sender connected even when Graph returned no mailbox email, and Microsoft can later revoke a token.
 
-**How to apply:** Preserve explicit mailbox verification when changing OAuth or admin status logic. Never infer a connection from login identity, profile, or an OAuth flow merely being started, and never return token values to the admin UI.
+**How to apply:** Use the same derived status in admin, company settings, sender management, and campaign views. Only verified active senders may be selected for company notifications; otherwise use the platform sender. Never infer a connection from login identity, profile, or an OAuth flow merely being started, and never return tokens or the raw verification marker to the UI.

@@ -78,6 +78,7 @@ interface OutreachSender {
   role: string;
   developerProfileId?: string | null;
   outlookConnected: boolean;
+  connectionStatus: "connected" | "not_connected" | "needs_verification";
   tokenExpired?: boolean;
   tokenExpiringSoon?: boolean;
   microsoftTokenExpiry?: string;
@@ -1688,11 +1689,9 @@ export default function OutreachOnboarding() {
         return [];
       }
       return data.map((sender: OutreachSender) => {
-        const rawOutlookConnected = (sender as any).outlookConnected;
-        const outlookConnected = rawOutlookConnected === true || rawOutlookConnected === 't' || rawOutlookConnected === 'true' || rawOutlookConnected === 1;
         return {
           ...sender,
-          outlookConnected: outlookConnected,
+          outlookConnected: sender.connectionStatus === "connected",
           isActive: (sender as any).isActive === true || (sender as any).isActive === 't' || (sender as any).isActive === 'true' || (sender as any).isActive === 1,
         };
       });
@@ -2212,6 +2211,8 @@ export default function OutreachOnboarding() {
                           ? "bg-red-500 text-white border-red-500"
                           : sender.tokenExpiringSoon
                           ? "bg-yellow-400 text-black border-yellow-400"
+                          : sender.connectionStatus === "needs_verification"
+                          ? "bg-amber-100 text-amber-800 border-amber-200"
                           : sender.outlookConnected === true
                           ? "bg-green-500"
                           : ""
@@ -2226,6 +2227,11 @@ export default function OutreachOnboarding() {
                         <>
                           <AlertTriangle className="h-3 w-3 mr-1" />
                           Reconnect within {refreshTokenDaysLeft(sender.microsoftTokenExpiry)} days
+                        </>
+                      ) : sender.connectionStatus === "needs_verification" ? (
+                        <>
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Outlook needs verification
                         </>
                       ) : sender.outlookConnected === true ? (
                         <>
@@ -2270,7 +2276,7 @@ export default function OutreachOnboarding() {
                       <AlertTriangle className="h-4 w-4 mr-2" />
                       Reconnect Outlook — Token Expired
                     </Button>
-                  ) : sender.outlookConnected !== true ? (
+                  ) : sender.connectionStatus !== "connected" ? (
                     <Button
                       size="sm"
                       onClick={() => connectOutlookMutation.mutate(sender.id)}
@@ -2278,7 +2284,7 @@ export default function OutreachOnboarding() {
                       data-testid={`connect-outlook-${sender.id}`}
                     >
                       <Mail className="h-4 w-4 mr-2" />
-                      Connect Outlook
+                      {sender.connectionStatus === "needs_verification" ? "Verify Outlook" : "Connect Outlook"}
                     </Button>
                   ) : (
                     <Button
@@ -2447,7 +2453,7 @@ export default function OutreachOnboarding() {
 
   // Step 2: Email Integration (Microsoft Graph API)
   const renderStep2 = () => {
-    const connectedCount = senders.filter((s) => s.outlookConnected === true && !s.tokenExpired).length;
+    const connectedCount = senders.filter((s) => s.connectionStatus === "connected" && !s.tokenExpired).length;
     const expiredCount = senders.filter((s) => s.tokenExpired).length;
     const totalCount = senders.length;
 
@@ -2499,6 +2505,8 @@ export default function OutreachOnboarding() {
                     ? "bg-red-50 border-red-300"
                     : sender.tokenExpiringSoon
                     ? "bg-yellow-50 border-yellow-300"
+                    : sender.connectionStatus === "needs_verification"
+                    ? "bg-amber-50 border-amber-200"
                     : sender.outlookConnected === true
                     ? "bg-green-50 border-green-200"
                     : "bg-gray-50"
@@ -2511,12 +2519,16 @@ export default function OutreachOnboarding() {
                         ? "bg-red-500 text-white"
                         : sender.tokenExpiringSoon
                         ? "bg-yellow-400 text-black"
+                        : sender.connectionStatus === "needs_verification"
+                        ? "bg-amber-500 text-white"
                         : sender.outlookConnected === true
                         ? "bg-green-500 text-white"
                         : "bg-gray-300"
                     }`}
                   >
                     {sender.tokenExpired ? (
+                      <AlertTriangle className="h-5 w-5" />
+                    ) : sender.connectionStatus === "needs_verification" ? (
                       <AlertTriangle className="h-5 w-5" />
                     ) : sender.outlookConnected === true ? (
                       <CheckCircle className="h-5 w-5" />
@@ -2537,6 +2549,11 @@ export default function OutreachOnboarding() {
                         Reconnect within {refreshTokenDaysLeft(sender.microsoftTokenExpiry)} days to avoid interruption.
                       </p>
                     )}
+                    {sender.connectionStatus === "needs_verification" && !sender.tokenExpired && (
+                      <p className="text-xs text-amber-700 font-medium mt-0.5">
+                        Verify the Microsoft mailbox before using this sender. Reconnect Outlook to confirm it.
+                      </p>
+                    )}
                   </div>
                 </div>
                 {sender.tokenExpired ? (
@@ -2549,7 +2566,7 @@ export default function OutreachOnboarding() {
                     <AlertTriangle className="h-4 w-4 mr-1" />
                     Reconnect
                   </Button>
-                ) : sender.outlookConnected === true ? (
+                ) : sender.connectionStatus === "connected" ? (
                   <div className="flex items-center gap-2">
                     <Badge className="bg-green-500">
                       <CheckCircle className="h-3 w-3 mr-1" />
@@ -2565,6 +2582,16 @@ export default function OutreachOnboarding() {
                       <RefreshCw className="h-4 w-4" />
                     </Button>
                   </div>
+                ) : sender.connectionStatus === "needs_verification" ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => connectOutlookMutation.mutate(sender.id)}
+                    disabled={connectOutlookMutation.isPending}
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    Verify mailbox
+                  </Button>
                 ) : (
                   <Button
                     size="sm"
