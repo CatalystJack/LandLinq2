@@ -259,3 +259,17 @@ mtime_ms = 1790971049307
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/bd270495-5052-4a4a-93c3-614e20ff6b10/b04b9be4-b0c1-44e2-8b4e-50570e05e044"
 storage_version_token = "1790971072181349"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "ZYvc78NoGNjgPMpZDldQY"
+uri = "file://templates/company-contacts-template.csv"
+type = "table"
+title = "Company CRM contact upload template"
+description = "Blank CSV matching the company CRM contact importer fields."
+logical_id = "5f30eceb-95de-4455-906e-44b5ddd7e5e5"
+content_hash = "sha256:f1442cb3f620f977367534c93b8bcbae29b261e8bc8945b9b659a15d95657d8d"
+size = 141
+mtime_ms = 1791577293753
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/5f30eceb-95de-4455-906e-44b5ddd7e5e5/55497fd2-5c4f-4fbd-a401-7934653ff6d2"
+storage_version_token = "1791577294573967"
+content_type = "text/csv"
