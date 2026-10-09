@@ -14,6 +14,7 @@ backups/
 
 # Attached assets (117MB) - referenced via object storage in production
 attached_assets/
+/generated-artifacts/
 
 # Cache and temp
 .cache/

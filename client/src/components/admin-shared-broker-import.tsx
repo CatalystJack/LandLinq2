@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_BYTES = 100 * 1024 * 1024;
 const MAX_ROWS = 20_000;
 const CONFIRM_PREFIX = "IMPORT";
 
@@ -93,7 +93,7 @@ export default function AdminSharedBrokerImport() {
     setMapping({});
     if (!selected) return;
     if (selected.size > MAX_FILE_BYTES) {
-      setError("Choose a file that is 10 MB or smaller.");
+      setError("Choose a file that is 100 MB or smaller.");
       return;
     }
     if (!/\.(csv|xlsx)$/i.test(selected.name)) {
@@ -197,7 +197,7 @@ export default function AdminSharedBrokerImport() {
             <div className="space-y-2">
               <Label htmlFor="shared-broker-file">Broker list</Label>
               <Input id="shared-broker-file" type="file" accept=".csv,.xlsx" onChange={(event) => void readFile(event.target.files?.[0] || null)} />
-              <p className="text-xs text-slate-500">Maximum 10 MB and 20,000 contacts. Keep license numbers formatted as text to preserve leading zeroes.</p>
+              <p className="text-xs text-slate-500">Maximum 100 MB and 20,000 contacts per file. Split larger lists into separate files; license numbers are preserved as text.</p>
             </div>
           </div>
 

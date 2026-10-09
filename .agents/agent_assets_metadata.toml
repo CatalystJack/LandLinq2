@@ -273,3 +273,17 @@ mtime_ms = 1791577293753
 storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/5f30eceb-95de-4455-906e-44b5ddd7e5e5/55497fd2-5c4f-4fbd-a401-7934653ff6d2"
 storage_version_token = "1791577294573967"
 content_type = "text/csv"
+
+[[outputs]]
+id = "9g6CXHR5iqsoVSF9hwagX"
+uri = "file://generated-artifacts/broker-license-holder-upload-20261009/shared-broker-upload-files.zip"
+type = "unspecified"
+title = "Shared broker upload files"
+description = "17 upload-ready Excel workbooks, a review file for 193 unnamed records, and instructions."
+logical_id = "77e15142-0687-422b-b2e3-848094fa3b27"
+content_hash = "sha256:a35e93c6b3fb1e88a7eb92e340d3b1c95514bede362fb8020f1f67d7e0666ba9"
+size = 23029379
+mtime_ms = 1791578054169
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:8f1d4825-0343-44de-8682-38b3fa946961/77e15142-0687-422b-b2e3-848094fa3b27/5d15dc3d-034d-4795-ac60-5e840abfe738"
+storage_version_token = "1791578237115048"
+content_type = "application/octet-stream"

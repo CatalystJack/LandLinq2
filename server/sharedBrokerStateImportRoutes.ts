@@ -17,7 +17,7 @@ import {
   type SharedImportPlan,
 } from "./sharedBrokerStateImport";
 
-const maxFileBytes = 10 * 1024 * 1024;
+const maxFileBytes = 100 * 1024 * 1024;
 const previewLifetimeMs = 30 * 60 * 1000;
 const previews = new Map<string, {
   email: string;
@@ -33,10 +33,11 @@ const upload = multer({
 const singleWorkbook: RequestHandler = (req, res, next) => {
   upload.single("workbook")(req, res, (error: any) => {
     if (error) {
-      const message = error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE"
-        ? "The file must be 10 MB or smaller."
+      const tooLarge = error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE";
+      const message = tooLarge
+        ? "The file must be 100 MB or smaller."
         : "Upload one CSV or Excel workbook.";
-      return res.status(400).json({ error: message });
+      return res.status(tooLarge ? 413 : 400).json({ error: message });
     }
     next();
   });
