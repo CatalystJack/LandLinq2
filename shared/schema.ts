@@ -54,7 +54,7 @@ export const developerProfiles = pgTable("developer_profiles", {
   crmContactCounties: text("crm_contact_counties").array().default(sql`ARRAY[]::text[]`).notNull(),
   crmContactProductTypes: text("crm_contact_product_types").array().default(sql`ARRAY[]::text[]`).notNull(),
   crmContactSourceTags: text("crm_contact_source_tags").array().default(sql`ARRAY[]::text[]`).notNull(),
-  accountManagerUserId: varchar("account_manager_user_id").references(() => users.id, { onDelete: "set null" }),
+  accountManagerUserId: varchar("account_manager_user_id"),
 
   // Rent criteria — primary drives classification, secondary is reference only
   rentMetric: varchar("rent_metric").notNull(), // 'psf' | 'per_unit'

@@ -7,6 +7,7 @@
 - [drizzle-kit db:push broken](drizzle-kit-db-push-broken.md) — fails with "Please provide required params" even with correct config; use raw SQL via psql for schema changes instead.
 - [HubSpot column names are CRM-native, not legacy HubSpot](hubspot-native-crm-naming.md) — hubspot_trigger_tag/hubspot_owner_id columns power the actively-used internal CRM scheduler; don't rename/remove them when doing HubSpot integration cleanup.
 - [Drizzle select field must belong to referenced table](drizzle-select-wrong-table-column.md) — a select() field pointing at a same-named column from the wrong pgTable crashes at runtime ("Cannot convert undefined or null to object"), even when tsc passes clean.
+- [Bidirectional Drizzle profile-user links](drizzle-bidirectional-profile-user-links.md) — keep one side scalar when profile and user tables mutually reference each other; define that foreign key in the additive SQL migration.
 - [Multer multipart webhook handling](multer-multipart-webhook.md) — multer.any() splits multipart bodies: text fields go to req.body, file uploads go to req.files; always pass req.files explicitly to any handler that needs attachment content.
 - [Import deal 413 fix](import-deal-413.md) — pasting HTML emails with embedded base64 images can easily exceed 10mb; Express JSON limit raised to 50mb, and frontend strips data URIs before sending.
 - [Login entrypoint presentation](login-entrypoint-presentation.md) — keep the credential form minimal; place alternate sign-in and demo paths outside the primary visual flow.

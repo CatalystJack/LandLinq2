@@ -1750,14 +1750,22 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   transition: none;
 }
 
-.ll-machine-dashboard .ll-analyst-toolbar,
-.ll-machine-dashboard .ll-analyst-table-scroll {
+.ll-machine-dashboard .ll-analyst-toolbar {
   scrollbar-width: none;
 }
 
-.ll-machine-dashboard .ll-analyst-toolbar::-webkit-scrollbar,
-.ll-machine-dashboard .ll-analyst-table-scroll::-webkit-scrollbar {
+.ll-machine-dashboard .ll-analyst-toolbar::-webkit-scrollbar {
   display: none;
+}
+
+.ll-machine-dashboard .ll-analyst-table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #aab7c1 #edf1f4;
+}
+.ll-machine-dashboard .ll-analyst-table-scroll::-webkit-scrollbar { height: 6px; }
+.ll-machine-dashboard .ll-analyst-table-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #aab7c1;
 }
 
 /* Platform showcase activity: rows, queues, cards, and reporting bars animate
@@ -3287,40 +3295,61 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
 .ll-analyst-columns { border-color: #4d9cdd; color: #2470b4; }
 .ll-analyst-columns b { margin-left: .2rem; color: #2470b4; }
 .ll-analyst-filter { padding-inline: .58rem; }
-.ll-analyst-table-scroll { overflow-x: auto; }
+.ll-analyst-table-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #aab7c1 #edf1f4;
+}
+.ll-analyst-table-scroll::-webkit-scrollbar { height: 6px; }
+.ll-analyst-table-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #aab7c1;
+}
 .ll-analyst-table {
-  width: max(100%, 67rem);
+  width: max(100%, 96rem);
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: .5rem;
+  font-size: .58rem;
 }
 .ll-analyst-table th {
-  height: 1.85rem;
+  height: 2rem;
   border-bottom: 1px solid #d3dbe0;
   background: #f8fafb;
   color: #596975;
-  font-size: .43rem;
+  font-size: .5rem;
   font-weight: 700;
   text-align: left;
   white-space: nowrap;
 }
 .ll-analyst-table th small { margin-left: .18rem; color: #a2adb5; font-size: .42rem; }
-.ll-analyst-table th, .ll-analyst-table td { padding: .2rem .32rem; border-right: 1px solid #edf0f2; }
+.ll-analyst-table th, .ll-analyst-table td { padding: .28rem .42rem; border-right: 1px solid #edf0f2; }
 .ll-analyst-table th:nth-child(1), .ll-analyst-table td:nth-child(1) { width: 3.1rem; }
-.ll-analyst-table th:nth-child(4), .ll-analyst-table td:nth-child(4) { width: 8.5rem; }
-.ll-analyst-table th:nth-child(5), .ll-analyst-table td:nth-child(5) { width: 6.5rem; }
-.ll-analyst-table th:nth-child(6), .ll-analyst-table td:nth-child(6) { width: 3rem; }
-.ll-analyst-table th:nth-child(5), .ll-analyst-table td:nth-child(5) { width: 7rem; }
-.ll-analyst-table th:nth-child(9), .ll-analyst-table td:nth-child(9) { width: 4.8rem; }
-.ll-analyst-table th:nth-child(n+10):nth-child(-n+13),
-.ll-analyst-table td:nth-child(n+10):nth-child(-n+13) { width: 6.8rem; }
+.ll-analyst-table th:nth-child(2), .ll-analyst-table td:nth-child(2) { width: 5rem; }
+.ll-analyst-table th:nth-child(3), .ll-analyst-table td:nth-child(3) { width: 5.2rem; }
+.ll-analyst-table th:nth-child(4), .ll-analyst-table td:nth-child(4) { width: 10rem; }
+.ll-analyst-table th:nth-child(5), .ll-analyst-table td:nth-child(5) { width: 8rem; }
+.ll-analyst-table th:nth-child(6), .ll-analyst-table td:nth-child(6) { width: 3.6rem; }
+.ll-analyst-table th:nth-child(7), .ll-analyst-table td:nth-child(7) { width: 4.3rem; }
+.ll-analyst-table th:nth-child(8), .ll-analyst-table td:nth-child(8) { width: 7rem; }
+.ll-analyst-table th:nth-child(9), .ll-analyst-table td:nth-child(9) { width: 9rem; }
+.ll-analyst-table th:nth-child(10), .ll-analyst-table td:nth-child(10) { width: 9rem; }
+.ll-analyst-table th:nth-child(11), .ll-analyst-table td:nth-child(11) { width: 8rem; }
+.ll-analyst-table th:nth-child(12), .ll-analyst-table td:nth-child(12) { width: 9rem; }
+.ll-analyst-table th:nth-child(13), .ll-analyst-table td:nth-child(13) { width: 7.6rem; }
+.ll-analyst-table th:nth-child(14), .ll-analyst-table td:nth-child(14) { width: 7rem; }
+.ll-analyst-table th:nth-child(15), .ll-analyst-table td:nth-child(15) { width: 4.5rem; }
 .ll-analyst-table td {
-  height: 1.72rem;
+  height: 2.15rem;
   border-bottom: 1px solid #e6ecef;
   color: #8b969d;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.ll-analyst-table td:nth-child(n+9):nth-child(-n+12) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
 }
 .ll-analyst-table td:first-child { color: #357bbb; font-weight: 700; }
 .ll-address, .ll-subaddress { display: block; overflow: hidden; text-overflow: ellipsis; }
