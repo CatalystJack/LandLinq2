@@ -54,7 +54,7 @@ import {
 import { or, like, ilike, eq, ne, desc, asc, gte, lte, gt, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
 import { setupAuthMiddleware, setupAuthRoutes, isAuthenticated, hashPassword, comparePasswords, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
 import { requirePlatformAdmin } from "./requirePlatformAdmin";
-import { isAnalyticsAuthorized } from "@shared/admin-auth";
+import { canManageOtherAdminPasswords, isAnalyticsAuthorized } from "@shared/admin-auth";
 import {
   getAccountOutlookConnectionStatus,
   getOutlookConnectionStatus,
@@ -4103,10 +4103,13 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       if (target.id === req.user?.id) {
         return res.status(400).json({ message: "You cannot set a temporary password for your own account" });
       }
-      if (isPlatformAdminEmail(target.email) || String(target.role || "").toUpperCase() === "SUPER_ADMIN") {
-        return res.status(403).json({ message: "Platform administrator passwords cannot be changed here" });
+      const targetRole = String(target.role || "").toUpperCase();
+      const targetIsAdmin = isPlatformAdminEmail(target.email) || targetRole === "ADMIN" || targetRole === "SUPER_ADMIN";
+      const actorEmail = String(req.user?.email || req.user?.claims?.email || "");
+      if (targetIsAdmin && !canManageOtherAdminPasswords(actorEmail)) {
+        return res.status(403).json({ message: "Only the designated super administrator can set another admin's password" });
       }
-      if (!target.password) {
+      if (!target.password && !targetIsAdmin) {
         return res.status(409).json({ message: "This account does not use a local password" });
       }
 
@@ -4117,7 +4120,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
         updatedAt: new Date(),
       }).where(and(
         eq(users.id, target.id),
-        eq(users.password, target.password),
+        target.password ? eq(users.password, target.password) : isNull(users.password),
       )).returning({ id: users.id });
 
       if (!updated) {

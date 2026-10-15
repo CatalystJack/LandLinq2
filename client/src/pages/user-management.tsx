@@ -15,7 +15,7 @@ import { formatDateEST } from "@/utils/timezone";
 import Footer from "@/components/footer";
 import Navigation from "@/components/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { isPlatformAdminEmail, isSuperAdminEmail } from "@shared/admin-auth";
+import { canManageOtherAdminPasswords, isPlatformAdminEmail, isSuperAdminEmail } from "@shared/admin-auth";
 import type { OutlookConnectionStatus } from "@shared/outlook-connection";
 
 interface User {
@@ -779,11 +779,19 @@ export default function UserManagement() {
                             Active
                           </Badge>
                           <div className="flex flex-wrap gap-2">
-                            {isCurrentUserPlatformAdmin &&
-                              user.id !== currentUser?.id &&
-                              user.hasLocalPassword &&
-                              !isPlatformAdminEmail(user.email) &&
-                              String(user.role || "").toUpperCase() !== "SUPER_ADMIN" && (
+                            {user.id !== currentUser?.id &&
+                              (
+                                (
+                                  canManageOtherAdminPasswords(currentUser?.email) &&
+                                  (isPlatformAdminEmail(user.email) || ["ADMIN", "SUPER_ADMIN"].includes(String(user.role || "").toUpperCase()))
+                                ) ||
+                                (
+                                  isCurrentUserPlatformAdmin &&
+                                  user.hasLocalPassword &&
+                                  !isPlatformAdminEmail(user.email) &&
+                                  !["ADMIN", "SUPER_ADMIN"].includes(String(user.role || "").toUpperCase())
+                                )
+                              ) && (
                                 <Button
                                   variant="outline"
                                   size="sm"

@@ -1,3 +1,5 @@
+const PRIMARY_ADMIN_PASSWORD_MANAGER_EMAIL = "jack@apexresi.com";
+
 export function isPlatformAdminEmail(email?: string | null): boolean {
   const normalized = (email || "").toLowerCase().trim();
   return normalized.endsWith("@apexresi.com") || normalized.endsWith("@landlinq.ai");
@@ -5,7 +7,11 @@ export function isPlatformAdminEmail(email?: string | null): boolean {
 
 export function isSuperAdminEmail(email?: string | null): boolean {
   const normalized = (email || "").toLowerCase().trim();
-  return normalized === "jack@apexresi.com" || normalized === "deals@landlinq.ai";
+  return normalized === PRIMARY_ADMIN_PASSWORD_MANAGER_EMAIL || normalized === "deals@landlinq.ai";
+}
+
+export function canManageOtherAdminPasswords(email?: string | null): boolean {
+  return (email || "").toLowerCase().trim() === PRIMARY_ADMIN_PASSWORD_MANAGER_EMAIL;
 }
 
 /**

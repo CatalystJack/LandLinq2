@@ -2,6 +2,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { requirePlatformAdmin } from "./requirePlatformAdmin";
+import { canManageOtherAdminPasswords } from "../shared/admin-auth";
+
+test("only the designated super admin can set another admin's password", () => {
+  assert.equal(canManageOtherAdminPasswords("jack@apexresi.com"), true);
+  assert.equal(canManageOtherAdminPasswords("JACK@APEXRESI.COM"), true);
+  assert.equal(canManageOtherAdminPasswords("deals@landlinq.ai"), false);
+  assert.equal(canManageOtherAdminPasswords("other@apexresi.com"), false);
+});
 
 test("platform-admin middleware rejects a logged-in non-admin with 403", () => {
   let statusCode = 200;
@@ -69,6 +77,8 @@ test("temporary password endpoint hashes the value, forces a reset, and never re
   assert.match(routeBody, /hashPassword\(password\)/);
   assert.match(routeBody, /mustResetPassword:\s*true/);
   assert.match(routeBody, /target\.password/);
+  assert.match(routeBody, /targetIsAdmin && !canManageOtherAdminPasswords\(actorEmail\)/);
+  assert.match(routeBody, /target\.password \? eq\(users\.password, target\.password\) : isNull\(users\.password\)/);
   assert.doesNotMatch(routeBody, /json\(\{[^}]*password\s*[,}]/i);
 });
 
@@ -94,7 +104,8 @@ test("people list exposes only a local-password eligibility flag, not password h
   const userManagement = readFileSync(new URL("../client/src/pages/user-management.tsx", import.meta.url), "utf8");
 
   assert.match(routes, /hasLocalPassword:\s*Boolean\(password\)/);
-  assert.match(userManagement, /user\.hasLocalPassword\s*&&/);
+  assert.match(userManagement, /canManageOtherAdminPasswords\(currentUser\?\.email\)/);
+  assert.match(userManagement, /user\.hasLocalPassword/);
   assert.match(userManagement, /user\.id !== currentUser\?\.id/);
 });
 
