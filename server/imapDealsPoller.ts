@@ -39,7 +39,7 @@ function safePollErrorField(value: unknown): string | undefined {
 
 function safePollErrorDetail(error: unknown): string {
   const record = error && typeof error === 'object' ? error as Record<string, unknown> : {};
-  let detail = String(record.message || error || 'Unknown IMAP error');
+  let detail = String(record.responseText || record.message || error || 'Unknown IMAP error');
   const password = process.env.DEALS_EMAIL_PASSWORD;
   if (password) detail = detail.split(password).join('[redacted]');
   return detail
@@ -47,6 +47,8 @@ function safePollErrorDetail(error: unknown): string {
     .replace(/\b(bearer\s+)[a-z0-9._~+/-]+=*/gi, '$1[redacted]')
     .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^/@\s:]+:[^/@\s]+@/gi, '$1[redacted]@')
     .replace(/\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/gi, '[email]')
+    .replace(/\b(?:\+?\d[\d().\s-]{7,}\d)\b/g, '[phone]')
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[ip]')
     .replace(/\s+/g, ' ')
     .slice(0, 300);
 }
@@ -315,6 +317,7 @@ export function createImapDealsPoller(
         pollFailureStage: ImapPollFailureStage;
         pollErrorName?: string;
         pollErrorCode?: string;
+        pollErrorResponseStatus?: string;
         pollErrorDetail: string;
       };
       sanitizedError.pollFailureCategory = classifyDealsImapPollFailure(error, stage);
@@ -322,6 +325,7 @@ export function createImapDealsPoller(
       const errorRecord = error && typeof error === 'object' ? error as Record<string, unknown> : {};
       sanitizedError.pollErrorName = safePollErrorField(errorRecord.name);
       sanitizedError.pollErrorCode = safePollErrorField(errorRecord.code);
+      sanitizedError.pollErrorResponseStatus = safePollErrorField(errorRecord.responseStatus);
       sanitizedError.pollErrorDetail = safePollErrorDetail(error);
       throw sanitizedError;
     } finally {
@@ -467,6 +471,7 @@ export function startDealsImapPoller(intervalMs = DEFAULT_IMAP_INTERVAL_MS): voi
             pollFailureStage?: ImapPollFailureStage;
             pollErrorName?: string;
             pollErrorCode?: string;
+            pollErrorResponseStatus?: string;
             pollErrorDetail?: string;
           }
         : {};
@@ -474,6 +479,7 @@ export function startDealsImapPoller(intervalMs = DEFAULT_IMAP_INTERVAL_MS): voi
         stage: diagnostic.pollFailureStage || 'unknown',
         errorName: diagnostic.pollErrorName || 'unknown',
         errorCode: diagnostic.pollErrorCode || 'none',
+        responseStatus: diagnostic.pollErrorResponseStatus || 'none',
         detail: diagnostic.pollErrorDetail || 'No safe error detail available',
       });
     }

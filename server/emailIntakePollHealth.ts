@@ -46,6 +46,7 @@ export function classifyDealsImapPollFailure(
     errorRecord.code,
     errorRecord.name,
     errorRecord.message,
+    errorRecord.responseText,
     typeof error === 'string' ? error : '',
   ].map(value => String(value || '')).join(' ').toLowerCase();
 

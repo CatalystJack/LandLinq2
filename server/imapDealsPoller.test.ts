@@ -122,8 +122,12 @@ const failingPoll = createImapDealsPoller({
     async connect() {
       const error = new Error('Login failed for jane@example.com using password mailbox-password') as Error & {
         code: string;
+        responseStatus: string;
+        responseText: string;
       };
       error.code = 'EAUTH';
+      error.responseStatus = 'NO';
+      error.responseText = 'Invalid credentials for jane@example.com; password=mailbox-password; contact +1 (555) 123-4567';
       throw error;
     },
   }),
@@ -135,9 +139,11 @@ await assert.rejects(failingPoll(), (error: any) => {
   assert.equal(error.pollFailureStage, 'connect');
   assert.equal(error.pollErrorName, 'Error');
   assert.equal(error.pollErrorCode, 'EAUTH');
-  assert.match(error.pollErrorDetail, /Login failed/);
+  assert.equal(error.pollErrorResponseStatus, 'NO');
+  assert.match(error.pollErrorDetail, /Invalid credentials/);
   assert.match(error.pollErrorDetail, /\[email\]/);
-  assert.match(error.pollErrorDetail, /password \[redacted\]/);
+  assert.match(error.pollErrorDetail, /password=\[redacted\]/);
+  assert.match(error.pollErrorDetail, /\[phone\]/);
   assert.doesNotMatch(error.message, /jane@example\.com|mailbox-password/);
   assert.doesNotMatch(error.pollErrorDetail, /jane@example\.com|mailbox-password/);
   return true;
@@ -199,6 +205,14 @@ assert.equal(
 assert.equal(
   classifyDealsImapPollFailure({ code: 'ETIMEDOUT', message: 'socket timeout to private-host' }),
   'connection',
+);
+assert.equal(
+  classifyDealsImapPollFailure({
+    message: 'Command failed',
+    responseStatus: 'NO',
+    responseText: 'LOGIN failed: invalid credentials',
+  }),
+  'authentication',
 );
 assert.equal(classifyDealsImapPollFailure(new Error('Mailbox closed'), 'mailbox'), 'mailbox_access');
 
