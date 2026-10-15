@@ -2173,8 +2173,9 @@ export default function OutreachOnboarding() {
           Configure Your Outreach Team
         </CardTitle>
         <CardDescription>
-          Add team members who will send personalized outreach emails to your contacts.
-          Each sender can have their own email account connected for authentic communication.
+          {isDeveloperUser
+            ? "Connect the email accounts for your existing outreach senders."
+            : "Add team members who will send personalized outreach emails to your contacts. Each sender can have their own email account connected for authentic communication."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -2329,7 +2330,7 @@ export default function OutreachOnboarding() {
               </div>
             ))}
 
-            {showAddSender ? (
+            {!isDeveloperUser && (showAddSender ? (
               <div className="border-2 border-dashed rounded-lg p-4 space-y-4">
                 <h4 className="font-semibold">Add New Team Member</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2421,7 +2422,7 @@ export default function OutreachOnboarding() {
                 <Plus className="h-4 w-4 mr-2" />
                 Add Team Member
               </Button>
-            )}
+            ))}
           </>
         )}
       </CardContent>
@@ -2430,7 +2431,7 @@ export default function OutreachOnboarding() {
         <Button 
           onClick={() => {
             // Dec 22, 2025: Auto-save unsaved team member before navigating
-            if (showAddSender && newSenderData.name && newSenderData.email) {
+            if (!isDeveloperUser && showAddSender && newSenderData.name && newSenderData.email) {
               createSenderMutation.mutate(newSenderData, {
                 onSuccess: () => setCurrentStep(2)
               });
@@ -2438,7 +2439,7 @@ export default function OutreachOnboarding() {
               setCurrentStep(2);
             }
           }} 
-          disabled={!!(showAddSender && newSenderData.name && newSenderData.email && createSenderMutation.isPending)}
+          disabled={!!(!isDeveloperUser && showAddSender && newSenderData.name && newSenderData.email && createSenderMutation.isPending)}
           data-testid="step1-next"
         >
           {createSenderMutation.isPending ? (
