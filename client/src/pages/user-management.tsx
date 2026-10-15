@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Plus, Users, Shield, Settings, Edit, Trash2, Mail, Calendar, UserCheck, Crown, Building, MapPin, KeyRound } from "lucide-react";
 import { formatDateEST } from "@/utils/timezone";
@@ -54,6 +55,9 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRole, setSelectedRole] = useState("all");
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [isBulkAddUserOpen, setIsBulkAddUserOpen] = useState(false);
+  const [bulkUserInput, setBulkUserInput] = useState("");
+  const [bulkUserResult, setBulkUserResult] = useState<{ sent: { email: string }[]; failed: { email: string; reason: string }[] } | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [resendingUser, setResendingUser] = useState<User | null>(null);
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
@@ -122,6 +126,44 @@ export default function UserManagement() {
         variant: "destructive",
       });
     },
+  });
+
+  const bulkCreateUsersMutation = useMutation({
+    mutationFn: async (entries: Pick<NewUser, "email" | "firstName" | "lastName">[]) => {
+      const response = await fetch("/api/users/bulk-initial-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(entries),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Failed to create admin accounts");
+      return result as { sent: { email: string }[]; failed: { email: string; reason: string }[] };
+    },
+    onSuccess: (result) => {
+      setBulkUserResult(result);
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      if (result.failed.length === 0) {
+        setBulkUserInput("");
+        setIsBulkAddUserOpen(false);
+      } else {
+        const failedEmails = new Set(result.failed.map((failure) => failure.email.toLowerCase()));
+        setBulkUserInput((current) => current.split(/\r?\n/).filter((row) => {
+          const email = row.split(",")[2]?.trim().toLowerCase();
+          return email && failedEmails.has(email);
+        }).join("\n"));
+      }
+      toast({
+        title: result.failed.length ? "Some login emails need attention" : "Admin login emails accepted",
+        description: `${result.sent.length} accepted by the mail service, ${result.failed.length} failed. Inbox delivery is not confirmed.`,
+        variant: result.failed.length ? "destructive" : "default",
+      });
+    },
+    onError: (error: Error) => toast({
+      title: "Could not create admin accounts",
+      description: error.message,
+      variant: "destructive",
+    }),
   });
 
   const resendInitialLoginMutation = useMutation({
@@ -335,6 +377,28 @@ export default function UserManagement() {
     createUserMutation.mutate(newUser);
   };
 
+  const handleBulkCreateUsers = () => {
+    const rows = bulkUserInput.split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
+    if (rows.length === 0) {
+      toast({ title: "Add at least one account", description: "Enter one account per line.", variant: "destructive" });
+      return;
+    }
+    if (rows.length > 25) {
+      toast({ title: "Batch is too large", description: "Send a maximum of 25 accounts at a time.", variant: "destructive" });
+      return;
+    }
+    const entries = rows.map((row) => row.split(",").map((value) => value.trim()));
+    if (entries.some((entry) => entry.length !== 3 || entry.some((value) => !value))) {
+      toast({
+        title: "Check the list format",
+        description: "Each line must be First name,Last name,email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    bulkCreateUsersMutation.mutate(entries.map(([firstName, lastName, email]) => ({ firstName, lastName, email })));
+  };
+
   const handleUpdateUser = (userId: string, updates: Partial<User>) => {
     updateUserMutation.mutate({ userId, updates });
   };
@@ -452,15 +516,14 @@ export default function UserManagement() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-                    {isCurrentUserSuperAdmin && (
+                  {isCurrentUserSuperAdmin && <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                    <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
                       <DialogTrigger asChild>
-                        <Button className="gap-2" data-testid="add-user-button">
+                        <Button className="w-full gap-2 sm:w-auto" data-testid="add-user-button">
                           <Plus className="h-4 w-4" />
                           Add User
                         </Button>
                       </DialogTrigger>
-                    )}
                     <DialogContent className="sm:max-w-md">
                       <DialogHeader>
                         <DialogTitle>Add New User</DialogTitle>
@@ -530,7 +593,73 @@ export default function UserManagement() {
                         </div>
                       </div>
                     </DialogContent>
-                  </Dialog>
+                    </Dialog>
+                    <Dialog
+                      open={isBulkAddUserOpen}
+                      onOpenChange={(open) => {
+                        setIsBulkAddUserOpen(open);
+                        if (open) setBulkUserResult(null);
+                      }}
+                    >
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full sm:w-auto" data-testid="bulk-add-admins-button">
+                          <Users className="mr-2 h-4 w-4" />
+                          Bulk Add Admins
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Bulk Add Admin Accounts</DialogTitle>
+                          <DialogDescription>
+                            Add up to 25 accounts. Login emails are sent three at a time. Each new user must change their temporary password after signing in.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-3 py-2">
+                          <Label htmlFor="bulk-admin-accounts">First name,Last name,email address</Label>
+                          <Textarea
+                            id="bulk-admin-accounts"
+                            rows={8}
+                            value={bulkUserInput}
+                            onChange={(event) => setBulkUserInput(event.target.value)}
+                            placeholder={"Jordan,Lee,jordan@example.com\nMorgan,Chen,morgan@example.com"}
+                            className="min-h-40 font-mono text-sm"
+                            data-testid="bulk-admin-accounts-input"
+                          />
+                          <p className="text-xs text-muted-foreground">One account per line. Existing accounts and duplicate addresses are skipped and reported.</p>
+                        </div>
+                        {bulkUserResult && (
+                          <div className="space-y-2 rounded-md border p-3 text-sm" role="status">
+                            <p>{bulkUserResult.sent.length} email(s) accepted by the mail service.</p>
+                            {bulkUserResult.failed.length > 0 && (
+                              <ul className="max-h-36 space-y-1 overflow-y-auto text-destructive">
+                                {bulkUserResult.failed.map((failure, index) => (
+                                  <li key={`${failure.email}-${index}`}>{failure.email || "Invalid row"}: {failure.reason}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
+                        <DialogFooter className="flex-col gap-2 sm:flex-row">
+                          <Button
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                            onClick={() => setIsBulkAddUserOpen(false)}
+                            disabled={bulkCreateUsersMutation.isPending}
+                          >
+                            Close
+                          </Button>
+                          <Button
+                            className="w-full border border-transparent hover:border-[#4A90E2] hover:bg-white hover:text-[#4A90E2] sm:w-auto"
+                            onClick={handleBulkCreateUsers}
+                            disabled={bulkCreateUsersMutation.isPending || !bulkUserInput.trim()}
+                            data-testid="bulk-add-admins-submit"
+                          >
+                            {bulkCreateUsersMutation.isPending ? "Sending login emails..." : "Create accounts and send emails"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>}
                 </div>
               </CardContent>
             </Card>

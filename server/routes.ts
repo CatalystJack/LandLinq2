@@ -95,7 +95,7 @@ import { generateDealMemoPdf, resolveDealMemoLogo } from "./dealMemoPdf";
 import { getAutomaticRouting, formatRoutingAssignments } from "./dealRouting";
 import { OpenAIService } from "./openaiService";
 import OpenAI from "openai";
-import { dealSubmissionLimiter, generalApiLimiter, authLimiter, webhookRateLimit, publicDataEnrichmentLimiter } from "./rateLimiter";
+import { dealSubmissionLimiter, generalApiLimiter, authLimiter, webhookRateLimit, publicDataEnrichmentLimiter, initialLoginBatchLimiter } from "./rateLimiter";
 import { sanitizeDealData, sanitizeStringArray } from "./inputSanitizer";
 import { analyzeAgainstCriteria, classifyDealByExactCriteria, classifyAllDevelopmentTypes, TARGET_MARKETS } from "./businessRules";
 // Teams service integration removed
@@ -3892,6 +3892,100 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     } catch (error) {
       console.error("Error creating user:", error);
       res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  app.post('/api/users/bulk-initial-login', isAuthenticated, initialLoginBatchLimiter, async (req: any, res) => {
+    const userEmail = String(req.user?.email || req.user?.claims?.email || '').toLowerCase().trim();
+    if (!isSuperAdminEmail(userEmail)) {
+      return res.status(403).json({ message: "Unauthorized - Super admin access required" });
+    }
+
+    const entries = Array.isArray(req.body) ? req.body : null;
+    if (!entries || entries.length === 0) {
+      return res.status(400).json({ message: "An array of users is required" });
+    }
+    if (entries.length > 25) {
+      return res.status(400).json({ message: "A maximum of 25 users can be created at once" });
+    }
+
+    try {
+      const emailCounts = entries.reduce((counts: Map<string, number>, entry: any) => {
+        const email = String(entry?.email || "").trim().toLowerCase();
+        if (email) counts.set(email, (counts.get(email) || 0) + 1);
+        return counts;
+      }, new Map<string, number>());
+      const outcomes: Array<{ email?: string; failure?: { email: string; reason: string } }> = [];
+      const concurrency = 3;
+
+      for (let start = 0; start < entries.length; start += concurrency) {
+        const batch = entries.slice(start, start + concurrency);
+        const batchOutcomes = await Promise.all(batch.map(async (entry: any) => {
+          const email = String(entry?.email || "").trim().toLowerCase();
+          const firstName = String(entry?.firstName || "").trim();
+          const lastName = String(entry?.lastName || "").trim();
+          if (!firstName || !lastName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return { failure: { email, reason: "First name, last name, and a valid email are required" } };
+          }
+          if ((emailCounts.get(email) || 0) > 1) {
+            return { failure: { email, reason: "This email appears more than once in the batch" } };
+          }
+
+          let newUser: any;
+          let stage: "lookup" | "create" | "email" = "lookup";
+          try {
+            if (await storage.getUserByEmail(email)) {
+              return { failure: { email, reason: "An account with this email already exists" } };
+            }
+
+            stage = "create";
+            const temporaryPassword = randomBytes(12).toString("base64url");
+            newUser = await storage.createUser({
+              email,
+              password: await hashPassword(temporaryPassword),
+              firstName,
+              lastName,
+              role: "ADMIN",
+              mustResetPassword: true,
+            });
+
+            stage = "email";
+            const emailSent = await sendNotificationEmail(buildPlatformUserInitialLoginEmail({
+              firstName,
+              email,
+              temporaryPassword,
+              role: "ADMIN",
+            }));
+            if (!emailSent) throw new Error("The welcome email could not be sent");
+            return { email };
+          } catch {
+            if (newUser) {
+              try {
+                await db.delete(users).where(eq(users.id, newUser.id));
+              } catch {
+                console.error("[bulk initial login] Could not roll back a user after email failure", {
+                  userId: newUser.id,
+                });
+                return { failure: { email, reason: "Email failed and account cleanup needs administrator review" } };
+              }
+            }
+            const reason = stage === "lookup"
+              ? "Could not verify whether an account with this email already exists"
+              : stage === "create"
+                ? "Could not create this account"
+                : "The account was not created because its login email could not be sent";
+            return { failure: { email, reason } };
+          }
+        }));
+        outcomes.push(...batchOutcomes);
+      }
+
+      const sent = outcomes.flatMap((outcome) => outcome.email ? [{ email: outcome.email }] : []);
+      const failed = outcomes.flatMap((outcome) => outcome.failure ? [outcome.failure] : []);
+      return res.json({ sent, failed });
+    } catch (error) {
+      console.error("[bulk initial login] Failed to process batch");
+      return res.status(500).json({ message: "Failed to process initial-login batch" });
     }
   });
 
@@ -14554,6 +14648,16 @@ RULES:
       }
     }
     stringArray("knownEmailDomains", "Known email domains");
+    if (body.accountManagerUserId !== undefined || !partial) {
+      const accountManagerUserId = body.accountManagerUserId;
+      if (accountManagerUserId === null || accountManagerUserId === "") {
+        payload.accountManagerUserId = null;
+      } else if (typeof accountManagerUserId !== "string" || !accountManagerUserId.trim()) {
+        throw new Error("Account manager must be an administrator account");
+      } else {
+        payload.accountManagerUserId = accountManagerUserId.trim();
+      }
+    }
     if (body.crmContactStates !== undefined) {
       if (!Array.isArray(body.crmContactStates) || body.crmContactStates.some((value: unknown) => typeof value !== "string")) {
         throw new Error("CRM contact states must be an array of strings");
@@ -14609,14 +14713,36 @@ RULES:
     return payload;
   }
 
+  async function isValidInvestmentCompanyAccountManager(userId: string | null | undefined): Promise<boolean> {
+    if (!userId) return true;
+    const [candidate] = await db.select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return Boolean(candidate && isPlatformAdminEmail(candidate.email));
+  }
+
   app.get("/api/admin/investment-companies", isAuthenticated, requirePlatformAdmin, async (_req: any, res) => {
     try {
       const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import("@shared/schema");
-      const [profiles, productTypes, countyLabels] = await Promise.all([
+      const [profiles, productTypes, countyLabels, allUsers] = await Promise.all([
         db.select().from(developerProfiles).orderBy(developerProfiles.companyName),
         db.select().from(developerProductTypes),
         db.select().from(developerCountyMarketLabels),
+        db.select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        }).from(users).orderBy(users.email),
       ]);
+      const accountManagers = allUsers
+        .filter((candidate) => isPlatformAdminEmail(candidate.email))
+        .map((candidate) => ({
+          ...candidate,
+          name: [candidate.firstName, candidate.lastName].filter(Boolean).join(" ").trim(),
+        }));
+      const accountManagerById = new Map(accountManagers.map((manager) => [manager.id, manager]));
       const productTypesByProfile = new Map<string, typeof productTypes>();
       for (const productType of productTypes) {
         const rows = productTypesByProfile.get(productType.developerProfileId) || [];
@@ -14639,10 +14765,14 @@ RULES:
       return res.json({
         profiles: profiles.map((profile) => ({
           ...profile,
+          accountManager: profile.accountManagerUserId
+            ? accountManagerById.get(profile.accountManagerUserId) || null
+            : null,
           productTypes: productTypesByProfile.get(profile.id) || [],
           countyMarketLabels: labelsByProfile.get(profile.id) || {},
           teamMemberCount: countMap.get(profile.id) || 0,
         })),
+        accountManagers,
       });
     } catch (error: any) {
       console.error("[admin investment companies GET] Error:", error);
@@ -15091,6 +15221,9 @@ RULES:
     try {
       const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import("@shared/schema");
       const payload = parseInvestmentCompanyPayload(req.body || {});
+      if (!(await isValidInvestmentCompanyAccountManager(payload.accountManagerUserId))) {
+        return res.status(400).json({ error: "Choose an Apex Resi or LandLinq administrator as the account manager" });
+      }
       const productTypes = parseAdminProductTypes(req.body || {}, payload, payload.targetStates || []);
       const firstActive = productTypes.find((productType: any) => productType.isActive);
       const countyLabels = parseAdminCountyMarketLabels(req.body?.countyMarketLabels, payload.targetCounties || []);
@@ -15138,6 +15271,9 @@ RULES:
         .where(eq(developerProfiles.id, req.params.profileId)).limit(1);
       if (!current) return res.status(404).json({ error: "Investment Company profile not found" });
       const payload = parseInvestmentCompanyPayload({ ...current, ...(req.body || {}) });
+      if (!(await isValidInvestmentCompanyAccountManager(payload.accountManagerUserId))) {
+        return res.status(400).json({ error: "Choose an Apex Resi or LandLinq administrator as the account manager" });
+      }
       const existingProductTypes = await db.select().from(developerProductTypes)
         .where(eq(developerProductTypes.developerProfileId, req.params.profileId));
       const productTypes = parseAdminProductTypes(
@@ -15410,50 +15546,59 @@ RULES:
     }
   });
 
-  app.post("/api/admin/investment-companies/:profileId/initial-login/bulk", isAuthenticated, requirePlatformAdmin, async (req: any, res) => {
+  app.post("/api/admin/investment-companies/:profileId/initial-login/bulk", isAuthenticated, requirePlatformAdmin, initialLoginBatchLimiter, async (req: any, res) => {
     try {
       const { developerProfiles } = await import("@shared/schema");
       const entries = Array.isArray(req.body) ? req.body : null;
       if (!entries || entries.length === 0) {
         return res.status(400).json({ error: "An array of team members is required" });
       }
+      if (entries.length > 25) {
+        return res.status(400).json({ error: "A maximum of 25 team members can be invited at once" });
+      }
       const [profile] = await db.select().from(developerProfiles)
         .where(eq(developerProfiles.id, req.params.profileId)).limit(1);
       if (!profile) return res.status(404).json({ error: "Investment Company profile not found" });
       if (!profile.isActive) return res.status(409).json({ error: "Reactivate this company before creating team logins" });
 
-      const invited: any[] = [];
-      const failed: Array<{ email: string; reason: string }> = [];
       const emailCounts = entries.reduce((counts: Map<string, number>, entry: any) => {
         const email = String(entry?.email || "").trim().toLowerCase();
         if (email) counts.set(email, (counts.get(email) || 0) + 1);
         return counts;
       }, new Map<string, number>());
-      for (const entry of entries) {
-        const name = String(entry?.name || "").trim();
-        const normalizedEmail = String(entry?.email || "").trim().toLowerCase();
-        if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-          failed.push({ email: normalizedEmail || String(entry?.email || "").trim(), reason: "Name and a valid email are required" });
-          continue;
-        }
-        if ((emailCounts.get(normalizedEmail) || 0) > 1) {
-          failed.push({ email: normalizedEmail, reason: "This email appears more than once in the batch" });
-          continue;
-        }
-        if (await storage.getUserByEmail(normalizedEmail)) {
-          failed.push({ email: normalizedEmail, reason: "An account with this email already exists" });
-          continue;
-        }
-        try {
-          const invitation = await createDeveloperInvitation(profile, name, normalizedEmail);
-          invited.push(invitation.member);
-        } catch (error: any) {
-          failed.push({
-            email: normalizedEmail,
-            reason: error?.message || "Failed to create and send invitation",
-          });
-        }
+
+      const outcomes: Array<{ member?: any; failure?: { email: string; reason: string } }> = [];
+      const concurrency = 3;
+      for (let start = 0; start < entries.length; start += concurrency) {
+        const batch = entries.slice(start, start + concurrency);
+        const batchOutcomes = await Promise.all(batch.map(async (entry: any) => {
+          const name = String(entry?.name || "").trim();
+          const normalizedEmail = String(entry?.email || "").trim().toLowerCase();
+          if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+            return { failure: { email: normalizedEmail || String(entry?.email || "").trim(), reason: "Name and a valid email are required" } };
+          }
+          if ((emailCounts.get(normalizedEmail) || 0) > 1) {
+            return { failure: { email: normalizedEmail, reason: "This email appears more than once in the batch" } };
+          }
+          try {
+            if (await storage.getUserByEmail(normalizedEmail)) {
+              return { failure: { email: normalizedEmail, reason: "An account with this email already exists" } };
+            }
+            const invitation = await createDeveloperInvitation(profile, name, normalizedEmail);
+            return { member: invitation.member };
+          } catch (error: any) {
+            return {
+              failure: {
+                email: normalizedEmail,
+                reason: error?.message || "Failed to create and send invitation",
+              },
+            };
+          }
+        }));
+        outcomes.push(...batchOutcomes);
       }
+      const invited = outcomes.flatMap((outcome) => outcome.member ? [outcome.member] : []);
+      const failed = outcomes.flatMap((outcome) => outcome.failure ? [outcome.failure] : []);
       return res.json({
         invited: invited.length,
         sent: invited.map(({ email }) => ({ email })),

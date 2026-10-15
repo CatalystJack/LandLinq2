@@ -120,7 +120,11 @@ const failingPoll = createImapDealsPoller({
   createClient: () => ({
     ...fakeClient,
     async connect() {
-      throw new Error('Login failed for jane@example.com using mailbox-password');
+      const error = new Error('Login failed for jane@example.com using password mailbox-password') as Error & {
+        code: string;
+      };
+      error.code = 'EAUTH';
+      throw error;
     },
   }),
   processMessage: async () => true,
@@ -128,7 +132,14 @@ const failingPoll = createImapDealsPoller({
 await assert.rejects(failingPoll(), (error: any) => {
   assert.equal(error.message, 'Deals mailbox polling failed');
   assert.equal(error.pollFailureCategory, 'authentication');
+  assert.equal(error.pollFailureStage, 'connect');
+  assert.equal(error.pollErrorName, 'Error');
+  assert.equal(error.pollErrorCode, 'EAUTH');
+  assert.match(error.pollErrorDetail, /Login failed/);
+  assert.match(error.pollErrorDetail, /\[email\]/);
+  assert.match(error.pollErrorDetail, /password \[redacted\]/);
   assert.doesNotMatch(error.message, /jane@example\.com|mailbox-password/);
+  assert.doesNotMatch(error.pollErrorDetail, /jane@example\.com|mailbox-password/);
   return true;
 });
 

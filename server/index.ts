@@ -372,7 +372,8 @@ setTimeout(() => {
              ADD COLUMN IF NOT EXISTS crm_contact_product_types text[] NOT NULL DEFAULT ARRAY[]::text[],
              ADD COLUMN IF NOT EXISTS crm_contact_source_tags text[] NOT NULL DEFAULT ARRAY[]::text[],
              ADD COLUMN IF NOT EXISTS comp_min_vintage_year integer,
-             ADD COLUMN IF NOT EXISTS comp_min_units integer;
+             ADD COLUMN IF NOT EXISTS comp_min_units integer,
+             ADD COLUMN IF NOT EXISTS account_manager_user_id varchar REFERENCES users(id) ON DELETE SET NULL;
         ALTER TABLE developer_profiles
           DROP COLUMN IF EXISTS acreage_overrides_by_product_type;
         UPDATE developer_profiles

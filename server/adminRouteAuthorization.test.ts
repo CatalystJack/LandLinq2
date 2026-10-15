@@ -72,6 +72,23 @@ test("temporary password endpoint hashes the value, forces a reset, and never re
   assert.doesNotMatch(routeBody, /json\(\{[^}]*password\s*[,}]/i);
 });
 
+test("bulk initial-login creation is super-admin-only, capped, and sends bounded batches", () => {
+  const routes = readFileSync(new URL("./routes.ts", import.meta.url), "utf8");
+  const routeStart = routes.indexOf("app.post('/api/users/bulk-initial-login'");
+  assert.notEqual(routeStart, -1, "bulk initial-login route must exist");
+  const nextRouteStart = routes.indexOf("\n  app.", routeStart + 1);
+  const routeBody = routes.slice(routeStart, nextRouteStart === -1 ? undefined : nextRouteStart);
+
+  assert.match(routeBody, /isAuthenticated/);
+  assert.match(routeBody, /initialLoginBatchLimiter/);
+  assert.match(routeBody, /isSuperAdminEmail\(userEmail\)/);
+  assert.match(routeBody, /entries\.length > 25/);
+  assert.match(routeBody, /const concurrency = 3/);
+  assert.match(routeBody, /mustResetPassword:\s*true/);
+  assert.match(routeBody, /sendNotificationEmail/);
+  assert.match(routeBody, /db\.delete\(users\)/);
+});
+
 test("people list exposes only a local-password eligibility flag, not password hashes", () => {
   const routes = readFileSync(new URL("./routes.ts", import.meta.url), "utf8");
   const userManagement = readFileSync(new URL("../client/src/pages/user-management.tsx", import.meta.url), "utf8");

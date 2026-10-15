@@ -100,6 +100,12 @@ export const authLimiter = createRateLimit({
   message: 'Too many authentication attempts. Please try again later.'
 });
 
+export const initialLoginBatchLimiter = createRateLimit({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 5,
+  message: 'Too many initial-login batches. Please wait before sending another batch.'
+});
+
 export const generalApiLimiter = createRateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   maxRequests: 100, // 100 requests per minute

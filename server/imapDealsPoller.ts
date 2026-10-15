@@ -29,6 +29,28 @@ export const DEALS_IMAP_HOST = 'imap.secureserver.net';
 export const DEALS_IMAP_PORT = 993;
 export const DEFAULT_IMAP_INTERVAL_MS = 3 * 60 * 1000;
 
+type ImapPollFailureStage = 'connect' | 'mailbox';
+
+function safePollErrorField(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  const normalized = String(value).replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 80);
+  return normalized || undefined;
+}
+
+function safePollErrorDetail(error: unknown): string {
+  const record = error && typeof error === 'object' ? error as Record<string, unknown> : {};
+  let detail = String(record.message || error || 'Unknown IMAP error');
+  const password = process.env.DEALS_EMAIL_PASSWORD;
+  if (password) detail = detail.split(password).join('[redacted]');
+  return detail
+    .replace(/\b(password|pass|token|secret|authorization)(\s*[:=]\s*|\s+)("[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1$2[redacted]')
+    .replace(/\b(bearer\s+)[a-z0-9._~+/-]+=*/gi, '$1[redacted]')
+    .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^/@\s:]+:[^/@\s]+@/gi, '$1[redacted]@')
+    .replace(/\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/gi, '[email]')
+    .replace(/\s+/g, ' ')
+    .slice(0, 300);
+}
+
 export interface ImapAttachmentFile {
   fieldname: string;
   originalname: string;
@@ -255,7 +277,7 @@ export function createImapDealsPoller(
     const result = emptyResult();
     let client: ImapMailboxClient | undefined;
     let lock: { release(): void } | undefined;
-    let stage: 'connect' | 'mailbox' = 'connect';
+    let stage: ImapPollFailureStage = 'connect';
 
     try {
       client = createClient();
@@ -290,8 +312,17 @@ export function createImapDealsPoller(
     } catch (error) {
       const sanitizedError = new Error('Deals mailbox polling failed') as Error & {
         pollFailureCategory: string;
+        pollFailureStage: ImapPollFailureStage;
+        pollErrorName?: string;
+        pollErrorCode?: string;
+        pollErrorDetail: string;
       };
       sanitizedError.pollFailureCategory = classifyDealsImapPollFailure(error, stage);
+      sanitizedError.pollFailureStage = stage;
+      const errorRecord = error && typeof error === 'object' ? error as Record<string, unknown> : {};
+      sanitizedError.pollErrorName = safePollErrorField(errorRecord.name);
+      sanitizedError.pollErrorCode = safePollErrorField(errorRecord.code);
+      sanitizedError.pollErrorDetail = safePollErrorDetail(error);
       throw sanitizedError;
     } finally {
       lock?.release();
@@ -431,7 +462,20 @@ export function startDealsImapPoller(intervalMs = DEFAULT_IMAP_INTERVAL_MS): voi
       );
     } catch (error) {
       const category = classifyDealsImapPollFailure(error);
-      console.error(`[IMAP-DEALS] Poll failed (${category}); messages remain unseen.`);
+      const diagnostic = error && typeof error === 'object'
+        ? error as {
+            pollFailureStage?: ImapPollFailureStage;
+            pollErrorName?: string;
+            pollErrorCode?: string;
+            pollErrorDetail?: string;
+          }
+        : {};
+      console.error(`[IMAP-DEALS] Poll failed (${category}); messages remain unseen.`, {
+        stage: diagnostic.pollFailureStage || 'unknown',
+        errorName: diagnostic.pollErrorName || 'unknown',
+        errorCode: diagnostic.pollErrorCode || 'none',
+        detail: diagnostic.pollErrorDetail || 'No safe error detail available',
+      });
     }
   };
 
