@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, UserRole } from "@/hooks/useAuth";
 import Navigation from "@/components/navigation";
+import DeveloperNavigation from "@/components/developer-navigation";
 import Footer from "@/components/footer";
 import SEO from "@/components/SEO";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -1019,7 +1020,7 @@ function refreshTokenDaysLeft(accessTokenExpiry: string | undefined | null): num
 }
 
 export default function OutreachOnboarding() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, userRole, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
@@ -1847,7 +1848,7 @@ export default function OutreachOnboarding() {
   });
 
   const editingDeveloperProfileId = editingSender?.developerProfileId || null;
-  const isDeveloperUser = String(user?.role || "").toUpperCase() === "DEVELOPER";
+  const isDeveloperUser = userRole === UserRole.DEVELOPER;
   const { data: crmTags = [] } = useQuery<string[]>({
     queryKey: isDeveloperUser
       ? ["/api/developer-profile/me/crm-tags"]
@@ -5073,7 +5074,7 @@ export default function OutreachOnboarding() {
         title={`Outreach Setup | ${companyName}`}
         description="Configure your automated outreach campaigns"
       />
-      <Navigation />
+      {isDeveloperUser ? <DeveloperNavigation /> : <Navigation />}
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8 text-center">
