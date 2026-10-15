@@ -34,7 +34,7 @@
 - [Production fake-data cleanup](production-fake-data-cleanup.md) — delete seeded production data by exact owner/record identity in one transaction; never use broad text matching.
 - [Authenticated runtime smoke tests](authenticated-runtime-smoke-tests.md) — the production build can pass with an undefined JSX icon; data-driven authenticated pages need a browser runtime check.
 - [Microsoft deals mailbox](microsoft-deals-mailbox.md) — Graph intake must stay disabled until deals@landlinq.ai exists in the configured Microsoft tenant or its real mailbox identity is known.
-- [GoDaddy Microsoft Graph mailbox alignment](godaddy-microsoft-graph-mailbox.md) — GoDaddy login does not prove the mailbox is in the Graph app's configured tenant; verify tenant and alias alignment first.
+- [GoDaddy Microsoft 365 mailbox intake](godaddy-microsoft-graph-mailbox.md) — Email Essentials is Exchange Online; use Graph with tenant app permissions, not legacy GoDaddy IMAP.
 - [Developer Microsoft OAuth authority](developer-microsoft-oauth-authority.md) — developer-owned Microsoft connections use the organizations authority; internal Catalyst connections remain tenant-specific.
 - [Truthful Outlook connection status](outlook-connection-status.md) — green requires persisted mailbox-match proof; unverifiable legacy records remain amber, and saved authorization is not a live token check.
 - [Outreach sender tenant identity](outreach-sender-tenant-identity.md) — sender email uniqueness is profile-scoped; legacy shared senders may coexist without crossing developer tenants.

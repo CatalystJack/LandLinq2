@@ -44,13 +44,15 @@ export function classifyDealsImapPollFailure(
 
   const errorText = [
     errorRecord.code,
+    errorRecord.graphErrorCode,
+    errorRecord.graphStatus,
     errorRecord.name,
     errorRecord.message,
     errorRecord.responseText,
     typeof error === 'string' ? error : '',
   ].map(value => String(value || '')).join(' ').toLowerCase();
 
-  if (/auth|login|credential|password|not configured|unauthori[sz]ed/.test(errorText)) {
+  if (/auth|login|credential|password|not configured|unauthori[sz]ed|forbidden|access.?denied|invalid_client|invalid_grant|invalidauthenticationtoken|authorization_requestdenied|\b401\b|\b403\b/.test(errorText)) {
     return 'authentication';
   }
   if (/econn|etimedout|timeout|enotfound|eai_again|socket|tls|network|connection reset/.test(errorText)) {
@@ -98,7 +100,7 @@ export function startDealsImapPollHealthWatchdog(intervalMs: number): void {
       if (!(await getEmailScrapingEnabled())) return;
       await queueDealsImapPollHealthAlertIfStale(new Date());
     } catch {
-      console.error('[IMAP-DEALS] Mailbox poll health watchdog could not run.');
+      console.error('[DEALS-MAILBOX] Poll health watchdog could not run.');
     }
   };
 

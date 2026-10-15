@@ -529,14 +529,14 @@ setTimeout(() => {
       // unrelated slow migration cannot prevent inbound deal email intake.
       if (process.env.NODE_ENV === 'production') {
         try {
-          const { startDealsImapPoller } = await import('./imapDealsPoller');
-          startDealsImapPoller();
-          log("📬 Deals mailbox IMAP poller scheduled after intake schema setup");
+          const { startDealsMailboxPoller } = await import('./graphDealsPoller');
+          startDealsMailboxPoller();
+          log("📬 Deals mailbox Microsoft Graph poller scheduled after intake schema setup");
         } catch {
-          console.error("❌ Failed to start deals mailbox IMAP poller; check the admin poll-health status.");
+          console.error("❌ Failed to start deals mailbox Graph poller; check the admin poll-health status.");
         }
       } else {
-        log("⏭️ Deals mailbox IMAP poller not started outside production");
+        log("⏭️ Deals mailbox Graph poller not started outside production");
       }
 
       const legacyStateProfiles = await migrationPool.query<{

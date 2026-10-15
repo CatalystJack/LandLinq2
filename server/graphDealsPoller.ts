@@ -161,8 +161,18 @@ export async function fetchWithTimeout(
 
 async function readJson<T>(response: Response, context: string): Promise<T> {
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Microsoft Graph ${context} failed (${response.status}): ${detail}`);
+    const responseText = await response.text();
+    let graphErrorCode: string | undefined;
+    try {
+      const body = JSON.parse(responseText) as { error?: { code?: unknown } };
+      graphErrorCode = typeof body.error?.code === 'string' ? body.error.code : undefined;
+    } catch {
+      // Keep provider response bodies out of logs and propagated diagnostics.
+    }
+    throw Object.assign(
+      new Error(`Microsoft Graph ${context} failed (${response.status})`),
+      { graphStatus: response.status, graphErrorCode },
+    );
   }
   return response.json() as Promise<T>;
 }
@@ -295,11 +305,80 @@ export function pollDealsMailbox(processMessage: DealsMailboxProcessor): Promise
 
 /** Start one delayed, non-overlapping production schedule. */
 export function startDealsMailboxPoller(intervalMs = 3 * 60 * 1000): void {
-  // deals@landlinq.ai is GoDaddy-hosted and must be polled through IMAP.
-  // Keep the Graph adapter available for its fixtures and provider utilities,
-  // but never let this legacy production entry point connect to the mailbox.
-  console.warn(
-    `[GRAPH-DEALS] Disabled for deals@landlinq.ai; use the IMAP poller instead ` +
-    `(requested interval ${Math.round(intervalMs / 1000)} seconds)`,
-  );
+  if (pollSchedule) return;
+
+  const run = async () => {
+    let health: typeof import('./emailIntakePollHealth.js');
+    try {
+      health = await import('./emailIntakePollHealth.js');
+    } catch {
+      console.error('[GRAPH-DEALS] Mailbox poll health monitoring is unavailable.');
+      return;
+    }
+    try {
+      const { getEmailScrapingEnabled } = await import('./emailAutomationConfig.js');
+      if (!(await getEmailScrapingEnabled())) {
+        await health.recordDealsImapPollDisabled(new Date());
+        console.log('[GRAPH-DEALS] Poll skipped because email automation is disabled');
+        return;
+      }
+    } catch (error) {
+      try {
+        await health.recordDealsImapPollFailure(error, new Date());
+      } catch {
+        console.error('[GRAPH-DEALS] Unable to record mailbox poll status.');
+      }
+      console.error('[GRAPH-DEALS] Unable to check whether email automation is enabled.');
+      return;
+    }
+
+    try {
+      await health.recordDealsImapPollAttempt(new Date());
+    } catch {
+      console.error('[GRAPH-DEALS] Unable to record the mailbox poll attempt.');
+    }
+
+    try {
+      const { EmailIntakeService } = await import('./emailIntakeService.js');
+      const result = await pollDealsMailbox(message => EmailIntakeService.processGraphMessage(message));
+      if (!result.skippedBecauseRunning) {
+        await health.recordDealsImapPollSuccess(result, new Date());
+      }
+      console.log(
+        `[GRAPH-DEALS] Poll complete: seen=${result.messagesSeen}, processed=${result.processed}, ` +
+        `deferred=${result.deferred}, errors=${result.errors}, readFailures=${result.markReadFailures}`,
+      );
+    } catch (error) {
+      const category = health.classifyDealsImapPollFailure(error);
+      const diagnostic = error && typeof error === 'object'
+        ? error as { graphStatus?: number; graphErrorCode?: string; name?: string }
+        : {};
+      try {
+        await health.recordDealsImapPollFailure(error, new Date());
+      } catch {
+        console.error('[GRAPH-DEALS] Unable to record the mailbox poll failure.');
+      }
+      console.error('[GRAPH-DEALS] Poll failed; unread messages remain available for retry.', {
+        category,
+        errorName: diagnostic.name || 'unknown',
+        responseStatus: diagnostic.graphStatus || 'none',
+        responseCode: diagnostic.graphErrorCode || 'none',
+      });
+    }
+  };
+
+  void import('./emailIntakePollHealth.js').then(async health => {
+    await health.initializeDealsImapPollHealth(new Date());
+    health.startDealsImapPollHealthWatchdog(intervalMs);
+  }).catch(() => {
+    console.error('[GRAPH-DEALS] Unable to initialize mailbox poll health monitoring.');
+  });
+
+  pollSchedule = setInterval(() => { void run(); }, intervalMs);
+  pollSchedule.unref?.();
+  console.log(`[GRAPH-DEALS] Poller scheduled every ${Math.round(intervalMs / 1000)} seconds`);
+}
+
+export function isDealsMailboxPollerScheduled(): boolean {
+  return Boolean(pollSchedule);
 }

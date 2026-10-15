@@ -1,10 +1,10 @@
 ---
-name: GoDaddy mailbox transport
-description: The GoDaddy-hosted deals mailbox is not a Microsoft 365 Graph mailbox and uses direct IMAP for inbound intake.
+name: GoDaddy Microsoft 365 mailbox intake
+description: GoDaddy Email Essentials is Microsoft 365; intake must use the Exchange Online mailbox and authorized Graph access.
 ---
 
-The GoDaddy-hosted deals mailbox must use direct IMAP for inbound polling. Microsoft Graph app-only access requires an Exchange Online mailbox in the same Microsoft tenant named by the app configuration; a successful GoDaddy user login does not prove that alignment. Outbound transport remains a separate concern.
+The deals@landlinq.ai mailbox is provisioned as GoDaddy Email Essentials, which is Microsoft 365 / Exchange Online. Its inbound mail route is Microsoft 365, so use Microsoft Graph app-only access for intake rather than legacy GoDaddy IMAP endpoints. The Graph app registration must target the same Microsoft tenant and have the required mail-reading application permission with admin consent. Outbound transport remains a separate concern.
 
-**Why:** Graph returned `ErrorInvalidUser` for the sender, while the GoDaddy admin view identified the account as Email Plus rather than Microsoft 365, indicating a transport/product mismatch rather than an HTML-rendering problem.
+**Why:** The GoDaddy Email & Office dashboard identifies deals@ as Email Essentials, and live MX records route landlinq.ai to Exchange Online. Earlier assumptions treated the mailbox as legacy GoDaddy Professional Email, which led to the wrong transport.
 
-**How to apply:** Keep the deals mailbox's inbound path on IMAP until the mailbox is actually moved to Exchange Online and aligned with the Graph app tenant. Do not re-enable Graph polling for this mailbox based only on GoDaddy login or alias evidence.
+**How to apply:** For deals@ intake, use Graph against the configured Exchange Online tenant and verify application permission/admin consent. Do not revert to imap.secureserver.net unless the mailbox is moved to GoDaddy Professional Email powered by Titan and the domain's mail routing is updated accordingly.

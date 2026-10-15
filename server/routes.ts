@@ -29571,11 +29571,11 @@ RULES:
 
     try {
       const { getDealsImapPollHealthStatus } = await import('./emailIntakePollHealth.js');
-      const { isDealsImapPollerScheduled } = await import('./imapDealsPoller.js');
+      const { isDealsMailboxPollerScheduled } = await import('./graphDealsPoller.js');
       const automationEnabled = await getEmailScrapingEnabledFromDatabase();
       const status = await getDealsImapPollHealthStatus({
         automationEnabled,
-        schedulerActive: isDealsImapPollerScheduled(),
+        schedulerActive: isDealsMailboxPollerScheduled(),
         schedulerExpected: process.env.NODE_ENV === 'production',
       });
       return res.json(status);
