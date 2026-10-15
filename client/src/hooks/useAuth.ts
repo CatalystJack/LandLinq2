@@ -193,23 +193,16 @@ const fetchUserOnce = async (force = false): Promise<void> => {
 async function determineUserRole(user: any): Promise<UserRole | null> {
   const email = String(user?.email || user?.claims?.email || '').trim().toLowerCase();
   const rawRole = String(user?.role || user?.claims?.role || '').trim();
+  const normalizedRole = rawRole.toUpperCase();
   const roleMapping: { [key: string]: UserRole } = {
     'SUPER_ADMIN': UserRole.SUPER_ADMIN,
-    'super_admin': UserRole.SUPER_ADMIN,
     'ADMIN': UserRole.ADMIN,
-    'admin': UserRole.ADMIN,
     'ANALYST': UserRole.ANALYST,
-    'analyst': UserRole.ANALYST,
     'DEVELOPER': UserRole.DEVELOPER,
-    'developer': UserRole.DEVELOPER,
     'PARTNER': UserRole.PARTNER,
-    'partner': UserRole.PARTNER,
     'BROKER': UserRole.BROKER,
-    'broker': UserRole.BROKER,
     'VIEWER': UserRole.VIEWER,
-    'viewer': UserRole.VIEWER,
     'DEMO': UserRole.DEMO,
-    'demo': UserRole.DEMO,
   };
 
   // The two designated platform owners retain super-admin privileges,
@@ -226,8 +219,8 @@ async function determineUserRole(user: any): Promise<UserRole | null> {
   
   // Persisted roles are authoritative, including when an OAuth/session
   // payload does not include an email address.
-  if (rawRole && roleMapping[rawRole]) {
-    return roleMapping[rawRole];
+  if (normalizedRole && roleMapping[normalizedRole]) {
+    return roleMapping[normalizedRole];
   }
 
   if (!email) return null;

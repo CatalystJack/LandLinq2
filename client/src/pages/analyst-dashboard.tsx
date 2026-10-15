@@ -608,7 +608,7 @@ export default function AnalystDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
-  const isDeveloperUser = userRole === UserRole.DEVELOPER;
+  const isDeveloperUser = String((user as any)?.role || "").trim().toUpperCase() === "DEVELOPER";
   const [filterClassifications, setFilterClassifications] = useState<string[]>([]);
   const [filterPriorities, setFilterPriorities] = useState<string[]>([]);
   const [filterDealTypes, setFilterDealTypes] = useState<string[]>([]);
