@@ -155,7 +155,6 @@ function DeveloperHomeEntry() {
 function Router() {
   const [location] = useLocation();
   const { isAuthenticated, isLoading, isInitialized, authStatus, user, userRole } = useAuth();
-  const persistedRole = String((user as any)?.role || "").trim().toUpperCase();
   // Automatically scroll to top on route changes
   useScrollToTop();
 
@@ -255,7 +254,7 @@ function Router() {
   // DEVELOPER users have a separate tenant-scoped navigation and route surface.
   // Keep this branch before all internal role branches so they cannot fall
   // through to the shared Catalyst navigation.
-  if (isAuthenticated && user && persistedRole === UserRole.DEVELOPER) {
+  if (isAuthenticated && user && userRole === UserRole.DEVELOPER) {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <Switch>
