@@ -79,6 +79,7 @@ test("temporary password endpoint hashes the value, forces a reset, and never re
   assert.match(routeBody, /target\.password/);
   assert.match(routeBody, /targetIsAdmin && !canManageOtherAdminPasswords\(actorEmail\)/);
   assert.match(routeBody, /target\.password \? eq\(users\.password, target\.password\) : isNull\(users\.password\)/);
+  assert.match(routeBody, /tx\.delete\(passwordResetTokens\)/);
   assert.doesNotMatch(routeBody, /json\(\{[^}]*password\s*[,}]/i);
 });
 

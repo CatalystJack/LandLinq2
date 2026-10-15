@@ -50,6 +50,7 @@ import {
   emailIntakeQueue,
   propertyData,
   dealShareTokens,
+  passwordResetTokens,
 } from "@shared/schema";
 import { or, like, ilike, eq, ne, desc, asc, gte, lte, gt, sql, and, count, inArray, isNull, isNotNull } from "drizzle-orm";
 import { setupAuthMiddleware, setupAuthRoutes, isAuthenticated, hashPassword, comparePasswords, isPlatformAdminEmail, isSuperAdminEmail } from "./auth";
@@ -4114,14 +4115,21 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       }
 
       const passwordHash = await hashPassword(password);
-      const [updated] = await db.update(users).set({
-        password: passwordHash,
-        mustResetPassword: true,
-        updatedAt: new Date(),
-      }).where(and(
-        eq(users.id, target.id),
-        target.password ? eq(users.password, target.password) : isNull(users.password),
-      )).returning({ id: users.id });
+      const updated = await db.transaction(async (tx) => {
+        const [changed] = await tx.update(users).set({
+          password: passwordHash,
+          mustResetPassword: true,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(users.id, target.id),
+          target.password ? eq(users.password, target.password) : isNull(users.password),
+        )).returning({ id: users.id });
+
+        if (!changed) return null;
+
+        await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.email, target.email));
+        return changed;
+      });
 
       if (!updated) {
         return res.status(409).json({ message: "The account changed. Refresh the page and try again." });
