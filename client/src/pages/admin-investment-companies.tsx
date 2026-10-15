@@ -682,7 +682,7 @@ export default function AdminInvestmentCompanies() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/investment-companies"] });
-      toast({ title: "Account manager updated" });
+      toast({ title: "Account coverage updated" });
     },
     onError: (error: Error) => toast({
       title: "Could not update account manager",
@@ -823,53 +823,121 @@ export default function AdminInvestmentCompanies() {
          actions={<Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Create New Development Partner</Button>}
        />
       <AdminInvestmentCompanyAssistant onUseDraft={openAssistantDraft} />
-      {!!sortedProfiles.length && <Card className="mb-5">
-        <CardHeader>
-          <CardTitle>Investment Company account managers</CardTitle>
-          <p className="text-sm text-slate-500">Assign a platform administrator to oversee each company account.</p>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-2">
-            {sortedProfiles.map((profile) => (
-              <div key={profile.id} className="grid min-w-0 gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(200px,0.8fr)] sm:items-center">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900">{profile.companyName}</p>
-                  <p className="mt-1 text-xs text-slate-500">Account manager</p>
-                  <p className="truncate text-sm text-slate-700">
-                    {profile.accountManager?.name || profile.accountManager?.email || "Unassigned"}
-                  </p>
-                  {profile.accountManager?.name && <p className="truncate text-xs text-slate-500">{profile.accountManager.email}</p>}
-                </div>
-                <Select
-                  value={profile.accountManagerUserId || "unassigned"}
-                  onValueChange={(value) => accountManagerMutation.mutate({
-                    profileId: profile.id,
-                    accountManagerUserId: value === "unassigned" ? null : value,
-                  })}
-                  disabled={accountManagerMutation.isPending}
-                >
-                  <SelectTrigger aria-label={`Account manager for ${profile.companyName}`}>
-                    <SelectValue placeholder="Choose an administrator" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {(companiesQuery.data?.accountManagers || []).map((manager) => (
-                      <SelectItem key={manager.id} value={manager.id}>
-                        {manager.name || manager.email} ({manager.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-          </div>
-          {!companiesQuery.data?.accountManagers.length && (
-            <p className="mt-3 text-sm text-amber-700">No Apex Resi or LandLinq admin accounts are available to assign.</p>
-          )}
-        </CardContent>
-      </Card>}
       {companiesQuery.isLoading ? <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[#4A90E2]" /></div> : companiesQuery.isError ? <Card><CardContent className="py-12 text-center text-red-600">Unable to load Investment Company profiles.</CardContent></Card> : !sortedProfiles.length ? <Card className="border-dashed"><CardContent className="flex flex-col items-center py-16 text-center"><Building2 className="mb-4 h-12 w-12 text-slate-300" /><h2 className="text-xl font-semibold text-[#0A2B4A]">No Investment Companies yet</h2><p className="mt-2 max-w-md text-slate-500">Create the first profile when your team is ready. No company records are created automatically.</p><Button className="mt-6" onClick={openCreate} style={{ backgroundColor: "#0A2B4A" }}><Plus className="mr-2 h-4 w-4" />Create profile</Button></CardContent></Card> :
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{sortedProfiles.map((profile) => { const activeProductTypeCount = (profile.productTypes || []).filter((productType) => productType.isActive).length; const isGeneralSales = profile.profileType === "general_sales"; const logoBackground = darkestBrandColor(profile.primaryColor, profile.secondaryColor); return <Card key={profile.id} className={`overflow-hidden ${profile.isActive ? "" : "opacity-75"}`}><div className="h-2" style={{ background: `linear-gradient(90deg, ${profile.primaryColor || "#0A2B4A"}, ${profile.secondaryColor || "#4A90E2"})` }} /><CardHeader><div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-center gap-3">{profile.logoUrl ? <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border p-1" style={{ backgroundColor: logoBackground }}><img src={profile.logoUrl} alt="" className="h-full w-full object-contain" /></div> : <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border" style={{ backgroundColor: logoBackground }}><Building2 className="h-6 w-6 text-white" /></div>}<div className="min-w-0"><CardTitle className="truncate">{profile.companyName}</CardTitle><p className="truncate text-sm text-slate-500">/developer/{profile.slug}/login</p><Badge variant="outline" className="mt-2">{isGeneralSales ? "General Sales" : "Real Estate"}</Badge></div></div><Badge variant={profile.isActive ? "default" : "secondary"}>{profile.isActive ? "Active" : "Inactive"}</Badge></div></CardHeader><CardContent><div className="mb-5 grid grid-cols-2 gap-3 text-sm"><div className="rounded-lg bg-slate-50 p-3"><p className="text-slate-500">Team members</p><p className="mt-1 flex items-center gap-1 font-semibold"><Users className="h-4 w-4" />{profile.teamMemberCount}</p></div><div className="rounded-lg bg-slate-50 p-3"><p className="text-slate-500">{isGeneralSales ? "Capabilities" : "Product types"}</p><p className="mt-1 font-semibold">{isGeneralSales ? "CRM & Outreach" : `${activeProductTypeCount} active ${activeProductTypeCount === 1 ? "type" : "types"}`}</p></div></div><div className="mb-2"><Button disabled={!profile.isActive} onClick={() => setEntryCompany(profile)} className="w-full border border-[#4A90E2] bg-[#0A2B4A] text-white hover:bg-white hover:text-[#4A90E2]"><Plus className="mr-2 h-4 w-4" />Add {isGeneralSales ? "Opportunity" : "Deal / Opportunity"}</Button></div><div className="flex gap-2"><Button variant="outline" className="flex-1" onClick={() => openEdit(profile)}><Edit3 className="mr-2 h-4 w-4" />Manage</Button>{profile.isActive ? <><Button className="flex-1" onClick={() => openInvite(profile)}><KeyRound className="mr-2 h-4 w-4" />Initial Login</Button><Button variant="outline" size="icon" className="shrink-0 border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700" onClick={() => { setDeactivatingCompany(profile); setDeactivationConfirmation(""); }} aria-label={`Deactivate ${profile.companyName}`} title="Deactivate company"><Trash2 className="h-4 w-4" /></Button></> : <><Button className="flex-1" onClick={() => companyStatusMutation.mutate({ profile, isActive: true })} disabled={companyStatusMutation.isPending}><RotateCcw className="mr-2 h-4 w-4" />Reactivate</Button><Button variant="outline" className="border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700" onClick={() => { setPermanentlyDeletingCompany(profile); setPermanentDeletionConfirmation(""); }}><Trash2 className="mr-2 h-4 w-4" />Delete permanently</Button></>}</div></CardContent></Card>; })}</div>}
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {sortedProfiles.map((profile) => {
+            const activeProductTypeCount = (profile.productTypes || []).filter((productType) => productType.isActive).length;
+            const isGeneralSales = profile.profileType === "general_sales";
+            const logoBackground = darkestBrandColor(profile.primaryColor, profile.secondaryColor);
+            const accountManagers = companiesQuery.data?.accountManagers || [];
+            return (
+              <Card key={profile.id} className={`overflow-hidden ${profile.isActive ? "" : "opacity-75"}`}>
+                <div className="h-2" style={{ background: `linear-gradient(90deg, ${profile.primaryColor || "#0A2B4A"}, ${profile.secondaryColor || "#4A90E2"})` }} />
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      {profile.logoUrl ? (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border p-1" style={{ backgroundColor: logoBackground }}>
+                          <img src={profile.logoUrl} alt="" className="h-full w-full object-contain" />
+                        </div>
+                      ) : (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border" style={{ backgroundColor: logoBackground }}>
+                          <Building2 className="h-6 w-6 text-white" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <CardTitle className="truncate">{profile.companyName}</CardTitle>
+                        <p className="truncate text-sm text-slate-500">/developer/{profile.slug}/login</p>
+                        <Badge variant="outline" className="mt-2">{isGeneralSales ? "General Sales" : "Real Estate"}</Badge>
+                      </div>
+                    </div>
+                    <Badge variant={profile.isActive ? "default" : "secondary"}>{profile.isActive ? "Active" : "Inactive"}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-lg bg-slate-50 p-3">
+                      <p className="text-slate-500">Team members</p>
+                      <p className="mt-1 flex items-center gap-1 font-semibold"><Users className="h-4 w-4" />{profile.teamMemberCount}</p>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-3">
+                      <p className="text-slate-500">{isGeneralSales ? "Capabilities" : "Product types"}</p>
+                      <p className="mt-1 font-semibold">{isGeneralSales ? "CRM & Outreach" : `${activeProductTypeCount} active ${activeProductTypeCount === 1 ? "type" : "types"}`}</p>
+                    </div>
+                  </div>
+                  <div className="mb-4 rounded-lg border border-slate-200 p-3">
+                    <Label htmlFor={`coverage-manager-${profile.id}`} className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Apex / LandLinq coverage
+                    </Label>
+                    <Select
+                      value={profile.accountManagerUserId || "unassigned"}
+                      onValueChange={(value) => accountManagerMutation.mutate({
+                        profileId: profile.id,
+                        accountManagerUserId: value === "unassigned" ? null : value,
+                      })}
+                      disabled={accountManagerMutation.isPending || accountManagers.length === 0}
+                    >
+                      <SelectTrigger id={`coverage-manager-${profile.id}`} aria-label={`Apex or LandLinq coverage for ${profile.companyName}`} className="mt-2">
+                        <SelectValue placeholder="Choose who covers this account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {accountManagers.map((manager) => (
+                          <SelectItem key={manager.id} value={manager.id}>
+                            {manager.name || manager.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!accountManagers.length && (
+                      <p className="mt-2 text-xs text-amber-700">No Apex Resi or LandLinq administrator accounts are available to assign.</p>
+                    )}
+                  </div>
+                  <div className="mb-2">
+                    <Button disabled={!profile.isActive} onClick={() => setEntryCompany(profile)} className="w-full border border-[#4A90E2] bg-[#0A2B4A] text-white hover:bg-white hover:text-[#4A90E2]">
+                      <Plus className="mr-2 h-4 w-4" />Add {isGeneralSales ? "Opportunity" : "Deal / Opportunity"}
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" onClick={() => openEdit(profile)}>
+                      <Edit3 className="mr-2 h-4 w-4" />Manage
+                    </Button>
+                    {profile.isActive ? (
+                      <>
+                        <Button className="flex-1" onClick={() => openInvite(profile)}>
+                          <KeyRound className="mr-2 h-4 w-4" />Initial Login
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0 border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => { setDeactivatingCompany(profile); setDeactivationConfirmation(""); }}
+                          aria-label={`Deactivate ${profile.companyName}`}
+                          title="Deactivate company"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button className="flex-1" onClick={() => companyStatusMutation.mutate({ profile, isActive: true })} disabled={companyStatusMutation.isPending}>
+                          <RotateCcw className="mr-2 h-4 w-4" />Reactivate
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => { setPermanentlyDeletingCompany(profile); setPermanentDeletionConfirmation(""); }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />Delete permanently
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>}
     </main>
 
      <Dialog open={formOpen} onOpenChange={setFormOpen}><DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle>{editing ? `Manage ${editing.companyName}` : "Create New Development Partner"}</DialogTitle><DialogDescription>Set up an Investment Company portal with branding, acquisition criteria, targeting, and portal availability.</DialogDescription></DialogHeader>
