@@ -270,7 +270,7 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
   const coordinates = coordinatePairs[0] || null;
   const extractedGeography = extractCountyState(propertyEvidence);
   const statedGeography = {
-    county: extractedGeography.county,
+    county: intake.parsedCounty || extractedGeography.county,
     state: intake.parsedState || extractedGeography.state,
   };
   let location: LocationEvidence = {
@@ -329,7 +329,12 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
   }
   const rent = extractStatedRent(propertyEvidence);
   const profiles = await db.select().from(developerProfiles).where(eq(developerProfiles.isActive, true));
-  const route = routeProfile(profiles as AutomationRouteProfile[], identities.routingSender, location.county, location.state);
+  const explicitProfile = intake.targetDeveloperProfileId
+    ? profiles.find(profile => profile.id === intake.targetDeveloperProfileId) || null
+    : null;
+  const route = explicitProfile
+    ? { profile: explicitProfile, reason: 'explicit_external_api_target' }
+    : routeProfile(profiles as AutomationRouteProfile[], identities.routingSender, location.county, location.state);
   if (!route.profile) return manual(route.reason);
   const plausibilityIssues = validateIntakePlausibility({
     acres: intake.parsedAcres,
@@ -339,9 +344,18 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
   if (plausibilityIssues.length) {
     return manual('implausible_numbers', `Automation held: implausible_numbers. ${plausibilityIssues.join('; ')}.`);
   }
-  if (!isCompleteConfidentIntake({ dealType: intake.parsedDealType, confidence: intake.overallConfidence, county: location.county, state: location.state, acres: intake.parsedAcres, price: intake.parsedPrice, rent })) return manual('incomplete_or_low_confidence');
+  if (!intake.targetDeveloperProfileId && !isCompleteConfidentIntake({ dealType: intake.parsedDealType, confidence: intake.overallConfidence, county: location.county, state: location.state, acres: intake.parsedAcres, price: intake.parsedPrice, rent })) return manual('incomplete_or_low_confidence');
   if (!intake.parsedAddress) return manual('missing_address');
   const profile = route.profile;
+  if (intake.sourceEmailMessageId) {
+    const [alreadyCreated] = await db.select().from(deals)
+      .where(eq(deals.externalSourceMessageId, intake.sourceEmailMessageId)).limit(1);
+    if (alreadyCreated) {
+      await db.update(emailIntakeQueue).set({ status: 'approved', dealId: alreadyCreated.id, reviewedAt: new Date(), routingReason: 'source_message_already_processed' })
+        .where(eq(emailIntakeQueue.id, intake.id));
+      return complete({ outcome: 'duplicate', handled: true, dealId: alreadyCreated.id, reason: 'source_message_already_processed' });
+    }
+  }
   let broker: typeof brokers.$inferSelect | null = null;
   if (sourceIsConfident(originalLeadSource)) {
     const [ownedBroker] = await db.select().from(brokers).where(and(
@@ -357,6 +371,23 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
       email: originalLeadSource.email.toLowerCase(),
       phone: intake.parsedBrokerPhone,
       company: originalLeadSource.company || null,
+      ownerDeveloperProfileId: profile.id,
+      isActive: true,
+    }).returning())[0];
+  } else if (intake.targetDeveloperProfileId && intake.parsedBrokerPhone) {
+    const normalizedPhone = intake.parsedBrokerPhone.replace(/\D/g, '');
+    const [ownedBroker] = await db.select().from(brokers).where(and(
+      eq(brokers.phone, normalizedPhone),
+      eq(brokers.ownerDeveloperProfileId, profile.id),
+    )).limit(1);
+    const [sharedBroker] = ownedBroker ? [] : await db.select().from(brokers).where(and(
+      eq(brokers.phone, normalizedPhone),
+      isNull(brokers.ownerDeveloperProfileId),
+    )).limit(1);
+    broker = ownedBroker || sharedBroker || (await db.insert(brokers).values({
+      ...names(intake.parsedBrokerName),
+      phone: normalizedPhone,
+      email: null,
       ownerDeveloperProfileId: profile.id,
       isActive: true,
     }).returning())[0];
@@ -404,7 +435,9 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
     : null;
   if (!deal) {
     [deal] = await db.insert(deals).values({
-      brokerId: broker?.id || null, dealType: intake.parsedDealType === 'existing_multifamily' ? 'acquisition' : 'land',
+      brokerId: broker?.id || null,
+      dealType: intake.parsedDealType === 'existing_multifamily' ? 'acquisition' : 'land',
+      propertyType: intake.parsedPropertyType || null,
       address: intake.parsedAddress, city: location.city, state: location.state, zip: location.zip,
       latitude: location.latitude === null ? null : String(location.latitude), longitude: location.longitude === null ? null : String(location.longitude),
       county: location.county, askingPrice: intake.parsedPrice === null ? null : String(intake.parsedPrice), sizeAcres: String(intake.parsedAcres),
@@ -412,6 +445,7 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
       unitCount: intake.parsedUnitCount, vintage: intake.parsedVintage, zoning: intake.parsedZoning, propertyName: intake.parsedPropertyName,
       brokerPhone: intake.parsedBrokerPhone, brokerNotes: intake.parsedNotes, assignedDeveloper: profile.companyName,
       submissionMethod: 'email', source: 'email_automation', confidenceScore: String(intake.overallConfidence || 0),
+      externalSourceMessageId: intake.sourceEmailMessageId,
       ingestionNotes: `Automated intake ${intake.id}; routing sender=${identities.routingSender.email || 'unknown'}; original source=${originalLeadSource?.email || 'unidentified'}.`,
     }).returning();
     // This write is the retry anchor: if enrichment/classification fails, the

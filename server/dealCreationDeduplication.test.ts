@@ -29,3 +29,16 @@ test("external lead creation serializes and reuses normalized-address matches", 
   assert.match(route, /reused_existing_lead: submission\.reusedExistingLead/);
   assert.match(route, /res\.status\(submission\.reusedExistingLead \? 200 : 201\)/);
 });
+
+test("parsed-email external API uses explicit tenant routing and the existing intake processor", () => {
+  const routes = readFileSync(new URL("./externalApiRoutes.ts", import.meta.url), "utf8");
+  const pipeline = readFileSync(new URL("./automatedDealEmailPipeline.ts", import.meta.url), "utf8");
+  assert.match(routes, /app\.get\("\/api\/v1\/investment-companies", requireApiKey/);
+  assert.match(routes, /app\.post\("\/api\/v1\/deals\/parsed-email", requireApiKey, parsedDealApiLimiter/);
+  assert.match(routes, /sourceEmailMessageId/);
+  assert.match(routes, /pg_advisory_lock/);
+  assert.match(routes, /processAutomatedDealEmailIntake\(intake\.id\)/);
+  assert.match(pipeline, /intake\.targetDeveloperProfileId/);
+  assert.match(pipeline, /externalSourceMessageId: intake\.sourceEmailMessageId/);
+  assert.match(pipeline, /partnerDeveloperSends/);
+});

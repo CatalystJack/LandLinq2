@@ -326,11 +326,20 @@ setTimeout(() => {
         ALTER TABLE email_intake_queue
           ADD COLUMN IF NOT EXISTS automation_processed_at timestamp,
           ADD COLUMN IF NOT EXISTS parsed_parcel_id varchar,
-          ADD COLUMN IF NOT EXISTS analyst_overrides jsonb NOT NULL DEFAULT '{}'::jsonb;
+          ADD COLUMN IF NOT EXISTS analyst_overrides jsonb NOT NULL DEFAULT '{}'::jsonb,
+          ADD COLUMN IF NOT EXISTS parsed_county varchar,
+          ADD COLUMN IF NOT EXISTS parsed_property_type varchar,
+          ADD COLUMN IF NOT EXISTS target_developer_profile_id varchar REFERENCES developer_profiles(id),
+          ADD COLUMN IF NOT EXISTS source_email_message_id varchar;
         ALTER TABLE deals
           ADD COLUMN IF NOT EXISTS census_data_json jsonb,
           ADD COLUMN IF NOT EXISTS census_data_fetched_at timestamp,
-          ADD COLUMN IF NOT EXISTS manual_is_coastal boolean;
+          ADD COLUMN IF NOT EXISTS manual_is_coastal boolean,
+          ADD COLUMN IF NOT EXISTS property_type varchar,
+          ADD COLUMN IF NOT EXISTS external_source_message_id varchar;
+        CREATE UNIQUE INDEX IF NOT EXISTS deals_external_source_message_unique
+          ON deals (external_source_message_id)
+          WHERE external_source_message_id IS NOT NULL;
         ALTER TABLE brokers
           ADD COLUMN IF NOT EXISTS source_tags text[] NOT NULL DEFAULT ARRAY[]::text[];
         CREATE TABLE IF NOT EXISTS broker_developer_email_suppressions (

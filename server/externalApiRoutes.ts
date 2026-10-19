@@ -17,15 +17,21 @@
  */
 
 import type { Express, Request, Response, NextFunction } from "express";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { isAuthenticated } from "./auth";
-import { apiKeys, leadAttachments, deals, brokers } from "@shared/schema";
+import { apiKeys, leadAttachments, deals, brokers, developerProfiles, emailIntakeQueue } from "@shared/schema";
 import { isPlatformAdminEmail } from "@shared/admin-auth";
-import { eq, desc, and, isNull, sql } from "drizzle-orm";
+import { eq, desc, and, isNull, or, sql } from "drizzle-orm";
 import crypto from "crypto";
 import multer from "multer";
+import { createRateLimit } from "./rateLimiter";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const parsedDealApiLimiter = createRateLimit({
+  windowMs: 60 * 1000,
+  maxRequests: 20,
+  message: "Too many parsed-deal submissions. Please retry shortly.",
+});
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -115,6 +121,224 @@ export function registerExternalApiRoutes(app: Express) {
   // ── Public health check ──────────────────────────────────────────────────────
   app.get("/api/v1/ping", (_req, res) => {
     res.json({ ok: true, version: "v1", service: "LandLinq API" });
+  });
+
+  // List active tenant workspaces available for explicit external routing.
+  app.get("/api/v1/investment-companies", requireApiKey, async (_req, res) => {
+    try {
+      const companies = await db.select({
+        id: developerProfiles.id,
+        companyName: developerProfiles.companyName,
+        knownEmailDomains: developerProfiles.knownEmailDomains,
+      }).from(developerProfiles).where(and(
+        eq(developerProfiles.isActive, true),
+        or(eq(developerProfiles.isInternal, false), isNull(developerProfiles.isInternal)),
+      ))
+        .orderBy(developerProfiles.companyName);
+      return res.json({ companies });
+    } catch (error) {
+      console.error("[ExternalAPI] Unable to list active Investment Companies");
+      return res.status(500).json({ error: "Unable to list Investment Companies." });
+    }
+  });
+
+  // Accept already-parsed email data and hand it to the normal automated intake
+  // pipeline. This intentionally does not call the email parser or auto-send.
+  app.post("/api/v1/deals/parsed-email", requireApiKey, parsedDealApiLimiter, async (req, res) => {
+    const body = req.body || {};
+    const sourceEmailMessageId = typeof body.sourceEmailMessageId === "string"
+      ? body.sourceEmailMessageId.trim() : "";
+    const address = typeof body.address === "string" ? body.address.trim() : "";
+    const dryRun = body.dryRun === true;
+    const inputFields = [
+      "propertyName", "address", "city", "county", "state", "zip", "parcelId",
+      "acreage", "askingPrice", "unitCount", "vintage", "zoning", "propertyType",
+      "brokerName", "brokerEmail", "brokerPhone", "notes",
+    ];
+    const strings: Record<string, string> = {};
+    for (const field of inputFields) {
+      const value = body[field];
+      if (value !== undefined && value !== null && typeof value !== "string" && field !== "acreage" && field !== "askingPrice" && field !== "unitCount" && field !== "vintage") {
+        return res.status(400).json({ error: `${field} must be a string.` });
+      }
+      if (typeof value === "string") {
+        if (value.length > (field === "notes" ? 10000 : 500)) {
+          return res.status(400).json({ error: `${field} exceeds the allowed length.` });
+        }
+        strings[field] = value.trim();
+      }
+    }
+    const numeric: Record<string, number | null> = {};
+    for (const field of ["acreage", "askingPrice", "unitCount", "vintage"]) {
+      const value = body[field];
+      if (value === undefined || value === null || value === "") {
+        numeric[field] = null;
+      } else {
+        const parsed = typeof value === "number" ? value : Number(value);
+        if (!Number.isFinite(parsed) || parsed < 0 || (["unitCount", "vintage", "askingPrice"].includes(field) && !Number.isInteger(parsed))) {
+          return res.status(400).json({ error: `${field} must be a valid non-negative ${["unitCount", "vintage", "askingPrice"].includes(field) ? "integer" : "number"}.` });
+        }
+        numeric[field] = parsed;
+      }
+    }
+    if (!sourceEmailMessageId || sourceEmailMessageId.length > 500) {
+      return res.status(400).json({ error: "sourceEmailMessageId is required and must be 500 characters or fewer." });
+    }
+    if (!address) return res.status(400).json({ error: "address is required." });
+    const brokerEmail = (strings.brokerEmail || "").toLowerCase();
+    if (brokerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(brokerEmail)) {
+      return res.status(400).json({ error: "brokerEmail must be a valid email address." });
+    }
+    const targetProfileId = typeof body.targetProfileId === "string" ? body.targetProfileId.trim() : "";
+    const targetSenderEmail = typeof body.targetSenderEmail === "string" ? body.targetSenderEmail.trim().toLowerCase() : "";
+    const targetSenderDomain = typeof body.targetSenderDomain === "string" ? body.targetSenderDomain.trim().toLowerCase().replace(/^@/, "") : "";
+    if ([targetProfileId, targetSenderEmail, targetSenderDomain].filter(Boolean).length !== 1) {
+      return res.status(400).json({ error: "Provide exactly one of targetProfileId, targetSenderEmail, or targetSenderDomain." });
+    }
+    const senderDomain = targetSenderEmail ? targetSenderEmail.split("@").at(-1) || "" : targetSenderDomain;
+    if (targetSenderEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetSenderEmail)) {
+      return res.status(400).json({ error: "targetSenderEmail must be a valid email address." });
+    }
+    if ((targetSenderDomain || targetSenderEmail) && !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(senderDomain)) {
+      return res.status(400).json({ error: "A valid target sender email or domain is required." });
+    }
+
+    try {
+      const activeCompanies = await db.select({
+        id: developerProfiles.id,
+        companyName: developerProfiles.companyName,
+        knownEmailDomains: developerProfiles.knownEmailDomains,
+      }).from(developerProfiles).where(and(
+        eq(developerProfiles.isActive, true),
+        or(eq(developerProfiles.isInternal, false), isNull(developerProfiles.isInternal)),
+      ));
+      let matches = activeCompanies;
+      if (targetProfileId) matches = matches.filter(company => company.id === targetProfileId);
+      else {
+        const normalizedDomain = senderDomain.replace(/\.$/, "");
+        matches = matches.filter(company => (company.knownEmailDomains || []).some(domain =>
+          String(domain).trim().toLowerCase().replace(/^@/, "").replace(/\.$/, "") === normalizedDomain,
+        ));
+      }
+      if (matches.length !== 1) {
+        return res.status(matches.length ? 409 : 404).json({
+          error: matches.length ? "Target sender domain matches multiple active companies." : "No matching active Investment Company was found.",
+        });
+      }
+      const company = matches[0];
+      const isSandbox = Boolean((req as any).isSandbox);
+      const storedAddress = isSandbox ? `[SANDBOX TEST] ${address}` : address;
+      const propertyType = (strings.propertyType || "").toLowerCase();
+      const parsedDealType = ["multifamily", "existing_multifamily", "acquisition"].includes(propertyType)
+        ? "existing_multifamily" : "land_development";
+      const preview = {
+        company: { id: company.id, companyName: company.companyName },
+        deal: {
+          propertyName: strings.propertyName || null,
+          address: storedAddress,
+          city: strings.city || null,
+          county: strings.county || null,
+          state: strings.state || null,
+          zip: strings.zip || null,
+          parcelId: strings.parcelId || null,
+          acreage: numeric.acreage,
+          askingPrice: numeric.askingPrice,
+          unitCount: numeric.unitCount,
+          vintage: numeric.vintage,
+          zoning: strings.zoning || null,
+          propertyType: strings.propertyType || "land",
+          broker: { name: strings.brokerName || null, email: brokerEmail || null, phone: strings.brokerPhone || null },
+          notes: strings.notes || null,
+        },
+      };
+      if (dryRun) return res.json({ ok: true, dryRun: true, wouldCreate: preview });
+
+      const scopedSourceMessageId = isSandbox ? `test:${sourceEmailMessageId}` : sourceEmailMessageId;
+      const messageHash = crypto.createHash("sha256").update(`external-parsed-email:${scopedSourceMessageId}`).digest("hex");
+      // Serialize retries, including across app instances, while the normal
+      // intake pipeline creates the deal and partner-developer visibility row.
+      const lockClient = await pool.connect();
+      try {
+        await lockClient.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [scopedSourceMessageId]);
+        let [intake] = await db.select().from(emailIntakeQueue)
+          .where(eq(emailIntakeQueue.emailHash, messageHash)).limit(1);
+        if (!intake) {
+          [intake] = await db.insert(emailIntakeQueue).values({
+            fromEmail: brokerEmail || "external-api@landlinq.invalid",
+            fromName: strings.brokerName || null,
+            subject: "Externally parsed deal submission",
+            emailBody: "",
+            emailHash: messageHash,
+            parsedDealType,
+            parsedPropertyType: strings.propertyType || "land",
+            parsedPropertyName: strings.propertyName || null,
+            parsedAddress: storedAddress,
+            parsedCity: strings.city || null,
+            parsedCounty: strings.county || null,
+            parsedState: strings.state || null,
+            parsedZip: strings.zip || null,
+            parsedParcelId: strings.parcelId || null,
+            parsedAcres: numeric.acreage === null ? null : String(numeric.acreage),
+            parsedPrice: numeric.askingPrice,
+            parsedUnitCount: numeric.unitCount,
+            parsedVintage: numeric.vintage,
+            parsedBrokerName: strings.brokerName || null,
+            parsedBrokerEmail: brokerEmail || null,
+            parsedBrokerPhone: strings.brokerPhone || null,
+            parsedNotes: strings.notes || null,
+            parsedZoning: strings.zoning || null,
+            overallConfidence: "100",
+            targetDeveloperProfileId: company.id,
+            sourceEmailMessageId: scopedSourceMessageId,
+            status: "processing",
+          }).returning();
+        }
+        if (intake.dealId) {
+          const [existing] = await db.select({
+            id: deals.id, dealNumber: deals.dealNumber, address: deals.address,
+          }).from(deals).where(eq(deals.id, intake.dealId)).limit(1);
+          if (existing) {
+            return res.json({
+              ok: true,
+              duplicate: true,
+              sandbox: isSandbox,
+              sourceEmailMessageId,
+              deal: existing,
+              company: preview.company,
+            });
+          }
+        }
+        await db.update(emailIntakeQueue).set({ status: "processing" }).where(eq(emailIntakeQueue.id, intake.id));
+        try {
+          const { processAutomatedDealEmailIntake } = await import("./automatedDealEmailPipeline.js");
+          const result = await processAutomatedDealEmailIntake(intake.id);
+          if (!result.dealId) {
+            return res.status(422).json({ ok: false, outcome: result.outcome, reason: result.reason, intakeId: intake.id });
+          }
+          const [deal] = await db.select({
+            id: deals.id, dealNumber: deals.dealNumber, address: deals.address,
+          }).from(deals).where(eq(deals.id, result.dealId)).limit(1);
+          return res.status(result.outcome === "duplicate" ? 200 : 201).json({
+            ok: true,
+            duplicate: result.outcome === "duplicate",
+            sandbox: isSandbox,
+            sourceEmailMessageId,
+            company: preview.company,
+            deal,
+          });
+        } catch (error) {
+          await db.update(emailIntakeQueue).set({ status: "pending" }).where(eq(emailIntakeQueue.id, intake.id)).catch(() => {});
+          console.error("[ExternalAPI] Parsed deal intake failed", { intakeId: intake.id });
+          return res.status(500).json({ error: "Deal intake failed. Retry the same sourceEmailMessageId to resume." });
+        }
+      } finally {
+        await lockClient.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [scopedSourceMessageId]).catch(() => {});
+        lockClient.release();
+      }
+    } catch (error) {
+      console.error("[ExternalAPI] Parsed deal request failed");
+      return res.status(500).json({ error: "Unable to process parsed deal." });
+    }
   });
 
   // ── POST /api/v1/leads ───────────────────────────────────────────────────────

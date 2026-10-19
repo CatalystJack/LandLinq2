@@ -520,6 +520,7 @@ export const deals = pgTable("deals", {
   dealNumber: integer("deal_number").generatedAlwaysAsIdentity({ startWith: 1 }),
   brokerId: varchar("broker_id").references(() => brokers.id),
   dealType: varchar("deal_type").default("land"), // Land development or acquisition deal
+  propertyType: varchar("property_type"),
   brokerPhone: varchar("broker_phone"),
   teamMemberEmails: jsonb("team_member_emails"),
   taggedEmails: jsonb("tagged_emails"),
@@ -645,6 +646,7 @@ export const deals = pgTable("deals", {
   excelModelUrl: text("excel_model_url"), // OneDrive/SharePoint Excel underwriting model link added by analyst
   wetlandNotes: text("wetland_notes"), // Manually written wetland/environmental notes shown to partner developers in deal emails
   ingestionNotes: text("ingestion_notes"), // System-generated notes from email parsing (OCR results, extracted links, etc.)
+  externalSourceMessageId: varchar("external_source_message_id"),
   rejectionReason: text("rejection_reason"), // Detailed explanation for rejected deals
   calculatedFields: jsonb("calculated_fields"), // Store custom formulas and their results
   // Additional fields will be added later when database is ready
@@ -3886,9 +3888,11 @@ export const emailIntakeQueue = pgTable("email_intake_queue", {
 
   // AI-parsed fields (editable by analyst before approval)
   parsedDealType: varchar("parsed_deal_type"), // 'land_development' | 'existing_multifamily' | 'unknown'
+  parsedPropertyType: varchar("parsed_property_type"),
   parsedPropertyName: varchar("parsed_property_name"),
   parsedAddress: varchar("parsed_address"),
   parsedCity: varchar("parsed_city"),
+  parsedCounty: varchar("parsed_county"),
   parsedState: varchar("parsed_state"),
   parsedZip: varchar("parsed_zip"),
   parsedParcelId: varchar("parsed_parcel_id"),
@@ -3901,6 +3905,8 @@ export const emailIntakeQueue = pgTable("email_intake_queue", {
   parsedBrokerPhone: varchar("parsed_broker_phone"),
   parsedNotes: text("parsed_notes"),
   parsedZoning: varchar("parsed_zoning"),
+  targetDeveloperProfileId: varchar("target_developer_profile_id").references(() => developerProfiles.id),
+  sourceEmailMessageId: varchar("source_email_message_id"),
   // Analyst edits remain separate from the original AI extraction for audit
   // comparisons and correction-training data.
   analystOverrides: jsonb("analyst_overrides").notNull().default(sql`'{}'::jsonb`),
