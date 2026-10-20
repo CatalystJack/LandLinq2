@@ -14672,7 +14672,7 @@ RULES:
     stringArray("knownEmailDomains", "Known email domains");
     if (body.accountManagerUserId !== undefined || !partial) {
       const accountManagerUserId = body.accountManagerUserId;
-      if (accountManagerUserId === null || accountManagerUserId === "") {
+      if (accountManagerUserId === undefined || accountManagerUserId === null || accountManagerUserId === "") {
         payload.accountManagerUserId = null;
       } else if (typeof accountManagerUserId !== "string" || !accountManagerUserId.trim()) {
         throw new Error("Account manager must be an administrator account");
