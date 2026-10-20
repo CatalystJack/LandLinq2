@@ -15131,7 +15131,8 @@ RULES:
   function parseAdminProductTypes(body: any, legacy: Record<string, any>, targetStates: string[] = []) {
     if (
       (body.profileType ?? legacy.profileType) === "general_sales" ||
-      (body.assetClass ?? legacy.assetClass) === "industrial"
+      (body.assetClass ?? legacy.assetClass) === "industrial" ||
+      (body.assetClass ?? legacy.assetClass) === "rural_land"
     ) return [];
     const rawProductTypes = body.productTypes;
     if (rawProductTypes === undefined) {
