@@ -39,7 +39,7 @@ export default function DeveloperManualDealDialog({ open, onOpenChange, onSucces
     enabled: open,
   });
   const options = optionsQuery.data;
-  const industrial = options?.profile.assetClass === "industrial";
+  const industrial = options?.profile.assetClass === "industrial" || options?.profile.assetClass === "rural_land";
   const activeProductTypes = (options?.productTypes || []).filter((productType) => productType.isActive);
 
   useEffect(() => {

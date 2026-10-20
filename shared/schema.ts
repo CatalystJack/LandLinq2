@@ -39,6 +39,7 @@ export const developerProfiles = pgTable("developer_profiles", {
   profileType: varchar("profile_type").notNull().default("real_estate"),
   assetClass: varchar("asset_class").notNull().default("multifamily"),
   industrialCriteria: jsonb("industrial_criteria").default('{}'),
+  ruralLandCriteria: jsonb("rural_land_criteria").notNull().default(sql`'{"yellowMinAcres":0}'::jsonb`),
   logoUrl: varchar("logo_url"),
   primaryColor: varchar("primary_color").default("#0A2B4A"),
   secondaryColor: varchar("secondary_color").default("#4A90E2"),

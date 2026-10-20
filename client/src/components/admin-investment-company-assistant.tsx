@@ -193,7 +193,7 @@ export default function AdminInvestmentCompanyAssistant({ onUseDraft }: Props) {
               <div>
                 <p className="font-semibold text-slate-900">{draft.companyName || "Company name needs review"}</p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  {draft.profileType === "general_sales" ? "General Sales" : `${draft.assetClass === "industrial" ? "Industrial" : "Multifamily"} real estate`}
+                  {draft.profileType === "general_sales" ? "General Sales" : `${draft.assetClass === "industrial" ? "Industrial" : draft.assetClass === "rural_land" ? "Rural Land" : "Multifamily"} real estate`}
                   {draft.slug ? ` · /developer/${draft.slug}/login` : ""}
                 </p>
               </div>

@@ -69,3 +69,4 @@
 - [Drizzle array interpolation](drizzle-array-interpolation.md) — build raw SQL `IN` lists with `sql.join` rather than casting interpolated JavaScript arrays.
 - [Multifamily data quality](multifamily-data-quality.md) — prioritize free, current, authoritative records; label estimates and proxies instead of presenting them as observed data.
 - [Raleigh parcel and zoning sources](raleigh-parcel-zoning-sources.md) — use exact PIN or unique address matches and verify the county ArcGIS service separately from the similarly named city map.
+- [Rural Land classification](rural-land-classification.md) — acreage screens Red versus Yellow; Green is only the manual Pursuing flag.

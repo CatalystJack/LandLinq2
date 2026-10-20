@@ -24,6 +24,7 @@ export interface AutomationRouteProfile {
   id: string;
   companyName: string;
   profileType: string;
+  assetClass?: string;
   isActive: boolean;
   knownEmailDomains: string[] | null;
   targetCounties: string[];
@@ -452,10 +453,15 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
     // unread Graph message resumes this deal instead of inserting another.
     await db.update(emailIntakeQueue).set({ dealId: deal.id }).where(eq(emailIntakeQueue.id, intake.id));
   }
-  const activeTypes = await db.select().from(developerProductTypes).where(and(eq(developerProductTypes.developerProfileId, profile.id), eq(developerProductTypes.isActive, true)));
-  const comparableCriteria = resolveDeveloperComparableCriteria(deal, profile as DeveloperProfile, activeTypes);
+  const activeTypes = profile.assetClass === "rural_land"
+    ? []
+    : await db.select().from(developerProductTypes).where(and(eq(developerProductTypes.developerProfileId, profile.id), eq(developerProductTypes.isActive, true)));
+  const comparableCriteria = profile.assetClass === "rural_land"
+    ? {}
+    : resolveDeveloperComparableCriteria(deal, profile as DeveloperProfile, activeTypes);
   // HelloData's qualifying-comparable method checks its warehouse before making a live request.
-  const comps = await new HelloDataService().searchQualifyingComparables(deal.address, {
+  const comps: { topRentPSF?: number; avgRentPSF?: number; topRentPerUnit?: number; avgRentPerUnit?: number } =
+    profile.assetClass === "rural_land" ? {} : await new HelloDataService().searchQualifyingComparables(deal.address, {
     latitude: location.latitude || undefined, longitude: location.longitude || undefined,
     radiusMiles: Number((profile as DeveloperProfile).compSearchRadiusMiles || 3),
     productType: comparableCriteria.productType,
@@ -477,21 +483,23 @@ export async function processAutomatedDealEmailIntake(intakeId: string): Promise
     latitude: location.latitude,
     longitude: location.longitude,
   }).catch(error => console.warn(`⚠️ [GOVERNMENT-ENRICHMENT] Deal ${dealId} skipped:`, error));
-  try {
-    const { AutoClassificationEngine } = await import('./autoClassificationEngine.js');
-    const result = await AutoClassificationEngine.classifyDeal(deal as any);
-    const classificationUpdates = {
-      classification: result.classification,
-      classificationReason: result.rejectionReason || null,
-      aiExplanatoryNotes: result.aiExplanatoryNotes || null,
-      comparableNotes: result.comparableNotes || null,
-    };
-    deal = { ...deal, ...classificationUpdates };
-    const { storage } = await import('./storage.js');
-    await storage.updateDeal(deal.id, classificationUpdates);
-  } catch (error) {
-    const errorType = error instanceof Error ? error.name : 'Unknown error';
-    console.warn(`⚠️ [AUTO-CLASSIFICATION] Deal ${deal.id} skipped (${errorType}); continuing intake.`);
+  if (profile.assetClass !== "rural_land") {
+    try {
+      const { AutoClassificationEngine } = await import('./autoClassificationEngine.js');
+      const result = await AutoClassificationEngine.classifyDeal(deal as any);
+      const classificationUpdates = {
+        classification: result.classification,
+        classificationReason: result.rejectionReason || null,
+        aiExplanatoryNotes: result.aiExplanatoryNotes || null,
+        comparableNotes: result.comparableNotes || null,
+      };
+      deal = { ...deal, ...classificationUpdates };
+      const { storage } = await import('./storage.js');
+      await storage.updateDeal(deal.id, classificationUpdates);
+    } catch (error) {
+      const errorType = error instanceof Error ? error.name : 'Unknown error';
+      console.warn(`⚠️ [AUTO-CLASSIFICATION] Deal ${deal.id} skipped (${errorType}); continuing intake.`);
+    }
   }
   const classifiedDeal = { ...deal, topRentPSF: comps.topRentPSF, avgRentPerUnit: comps.avgRentPerUnit, county: location.county, state: location.state };
   const classification = classifyDealForProfile(classifiedDeal, profile as DeveloperProfile, activeTypes);

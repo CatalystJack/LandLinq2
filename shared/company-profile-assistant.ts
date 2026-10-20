@@ -27,13 +27,16 @@ export const investmentCompanyAssistantDraftSchema = z.object({
   companyName: z.string().trim().max(200).nullable().optional(),
   slug: z.string().trim().max(100).nullable().optional(),
   profileType: z.enum(["real_estate", "general_sales"]).optional(),
-  assetClass: z.enum(["multifamily", "industrial"]).optional(),
+  assetClass: z.enum(["multifamily", "industrial", "rural_land"]).optional(),
   rentMetric: z.enum(["psf", "per_unit"]).optional(),
   targetStates: z.array(z.string().trim().max(100)).max(60).optional(),
   targetCounties: z.array(z.string().trim().max(150)).max(500).optional(),
   knownEmailDomains: z.array(z.string().trim().max(255)).max(200).optional(),
   productTypes: z.array(assistantProductTypeSchema).max(100).optional(),
   industrialCriteria: z.record(z.unknown()).optional(),
+  ruralLandCriteria: z.object({
+    yellowMinAcres: optionalNonnegativeNumber,
+  }).optional(),
   warnings: z.array(z.string().trim().max(300)).max(30).optional(),
 }).strip();
 

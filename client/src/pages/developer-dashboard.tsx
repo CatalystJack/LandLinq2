@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { useLocation } from "wouter";
 import {
   Building2,
+  AlertCircle,
   CheckCircle2,
   Columns3,
   Download,
@@ -318,7 +319,7 @@ function localZoningCell(deal: DealRecord): { value: string; title?: string } {
 
 type DeveloperDeal = {
   id: string;
-  classification: "passed" | "review" | "red" | "yellow" | null;
+  classification: "passed" | "review" | "red" | "yellow" | "green" | null;
   matchedProductTypes: string[] | null;
   matchedAt: string | null;
   sentAt: string | null;
@@ -371,7 +372,7 @@ function dealPrograms(deal: DealRecord): string[] {
   return programs;
 }
 
-function DealStatus({ row, industrial }: { row: DeveloperDeal; industrial: boolean }) {
+function DealStatus({ row, industrial, ruralLand = false }: { row: DeveloperDeal; industrial: boolean; ruralLand?: boolean }) {
   if (row.greenFlaggedByDeveloper) {
     return (
       <Badge className="border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
@@ -379,6 +380,14 @@ function DealStatus({ row, industrial }: { row: DeveloperDeal; industrial: boole
         Pursuing
       </Badge>
     );
+  }
+  if (ruralLand) {
+    const tone = row.classification === "green"
+      ? "border-emerald-200 bg-emerald-100 text-emerald-800"
+      : row.classification === "yellow"
+        ? "border-amber-200 bg-amber-100 text-amber-800"
+        : "border-red-200 bg-red-100 text-red-800";
+    return <div className="flex flex-wrap items-center gap-1.5"><Badge className={tone}>{String(row.classification || "red").toUpperCase()}</Badge>{(row.matchedProductTypes || []).map((reason) => <Badge key={reason} variant="outline">{reason}</Badge>)}</div>;
   }
   if (industrial && row.classification === "red") {
     return (
@@ -436,6 +445,7 @@ type DeveloperDealsResponse = {
     pursuing: number;
     red: number;
     yellow: number;
+    green: number;
   };
   filterOptions: {
     productTypes: string[];
@@ -450,7 +460,8 @@ export default function DeveloperDashboard() {
   const queryClient = useQueryClient();
   const profile = (user as any)?.developerProfile;
   const isGeneralSales = profile?.profileType === "general_sales";
-  const isIndustrial = profile?.assetClass === "industrial";
+  const isRuralLand = profile?.assetClass === "rural_land";
+  const isIndustrial = profile?.assetClass === "industrial" || isRuralLand;
   const primaryColor = profile?.primaryColor || "#0A2B4A";
   const secondaryColor = profile?.secondaryColor || "#4A90E2";
 
@@ -690,6 +701,7 @@ export default function DeveloperDashboard() {
     pursuing: 0,
     red: 0,
     yellow: 0,
+    green: 0,
   };
 
   const canImport = Boolean(file && mapping.address && mapping.acreage && rowCount > 0 && !parsing);
@@ -805,7 +817,14 @@ export default function DeveloperDashboard() {
         />
 
         <div className="section-gap-sm grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {(isIndustrial
+          {(isRuralLand
+            ? [
+                { label: "All sites", value: counts.total, icon: Building2, tone: "text-slate-700 bg-slate-100" },
+                { label: "Red", value: counts.red, icon: AlertCircle, tone: "text-red-700 bg-red-100" },
+                { label: "Yellow", value: counts.yellow, icon: Search, tone: "text-amber-700 bg-amber-100" },
+                { label: "Pursuing", value: counts.pursuing, icon: Star, tone: "text-emerald-700 bg-emerald-100" },
+              ]
+            : isIndustrial
             ? [
                 { label: "All sites", value: counts.total, icon: Building2, tone: "text-slate-700 bg-slate-100" },
                 { label: "Passed", value: counts.red, icon: CheckCircle2, tone: "text-red-700 bg-red-100" },
@@ -823,7 +842,9 @@ export default function DeveloperDashboard() {
               key={label}
               type="button"
               onClick={() => {
-                const nextFilter = isIndustrial
+                const nextFilter = isRuralLand
+                  ? label === "Red" || label === "Yellow" || label === "Green" ? label.toLowerCase() : label.toLowerCase()
+                  : isIndustrial
                   ? label === "Passed" ? "red" : label === "Review" ? "yellow" : label.toLowerCase()
                   : label.toLowerCase();
                 setStatusFilter(statusFilter === nextFilter ? "all" : nextFilter);
@@ -1015,7 +1036,12 @@ export default function DeveloperDashboard() {
                         })()}
                       </TableCell>
                       <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.sizeAcres ? `${Number(row.deal.sizeAcres).toLocaleString()} ac` : "—"}</TableCell>
-                      {isIndustrial ? (
+                      {isRuralLand ? (
+                        <>
+                          <SelectItem value="red">Red</SelectItem>
+                          <SelectItem value="yellow">Yellow</SelectItem>
+                        </>
+                      ) : isIndustrial ? (
                         <>
                           <TableCell className="whitespace-nowrap py-2.5 text-xs">{row.deal.askingPrice ? money(row.deal.askingPrice) : "—"}</TableCell>
                           <TableCell className="max-w-36 truncate py-2.5 text-xs" title={localParcelCell(row.deal).title}>{localParcelCell(row.deal).value}</TableCell>
@@ -1039,7 +1065,7 @@ export default function DeveloperDashboard() {
                           )}
                         </>
                       )}
-                      <TableCell className="py-2.5"><DealStatus row={row} industrial={isIndustrial} /></TableCell>
+                      <TableCell className="py-2.5"><DealStatus row={row} industrial={isIndustrial} ruralLand={isRuralLand} /></TableCell>
                       <TableCell className="py-2.5 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Button

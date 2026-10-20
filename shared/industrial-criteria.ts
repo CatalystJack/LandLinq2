@@ -4,7 +4,7 @@ import {
   type IndustrialCriteriaOverride,
 } from "./criteria-overrides";
 
-export type DeveloperAssetClass = "multifamily" | "industrial";
+export type DeveloperAssetClass = "multifamily" | "industrial" | "rural_land";
 
 export type IndustrialCriteriaDefaults = {
   minSingleLoadAcres: number;

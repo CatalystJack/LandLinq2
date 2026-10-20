@@ -36,6 +36,7 @@ import {
   type DeveloperAssetClass,
   type IndustrialCriteria,
 } from "@shared/industrial-criteria";
+import { DEFAULT_RURAL_LAND_CRITERIA, type RuralLandCriteria } from "@shared/rural-land-criteria";
 import type { InvestmentCompanyAssistantDraft } from "@shared/company-profile-assistant";
 
 type ProductType = YocAssumptionsValue & {
@@ -58,6 +59,7 @@ interface InvestmentCompany {
   profileType: "real_estate" | "general_sales";
   assetClass: DeveloperAssetClass;
   industrialCriteria: IndustrialCriteria;
+  ruralLandCriteria: RuralLandCriteria;
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
@@ -103,6 +105,7 @@ interface CompanyForm {
   profileType: "real_estate" | "general_sales";
   assetClass: DeveloperAssetClass;
   industrialCriteria: IndustrialCriteria;
+  ruralLandCriteria: RuralLandCriteria;
   logoUrl: string;
   primaryColor: string;
   secondaryColor: string;
@@ -197,6 +200,7 @@ const blankForm: CompanyForm = {
   profileType: "real_estate",
   assetClass: "multifamily",
   industrialCriteria: DEFAULT_INDUSTRIAL_CRITERIA,
+  ruralLandCriteria: DEFAULT_RURAL_LAND_CRITERIA,
   logoUrl: "",
   primaryColor: "#0A2B4A",
   secondaryColor: "#4A90E2",
@@ -271,6 +275,7 @@ function companyFormFromAssistantDraft(draft: InvestmentCompanyAssistantDraft): 
     profileType,
     assetClass,
     industrialCriteria,
+    ruralLandCriteria: (draft.ruralLandCriteria as RuralLandCriteria) || DEFAULT_RURAL_LAND_CRITERIA,
     knownEmailDomains: draft.knownEmailDomains || [],
     rentMetric: draft.rentMetric || "psf",
     minAcres: firstActive?.minAcres || "",
@@ -421,7 +426,8 @@ function ManualEntryDialog({ company, open, onOpenChange }: { company: Investmen
   });
   const options = optionsQuery.data;
   const isRealEstate = company?.profileType === "real_estate";
-  const isIndustrial = company?.assetClass === "industrial";
+  const isIndustrial = company?.assetClass === "industrial" || company?.assetClass === "rural_land";
+  const isRuralLand = company?.assetClass === "rural_land";
   const products = (options?.productTypes || company?.productTypes || []).filter((product) => product.isActive !== false);
   const stages = (options?.stages || []).filter((stage) => stage.isActive !== false).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
   const contacts = options?.contacts || [];
@@ -454,28 +460,29 @@ function ManualEntryDialog({ company, open, onOpenChange }: { company: Investmen
   });
   const submit = () => {
     if (isRealEstate) {
-      if (!form.address.trim() || !form.city.trim() || !form.state.trim() || !form.county.trim() || !form.sizeAcres || (!isIndustrial && (!form.productTypeId || !form.rent))) {
+      if (!form.address.trim() || !form.city.trim() || !form.state.trim() || !form.county.trim() || !form.sizeAcres || (!isIndustrial && !isRuralLand && (!form.productTypeId || !form.rent))) {
         toast({
           title: "Complete the required deal fields",
-          description: isIndustrial ? "Address, location, and acreage are required." : "Address, location, acreage, product type, and rent are required.",
+          description: isIndustrial || isRuralLand ? "Address, location, and acreage are required." : "Address, location, acreage, product type, and rent are required.",
           variant: "destructive",
         });
         return;
       }
-      if (Number(form.sizeAcres) < 0 || (!isIndustrial && Number(form.rent) < 0)) { toast({ title: "Enter valid deal values", variant: "destructive" }); return; }
+      if (Number(form.sizeAcres) < 0 || (!isIndustrial && !isRuralLand && Number(form.rent) < 0)) { toast({ title: "Enter valid deal values", variant: "destructive" }); return; }
     } else if (!form.contactId || !form.stageId || !form.title.trim()) { toast({ title: "Contact, stage, and title are required", variant: "destructive" }); return; }
     entryMutation.mutate();
   };
-  const isRed = isIndustrial && result?.classification?.toLowerCase() === "red";
-  const isYellow = isIndustrial && !isRed;
-  const isReview = (isIndustrial && result?.classification?.toLowerCase() === "yellow")
-    || (!isIndustrial && (result?.classification?.toLowerCase() === "green" || result?.classification?.toLowerCase() === "review"));
-  const resultLabel = isIndustrial ? (isRed ? "Passed" : "Review") : (isReview ? "Review" : "Passed");
+  const isRed = (isIndustrial || isRuralLand) && result?.classification?.toLowerCase() === "red";
+  const isYellow = isIndustrial && (!isRuralLand || result?.classification?.toLowerCase() === "yellow") && !isRed;
+  const isGreen = isRuralLand && result?.classification?.toLowerCase() === "green";
+  const isReview = !isRuralLand && ((isIndustrial && result?.classification?.toLowerCase() === "yellow") || isGreen
+    || (!isIndustrial && (result?.classification?.toLowerCase() === "green" || result?.classification?.toLowerCase() === "review")));
+  const resultLabel = isRuralLand ? result?.classification?.toUpperCase() : isIndustrial ? (isRed ? "Passed" : "Review") : (isReview ? "Review" : "Passed");
   return <Dialog open={open} onOpenChange={(next) => { if (!next) reset(); onOpenChange(next); }}>
     <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
       <DialogHeader><DialogTitle className="text-[#0A2B4A]">Add {company?.profileType === "general_sales" ? "pipeline opportunity" : "deal / opportunity"}</DialogTitle><DialogDescription>Enter a record directly into {company?.companyName}. Company-specific rules and stages are applied on submission.</DialogDescription></DialogHeader>
       {!company ? null : result ? <div className="space-y-5 py-4">
-         <div className={`rounded-xl border p-5 ${isRed ? "border-red-200 bg-red-50" : isYellow ? "border-amber-200 bg-amber-50" : isReview ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}><div className="flex items-start gap-3">{isRed ? <AlertCircle className="mt-0.5 h-6 w-6 text-red-600" /> : isReview ? <CheckCircle2 className="mt-0.5 h-6 w-6 text-emerald-600" /> : <AlertCircle className="mt-0.5 h-6 w-6 text-amber-600" />}<div><p className={`text-lg font-semibold ${isRed ? "text-red-900" : isReview ? "text-emerald-900" : "text-amber-900"}`}>{resultLabel}</p><p className="mt-1 text-sm text-slate-700">{isIndustrial ? (isRed ? "This industrial site passed the current automated screen." : "This industrial site is saved for manual review.") : isReview ? "This deal met the company’s current criteria and is ready for review." : "This deal did not match the company’s current criteria, but was saved successfully."}</p></div></div></div>
+          <div className={`rounded-xl border p-5 ${isRed ? "border-red-200 bg-red-50" : isYellow ? "border-amber-200 bg-amber-50" : isReview ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}><div className="flex items-start gap-3">{isRed ? <AlertCircle className="mt-0.5 h-6 w-6 text-red-600" /> : isReview ? <CheckCircle2 className="mt-0.5 h-6 w-6 text-emerald-600" /> : <AlertCircle className="mt-0.5 h-6 w-6 text-amber-600" />}<div><p className={`text-lg font-semibold ${isRed ? "text-red-900" : isReview ? "text-emerald-900" : "text-amber-900"}`}>{resultLabel}</p><p className="mt-1 text-sm text-slate-700">{isRuralLand ? (isRed ? "This rural land is below the acreage minimum. It was saved successfully." : "This rural land meets the acreage minimum. Mark it Pursuing manually to show Green.") : isIndustrial ? (isRed ? "This industrial site passed the current automated screen." : "This industrial site is saved for manual review.") : isReview ? "This deal met the company’s current criteria and is ready for review." : "This deal did not match the company’s current criteria, but was saved successfully."}</p></div></div></div>
         {result.matchedProductTypes?.length ? <div className="rounded-lg border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Matched product types</p><p className="mt-2 text-sm font-medium text-slate-800">{result.matchedProductTypes.join(", ")}</p></div> : null}
          <DialogFooter><Button className="border border-catalyst-blue bg-[#0A2B4A] text-white hover:bg-white hover:text-catalyst-blue" onClick={() => { reset(); onOpenChange(false); }}>Done</Button></DialogFooter>
        </div> : optionsQuery.isLoading ? <div className="flex justify-center py-14"><Loader2 className="h-7 w-7 animate-spin text-catalyst-blue" /></div> : optionsQuery.isError ? <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">Entry options could not be loaded. Close this dialog and try again.</div> : <div className="space-y-5 py-2">
@@ -533,6 +540,7 @@ export default function AdminInvestmentCompanies() {
       profileType: editing.profileType || "real_estate",
       assetClass: editing.assetClass || "multifamily",
       industrialCriteria: editing.industrialCriteria || DEFAULT_INDUSTRIAL_CRITERIA,
+      ruralLandCriteria: editing.ruralLandCriteria || DEFAULT_RURAL_LAND_CRITERIA,
       logoUrl: editing.logoUrl || "",
       primaryColor: editing.primaryColor || "#0A2B4A",
       secondaryColor: editing.secondaryColor || "#4A90E2",
@@ -600,9 +608,10 @@ export default function AdminInvestmentCompanies() {
     mutationFn: () => {
       const isGeneralSales = form.profileType === "general_sales";
       const isIndustrial = form.assetClass === "industrial";
+      const isRuralLand = form.assetClass === "rural_land";
       const activeProductTypes = form.productTypes.filter((productType) => productType.isActive);
       const firstActive = activeProductTypes[0];
-      if (!isGeneralSales && !isIndustrial) {
+      if (!isGeneralSales && !isIndustrial && !isRuralLand) {
         if (!firstActive) throw new Error("At least one active product type is required");
         for (let index = 0; index < form.productTypes.length; index++) {
           const productType = form.productTypes[index];
@@ -621,14 +630,15 @@ export default function AdminInvestmentCompanies() {
           profileType: form.profileType,
           assetClass: form.assetClass,
           industrialCriteria: form.industrialCriteria,
+          ruralLandCriteria: form.ruralLandCriteria,
           logoUrl: form.logoUrl || null,
-          minAcres: isGeneralSales || isIndustrial ? "0" : firstActive?.minAcres,
-          maxAcres: isGeneralSales || isIndustrial ? null : firstActive?.maxAcres || null,
-          minRentPsf: isGeneralSales || isIndustrial ? null : firstActive?.minRentPsf || null,
-          minRentPerUnit: isGeneralSales || isIndustrial ? null : firstActive?.minRentPerUnit || null,
+          minAcres: isGeneralSales || isIndustrial || isRuralLand ? "0" : firstActive?.minAcres,
+          maxAcres: isGeneralSales || isIndustrial || isRuralLand ? null : firstActive?.maxAcres || null,
+          minRentPsf: isGeneralSales || isIndustrial || isRuralLand ? null : firstActive?.minRentPsf || null,
+          minRentPerUnit: isGeneralSales || isIndustrial || isRuralLand ? null : firstActive?.minRentPerUnit || null,
           targetStates: isGeneralSales ? [] : form.targetStates,
           targetCounties: isGeneralSales ? [] : form.targetCounties,
-          productTypes: isGeneralSales || isIndustrial ? [] : form.productTypes.map(({ id: _id, ...productType }) => ({
+          productTypes: isGeneralSales || isIndustrial || isRuralLand ? [] : form.productTypes.map(({ id: _id, ...productType }) => ({
             ...productType,
             name: productType.name.trim(),
             maxAcres: productType.maxAcres || null,
@@ -944,7 +954,7 @@ export default function AdminInvestmentCompanies() {
         <div className="space-y-7 py-2">
           <section><h3 className="mb-3 font-semibold">Profile type</h3><div className="grid min-w-0 gap-3 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => !editing && update("profileType", "real_estate")} className={`h-auto min-w-0 items-start justify-start whitespace-normal rounded-lg border p-4 text-left transition ${form.profileType === "real_estate" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"} ${editing ? "cursor-default opacity-80" : "hover:border-slate-300"}`}><div className="min-w-0"><p className="break-words font-semibold text-slate-900">Real Estate Investment Company</p><p className="mt-1 break-words text-sm text-slate-500">Deal Dashboard, acquisition criteria, CRM, Outreach, and Analytics.</p></div></Button><Button type="button" variant="outline" onClick={() => !editing && update("profileType", "general_sales")} className={`h-auto min-w-0 items-start justify-start whitespace-normal rounded-lg border p-4 text-left transition ${form.profileType === "general_sales" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"} ${editing ? "cursor-default opacity-80" : "hover:border-slate-300"}`}><div className="min-w-0"><p className="break-words font-semibold text-slate-900">General Sales</p><p className="mt-1 break-words text-sm text-slate-500">CRM, Outreach, Analytics, and team access without deal criteria.</p></div></Button></div>{editing && <p className="mt-2 text-xs text-slate-500">Profile type is set when the profile is created.</p>}</section>
          <section><h3 className="mb-3 font-semibold">Company and branding</h3><div className="grid gap-4 sm:grid-cols-2"><div><Label>Company name</Label><Input value={form.companyName} onChange={(e) => { update("companyName", e.target.value); if (!editing) update("slug", e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")); }} /></div><div><Label>Login slug</Label><Input value={form.slug} onChange={(e) => update("slug", e.target.value.toLowerCase())} placeholder="company-name" /></div><div><Label>Primary color</Label><div className="flex gap-2"><Input type="color" value={form.primaryColor} onChange={(e) => update("primaryColor", e.target.value)} className="w-14 p-1" /><Input value={form.primaryColor} onChange={(e) => update("primaryColor", e.target.value)} /></div></div><div><Label>Secondary color</Label><div className="flex gap-2"><Input type="color" value={form.secondaryColor} onChange={(e) => update("secondaryColor", e.target.value)} className="w-14 p-1" /><Input value={form.secondaryColor} onChange={(e) => update("secondaryColor", e.target.value)} /></div></div><div className="sm:col-span-2"><Label>Company logo</Label><div className="mt-1 flex items-center gap-3 rounded-lg border p-3">{form.logoUrl ? <img src={form.logoUrl} alt="Logo preview" className="h-14 w-20 object-contain" /> : <Building2 className="h-10 w-10 text-slate-300" />}<label className="cursor-pointer"><Input type="file" accept=".png,.jpg,.jpeg,.webp" className="hidden" onChange={(e) => e.target.files?.[0] && logoMutation.mutate(e.target.files[0])} /><span className="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium"><Upload className="mr-2 h-4 w-4" />{logoMutation.isPending ? "Uploading…" : "Upload logo"}</span></label>{form.logoUrl && <Button variant="ghost" size="sm" onClick={() => update("logoUrl", "")}>Remove</Button>}</div><p className="mt-1 text-xs text-slate-500">PNG, JPG, or WebP. Maximum 5 MB.</p></div></div></section>
-          {form.profileType === "real_estate" && <section><h3 className="mb-3 font-semibold">Asset class</h3><div className="grid min-w-0 gap-3 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => update("assetClass", "multifamily")} className={`h-auto min-w-0 items-start justify-start whitespace-normal rounded-lg border p-4 text-left ${form.assetClass === "multifamily" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"}`}><div className="min-w-0"><p className="break-words font-semibold text-slate-900">Multifamily</p><p className="mt-1 break-words text-sm text-slate-500">Rent, product type, and automated YOC criteria.</p></div></Button><Button type="button" variant="outline" onClick={() => update("assetClass", "industrial")} className={`h-auto min-w-0 items-start justify-start whitespace-normal rounded-lg border p-4 text-left ${form.assetClass === "industrial" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"}`}><div className="min-w-0"><p className="break-words font-semibold text-slate-900">Industrial</p><p className="mt-1 break-words text-sm text-slate-500">Site-screening criteria only. No automated YOC.</p></div></Button></div></section>}
+          {form.profileType === "real_estate" && <section><h3 className="mb-3 font-semibold">Asset class</h3><div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3"><Button type="button" variant="outline" onClick={() => update("assetClass", "multifamily")} className={`h-auto min-w-0 items-start justify-start whitespace-normal rounded-lg border p-4 text-left ${form.assetClass === "multifamily" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"}`}><div className="min-w-0"><p className="break-words font-semibold text-slate-900">Multifamily</p><p className="mt-1 break-words text-sm text-slate-500">Rent, product type, and automated YOC criteria.</p></div></Button><Button type="button" variant="outline" onClick={() => update("assetClass", "industrial")} className={`h-auto min-w-0 items-start justify-start whitespace-normal rounded-lg border p-4 text-left ${form.assetClass === "industrial" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"}`}><div className="min-w-0"><p className="break-words font-semibold text-slate-900">Industrial</p><p className="mt-1 break-words text-sm text-slate-500">Site-screening criteria only. No automated YOC.</p></div></Button><Button type="button" variant="outline" onClick={() => update("assetClass", "rural_land")} className={`h-auto min-w-0 items-start justify-start whitespace-normal rounded-lg border p-4 text-left ${form.assetClass === "rural_land" ? "border-[#4A90E2] bg-blue-50" : "border-slate-200 bg-white"}`}><div className="min-w-0"><p className="break-words font-semibold text-slate-900">Rural Land</p><p className="mt-1 break-words text-sm text-slate-500">Acreage-only red, yellow, and green screening. No rent criteria.</p></div></Button></div></section>}
          {form.profileType === "real_estate" && form.assetClass === "multifamily" && <><section><h3 className="mb-3 font-semibold">Acquisition criteria</h3><div className="max-w-sm"><Label>Primary rent metric</Label><Select value={form.rentMetric} onValueChange={(value: "psf" | "per_unit") => update("rentMetric", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="psf">Rent per square foot</SelectItem><SelectItem value="per_unit">Rent per unit</SelectItem></SelectContent></Select></div></section>
            <section>
              <div className="mb-3 flex items-center justify-between gap-3">
@@ -975,6 +985,7 @@ export default function AdminInvestmentCompanies() {
          <section><h3 className="mb-3 font-semibold">Affordable housing overrides</h3><div className="grid gap-3 sm:grid-cols-3"><ToggleRow label="QCT override" description="QCT status may override the rent minimum." checked={form.qctOverridesRentMinimum} onChange={(value) => update("qctOverridesRentMinimum", value)} /><ToggleRow label="DDA override" description="DDA status may override the rent minimum." checked={form.ddaOverridesRentMinimum} onChange={(value) => update("ddaOverridesRentMinimum", value)} /><ToggleRow label="OZ override" description="Opportunity Zone status may override rent." checked={form.ozOverridesRentMinimum} onChange={(value) => update("ozOverridesRentMinimum", value)} /></div></section>
          <section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><StateMultiSelect label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} /><CountyMarketEditor states={form.targetStates} values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
           {form.profileType === "real_estate" && form.assetClass === "industrial" && <><section className="rounded-lg border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Industrial site-screening criteria</h3><p className="mt-1 text-sm text-amber-900">These values drive the initial site search and manual review queue. Automated multifamily YOC and rent underwriting are intentionally disabled for this company.</p><div className="mt-5"><IndustrialCriteriaFields value={form.industrialCriteria} onChange={(value) => update("industrialCriteria", value)} targetStates={form.targetStates} compact /></div></section><section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><StateMultiSelect label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} /><CountyMarketEditor states={form.targetStates} values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
+          {form.profileType === "real_estate" && form.assetClass === "rural_land" && <><section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4"><h3 className="font-semibold text-emerald-950">Rural land acreage screening</h3><p className="mt-1 text-sm text-emerald-900">Below the Yellow minimum is Red; at or above it is Yellow. Green is reserved for deals manually marked Pursuing.</p><div className="mt-4 max-w-sm"><Label>Yellow minimum acreage</Label><Input type="number" min="0" step="0.1" value={form.ruralLandCriteria.yellowMinAcres} onChange={(event) => update("ruralLandCriteria", { yellowMinAcres: Number(event.target.value) })} /></div></section><section><h3 className="mb-3 font-semibold">Markets and identity</h3><div className="grid gap-4 sm:grid-cols-2"><StateMultiSelect label="Target states" values={form.targetStates} onChange={(values) => update("targetStates", values)} /><CountyMarketEditor states={form.targetStates} values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(values) => update("targetCounties", values)} onLabelsChange={(labels) => update("countyMarketLabels", labels)} /><div className="sm:col-span-2"><TagsField label="Known email domains" values={form.knownEmailDomains} onChange={(values) => update("knownEmailDomains", values.map((value) => value.toLowerCase().replace(/^@/, "")))} placeholder="company.com" /></div></div></section></>}
           <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <h3 className="font-semibold text-slate-900">Shared broker contact access</h3>
             <p className="mt-1 text-sm text-slate-600">Choose which shared LandLinq contacts this company can see.</p>

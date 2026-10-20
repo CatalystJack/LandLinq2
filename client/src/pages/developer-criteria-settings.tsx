@@ -50,6 +50,7 @@ import {
   type DeveloperAssetClass,
   type IndustrialCriteria,
 } from "@shared/industrial-criteria";
+import { DEFAULT_RURAL_LAND_CRITERIA, type RuralLandCriteria } from "@shared/rural-land-criteria";
 import { parseCountyTarget } from "@shared/county-targets";
 import { normalizeUsStateCode } from "@shared/us-states";
 
@@ -58,6 +59,7 @@ type Profile = {
   profileType: "real_estate" | "general_sales";
   assetClass: DeveloperAssetClass;
   industrialCriteria: IndustrialCriteria;
+  ruralLandCriteria: RuralLandCriteria;
   primaryColor: string | null;
   secondaryColor: string | null;
   outreachTestModeEnabled: boolean;
@@ -280,6 +282,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
         ...profile,
         assetClass: profile.assetClass || "multifamily",
         industrialCriteria: profile.industrialCriteria || DEFAULT_INDUSTRIAL_CRITERIA,
+        ruralLandCriteria: profile.ruralLandCriteria || DEFAULT_RURAL_LAND_CRITERIA,
         targetStates: Array.from(new Set((profile.targetStates || []).map(normalizeUsStateCode).filter(Boolean))),
         targetCounties: profile.targetCounties || [],
         productTypes: (profile.productTypes || []).map((productType) => ({
@@ -536,6 +539,23 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
       });
       return;
     }
+    if (form.assetClass === "rural_land") {
+      saveMutation.mutate({
+        assetClass: "rural_land",
+        ruralLandCriteria: form.ruralLandCriteria,
+        targetStates: form.targetStates,
+        targetCounties: form.targetCounties,
+        countyMarketLabels: form.countyMarketLabels,
+        productTypes: [],
+        crmContactSectors: form.crmContactSectors,
+        crmContactStates: form.crmContactStates,
+        crmContactCounties: form.crmContactCounties,
+        crmContactProductTypes: form.crmContactProductTypes,
+        crmContactSourceTags: form.crmContactSourceTags,
+        crmSharedContactsEnabled: form.crmSharedContactsEnabled,
+      });
+      return;
+    }
     if (!form.productTypes.length || !form.productTypes.some((productType) => productType.isActive)) {
       toast({ title: "Add at least one active product type before saving", variant: "destructive" });
       return;
@@ -681,7 +701,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
   const secondaryColor = form.secondaryColor || "#4A90E2";
   const isPsf = form.rentMetric === "psf";
   const supportsCriteria = form.profileType === "real_estate" &&
-    (form.assetClass === "multifamily" || form.assetClass === "industrial");
+    (form.assetClass === "multifamily" || form.assetClass === "industrial" || form.assetClass === "rural_land");
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1162,6 +1182,20 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
                   onCountiesChange={(value) => update("targetCounties", value)}
                   onLabelsChange={(value) => update("countyMarketLabels", value)}
                 />
+              </div>
+            </CardContent>
+          </Card>}
+
+          {form.profileType === "real_estate" && form.assetClass === "rural_land" && <Card className="rounded-2xl border-emerald-200 bg-emerald-50 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-emerald-950">Rural land acreage grading</CardTitle>
+              <CardDescription className="text-emerald-900">Red is below the Yellow minimum; meeting the acreage minimum is Yellow. Green is reserved for deals manually marked Pursuing. Rent and YOC criteria are not used.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-5 border-t border-emerald-200 pt-5">
+              <NumberField label="Yellow minimum acreage" value={String(form.ruralLandCriteria.yellowMinAcres)} onChange={(value) => update("ruralLandCriteria", { ...form.ruralLandCriteria, yellowMinAcres: Number(value) })} required />
+              <div className="sm:col-span-2 grid gap-5 md:grid-cols-2">
+                <StateMultiSelect label="Target states" values={form.targetStates} onChange={updateTargetStates} />
+                <CountyMarketEditor states={form.targetStates} values={form.targetCounties} labels={form.countyMarketLabels} onCountiesChange={(value) => update("targetCounties", value)} onLabelsChange={(value) => update("countyMarketLabels", value)} />
               </div>
             </CardContent>
           </Card>}

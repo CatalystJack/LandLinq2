@@ -69,6 +69,11 @@ import {
   type DeveloperAssetClass,
 } from "@shared/industrial-criteria";
 import {
+  DEFAULT_RURAL_LAND_CRITERIA,
+  normalizeRuralLandCriteria,
+  validateRuralLandCriteria,
+} from "@shared/rural-land-criteria";
+import {
   normalizeNumericStateOverrides,
   resolveStateAwareCriteria,
 } from "@shared/criteria-overrides";
@@ -14556,12 +14561,18 @@ RULES:
     const requestedAssetClass = body.assetClass === undefined
       ? (partial ? undefined : "multifamily")
       : String(body.assetClass).trim();
-    if (requestedAssetClass !== undefined && !["multifamily", "industrial"].includes(requestedAssetClass)) {
-      throw new Error("Asset class must be multifamily or industrial");
+    if (requestedAssetClass !== undefined && !["multifamily", "industrial", "rural_land"].includes(requestedAssetClass)) {
+      throw new Error("Asset class must be multifamily, industrial, or rural_land");
     }
     const assetClass = isGeneralSales ? "multifamily" : requestedAssetClass;
     if (assetClass !== undefined) payload.assetClass = assetClass;
     const isIndustrial = assetClass === "industrial";
+    const isRuralLand = assetClass === "rural_land";
+    if (!partial || body.ruralLandCriteria !== undefined) {
+      payload.ruralLandCriteria = isRuralLand
+        ? validateRuralLandCriteria(body.ruralLandCriteria)
+        : normalizeRuralLandCriteria(body.ruralLandCriteria || DEFAULT_RURAL_LAND_CRITERIA);
+    }
     if (!partial || body.industrialCriteria !== undefined) {
       payload.industrialCriteria = isIndustrial
         ? validateIndustrialCriteria(normalizeIndustrialCriteria(
@@ -14621,7 +14632,7 @@ RULES:
     }
     decimal("minRentPsf", "Minimum rent per square foot");
     decimal("minRentPerUnit", "Minimum rent per unit");
-    decimal("minAcres", "Minimum acreage", !isGeneralSales && !isIndustrial);
+    decimal("minAcres", "Minimum acreage", !isGeneralSales && !isIndustrial && !isRuralLand);
     decimal("maxAcres", "Maximum acreage");
     for (const field of [
       "qctOverridesRentMinimum", "ddaOverridesRentMinimum", "ozOverridesRentMinimum",
@@ -14650,7 +14661,7 @@ RULES:
     } else {
       stringArray("targetStates", "Target states");
       stringArray("targetCounties", "Target counties");
-      if (isIndustrial) {
+      if (isIndustrial || isRuralLand) {
         payload.rentMetric = payload.rentMetric ?? "psf";
         payload.minAcres = payload.minAcres ?? "0";
         payload.maxAcres = payload.maxAcres ?? null;
@@ -14715,10 +14726,10 @@ RULES:
       throw new Error("Maximum acreage cannot be lower than minimum acreage");
     }
     const effectiveMetric = payload.rentMetric ?? body.rentMetric;
-    if (!isGeneralSales && !isIndustrial && !partial && effectiveMetric === "psf" && (!payload.minRentPsf || Number(payload.minRentPsf) <= 0)) {
+    if (!isGeneralSales && !isIndustrial && !isRuralLand && !partial && effectiveMetric === "psf" && (!payload.minRentPsf || Number(payload.minRentPsf) <= 0)) {
       throw new Error("Minimum rent per square foot is required for the primary rent metric");
     }
-    if (!isGeneralSales && !isIndustrial && !partial && effectiveMetric === "per_unit" && (!payload.minRentPerUnit || Number(payload.minRentPerUnit) <= 0)) {
+    if (!isGeneralSales && !isIndustrial && !isRuralLand && !partial && effectiveMetric === "per_unit" && (!payload.minRentPerUnit || Number(payload.minRentPerUnit) <= 0)) {
       throw new Error("Minimum rent per unit is required for the primary rent metric");
     }
     return payload;
@@ -16381,6 +16392,8 @@ RULES:
         id: profile.id,
         companyName: profile.companyName,
         profileType: profile.profileType,
+         assetClass: profile.assetClass,
+         ruralLandCriteria: profile.ruralLandCriteria,
         rentMetric: profile.rentMetric,
         qctOverridesRentMinimum: profile.qctOverridesRentMinimum,
         ddaOverridesRentMinimum: profile.ddaOverridesRentMinimum,
@@ -16436,11 +16449,12 @@ RULES:
         assetClass: developerProfiles.assetClass,
       }).from(developerProfiles).where(eq(developerProfiles.id, req.params.profileId)).limit(1);
       const isIndustrial = profileForValidation?.assetClass === "industrial";
-      if (!address || !city || !state || !county || (!isIndustrial && !productTypeId)) {
-        return res.status(400).json({ error: isIndustrial ? "Address, city, state, county, and acreage are required" : "Address, city, state, county, and product type are required" });
+      const isRuralLand = profileForValidation?.assetClass === "rural_land";
+      if (!address || !city || !state || !county || (!isIndustrial && !isRuralLand && !productTypeId)) {
+        return res.status(400).json({ error: isIndustrial || isRuralLand ? "Address, city, state, county, and acreage are required" : "Address, city, state, county, and product type are required" });
       }
       if (!Number.isFinite(sizeAcres) || sizeAcres < 0) return res.status(400).json({ error: "Size in acres must be a valid non-negative number" });
-      if (!isIndustrial && (rent === null || !Number.isFinite(rent) || rent < 0)) return res.status(400).json({ error: "Rent must be a valid non-negative number" });
+      if (!isIndustrial && !isRuralLand && (rent === null || !Number.isFinite(rent) || rent < 0)) return res.status(400).json({ error: "Rent must be a valid non-negative number" });
       if (askingPrice !== null && (!Number.isFinite(askingPrice) || askingPrice < 0)) {
         return res.status(400).json({ error: "Asking price must be a valid non-negative number" });
       }
@@ -16462,13 +16476,14 @@ RULES:
         ));
         const selectedProductType = productTypes.find((productType) => productType.id === productTypeId);
         const industrial = profile.assetClass === "industrial";
-        if (!industrial && !selectedProductType) throw adminRequestError(400, "Selected product type is not active for this Investment Company");
+        const ruralLand = profile.assetClass === "rural_land";
+        if (!industrial && !ruralLand && !selectedProductType) throw adminRequestError(400, "Selected product type is not active for this Investment Company");
         const dealValues: any = {
           address, city, state, county, sizeAcres: String(sizeAcres), askingPrice: askingPrice === null ? null : String(askingPrice),
-          productTypes: [industrial ? "Industrial site" : selectedProductType!.name], submissionMethod: "admin_manual_entry", source: "admin_manual_entry",
+          productTypes: [industrial ? "Industrial site" : ruralLand ? "Rural land" : selectedProductType!.name], submissionMethod: "admin_manual_entry", source: "admin_manual_entry",
           status: "pending_review", isQct: body.qctDesignation === true, isDda: body.ddaDesignation === true, isOz: body.opportunityZone === true,
         };
-        if (!industrial) {
+        if (!industrial && !ruralLand) {
           if (profile.rentMetric === "per_unit") dealValues.avgRentPerUnit = String(rent);
           else dealValues.topRentPSF = String(rent);
         }
@@ -16521,7 +16536,7 @@ RULES:
         }).returning();
         return { deal, send, classificationResult, reusedExistingDeal: Boolean(existingDeal), canonicalDealUpdated };
       });
-      if (result.canonicalDealUpdated) {
+      if (result.canonicalDealUpdated && result.deal.dealType !== "land") {
         try {
           const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
           const recomputed = await recomputeDealYoc(result.deal.id);
@@ -16689,6 +16704,7 @@ RULES:
         profileType: developerProfiles.profileType,
         assetClass: developerProfiles.assetClass,
         industrialCriteria: developerProfiles.industrialCriteria,
+         ruralLandCriteria: developerProfiles.ruralLandCriteria,
         rentMetric: developerProfiles.rentMetric,
         targetStates: developerProfiles.targetStates,
         compMinVintageYear: developerProfiles.compMinVintageYear,
@@ -16702,10 +16718,11 @@ RULES:
       const effectiveAssetClass = isGeneralSales
         ? "multifamily"
         : body.assetClass ?? currentProfile.assetClass ?? "multifamily";
-      if (!["multifamily", "industrial"].includes(effectiveAssetClass)) {
-        throw new Error("Asset class must be multifamily or industrial");
+      if (!["multifamily", "industrial", "rural_land"].includes(effectiveAssetClass)) {
+        throw new Error("Asset class must be multifamily, industrial, or rural_land");
       }
       const isIndustrial = effectiveAssetClass === "industrial";
+      const isRuralLand = effectiveAssetClass === "rural_land";
       updates.assetClass = effectiveAssetClass as DeveloperAssetClass;
       if (isIndustrial || body.industrialCriteria !== undefined) {
         updates.industrialCriteria = isIndustrial
@@ -16714,6 +16731,11 @@ RULES:
             body.targetStates ?? currentProfile.targetStates ?? [],
           ))
           : normalizeIndustrialCriteria(body.industrialCriteria ?? DEFAULT_INDUSTRIAL_CRITERIA);
+      }
+      if (isRuralLand || body.ruralLandCriteria !== undefined) {
+        updates.ruralLandCriteria = isRuralLand
+          ? validateRuralLandCriteria(body.ruralLandCriteria ?? currentProfile.ruralLandCriteria)
+          : normalizeRuralLandCriteria(body.ruralLandCriteria ?? DEFAULT_RURAL_LAND_CRITERIA);
       }
 
       const stringArray = (value: any, field: string) => {
@@ -16733,7 +16755,7 @@ RULES:
         stringArray(body.targetCounties, 'targetCounties');
       }
 
-      if (!isGeneralSales && !isIndustrial && (!Array.isArray(body.productTypes) || body.productTypes.length === 0)) {
+      if (!isGeneralSales && !isIndustrial && !isRuralLand && (!Array.isArray(body.productTypes) || body.productTypes.length === 0)) {
         throw new Error('At least one product type is required');
       }
 
@@ -16777,7 +16799,7 @@ RULES:
         }
         updates[field] = value;
       }
-      if (!isGeneralSales && !isIndustrial) {
+      if (!isGeneralSales && !isIndustrial && !isRuralLand) {
         const effectiveVintage = body.compMinVintageYear !== undefined
           ? body.compMinVintageYear
           : currentProfile.compMinVintageYear;
@@ -16790,7 +16812,7 @@ RULES:
         }
       }
 
-      const productTypes = isGeneralSales || isIndustrial ? [] : body.productTypes.map((raw: any, index: number) => {
+      const productTypes = isGeneralSales || isIndustrial || isRuralLand ? [] : body.productTypes.map((raw: any, index: number) => {
         const name = String(raw?.name ?? '').trim();
         const minAcres = Number(raw?.minAcres);
         const maxAcres = raw?.maxAcres === null || raw?.maxAcres === undefined || raw?.maxAcres === ''
@@ -16826,7 +16848,7 @@ RULES:
           isActive,
         };
       });
-      if (!isGeneralSales && !isIndustrial && !productTypes.some((productType: any) => productType.isActive)) {
+      if (!isGeneralSales && !isIndustrial && !isRuralLand && !productTypes.some((productType: any) => productType.isActive)) {
         throw new Error('At least one active product type is required');
       }
       const normalizedNames = productTypes.map((productType: any) => productType.name.toLowerCase());
@@ -16889,10 +16911,10 @@ RULES:
       }
 
       const effectiveMetric = updates.rentMetric ?? currentProfile.rentMetric;
-      if (!isGeneralSales && !isIndustrial && effectiveMetric === 'psf' && productTypes.some((productType: any) => productType.isActive && !productType.minRentPsf)) {
+      if (!isGeneralSales && !isIndustrial && !isRuralLand && effectiveMetric === 'psf' && productTypes.some((productType: any) => productType.isActive && !productType.minRentPsf)) {
         throw new Error('Every active product type needs a minimum $/SF');
       }
-      if (!isGeneralSales && !isIndustrial && effectiveMetric === 'per_unit' && productTypes.some((productType: any) => productType.isActive && !productType.minRentPerUnit)) {
+      if (!isGeneralSales && !isIndustrial && !isRuralLand && effectiveMetric === 'per_unit' && productTypes.some((productType: any) => productType.isActive && !productType.minRentPerUnit)) {
         throw new Error('Every active product type needs a minimum $/Unit');
       }
 
@@ -16900,10 +16922,10 @@ RULES:
       // admin lists and older records remain readable. Classification reads
       // only developer_product_types.
       const firstActive = productTypes.find((productType: any) => productType.isActive);
-      updates.minAcres = isGeneralSales || isIndustrial ? '0' : firstActive.minAcres;
-      updates.maxAcres = isGeneralSales || isIndustrial ? null : firstActive.maxAcres;
-      updates.minRentPsf = isGeneralSales || isIndustrial ? null : firstActive.minRentPsf;
-      updates.minRentPerUnit = isGeneralSales || isIndustrial ? null : firstActive.minRentPerUnit;
+      updates.minAcres = isGeneralSales || isIndustrial || isRuralLand ? '0' : firstActive.minAcres;
+      updates.maxAcres = isGeneralSales || isIndustrial || isRuralLand ? null : firstActive.maxAcres;
+      updates.minRentPsf = isGeneralSales || isIndustrial || isRuralLand ? null : firstActive.minRentPsf;
+      updates.minRentPerUnit = isGeneralSales || isIndustrial || isRuralLand ? null : firstActive.minRentPerUnit;
       const updated = await db.transaction(async (tx) => {
         const [saved] = await tx.update(developerProfiles)
           .set({ ...updates, updatedAt: new Date() })
@@ -20015,7 +20037,7 @@ RULES:
         return res.status(400).json({ error: "Manual deal entry is only available for real-estate Investment Companies" });
       }
 
-      const productTypes = profile.assetClass === "industrial"
+      const productTypes = profile.assetClass === "industrial" || profile.assetClass === "rural_land"
         ? []
         : await db.select({
             id: developerProductTypes.id,
@@ -20083,7 +20105,9 @@ RULES:
           throw adminRequestError(400, "Manual deal entry is only available for real-estate Investment Companies");
         }
         const industrial = profile.assetClass === "industrial";
-        if (!industrial && (rent === null || !Number.isFinite(rent) || rent < 0)) {
+        const ruralLand = profile.assetClass === "rural_land";
+        const acreageOnly = industrial || ruralLand;
+        if (!acreageOnly && (rent === null || !Number.isFinite(rent) || rent < 0)) {
           throw adminRequestError(400, "Rent must be a valid non-negative number");
         }
 
@@ -20092,7 +20116,7 @@ RULES:
           eq(developerProductTypes.isActive, true),
         ));
         const selectedProductType = activeProductTypes.find((productType) => productType.id === productTypeId);
-        if (!industrial && !selectedProductType) {
+        if (!acreageOnly && !selectedProductType) {
           throw adminRequestError(400, "Select an active product type for this Investment Company");
         }
 
@@ -20103,7 +20127,7 @@ RULES:
           county,
           sizeAcres: String(sizeAcres),
           askingPrice: askingPrice === null ? null : String(askingPrice),
-          productTypes: [industrial ? "Industrial site" : selectedProductType!.name],
+          productTypes: [industrial ? "Industrial site" : ruralLand ? "Rural land" : selectedProductType!.name],
           submissionMethod: "form",
           source: "developer_manual_entry",
           status: "pending_review",
@@ -20112,7 +20136,7 @@ RULES:
           isOz: body.oz === true,
           updatedAt: new Date(),
         };
-        if (!industrial) {
+        if (!acreageOnly) {
           if (profile.rentMetric === "per_unit") dealValues.avgRentPerUnit = String(rent);
           else dealValues.topRentPSF = String(rent);
         }
@@ -20171,10 +20195,10 @@ RULES:
           },
         }).returning();
 
-        return { deal, send, classificationResult, reusedExistingDeal: Boolean(existingDeal), canonicalDealUpdated };
+        return { deal, send, classificationResult, reusedExistingDeal: Boolean(existingDeal), canonicalDealUpdated, ruralLand };
       });
 
-      if (result.canonicalDealUpdated) {
+      if (result.canonicalDealUpdated && !result.ruralLand) {
         try {
           const { recomputeDealYoc } = await import("./services/yocUnderwritingService");
           const recomputed = await recomputeDealYoc(result.deal.id);
@@ -20226,6 +20250,7 @@ RULES:
         .where(eq(developerProfilesTable.id, developerProfileId))
         .limit(1);
       const isIndustrial = profile?.assetClass === "industrial";
+      const isRuralLand = profile?.assetClass === "rural_land";
 
       const rows = await db
         .select({
@@ -20255,7 +20280,10 @@ RULES:
         const pursuing = Boolean(send.greenFlaggedByDeveloper);
         const matchesStatus = statusFilter === "all"
           || (statusFilter === "pursuing" && pursuing)
-          || (isIndustrial
+          || (isRuralLand
+            ? ((statusFilter === "red" && send.classification === "red")
+              || (statusFilter === "yellow" && send.classification === "yellow")) && !pursuing
+            : isIndustrial
             ? ((statusFilter === "red" && send.classification === "red")
               || (statusFilter === "yellow" && send.classification !== "red")) && !pursuing
             : (statusFilter === "review" && send.classification === "review" && !pursuing)
@@ -20278,7 +20306,8 @@ RULES:
         passed: rows.filter(({ send }) => send.classification !== "review" && !send.greenFlaggedByDeveloper).length,
         pursuing: rows.filter(({ send }) => Boolean(send.greenFlaggedByDeveloper)).length,
         red: rows.filter(({ send }) => send.classification === "red" && !send.greenFlaggedByDeveloper).length,
-        yellow: rows.filter(({ send }) => send.classification !== "red" && !send.greenFlaggedByDeveloper).length,
+        yellow: rows.filter(({ send }) => send.classification === "yellow" && !send.greenFlaggedByDeveloper).length,
+        green: rows.filter(({ send }) => send.classification === "green" && !send.greenFlaggedByDeveloper).length,
       };
       const productTypes = Array.from(new Set(rows.flatMap(({ send, deal }) => [
         ...(Array.isArray(send.matchedProductTypes) ? send.matchedProductTypes : []),

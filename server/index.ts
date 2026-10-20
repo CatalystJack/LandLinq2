@@ -376,6 +376,7 @@ setTimeout(() => {
         ALTER TABLE developer_profiles
           ADD COLUMN IF NOT EXISTS asset_class varchar NOT NULL DEFAULT 'multifamily',
            ADD COLUMN IF NOT EXISTS industrial_criteria jsonb NOT NULL DEFAULT '{}',
+           ADD COLUMN IF NOT EXISTS rural_land_criteria jsonb NOT NULL DEFAULT '{"yellowMinAcres":0}'::jsonb,
             ADD COLUMN IF NOT EXISTS email_unsubscribe_enabled boolean NOT NULL DEFAULT false,
              ADD COLUMN IF NOT EXISTS crm_contact_states text[] NOT NULL DEFAULT ARRAY[]::text[],
              ADD COLUMN IF NOT EXISTS crm_contact_product_types text[] NOT NULL DEFAULT ARRAY[]::text[],

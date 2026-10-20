@@ -1,10 +1,11 @@
 import type { DeveloperProductType, DeveloperProfile } from "@shared/schema";
 import { normalizeIndustrialCriteria } from "@shared/industrial-criteria";
+import { normalizeRuralLandCriteria } from "@shared/rural-land-criteria";
 import { resolveStateAwareCriteria } from "@shared/criteria-overrides";
 import { countyTargetMatchesDeal } from "@shared/county-targets";
 import { normalizeUsStateCode } from "@shared/us-states";
 
-export type DealClassification = "passed" | "review" | "red" | "yellow";
+export type DealClassification = "passed" | "review" | "red" | "yellow" | "green";
 export interface DeveloperClassificationResult {
   classification: DealClassification;
   matchedProductTypes: string[];
@@ -101,6 +102,19 @@ export function classifyDealForProfile(
   const countyMatch = isDealInProfileMarket(deal, profile);
   const dealAcreage = numericValue(deal?.sizeAcres);
   const dealState = deal?.state;
+  if (profile.assetClass === "rural_land") {
+    const criteria = normalizeRuralLandCriteria(profile.ruralLandCriteria);
+    if (!countyMatch || dealAcreage === null) {
+      return {
+        classification: "red",
+        matchedProductTypes: [!countyMatch ? "Red: outside configured target market" : "Red: acreage not verified"],
+      };
+    }
+    if (dealAcreage < criteria.yellowMinAcres) {
+      return { classification: "red", matchedProductTypes: [`Red: below the ${criteria.yellowMinAcres} acre Yellow minimum`] };
+    }
+    return { classification: "yellow", matchedProductTypes: [`Yellow: meets the ${criteria.yellowMinAcres} acre minimum; mark Pursuing manually to set Green`] };
+  }
   if (profile.assetClass === "industrial") {
     const industrialCriteria = normalizeIndustrialCriteria(profile.industrialCriteria);
     if (!countyMatch) {
