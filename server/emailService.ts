@@ -74,7 +74,7 @@ function getGoDaddyMailbox(email: string) {
 
 const GODADDY_SMTP_TRANSPORTERS = new Map<
   string,
-  ReturnType<typeof nodemailer.createTransport>
+  nodemailer.Transporter
 >();
 
 function getGoDaddySmtpTransporter(senderEmail: string, password: string) {

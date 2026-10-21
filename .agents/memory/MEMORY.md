@@ -71,3 +71,4 @@
 - [Raleigh parcel and zoning sources](raleigh-parcel-zoning-sources.md) — use exact PIN or unique address matches and verify the county ArcGIS service separately from the similarly named city map.
 - [Rural Land classification](rural-land-classification.md) — acreage screens Red versus Yellow; Green is only the manual Pursuing flag.
 - [Buyer acquisition CSV privacy](buyer-acquisition-csv-privacy.md) — use one selected row to draft criteria; exclude contact and CRM fields from AI input and persistence.
+- [Replit package firewall](replit-package-firewall.md) — trace blocked publish-install packages to their parent and update safe compatible releases instead of bypassing policy.
