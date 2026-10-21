@@ -1,8 +1,10 @@
 import { useRef, useState, type ChangeEvent } from "react";
+import * as XLSX from "xlsx";
 import { FileText, Loader2, MessageCircle, Sparkles, Upload } from "lucide-react";
 import { investmentCompanyAssistantDraftSchema, type InvestmentCompanyAssistantDraft } from "@shared/company-profile-assistant";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
 type AssistantMessage = {
@@ -14,9 +16,52 @@ type Props = {
   onUseDraft: (draft: InvestmentCompanyAssistantDraft) => void;
 };
 
+type CsvCriteriaRow = {
+  companyName: string;
+  criteriaText: string;
+};
+
 const MAX_CRITERIA_LENGTH = 30000;
 const MAX_FILE_BYTES = 512_000;
 const ACCEPTED_FILE_EXTENSIONS = [".txt", ".md", ".csv", ".json"];
+const CSV_CRITERIA_COLUMNS = [
+  "Buyer Profile",
+  "Target Asset Types",
+  "Target Size",
+  "Target Deal Size",
+  "Target Markets",
+  "Strategy",
+] as const;
+
+function parseBuyerCriteriaCsv(text: string): CsvCriteriaRow[] {
+  const workbook = XLSX.read(text, { type: "string" });
+  const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+  if (!firstSheet) throw new Error("The CSV has no readable rows.");
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: "" });
+  const normalizeHeader = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  const companyHeader = Object.keys(rows[0] || {}).find((header) => normalizeHeader(header) === "owner sponsor");
+  if (!companyHeader) throw new Error("This CSV needs an Owner / Sponsor column.");
+  const criteriaHeaders: Array<{ label: string; key: string }> = [];
+  for (const label of CSV_CRITERIA_COLUMNS) {
+    const key = Object.keys(rows[0] || {}).find((header) => normalizeHeader(header) === normalizeHeader(label));
+    if (key) criteriaHeaders.push({ label, key });
+  }
+  if (!criteriaHeaders.length) throw new Error("No supported acquisition-criteria columns were found.");
+
+  return rows.flatMap((row) => {
+    const rawCompanyName = String(row[companyHeader] || "").trim();
+    if (!rawCompanyName) return [];
+    const companyName = rawCompanyName.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    const criteriaText = criteriaHeaders
+      .map(({ label, key }) => {
+        const value = String(row[key] || "").trim();
+        return value ? `${label}: ${value}` : "";
+      })
+      .filter(Boolean)
+      .join("\n");
+    return criteriaText ? [{ companyName: companyName || "Company name needs review", criteriaText }] : [];
+  });
+}
 
 function formatAmount(value: number | null | undefined): string {
   return value === null || value === undefined ? "not specified" : String(value);
@@ -26,6 +71,8 @@ export default function AdminInvestmentCompanyAssistant({ onUseDraft }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [criteriaText, setCriteriaText] = useState("");
   const [fileName, setFileName] = useState("");
+  const [csvRows, setCsvRows] = useState<CsvCriteriaRow[]>([]);
+  const [selectedCsvRow, setSelectedCsvRow] = useState("");
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [draft, setDraft] = useState<InvestmentCompanyAssistantDraft | null>(null);
   const [isSending, setIsSending] = useState(false);
@@ -37,6 +84,11 @@ export default function AdminInvestmentCompanyAssistant({ onUseDraft }: Props) {
     event.target.value = "";
     if (!file) return;
 
+    setCsvRows([]);
+    setSelectedCsvRow("");
+    setCriteriaText("");
+    setFileName("");
+    setDraft(null);
     const extension = `.${file.name.split(".").pop()?.toLowerCase() || ""}`;
     if (!ACCEPTED_FILE_EXTENSIONS.includes(extension)) {
       setError("Choose a plain-text, Markdown, CSV, or JSON file.");
@@ -49,11 +101,23 @@ export default function AdminInvestmentCompanyAssistant({ onUseDraft }: Props) {
 
     try {
       const text = await file.text();
-      if (text.length > MAX_CRITERIA_LENGTH) {
+      if (extension === ".csv") {
+        const parsedRows = parseBuyerCriteriaCsv(text);
+        if (!parsedRows.length) {
+          setError("No rows with a company name and acquisition criteria were found.");
+          return;
+        }
+        setCsvRows(parsedRows);
+        setSelectedCsvRow("0");
+        setCriteriaText(parsedRows[0].criteriaText);
+      } else if (text.length > MAX_CRITERIA_LENGTH) {
         setError("Criteria text must be 30,000 characters or fewer.");
         return;
+      } else {
+        setCsvRows([]);
+        setSelectedCsvRow("");
+        setCriteriaText(text);
       }
-      setCriteriaText(text);
       setFileName(file.name);
       setDraft(null);
       setError(null);
@@ -79,6 +143,7 @@ export default function AdminInvestmentCompanyAssistant({ onUseDraft }: Props) {
     setIsSending(true);
 
     try {
+      const selectedRow = csvRows[Number(selectedCsvRow)];
       const response = await fetch("/api/admin/investment-companies/assistant/parse-criteria", {
         method: "POST",
         credentials: "include",
@@ -89,7 +154,7 @@ export default function AdminInvestmentCompanyAssistant({ onUseDraft }: Props) {
       if (!response.ok) throw new Error(payload.error || "The assistant could not prepare a profile draft.");
 
       const parsedDraft = investmentCompanyAssistantDraftSchema.parse(payload.draft);
-      setDraft(parsedDraft);
+      setDraft(selectedRow ? { ...parsedDraft, companyName: selectedRow.companyName } : parsedDraft);
       setMessages((current) => [
         ...current,
         {
@@ -99,6 +164,8 @@ export default function AdminInvestmentCompanyAssistant({ onUseDraft }: Props) {
       ]);
       setCriteriaText("");
       setFileName("");
+      setCsvRows([]);
+      setSelectedCsvRow("");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "The assistant could not prepare a profile draft.");
     } finally {
@@ -144,6 +211,9 @@ export default function AdminInvestmentCompanyAssistant({ onUseDraft }: Props) {
             value={criteriaText}
             onChange={(event) => {
               setCriteriaText(event.target.value);
+              setCsvRows([]);
+              setSelectedCsvRow("");
+              setFileName("");
               setDraft(null);
               setError(null);
             }}
@@ -153,6 +223,33 @@ export default function AdminInvestmentCompanyAssistant({ onUseDraft }: Props) {
             aria-label="Company criteria text"
             disabled={isSending}
           />
+          {csvRows.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <label className="text-sm font-medium text-slate-800" htmlFor="buyer-criteria-csv-row">Choose one company</label>
+              <Select
+                value={selectedCsvRow}
+                onValueChange={(value) => {
+                  const row = csvRows[Number(value)];
+                  setSelectedCsvRow(value);
+                  setCriteriaText(row?.criteriaText || "");
+                  setDraft(null);
+                  setError(null);
+                }}
+              >
+                <SelectTrigger id="buyer-criteria-csv-row" className="bg-white">
+                  <SelectValue placeholder="Select a company row" />
+                </SelectTrigger>
+                <SelectContent>
+                  {csvRows.map((row, index) => (
+                    <SelectItem key={`${index}-${row.companyName}`} value={String(index)}>
+                      {row.companyName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-600">Only buyer profile and acquisition-criteria columns are used. Contact names, emails, phone numbers, and CRM property fields are excluded.</p>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <input
@@ -165,7 +262,7 @@ export default function AdminInvestmentCompanyAssistant({ onUseDraft }: Props) {
               />
               <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isSending}>
                 <Upload className="mr-2 h-4 w-4" />
-                Upload text
+                Upload CSV or text
               </Button>
               {fileName && (
                 <span className="inline-flex max-w-48 items-center gap-1 truncate text-xs text-slate-500">
@@ -184,7 +281,7 @@ export default function AdminInvestmentCompanyAssistant({ onUseDraft }: Props) {
               {isSending ? "Preparing draft…" : "Prepare profile draft"}
             </Button>
           </div>
-          <p className="text-xs text-slate-500">Text files up to 500 KB; criteria are limited to 30,000 characters. The original text is not saved by this assistant.</p>
+          <p className="text-xs text-slate-500">Files up to 500 KB. CSV uploads let you choose one company row; only the selected row’s criteria are sent for drafting. Nothing is created until you review and save the draft.</p>
 
           {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}
 
