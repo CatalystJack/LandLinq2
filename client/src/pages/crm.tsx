@@ -212,6 +212,8 @@ export default function CRMPage() {
   const [bulkTagAction, setBulkTagAction] = useState<"add" | "remove">("add");
   const [showContactImportModal, setShowContactImportModal] = useState(false);
   const [contactImportPreview, setContactImportPreview] = useState<any[]>([]);
+  const [contactImportFile, setContactImportFile] = useState<File | null>(null);
+  const [contactImportProgress, setContactImportProgress] = useState<{ processed: number; total: number; inserted: number; updated: number } | null>(null);
   const [contactImportResult, setContactImportResult] = useState<{ inserted: number; updated: number } | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
@@ -455,15 +457,56 @@ export default function CRMPage() {
   });
 
   const importContactsMutation = useMutation({
-    mutationFn: (contacts: any[]) =>
-      apiRequest("POST", "/api/crm/import-contacts", { contacts }).then(r => r.json()),
+    mutationFn: async (contacts: any[]) => {
+      if (!contactImportFile) throw new Error("Select the original import file to continue.");
+      const digest = await crypto.subtle.digest("SHA-256", await contactImportFile.arrayBuffer());
+      const fileHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+      const startResponse = await apiRequest("POST", "/api/crm/import-contacts/start", {
+        fileHash,
+        totalRows: contacts.length,
+      });
+      const job = await startResponse.json();
+      const batchSize = Number(job.batchSize) || 500;
+      let nextBatchIndex = Number(job.nextBatchIndex) || 0;
+      let inserted = Number(job.inserted) || 0;
+      let updated = Number(job.updated) || 0;
+      setContactImportProgress({
+        processed: Math.min(nextBatchIndex * batchSize, contacts.length),
+        total: contacts.length,
+        inserted,
+        updated,
+      });
+
+      const batchCount = Math.ceil(contacts.length / batchSize);
+      for (let batchIndex = nextBatchIndex; batchIndex < batchCount; batchIndex++) {
+        const batchContacts = contacts.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
+        const response = await apiRequest("POST", `/api/crm/import-contacts/${job.jobId}/batches`, {
+          batchIndex,
+          contacts: batchContacts,
+        });
+        const batch = await response.json();
+        nextBatchIndex = Number(batch.nextBatchIndex);
+        inserted = Number(batch.inserted);
+        updated = Number(batch.updated);
+        setContactImportProgress({
+          processed: Math.min(nextBatchIndex * batchSize, contacts.length),
+          total: contacts.length,
+          inserted,
+          updated,
+        });
+        // Keep the admin-only batch endpoint below its per-IP request limit.
+        if (batchIndex + 1 < batchCount) await new Promise(resolve => window.setTimeout(resolve, 700));
+      }
+      return { inserted, updated };
+    },
     onSuccess: (data: any) => {
       qc.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
       qc.invalidateQueries({ queryKey: ["/api/crm/tags"] });
       setContactImportResult({ inserted: data.inserted, updated: data.updated });
       setContactImportPreview([]);
+      setContactImportFile(null);
     },
-    onError: () => toast({ title: "Import failed", variant: "destructive" }),
+    onError: () => toast({ title: "Import paused", description: "Your progress is saved. Re-select the same file and retry to resume.", variant: "destructive" }),
   });
 
   const createTagMutation = useMutation({
@@ -488,6 +531,10 @@ export default function CRMPage() {
 
   const handleContactImportFile = async (file: File) => {
     try {
+      if (file.size > 50 * 1024 * 1024) {
+        toast({ title: "File is too large", description: "Choose a file smaller than 50 MB.", variant: "destructive" });
+        return;
+      }
       const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: "array" });
@@ -528,7 +575,13 @@ export default function CRMPage() {
         tags: [String(r[tagsIdx] ?? "").trim(), String(r[col("secondary") !== -1 ? col("secondary") : -1] ?? "").trim()].filter(Boolean).join("; "),
       })).filter(r => r.firstName || r.lastName || r.email);
       if (!parsed.length) { toast({ title: "No valid rows found. Check column headers.", variant: "destructive" }); return; }
+      if (parsed.length > 100_000) {
+        toast({ title: "Too many contacts", description: "A single import supports up to 100,000 contacts.", variant: "destructive" });
+        return;
+      }
       setContactImportPreview(parsed);
+      setContactImportFile(file);
+      setContactImportProgress(null);
       setContactImportResult(null);
       setShowContactImportModal(true);
     } catch {
@@ -2112,9 +2165,19 @@ export default function CRMPage() {
             ) : (
               <>
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-gray-500">{contactImportPreview.length} contacts parsed from file. Review below then click Import.</p>
+                  <p className="text-xs text-gray-500">
+                    {contactImportPreview.length.toLocaleString()} contacts parsed. Showing the first {Math.min(50, contactImportPreview.length)} for review.
+                  </p>
                   <button className="text-xs text-blue-600 underline hover:no-underline" onClick={downloadContactTemplate}>Download template</button>
                 </div>
+                {contactImportProgress && (
+                  <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900" aria-live="polite">
+                    Saved progress: {contactImportProgress.processed.toLocaleString()} / {contactImportProgress.total.toLocaleString()} contacts
+                    <span className="ml-2 text-blue-700">
+                      ({contactImportProgress.inserted.toLocaleString()} new, {contactImportProgress.updated.toLocaleString()} updated)
+                    </span>
+                  </div>
+                )}
                 <div className="border rounded-md overflow-auto max-h-64">
                   <table className="w-full text-[11px]">
                     <thead className="bg-gray-50 border-b sticky top-0">
@@ -2125,7 +2188,7 @@ export default function CRMPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {contactImportPreview.map((r, i) => (
+                      {contactImportPreview.slice(0, 50).map((r, i) => (
                         <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
                           <td className="px-2 py-1">{r.firstName}</td>
                           <td className="px-2 py-1">{r.lastName}</td>
@@ -2151,7 +2214,9 @@ export default function CRMPage() {
                     onClick={() => importContactsMutation.mutate(contactImportPreview)}
                   >
                     <Upload size={13} className="mr-1.5" />
-                    {importContactsMutation.isPending ? "Importing..." : `Import ${contactImportPreview.length} Contacts`}
+                    {importContactsMutation.isPending
+                      ? `Importing ${contactImportProgress?.processed.toLocaleString() || "0"} / ${contactImportPreview.length.toLocaleString()}`
+                      : `Import ${contactImportPreview.length.toLocaleString()} Contacts`}
                   </Button>
                 </div>
               </>

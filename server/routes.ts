@@ -62,6 +62,7 @@ import {
   isVerifiedMicrosoftMailbox,
 } from "@shared/outlook-connection";
 import { ensureOutlookVerificationSchema } from "./outlookVerificationSchema";
+import { ensureCrmContactImportSchema } from "./crmContactImportSchema";
 import {
   DEFAULT_INDUSTRIAL_CRITERIA,
   normalizeIndustrialCriteria,
@@ -2468,6 +2469,7 @@ const emailTemplates = {
 // Use landLinqSMSTemplates from smsService.ts which pulls from businessSettings
 
 export async function registerRoutes(app: Express, existingServer?: Server): Promise<Server> {
+  await ensureCrmContactImportSchema();
   if (process.env.NODE_ENV === "production") {
     await purgeLegacyDemoData();
   }
@@ -6429,93 +6431,256 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
       .join("");
   }
 
-  // POST /api/crm/import-contacts — bulk upsert contacts from CSV/Excel rows
-  // Body: { contacts: [{ firstName, lastName, email, phone, brokerage, assignedTo, tags }] }
-  app.post("/api/crm/import-contacts", isAuthenticated, requirePlatformAdmin, async (req, res) => {
+  // Large CRM imports are checkpointed after each bounded transaction. Only
+  // the file hash and counters persist; contact data stays in the request.
+  const crmImportBatchSize = 500;
+  const crmImportMaxRows = 100_000;
+  const crmImportRowSchema = z.object({
+    firstName: z.string().max(200).default(""),
+    lastName: z.string().max(200).default(""),
+    email: z.string().max(320).default(""),
+    phone: z.string().max(100).default(""),
+    brokerage: z.string().max(500).default(""),
+    stateRegion: z.string().max(100).default(""),
+    assignedTo: z.string().max(200).default(""),
+    tags: z.string().max(2000).default(""),
+  });
+  const crmImportAdmin = (req: any, res: any) => {
     const user = req.user as any;
     const userEmail = user?.claims?.email || user?.email || "";
     if (!isPlatformAdminEmail(userEmail) && !isSuperAdminEmail(userEmail)) {
-      return res.status(403).json({ message: "Access denied. Platform administrator privileges required." });
+      res.status(403).json({ message: "Access denied. Platform administrator privileges required." });
+      return null;
     }
+    const userId = String(user?.id || user?.claims?.sub || "");
+    if (!userId) {
+      res.status(401).json({ message: "Authenticated user identity is missing." });
+      return null;
+    }
+    return userId;
+  };
 
+  app.post("/api/crm/import-contacts/start", isAuthenticated, requirePlatformAdmin, generalApiLimiter, async (req, res) => {
     try {
-      const { contacts: rows } = req.body;
-      if (!Array.isArray(rows) || rows.length === 0) {
-        return res.status(400).json({ message: "contacts array required" });
+      const ownerUserId = crmImportAdmin(req, res);
+      if (!ownerUserId) return;
+      const input = z.object({
+        fileHash: z.string().regex(/^[a-f0-9]{64}$/i),
+        totalRows: z.number().int().min(1).max(crmImportMaxRows),
+      }).safeParse(req.body);
+      if (!input.success) {
+        return res.status(400).json({ message: "Invalid import metadata. Files may contain up to 100,000 contacts." });
       }
 
-      let inserted = 0;
-      let updated = 0;
-
-      for (const row of rows) {
-        const firstName = toTitleCase((row.firstName || "").trim());
-        const lastName = toTitleCase((row.lastName || "").trim());
-        const email = (row.email || "").trim().toLowerCase() || null;
-        const phone = (row.phone || "").trim() || null;
-        const brokerage = (row.brokerage || "").trim() || null;
-        const stateRegion = (row.stateRegion || "").trim() || null;
-        const assignedTo = (row.assignedTo || "").trim() || null;
-        const rawTags: string[] = (row.tags || "")
-          .split(/[;,]/)
-          .map((t: string) => t.trim())
-          .filter(Boolean);
-
-        if (!firstName && !lastName && !email) continue;
-
-        if (email) {
-          const existing = await db.select({ id: brokers.id, crmTags: brokers.crmTags })
-            .from(brokers).where(and(
-              sql`LOWER(${brokers.email}) = ${email}`,
-              isNull(brokers.ownerDeveloperProfileId),
-            )).limit(1);
-
-          if (existing.length) {
-            const mergedTags = rawTags.length
-              ? Array.from(new Set([...(existing[0].crmTags || []), ...rawTags]))
-              : existing[0].crmTags;
-            await db.update(brokers).set({
-              assignedTo: assignedTo || undefined,
-              brokerage: brokerage || undefined,
-              stateRegion: stateRegion || undefined,
-              crmTags: mergedTags,
-              isActive: true,
-              updatedAt: new Date(),
-            } as any).where(eq(brokers.id, existing[0].id));
-            updated++;
-          } else {
-            await db.insert(brokers).values({
-              firstName: firstName || "Unknown",
-              lastName,
-              email,
-              phone,
-              brokerage,
-              stateRegion,
-              assignedTo,
-              crmTags: rawTags.length ? rawTags : null,
-              isActive: true,
-            } as any);
-            inserted++;
-          }
-        } else {
-          await db.insert(brokers).values({
-            firstName: firstName || "Unknown",
-            lastName,
-            email,
-            phone,
-            brokerage,
-            stateRegion,
-            assignedTo,
-            crmTags: rawTags.length ? rawTags : null,
-            isActive: true,
-          } as any);
-          inserted++;
-        }
+      await db.execute(sql`
+        DELETE FROM crm_contact_import_jobs
+        WHERE status = 'processing' AND updated_at < NOW() - INTERVAL '30 days'
+      `);
+      const existing = await db.execute(sql`
+        SELECT id, total_rows, next_batch_index, inserted_count, updated_count, status
+        FROM crm_contact_import_jobs
+        WHERE owner_user_id = ${ownerUserId}
+          AND file_sha256 = ${input.data.fileHash.toLowerCase()}
+          AND status IN ('processing', 'completed')
+        ORDER BY CASE WHEN status = 'processing' THEN 0 ELSE 1 END, updated_at DESC
+        LIMIT 1
+      `);
+      let job = (existing.rows || [])[0] as any;
+      if (job && Number(job.total_rows) !== input.data.totalRows) {
+        return res.status(409).json({ message: "This file hash is already attached to an import with a different row count." });
       }
-
-      res.json({ message: `Imported ${inserted + updated} contact(s)`, inserted, updated });
+      if (!job) {
+        const created = await db.execute(sql`
+          INSERT INTO crm_contact_import_jobs (owner_user_id, file_sha256, total_rows)
+          VALUES (${ownerUserId}, ${input.data.fileHash.toLowerCase()}, ${input.data.totalRows})
+          RETURNING id, total_rows, next_batch_index, inserted_count, updated_count, status
+        `);
+        job = (created.rows || [])[0];
+      }
+      return res.json({
+        jobId: job.id,
+        totalRows: Number(job.total_rows),
+        nextBatchIndex: Number(job.next_batch_index),
+        inserted: Number(job.inserted_count),
+        updated: Number(job.updated_count),
+        status: job.status || "processing",
+        batchSize: crmImportBatchSize,
+      });
     } catch (error) {
-      console.error("Import contacts error:", error);
-      res.status(500).json({ message: "Failed to import contacts" });
+      console.error("CRM contact import initialization failed.");
+      return res.status(500).json({ message: "Could not start the contact import." });
+    }
+  });
+
+  app.post("/api/crm/import-contacts/:jobId/batches", isAuthenticated, requirePlatformAdmin, generalApiLimiter, async (req, res) => {
+    try {
+      const ownerUserId = crmImportAdmin(req, res);
+      if (!ownerUserId) return;
+      const input = z.object({
+        batchIndex: z.number().int().min(0),
+        contacts: z.array(crmImportRowSchema).min(1).max(crmImportBatchSize),
+      }).safeParse(req.body);
+      if (!input.success) return res.status(400).json({ message: "Invalid import batch." });
+
+      const result = await db.transaction(async (tx) => {
+        const jobResult = await tx.execute(sql`
+          SELECT * FROM crm_contact_import_jobs
+          WHERE id = ${req.params.jobId} AND owner_user_id = ${ownerUserId}
+          FOR UPDATE
+        `);
+        const job = (jobResult.rows || [])[0] as any;
+        if (!job) return { error: "Import job not found.", status: 404 as const };
+
+        const nextIndex = Number(job.next_batch_index);
+        const totalRows = Number(job.total_rows);
+        const expectedCount = Math.min(crmImportBatchSize, totalRows - input.data.batchIndex * crmImportBatchSize);
+        if (input.data.contacts.length !== expectedCount) {
+          return { error: "Batch row count does not match the import file.", status: 400 as const };
+        }
+        if (input.data.batchIndex < nextIndex) {
+          return {
+            jobId: job.id, totalRows, nextBatchIndex: nextIndex,
+            inserted: Number(job.inserted_count), updated: Number(job.updated_count),
+            status: job.status,
+          };
+        }
+        if (input.data.batchIndex !== nextIndex || job.status !== "processing") {
+          return { error: "This batch is out of order. Resume from the server-reported progress.", status: 409 as const };
+        }
+
+        const normalized = input.data.contacts.map((row) => ({
+          firstName: toTitleCase(row.firstName.trim()),
+          lastName: toTitleCase(row.lastName.trim()),
+          email: row.email.trim().toLowerCase(),
+          phone: row.phone.trim(),
+          brokerage: row.brokerage.trim(),
+          stateRegion: row.stateRegion.trim(),
+          assignedTo: row.assignedTo.trim(),
+          tags: Array.from(new Set(row.tags.split(/[;,]/).map((tag) => tag.trim()).filter(Boolean))),
+        })).filter((row) => row.firstName || row.lastName || row.email);
+
+        const grouped = new Map<string, typeof normalized[number]>();
+        const noEmailRows: typeof normalized = [];
+        for (const row of normalized) {
+          if (!row.email) {
+            noEmailRows.push(row);
+            continue;
+          }
+          const current = grouped.get(row.email);
+          if (!current) grouped.set(row.email, row);
+          else {
+            current.brokerage = row.brokerage || current.brokerage;
+            current.stateRegion = row.stateRegion || current.stateRegion;
+            current.assignedTo = row.assignedTo || current.assignedTo;
+            current.tags = Array.from(new Set([...current.tags, ...row.tags]));
+          }
+        }
+
+        const emails = Array.from(grouped.keys());
+        const existingByEmail = new Map<string, { id: string; crmTags: string[] | null }>();
+        if (emails.length) {
+          const emailList = sql.join(emails.map((email) => sql`${email}`), sql`, `);
+          const existingRows = await tx.execute(sql`
+            SELECT id, LOWER(email) AS normalized_email, crm_tags
+            FROM brokers
+            WHERE owner_developer_profile_id IS NULL AND LOWER(email) IN (${emailList})
+            ORDER BY created_at ASC NULLS LAST, id ASC
+          `);
+          for (const item of (existingRows.rows || []) as any[]) {
+            const key = String(item.normalized_email);
+            if (!existingByEmail.has(key)) existingByEmail.set(key, { id: item.id, crmTags: item.crm_tags });
+          }
+        }
+
+        const updates: any[] = [];
+        const inserts: any[] = [];
+        for (const row of Array.from(grouped.values())) {
+          const existing = existingByEmail.get(row.email);
+          if (existing) {
+            updates.push({
+              id: existing.id,
+              assignedTo: row.assignedTo || null,
+              brokerage: row.brokerage || null,
+              stateRegion: row.stateRegion || null,
+              crmTags: row.tags.length
+                ? Array.from(new Set([...(existing.crmTags || []), ...row.tags]))
+                : existing.crmTags,
+            });
+          } else {
+            inserts.push({
+              firstName: row.firstName || "Unknown",
+              lastName: row.lastName,
+              email: row.email,
+              phone: row.phone || null,
+              brokerage: row.brokerage || null,
+              stateRegion: row.stateRegion || null,
+              assignedTo: row.assignedTo || null,
+              crmTags: row.tags.length ? row.tags : null,
+              isActive: true,
+            });
+          }
+        }
+        for (const row of noEmailRows) {
+          inserts.push({
+            firstName: row.firstName || "Unknown",
+            lastName: row.lastName,
+            email: null,
+            phone: row.phone || null,
+            brokerage: row.brokerage || null,
+            stateRegion: row.stateRegion || null,
+            assignedTo: row.assignedTo || null,
+            crmTags: row.tags.length ? row.tags : null,
+            isActive: true,
+          });
+        }
+
+        if (updates.length) {
+          await tx.execute(sql`
+            UPDATE brokers AS b
+            SET assigned_to = COALESCE(NULLIF(x.assigned_to, ''), b.assigned_to),
+                brokerage = COALESCE(NULLIF(x.brokerage, ''), b.brokerage),
+                state_region = COALESCE(NULLIF(x.state_region, ''), b.state_region),
+                crm_tags = x.crm_tags,
+                is_active = TRUE,
+                updated_at = NOW()
+            FROM jsonb_to_recordset(${JSON.stringify(updates)}::jsonb)
+              AS x(id text, assigned_to text, brokerage text, state_region text, crm_tags text[])
+            WHERE b.id = x.id AND b.owner_developer_profile_id IS NULL
+          `);
+        }
+        let inserted = 0;
+        if (inserts.length) {
+          const insertedRows = await tx.insert(brokers).values(inserts as any)
+            .onConflictDoNothing().returning({ id: brokers.id });
+          inserted = insertedRows.length;
+        }
+
+        const updated = updates.length;
+        const nextBatchIndex = nextIndex + 1;
+        const status = nextBatchIndex * crmImportBatchSize >= totalRows ? "completed" : "processing";
+        await tx.execute(sql`
+          UPDATE crm_contact_import_jobs
+          SET next_batch_index = ${nextBatchIndex},
+              inserted_count = inserted_count + ${inserted},
+              updated_count = updated_count + ${updated},
+              status = ${status},
+              updated_at = NOW()
+          WHERE id = ${job.id} AND owner_user_id = ${ownerUserId}
+        `);
+        return {
+          jobId: job.id,
+          totalRows,
+          nextBatchIndex,
+          inserted: Number(job.inserted_count) + inserted,
+          updated: Number(job.updated_count) + updated,
+          status,
+        };
+      });
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      return res.json(result);
+    } catch (error) {
+      console.error("CRM contact import batch failed.");
+      return res.status(500).json({ message: "This batch could not be saved. Retry the import to resume safely." });
     }
   });
 
