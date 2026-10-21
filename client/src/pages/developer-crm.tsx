@@ -82,7 +82,7 @@ const FIELDS = [
   { key: "tags", label: "Tags", patterns: [/tag/] },
 ];
 
-const MAX_CONTACT_IMPORT_ROWS = 2500;
+const MAX_CONTACT_IMPORT_ROWS = 100000;
 
 const createEmptyCompanyContactDraft = () => ({
   firstName: "",
@@ -404,11 +404,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
 
   const importMutation = useMutation({
     mutationFn: async () => {
-      const batchSize = 500;
-      const batches = Array.from(
-        { length: Math.ceil(stagedImportRows.length / batchSize) },
-        (_, index) => stagedImportRows.slice(index * batchSize, (index + 1) * batchSize),
-      );
+      const batchSize = 1000;
+      const totalBatches = Math.ceil(stagedImportRows.length / batchSize);
       let inserted = 0;
       let updated = 0;
       let completedRows = 0;
@@ -419,11 +416,11 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
         inserted,
         updated,
         currentBatch: 1,
-        totalBatches: batches.length,
+        totalBatches,
       });
 
-      for (let index = 0; index < batches.length; index++) {
-        const batch = batches[index];
+      for (let index = 0; index < totalBatches; index++) {
+        const batch = stagedImportRows.slice(index * batchSize, (index + 1) * batchSize);
         const firstRow = index * batchSize + 1;
         const lastRow = firstRow + batch.length - 1;
         setImportProgress({
@@ -432,7 +429,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           inserted,
           updated,
           currentBatch: index + 1,
-          totalBatches: batches.length,
+          totalBatches,
         });
         try {
           const data = await requestJson(importEndpoint, {
@@ -449,11 +446,11 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
             inserted,
             updated,
             currentBatch: index + 1,
-            totalBatches: batches.length,
+            totalBatches,
           });
         } catch (error) {
           const reason = error instanceof Error ? error.message : "Request failed";
-          const failureMessage = `Batch ${index + 1} of ${batches.length} failed (import rows ${firstRow.toLocaleString()}–${lastRow.toLocaleString()}). ${completedRows.toLocaleString()} rows from earlier batches completed: ${inserted} inserted and ${updated} updated. ${reason} The failed batch may have partially processed; review those records before retrying.`;
+          const failureMessage = `Batch ${index + 1} of ${totalBatches} failed (import rows ${firstRow.toLocaleString()}–${lastRow.toLocaleString()}). ${completedRows.toLocaleString()} rows from earlier batches completed: ${inserted} inserted and ${updated} updated. ${reason} Check the completed rows before retrying.`;
           setImportFailure(failureMessage);
           throw new Error(failureMessage);
         }
@@ -709,8 +706,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const companyProfiles = filterOptions?.companies || [];
 
   const readFile = (selected: File) => {
-    if (selected.size > 10 * 1024 * 1024) {
-      toast({ title: "File is too large", description: "Choose a spreadsheet smaller than 10 MB.", variant: "destructive" });
+    if (selected.size > 50 * 1024 * 1024) {
+      toast({ title: "File is too large", description: "Choose a spreadsheet smaller than 50 MB.", variant: "destructive" });
       return;
     }
     setParsing(true);
@@ -1557,7 +1554,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               <div className="rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center sm:p-8">
                 <FileSpreadsheet className="mx-auto mb-3 h-10 w-10 text-slate-400" />
                 <p className="font-semibold text-slate-800">Choose a CSV or Excel file</p>
-                <p className="mt-1 text-xs text-slate-500">First row should contain column headers. Files must be under 10 MB.</p>
+                <p className="mt-1 text-xs text-slate-500">First row should contain column headers. Files must be under 50 MB.</p>
                 <Button
                   type="button"
                   variant="outline"

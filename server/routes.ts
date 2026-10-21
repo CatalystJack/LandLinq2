@@ -18479,13 +18479,13 @@ RULES:
       if (isManualEntry && rows.length !== 1) {
         return res.status(400).json({ message: "Manual entry accepts exactly one contact." });
       }
-      if (rows.length > 2500) {
-        return res.status(413).json({ message: 'A single import is limited to 2,500 contact rows' });
+      if (!isManualEntry && rows.length > 1000) {
+        return res.status(413).json({ message: 'A single import batch is limited to 1,000 contact rows' });
       }
 
       const now = Date.now();
       const rateLimitStore = isManualEntry ? manualContactEntryRateLimits : contactImportRateLimits;
-      const requestLimit = isManualEntry ? 30 : 5;
+      const requestLimit = isManualEntry ? 30 : 150;
       const currentWindow = rateLimitStore.get(developerProfileId);
       const activeWindow = currentWindow && currentWindow.resetAt > now ? currentWindow : null;
       if (activeWindow && activeWindow.count >= requestLimit) {
@@ -18576,125 +18576,95 @@ RULES:
         });
       }
 
-      let inserted = 0;
-      let updated = 0;
-      for (const row of validatedRows) {
-        const firstName = toTitleCase(String(row.firstName || '').trim());
-        const lastName = toTitleCase(String(row.lastName || '').trim());
-        const email = String(row.email || '').trim().toLowerCase() || null;
-        const phone = String(row.phone || '').trim() || null;
-        const brokerage = String(row.brokerage || '').trim() || null;
-        const stateRegion = String(row.stateRegion || '').trim() || null;
-        const assignedTo = String(row.assignedTo || '').trim() || null;
-        const rawTags = Array.isArray(row.tags)
+      const importRows = validatedRows.map((row) => {
+        const tags = Array.isArray(row.tags)
           ? row.tags.map((tag: string) => tag.trim()).filter(Boolean)
-          : String(row.tags || '')
-            .split(/[;,]/)
-            .map((tag: string) => tag.trim())
-            .filter(Boolean);
+          : String(row.tags || "").split(/[;,]/).map((tag: string) => tag.trim()).filter(Boolean);
+        return {
+          first_name: toTitleCase(String(row.firstName || "").trim()),
+          last_name: toTitleCase(String(row.lastName || "").trim()),
+          email: String(row.email || "").trim().toLowerCase() || null,
+          phone: String(row.phone || "").trim() || null,
+          brokerage: String(row.brokerage || "").trim() || null,
+          state_region: String(row.stateRegion || "").trim() || null,
+          contact_category: row.contactCategory || null,
+          mailing_address: String(row.mailingAddress || "").trim() || null,
+          city: String(row.city || "").trim() || null,
+          postal_code: String(row.postalCode || "").trim() || null,
+          assigned_to: String(row.assignedTo || "").trim() || null,
+          crm_tags: tags.length ? tags : null,
+        };
+      });
 
-        if (!firstName && !lastName && !email) continue;
-
-        if (email) {
-          const [existing] = await db.select({
-            id: brokers.id,
-            crmTags: brokers.crmTags,
-          }).from(brokers).where(and(
-            sql`LOWER(${brokers.email}) = ${email}`,
-            eq(brokers.ownerDeveloperProfileId, developerProfileId),
-          )).limit(1);
-
-          if (existing) {
-            const mergedTags = rawTags.length
-              ? Array.from(new Set([...(existing.crmTags || []), ...rawTags]))
-              : existing.crmTags;
-            await db.update(brokers).set({
-              firstName: firstName || undefined,
-              lastName: lastName || undefined,
-              phone: phone || undefined,
-              brokerage: brokerage || undefined,
-              stateRegion: stateRegion || undefined,
-              contactCategory: row.contactCategory || undefined,
-              mailingAddress: row.mailingAddress || undefined,
-              city: row.city || undefined,
-              postalCode: row.postalCode || undefined,
-              assignedTo: assignedTo || undefined,
-              crmTags: mergedTags,
-              isActive: true,
-              updatedAt: new Date(),
-            } as any).where(eq(brokers.id, existing.id));
-            updated++;
-          } else {
-            const insertedRows = await db.insert(brokers).values({
-              firstName: firstName || 'Unknown',
-              lastName: lastName || '',
-              email,
-              phone,
-              brokerage,
-              stateRegion,
-              contactCategory: row.contactCategory || "other",
-              mailingAddress: row.mailingAddress || null,
-              city: row.city || null,
-              postalCode: row.postalCode || null,
-              assignedTo,
-              crmTags: rawTags.length ? rawTags : null,
-              ownerDeveloperProfileId: developerProfileId,
-              isActive: true,
-            } as any).onConflictDoNothing({
-              target: [brokers.ownerDeveloperProfileId, brokers.email],
-            }).returning({ id: brokers.id });
-
-            if (insertedRows.length) {
-              inserted++;
-            } else {
-              const [concurrentExisting] = await db.select({
-                id: brokers.id,
-                crmTags: brokers.crmTags,
-              }).from(brokers).where(and(
-                eq(brokers.ownerDeveloperProfileId, developerProfileId),
-                sql`LOWER(${brokers.email}) = ${email}`,
-              )).limit(1);
-              if (concurrentExisting) {
-                const mergedTags = rawTags.length
-                  ? Array.from(new Set([...(concurrentExisting.crmTags || []), ...rawTags]))
-                  : concurrentExisting.crmTags;
-                await db.update(brokers).set({
-                  assignedTo: assignedTo || undefined,
-                  brokerage: brokerage || undefined,
-                  stateRegion: stateRegion || undefined,
-                  contactCategory: row.contactCategory || undefined,
-                  mailingAddress: row.mailingAddress || undefined,
-                  city: row.city || undefined,
-                  postalCode: row.postalCode || undefined,
-                  crmTags: mergedTags,
-                  isActive: true,
-                  updatedAt: new Date(),
-                } as any).where(eq(brokers.id, concurrentExisting.id));
-                updated++;
-              }
-            }
-          }
-        } else {
-          await db.insert(brokers).values({
-            firstName: firstName || 'Unknown',
-            lastName: lastName || '',
-            email: null,
+      const result = await db.execute(sql`
+        WITH import_rows AS (
+          SELECT * FROM jsonb_to_recordset(${JSON.stringify(importRows)}::jsonb) AS row_data(
+            first_name text,
+            last_name text,
+            email text,
+            phone text,
+            brokerage text,
+            state_region text,
+            contact_category text,
+            mailing_address text,
+            city text,
+            postal_code text,
+            assigned_to text,
+            crm_tags text[]
+          )
+        ),
+        upserted AS (
+          INSERT INTO brokers (
+            first_name, last_name, email, phone, brokerage, state_region,
+            contact_category, mailing_address, city, postal_code, assigned_to,
+            crm_tags, owner_developer_profile_id, is_active, updated_at
+          )
+          SELECT
+            COALESCE(NULLIF(first_name, ''), 'Unknown'),
+            COALESCE(last_name, ''),
+            email,
             phone,
             brokerage,
-            stateRegion,
-            contactCategory: row.contactCategory || "other",
-            mailingAddress: row.mailingAddress || null,
-            city: row.city || null,
-            postalCode: row.postalCode || null,
-            assignedTo,
-            crmTags: rawTags.length ? rawTags : null,
-            ownerDeveloperProfileId: developerProfileId,
-            isActive: true,
-          } as any);
-          inserted++;
-        }
-      }
-      return res.json({ inserted, updated });
+            state_region,
+            contact_category,
+            mailing_address,
+            city,
+            postal_code,
+            assigned_to,
+            crm_tags,
+            ${developerProfileId},
+            true,
+            NOW()
+          FROM import_rows
+          ON CONFLICT (owner_developer_profile_id, email) DO UPDATE SET
+            first_name = CASE WHEN EXCLUDED.first_name = 'Unknown' THEN brokers.first_name ELSE EXCLUDED.first_name END,
+            last_name = CASE WHEN EXCLUDED.last_name = '' THEN brokers.last_name ELSE EXCLUDED.last_name END,
+            phone = COALESCE(EXCLUDED.phone, brokers.phone),
+            brokerage = COALESCE(EXCLUDED.brokerage, brokers.brokerage),
+            state_region = COALESCE(EXCLUDED.state_region, brokers.state_region),
+            contact_category = COALESCE(EXCLUDED.contact_category, brokers.contact_category),
+            mailing_address = COALESCE(EXCLUDED.mailing_address, brokers.mailing_address),
+            city = COALESCE(EXCLUDED.city, brokers.city),
+            postal_code = COALESCE(EXCLUDED.postal_code, brokers.postal_code),
+            assigned_to = COALESCE(EXCLUDED.assigned_to, brokers.assigned_to),
+            crm_tags = CASE
+              WHEN EXCLUDED.crm_tags IS NULL THEN brokers.crm_tags
+              ELSE ARRAY(
+                SELECT DISTINCT tag
+                FROM unnest(COALESCE(brokers.crm_tags, ARRAY[]::text[]) || EXCLUDED.crm_tags) AS tag_values(tag)
+              )
+            END,
+            is_active = true,
+            updated_at = NOW()
+          RETURNING (xmax = 0) AS was_inserted
+        )
+        SELECT
+          COUNT(*) FILTER (WHERE was_inserted)::int AS inserted,
+          COUNT(*) FILTER (WHERE NOT was_inserted)::int AS updated
+        FROM upserted
+      `);
+      const counts = ((result as any).rows || [])[0] || { inserted: 0, updated: 0 };
+      return res.json({ inserted: Number(counts.inserted || 0), updated: Number(counts.updated || 0) });
     } catch (error: any) {
       console.error('[developer-profile/me/import-contacts] Import failed', {
         errorName: error instanceof Error ? error.name : "UnknownError",
