@@ -853,8 +853,9 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               </Button>
             </div>
           )}
-           <div className="flex flex-wrap items-center gap-2 border-b border-[#e6edf1] px-5 py-3 text-xs text-[#718493]">
-             <span className="mr-1 font-medium">Filters</span>
+           <div className="border-b border-[#e6edf1]">
+           <div className="flex flex-wrap items-center gap-2.5 bg-[#f8fafb] px-5 py-4 text-xs text-[#718493]">
+             <span className="mr-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8193a1]">Filters</span>
              <div className="flex items-center gap-2">
               <Building2 className="h-3.5 w-3.5" />
               <select
@@ -927,7 +928,9 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                <option value="all">Rep: All</option>
                {availableAssignedTo.map((person) => <option key={person} value={person}>{person}</option>)}
              </select>
-             {hasActiveFilters && <button type="button" onClick={clearFilters} className="h-8 rounded-md px-2 text-xs font-medium text-catalyst-blue hover:bg-[#edf4fa]">Clear filters</button>}
+              {hasActiveFilters && <button type="button" onClick={clearFilters} className="h-8 rounded-md px-2 text-xs font-medium text-catalyst-blue hover:bg-[#edf4fa]">Clear filters</button>}
+           </div>
+           <div className="flex flex-wrap items-center gap-2 border-t border-[#e6edf1] bg-white px-5 py-3 text-xs text-[#718493]">
               {!adminMode && (
                 <>
                   <Button
@@ -1012,10 +1015,11 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                   )}
                 </>
               )}
-              <span className="ml-auto hidden sm:inline">
+              <span className="ml-auto hidden lg:inline">
                 Showing {filteredContacts.length} of {contactsQuery.data?.pagination.total ?? 0} · search updates as you type
               </span>
           </div>
+           </div>
             {adminMode && !selectedAdminProfileId ? (
               <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
                 <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#eaf0f4] text-[#718493]"><Building2 className="h-5 w-5" /></div>
@@ -1057,15 +1061,15 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               ))}
             </div>
             <div className="hidden xl:block table-scroll-container">
-               <Table className="min-w-[1180px]">
+               <Table className="min-w-[1540px]">
                  <TableHeader>
                    <TableRow className="border-[#e3e9ee] bg-[#f8fafb] hover:bg-[#f8fafb]">
                      {!adminMode && <TableHead className="h-11 w-12 pl-5"><Checkbox aria-label="Select all visible contacts" disabled={selectMatchingContactsMutation.isPending} checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false} onCheckedChange={(checked) => toggleAllVisible(checked === true)} /></TableHead>}
-                     <TableHead className="h-11 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Name</TableHead>
-                     <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Email</TableHead>
-                     <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Phone</TableHead>
-                     <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Brokerage</TableHead>
-                     <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Region</TableHead>
+                      <TableHead className="h-12 min-w-[210px] text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Name</TableHead>
+                      <TableHead className="min-w-[250px] text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Email</TableHead>
+                      <TableHead className="min-w-[165px] text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Phone</TableHead>
+                      <TableHead className="min-w-[190px] text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Brokerage</TableHead>
+                      <TableHead className="min-w-[120px] text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Region</TableHead>
                     <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Category</TableHead>
                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Tags</TableHead>
                     {!isGeneralSales && <TableHead className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7d909f]">Source tags</TableHead>}
@@ -1075,7 +1079,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                 <TableBody>{filteredContacts.map((contact) => (
                    <TableRow
                      key={contact.id}
-                     className="cursor-pointer border-[#e8edf1] transition-colors hover:bg-[#f4f8fa]"
+                      className="h-[72px] cursor-pointer border-[#e8edf1] transition-colors hover:bg-[#f4f8fa]"
                      tabIndex={0}
                      onClick={() => setSelectedContact(contact)}
                      onKeyDown={(event) => {
@@ -1110,8 +1114,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                          <span className="font-semibold text-[#21394c]">{[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unknown"}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-[#5f7382]">{contact.email || "—"}</TableCell>
-                    <TableCell className="text-sm text-[#5f7382]">{contact.phone || "—"}</TableCell>
+                     <TableCell className="whitespace-nowrap text-sm text-[#5f7382]">{contact.email || "—"}</TableCell>
+                     <TableCell className="whitespace-nowrap text-sm text-[#5f7382]">{contact.phone || "—"}</TableCell>
                     <TableCell className="max-w-[210px] text-sm text-[#5f7382]">
                       {contact.brokerage ? (
                          <button
@@ -1130,8 +1134,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                         </button>
                       ) : "—"}
                     </TableCell>
-                    <TableCell className="text-sm text-[#5f7382]">{contact.stateRegion || "—"}</TableCell>
-                    <TableCell className="text-sm capitalize text-[#5f7382]">{(contact.contactCategory || "other").replace(/[_-]+/g, " ")}</TableCell>
+                     <TableCell className="whitespace-nowrap text-sm text-[#5f7382]">{contact.stateRegion || "—"}</TableCell>
+                     <TableCell className="whitespace-nowrap text-sm capitalize text-[#5f7382]">{(contact.contactCategory || "other").replace(/[_-]+/g, " ")}</TableCell>
                      {!isGeneralSales && <TableCell className="max-w-[300px]">
                        <div className="flex flex-wrap items-center gap-1.5">
                          {(contact.crmTags || []).filter(Boolean).map((tag, index) => adminMode ? (
