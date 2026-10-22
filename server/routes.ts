@@ -82,6 +82,7 @@ import {
 import { isUsStateCode, normalizeUsStateCode } from "@shared/us-states";
 import { getBrokerStateCodes, getOutOfStateCodeFromCounty } from "@shared/broker-location";
 import { countyTargetMatchesDeal, parseCountyTarget } from "@shared/county-targets";
+import { replaceBrokerCountyToken } from "@shared/outreach-personalization";
 import { isProtectedWorkspacePath } from "@shared/auth-route-guards";
 import {
   OFF_MARKET_MAX_IMPORT_ROWS,
@@ -35894,6 +35895,7 @@ RULES:
         .replace(/\{\{firstname\}\}/gi, 'Test')
         .replace(/\{\{companyName\}\}/gi, companyName)
         .replace(/\{\{targetMarket\}\}/gi, targetMarket);
+      personalizedMessage = replaceBrokerCountyToken(personalizedMessage, "Charleston County", true);
       
       // DEBUG: Log raw content before conversion
       console.log(`📧 [TEST-EMAIL-DEBUG] Raw content (first 500 chars):`, personalizedMessage.substring(0, 500));
@@ -35936,6 +35938,7 @@ RULES:
         .replace(/\{\{firstname\}\}/gi, 'Test')
         .replace(/\{\{companyName\}\}/gi, companyName)
         .replace(/\{\{targetMarket\}\}/gi, targetMarket);
+      const subjectWithCounty = replaceBrokerCountyToken(personalizedSubject, "Charleston County");
 
       // Check if sender has Microsoft OAuth connected
       if (sender.microsoftAccessToken) {
@@ -36077,7 +36080,7 @@ RULES:
               signal: graphController.signal,
               body: JSON.stringify({
                 message: {
-                  subject: `[TEST] ${personalizedSubject}`,
+                  subject: `[TEST] ${subjectWithCounty}`,
                   body: {
                     contentType: 'HTML',
                     content: personalizedMessage
@@ -36099,7 +36102,7 @@ RULES:
                 method: 'microsoft_outlook',
                 step: {
                   day: step.dayOffset,
-                  subject: personalizedSubject
+                  subject: subjectWithCounty
                 }
               });
             } else {
@@ -36159,7 +36162,7 @@ RULES:
 
         await sendNotificationEmail({
           to: testRecipientEmail,
-          subject: `[TEST] ${personalizedSubject}`,
+          subject: `[TEST] ${subjectWithCounty}`,
           html: personalizedMessage,
           type: 'test_drip_email',
           ...(sgAttachments.length > 0 && { attachments: sgAttachments })
@@ -36172,7 +36175,7 @@ RULES:
           method: 'sendgrid',
           step: {
             day: step.dayOffset,
-            subject: personalizedSubject
+            subject: subjectWithCounty
           }
         });
       }

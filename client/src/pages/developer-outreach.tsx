@@ -455,7 +455,7 @@ export default function DeveloperOutreach() {
                   minHeight="220px"
                   className="mt-1.5"
                 />
-                <p className="mt-1 text-xs text-slate-500">Use {"{{firstName}}"}, {"{{companyName}}"}, or {"{{targetMarket}}"} to personalize the email. Your edits stay in place until you choose an assistant action.</p>
+                <p className="mt-1 text-xs text-slate-500">Use {"{{firstName}}"}, {"{{companyName}}"}, {"{{targetMarket}}"}, or {"{{county}}"} to personalize the email with each broker’s CRM county. Your edits stay in place until you choose an assistant action.</p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="campaign-delay">Send delay in days</Label><Input id="campaign-delay" type="number" min={0} max={365} className="mt-1.5" value={form.dayNumber} onChange={(event) => setForm({ ...form, dayNumber: Number(event.target.value) })} /></div><div><Label htmlFor="campaign-status">Status</Label><select id="campaign-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as "paused" | "active" })} className="mt-1.5 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option value="paused">Draft / paused</option><option value="active">Active</option></select></div></div>
             </div>

@@ -10,6 +10,7 @@ import { sql } from 'drizzle-orm';
 import { isBrokerEmailSuppressed, markBrokerEmailUnavailable } from '../emailUnsubscribe';
 import { normalizeBounceMatchText } from '../emailBounceParsing';
 import { createInitialLoginBouncePoller } from '../imapInitialLoginBouncePoller';
+import { replaceBrokerCountyToken } from '@shared/outreach-personalization';
 
 let isInitialLoginBouncePollRunning = false;
 
@@ -455,11 +456,15 @@ export async function processDripEnrollments(): Promise<void> {
            p.target_counties,
           s.microsoft_access_token, s.microsoft_refresh_token, s.microsoft_token_expiry,
           s.signature_html, s.daily_limit_override,
+          b.contact_county AS broker_county,
           ROW_NUMBER() OVER (PARTITION BY e.sender_id ORDER BY e.next_send_at ASC) AS rn
         FROM drip_campaign_enrollments e
         JOIN outreach_campaign_templates t ON e.template_id = t.id
         JOIN outreach_senders s ON e.sender_id = s.id
         LEFT JOIN developer_profiles p ON p.id = s.developer_profile_id
+        LEFT JOIN brokers b
+          ON b.id = e.broker_id
+          AND (b.owner_developer_profile_id IS NULL OR b.owner_developer_profile_id = s.developer_profile_id)
         WHERE e.next_send_at <= NOW()
           AND e.status IN ('pending', 'in_progress')
           AND t.is_active = true
@@ -602,12 +607,14 @@ export async function processDripEnrollments(): Promise<void> {
            .replace(/\{\{sender\.email\}\}/gi, enrollment.sender_email)
            .replace(/\{\{companyName\}\}/gi, companyName)
            .replace(/\{\{targetMarket\}\}/gi, targetMarket);
+        emailContent = replaceBrokerCountyToken(emailContent, enrollment.broker_county, true);
         
         emailSubject = emailSubject
           .replace(/\{\{broker\.firstname\}\}/gi, brokerFirstName)
           .replace(/\{\{brokerName\}\}/gi, brokerName)
           .replace(/\{\{companyName\}\}/gi, companyName)
           .replace(/\{\{targetMarket\}\}/gi, targetMarket);
+        emailSubject = replaceBrokerCountyToken(emailSubject, enrollment.broker_county);
         
         // Convert to HTML
         let emailHtml = convertContentToHtml(emailContent);

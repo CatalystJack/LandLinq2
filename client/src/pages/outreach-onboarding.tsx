@@ -177,6 +177,7 @@ const PERSONALIZATION_TOKENS = [
   { token: '{{broker.email}}', label: 'Broker Email' },
   { token: '{{broker.phone}}', label: 'Broker Phone' },
   { token: '{{broker.company}}', label: 'Broker Company' },
+  { token: '{{broker.county}}', label: 'Broker County' },
   { token: '{{sender.name}}', label: 'Your Name' },
   { token: '{{sender.email}}', label: 'Your Email' },
   { token: '{{company.name}}', label: 'Company Name' },
@@ -475,6 +476,8 @@ export function renderEmailPreview(
       .replace(/{{broker\.email}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">john@example.com</span>')
       .replace(/{{broker\.phone}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">(555) 123-4567</span>')
       .replace(/{{broker\.company}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">ABC Realty</span>')
+      .replace(/{{broker\.county}}/gi, '<span class="bg-blue-100 text-blue-800 px-1 rounded">Charleston County</span>')
+      .replace(/{{county}}/gi, '<span class="bg-blue-100 text-blue-800 px-1 rounded">Charleston County</span>')
       .replace(/{{sender\.name}}/g, `<span class="bg-green-100 text-green-800 px-1 rounded">${senderName}</span>`)
       .replace(/{{sender\.email}}/g, `<span class="bg-green-100 text-green-800 px-1 rounded">${senderEmail}</span>`)
       .replace(/{{company\.name}}/g, '<span class="bg-purple-100 text-purple-800 px-1 rounded">Catalyst</span>');
@@ -3313,7 +3316,7 @@ export default function OutreachOnboarding() {
                                             )}
                                             <div className="mt-2 flex flex-wrap gap-1">
                                               <span className="text-xs text-gray-400">Insert personalization:</span>
-                                              {PERSONALIZATION_TOKENS.slice(0, 4).map(t => (
+                                              {PERSONALIZATION_TOKENS.slice(0, 6).map(t => (
                                                 <button
                                                   key={t.token}
                                                   type="button"
@@ -3664,7 +3667,7 @@ export default function OutreachOnboarding() {
                                             )}
                                             <div className="mt-2 flex flex-wrap gap-1">
                                               <span className="text-xs text-gray-400">Insert personalization:</span>
-                                              {PERSONALIZATION_TOKENS.slice(0, 4).map(t => (
+                                              {PERSONALIZATION_TOKENS.slice(0, 6).map(t => (
                                                 <button
                                                   key={t.token}
                                                   type="button"
@@ -3991,6 +3994,7 @@ export default function OutreachOnboarding() {
                             { label: 'First Name', token: '{{broker.firstName}}' },
                             { label: 'Last Name', token: '{{broker.lastName}}' },
                             { label: 'Company', token: '{{broker.company}}' },
+                            { label: 'County', token: '{{broker.county}}' },
                             { label: 'Sender Name', token: '{{sender.name}}' }
                           ].map(t => (
                             <Button
@@ -4424,7 +4428,7 @@ export default function OutreachOnboarding() {
                         )}
                         <div className="mt-2 flex flex-wrap gap-1">
                           <span className="text-xs text-gray-400">Insert personalization:</span>
-                          {PERSONALIZATION_TOKENS.slice(0, 4).map(t => (
+                          {PERSONALIZATION_TOKENS.slice(0, 6).map(t => (
                             <button
                               key={t.token}
                               type="button"
@@ -4709,7 +4713,7 @@ export default function OutreachOnboarding() {
                         )}
                         <div className="mt-2 flex flex-wrap gap-1">
                           <span className="text-xs text-gray-400">Insert personalization:</span>
-                          {PERSONALIZATION_TOKENS.slice(0, 4).map(t => (
+                          {PERSONALIZATION_TOKENS.slice(0, 6).map(t => (
                             <button
                               key={t.token}
                               type="button"
