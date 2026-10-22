@@ -269,7 +269,12 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [rows, setRows] = useState<Record<string, any>[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [parsing, setParsing] = useState(false);
-  const [result, setResult] = useState<{ inserted: number; updated: number } | null>(null);
+  const [result, setResult] = useState<{
+    inserted: number;
+    updated: number;
+    skippedDuplicateEmailRows: number;
+    skippedInvalidEmailRows: number;
+  } | null>(null);
   const [importProgress, setImportProgress] = useState<{
     completedRows: number;
     totalRows: number;
@@ -282,6 +287,26 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const stagedImportRows = rows
     .map((row) => Object.fromEntries(FIELDS.map(({ key }) => [key, mapping[key] ? row[mapping[key]] : ""])))
     .filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
+  const skippedDuplicateEmailRowIndexes = new Set<number>();
+  const skippedInvalidEmailRowIndexes = new Set<number>();
+  const seenImportEmails = new Set<string>();
+  stagedImportRows.forEach((row, index) => {
+    const email = String(row.email || "").trim().toLowerCase();
+    if (!email) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      skippedInvalidEmailRowIndexes.add(index);
+      return;
+    }
+    if (seenImportEmails.has(email)) {
+      skippedDuplicateEmailRowIndexes.add(index);
+      return;
+    }
+    seenImportEmails.add(email);
+  });
+  const importRowsWithIndex = stagedImportRows
+    .map((row, index) => ({ row, index }))
+    .filter(({ index }) => !skippedDuplicateEmailRowIndexes.has(index) && !skippedInvalidEmailRowIndexes.has(index));
+  const importRows = importRowsWithIndex.map(({ row }) => row);
   const hasContactNameOrEmail = Boolean(
     contactDraft.firstName.trim() || contactDraft.lastName.trim() || contactDraft.email.trim(),
   );
@@ -292,16 +317,12 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   if (stagedImportRows.length > MAX_CONTACT_IMPORT_ROWS) {
     importValidationErrors.push(`The limit is ${MAX_CONTACT_IMPORT_ROWS.toLocaleString()} non-empty rows per import.`);
   }
-  const seenImportEmails = new Set<string>();
-  stagedImportRows.forEach((row, index) => {
+  importRowsWithIndex.forEach(({ row, index }) => {
     const line = index + 2;
     const firstName = String(row.firstName || "").trim();
     const lastName = String(row.lastName || "").trim();
     const email = String(row.email || "").trim().toLowerCase();
     if (!firstName && !lastName && !email) importValidationErrors.push(`Row ${line} needs a name or email.`);
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) importValidationErrors.push(`Row ${line} has an invalid email address.`);
-    if (email && seenImportEmails.has(email)) importValidationErrors.push(`Row ${line} repeats email ${email}.`);
-    if (email) seenImportEmails.add(email);
     if (normalizeContactCategory(row.contactCategory) === null) importValidationErrors.push(`Row ${line} has an unsupported contact category.`);
   });
 
@@ -405,14 +426,14 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const importMutation = useMutation({
     mutationFn: async () => {
       const batchSize = 1000;
-      const totalBatches = Math.ceil(stagedImportRows.length / batchSize);
+      const totalBatches = Math.ceil(importRows.length / batchSize);
       let inserted = 0;
       let updated = 0;
       let completedRows = 0;
       setImportFailure(null);
       setImportProgress({
         completedRows,
-        totalRows: stagedImportRows.length,
+        totalRows: importRows.length,
         inserted,
         updated,
         currentBatch: 1,
@@ -420,12 +441,12 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       });
 
       for (let index = 0; index < totalBatches; index++) {
-        const batch = stagedImportRows.slice(index * batchSize, (index + 1) * batchSize);
+        const batch = importRows.slice(index * batchSize, (index + 1) * batchSize);
         const firstRow = index * batchSize + 1;
         const lastRow = firstRow + batch.length - 1;
         setImportProgress({
           completedRows,
-          totalRows: stagedImportRows.length,
+          totalRows: importRows.length,
           inserted,
           updated,
           currentBatch: index + 1,
@@ -442,7 +463,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           completedRows += batch.length;
           setImportProgress({
             completedRows,
-            totalRows: stagedImportRows.length,
+            totalRows: importRows.length,
             inserted,
             updated,
             currentBatch: index + 1,
@@ -455,12 +476,20 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           throw new Error(failureMessage);
         }
       }
-      return { inserted, updated };
+      return {
+        inserted,
+        updated,
+        skippedDuplicateEmailRows: skippedDuplicateEmailRowIndexes.size,
+        skippedInvalidEmailRows: skippedInvalidEmailRowIndexes.size,
+      };
     },
     onSuccess: (data) => {
       setResult(data);
       queryClient.invalidateQueries({ queryKey: [contactsQueryKey] });
-      toast({ title: "Contacts imported", description: `${data.inserted} inserted, ${data.updated} updated.` });
+      toast({
+        title: "Contacts imported",
+        description: `${data.inserted} inserted, ${data.updated} updated, ${data.skippedDuplicateEmailRows} duplicate-email rows skipped, and ${data.skippedInvalidEmailRows} invalid-email rows skipped.`,
+      });
     },
     onError: (error: Error) => toast({ title: "Import failed", description: error.message, variant: "destructive" }),
   });
@@ -1572,7 +1601,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               {parsing && <div className="flex items-center justify-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Reading spreadsheet…</div>}
             </div>
           ) : result ? (
-            <div className="py-8 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">✓</div><h3 className="font-semibold text-slate-900">Import complete</h3><p className="mt-2 text-sm text-slate-500">{result.inserted} inserted and {result.updated} updated.</p></div>
+          <div className="py-8 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">✓</div><h3 className="font-semibold text-slate-900">Import complete</h3><p className="mt-2 text-sm text-slate-500">{result.inserted} inserted and {result.updated} updated.</p>{(result.skippedDuplicateEmailRows > 0 || result.skippedInvalidEmailRows > 0) && <p className="mt-2 text-xs text-amber-700">{result.skippedDuplicateEmailRows} duplicate-email rows and {result.skippedInvalidEmailRows} invalid-email rows were skipped.</p>}</div>
           ) : (
             <div className="space-y-5 py-2">
               <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1593,7 +1622,8 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                   Choose another file
                 </Button>
               </div>
-              <p className="text-sm text-slate-600">{stagedImportRows.length.toLocaleString()} non-empty rows detected. Map available fields below; up to {MAX_CONTACT_IMPORT_ROWS.toLocaleString()} rows are allowed per import.</p>
+              <p className="text-sm text-slate-600">{stagedImportRows.length.toLocaleString()} non-empty rows detected; {importRows.length.toLocaleString()} will be imported. Map available fields below; up to {MAX_CONTACT_IMPORT_ROWS.toLocaleString()} source rows are allowed per import.</p>
+              {(skippedDuplicateEmailRowIndexes.size > 0 || skippedInvalidEmailRowIndexes.size > 0) && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">The first row for each valid email is kept. {skippedDuplicateEmailRowIndexes.size.toLocaleString()} later duplicate-email rows and {skippedInvalidEmailRowIndexes.size.toLocaleString()} rows with invalid emails will be skipped.</p>}
               {importProgress && (
                 <div className="space-y-2 rounded-lg border border-[#dce5eb] bg-[#f8fafb] p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -1642,7 +1672,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               )}
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
                 <p className="mb-2 font-semibold text-slate-800">Preview</p>
-                <div className="space-y-2">{stagedImportRows.slice(0, 3).map((row, index) => (
+                <div className="space-y-2">{importRows.slice(0, 3).map((row, index) => (
                   <div key={index} className="border-t border-slate-200 pt-2 first:border-0 first:pt-0">
                     <p className="font-medium text-slate-800">{row.firstName || ""} {row.lastName || ""} · {row.contactCategory || "Other"}</p>
                     <p>{row.email || "No email"} · {[row.city, row.stateRegion, row.postalCode].filter(Boolean).join(", ") || "No location"}</p>
@@ -1659,7 +1689,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
             ) : (
               <Button
                 onClick={() => importMutation.mutate()}
-                disabled={!file || !stagedImportRows.length || importValidationErrors.length > 0 || importMutation.isPending || parsing}
+                disabled={!file || !importRows.length || importValidationErrors.length > 0 || importMutation.isPending || parsing}
                 style={{ backgroundColor: primaryColor }}
                 className="min-h-10 text-white"
               >
