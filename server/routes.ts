@@ -18694,6 +18694,7 @@ RULES:
         const brokerage = readField(row.brokerage, "Company", 200);
         const mailingAddress = readField(row.mailingAddress, "Address", 300);
         const city = readField(row.city, "City", 120);
+        const contactCounty = readField(row.contactCounty, "County", 500);
         const stateRegion = readField(row.stateRegion, "State / region", 100);
         const postalCode = readField(row.postalCode, "Postal code", 24);
         const assignedTo = readField(row.assignedTo, "Assigned to", 120);
@@ -18733,6 +18734,7 @@ RULES:
           brokerage,
           mailingAddress,
           city,
+          contactCounty,
           stateRegion,
           postalCode,
           assignedTo,
@@ -18761,6 +18763,7 @@ RULES:
           brokerage: String(row.brokerage || "").trim() || null,
           state_region: String(row.stateRegion || "").trim() || null,
           contact_category: row.contactCategory || null,
+          contact_county: String(row.contactCounty || "").trim() || null,
           mailing_address: String(row.mailingAddress || "").trim() || null,
           city: String(row.city || "").trim() || null,
           postal_code: String(row.postalCode || "").trim() || null,
@@ -18779,6 +18782,7 @@ RULES:
             brokerage text,
             state_region text,
             contact_category text,
+            contact_county text,
             mailing_address text,
             city text,
             postal_code text,
@@ -18789,7 +18793,7 @@ RULES:
         upserted AS (
           INSERT INTO brokers (
             first_name, last_name, email, phone, brokerage, state_region,
-            contact_category, mailing_address, city, postal_code, assigned_to,
+            contact_category, contact_county, mailing_address, city, postal_code, assigned_to,
             crm_tags, owner_developer_profile_id, is_active, updated_at
           )
           SELECT
@@ -18800,6 +18804,7 @@ RULES:
             brokerage,
             state_region,
             contact_category,
+            contact_county,
             mailing_address,
             city,
             postal_code,
@@ -18816,6 +18821,7 @@ RULES:
             brokerage = COALESCE(EXCLUDED.brokerage, brokers.brokerage),
             state_region = COALESCE(EXCLUDED.state_region, brokers.state_region),
             contact_category = COALESCE(EXCLUDED.contact_category, brokers.contact_category),
+            contact_county = COALESCE(EXCLUDED.contact_county, brokers.contact_county),
             mailing_address = COALESCE(EXCLUDED.mailing_address, brokers.mailing_address),
             city = COALESCE(EXCLUDED.city, brokers.city),
             postal_code = COALESCE(EXCLUDED.postal_code, brokers.postal_code),

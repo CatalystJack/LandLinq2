@@ -76,6 +76,7 @@ const FIELDS = [
   { key: "contactCategory", label: "Contact Category", patterns: [/category/, /contact.*type/] },
   { key: "mailingAddress", label: "Address", patterns: [/address/, /street/] },
   { key: "city", label: "City", patterns: [/city/] },
+  { key: "contactCounty", label: "County", patterns: [/county/] },
   { key: "stateRegion", label: "State / Region", patterns: [/state/, /region/] },
   { key: "postalCode", label: "Postal Code", patterns: [/postal/, /zip/] },
   { key: "assignedTo", label: "Assigned To", patterns: [/assign/, /owner/, /rep/] },
@@ -93,6 +94,7 @@ const createEmptyCompanyContactDraft = () => ({
   contactCategory: "other",
   mailingAddress: "",
   city: "",
+  contactCounty: "",
   stateRegion: "",
   postalCode: "",
   assignedTo: "",
@@ -520,6 +522,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           brokerage: contactDraft.brokerage.trim(),
           mailingAddress: contactDraft.mailingAddress.trim(),
           city: contactDraft.city.trim(),
+          contactCounty: contactDraft.contactCounty.trim(),
           stateRegion: contactDraft.stateRegion.trim(),
           postalCode: contactDraft.postalCode.trim(),
           assignedTo: contactDraft.assignedTo.trim(),
@@ -1367,6 +1370,16 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
                     maxLength={300}
                     value={contactDraft.mailingAddress}
                     onChange={(event) => setContactDraft((current) => ({ ...current, mailingAddress: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-contact-county">County</Label>
+                  <Input
+                    id="company-contact-county"
+                    maxLength={500}
+                    value={contactDraft.contactCounty}
+                    onChange={(event) => setContactDraft((current) => ({ ...current, contactCounty: event.target.value }))}
+                    placeholder="County or counties"
                   />
                 </div>
                 <div className="space-y-2">
