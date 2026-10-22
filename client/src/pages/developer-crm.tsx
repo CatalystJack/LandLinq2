@@ -102,6 +102,7 @@ function normalizeContactCategory(value: unknown) {
   const normalized = String(value || "").trim().toLowerCase().replace(/[\s/-]+/g, "_");
   if (["attorney", "lawyer", "attorney_lawyer"].includes(normalized)) return "attorney";
   if (["contractor", "general_contractor"].includes(normalized)) return "general_contractor";
+  if (normalized === "crm_contact") return "other";
   if (["broker", "other"].includes(normalized)) return normalized;
   return normalized ? null : "other";
 }
@@ -285,7 +286,11 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   } | null>(null);
   const [importFailure, setImportFailure] = useState<string | null>(null);
   const stagedImportRows = rows
-    .map((row) => Object.fromEntries(FIELDS.map(({ key }) => [key, mapping[key] ? row[mapping[key]] : ""])))
+    .map((row) => {
+      const mapped = Object.fromEntries(FIELDS.map(({ key }) => [key, mapping[key] ? row[mapping[key]] : ""]));
+      if (mapped.contactCategory) mapped.contactCategory = normalizeContactCategory(mapped.contactCategory) || mapped.contactCategory;
+      return mapped;
+    })
     .filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
   const skippedDuplicateEmailRowIndexes = new Set<number>();
   const skippedInvalidEmailRowIndexes = new Set<number>();
@@ -307,6 +312,10 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     .map((row, index) => ({ row, index }))
     .filter(({ index }) => !skippedDuplicateEmailRowIndexes.has(index) && !skippedInvalidEmailRowIndexes.has(index));
   const importRows = importRowsWithIndex.map(({ row }) => row);
+  const remappedGenericCategoryRows = importRowsWithIndex.filter(({ index }) => {
+    const rawCategory = String(rows[index]?.[mapping.contactCategory] || "").trim().toLowerCase().replace(/[\s/-]+/g, "_");
+    return rawCategory === "crm_contact";
+  }).length;
   const hasContactNameOrEmail = Boolean(
     contactDraft.firstName.trim() || contactDraft.lastName.trim() || contactDraft.email.trim(),
   );
@@ -323,7 +332,9 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
     const lastName = String(row.lastName || "").trim();
     const email = String(row.email || "").trim().toLowerCase();
     if (!firstName && !lastName && !email) importValidationErrors.push(`Row ${line} needs a name or email.`);
-    if (normalizeContactCategory(row.contactCategory) === null) importValidationErrors.push(`Row ${line} has an unsupported contact category.`);
+    if (!["broker", "attorney", "general_contractor", "other"].includes(String(row.contactCategory || "other"))) {
+      importValidationErrors.push(`Row ${line} has an unsupported contact category.`);
+    }
   });
 
   useEffect(() => {
@@ -1624,6 +1635,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               </div>
               <p className="text-sm text-slate-600">{stagedImportRows.length.toLocaleString()} non-empty rows detected; {importRows.length.toLocaleString()} will be imported. Map available fields below; up to {MAX_CONTACT_IMPORT_ROWS.toLocaleString()} source rows are allowed per import.</p>
               {(skippedDuplicateEmailRowIndexes.size > 0 || skippedInvalidEmailRowIndexes.size > 0) && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">The first row for each valid email is kept. {skippedDuplicateEmailRowIndexes.size.toLocaleString()} later duplicate-email rows and {skippedInvalidEmailRowIndexes.size.toLocaleString()} rows with invalid emails will be skipped.</p>}
+              {remappedGenericCategoryRows > 0 && <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">{remappedGenericCategoryRows.toLocaleString()} “CRM Contact” category values will be saved as Other.</p>}
               {importProgress && (
                 <div className="space-y-2 rounded-lg border border-[#dce5eb] bg-[#f8fafb] p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
