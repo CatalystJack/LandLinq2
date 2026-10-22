@@ -74,6 +74,7 @@ import {
   normalizeRuralLandCriteria,
   validateRuralLandCriteria,
 } from "@shared/rural-land-criteria";
+import { DEFAULT_PURCHASE_CRITERIA, validatePurchaseCriteria } from "@shared/purchase-criteria";
 import {
   normalizeNumericStateOverrides,
   resolveStateAwareCriteria,
@@ -16871,6 +16872,7 @@ RULES:
         assetClass: developerProfiles.assetClass,
         industrialCriteria: developerProfiles.industrialCriteria,
          ruralLandCriteria: developerProfiles.ruralLandCriteria,
+        purchaseCriteria: developerProfiles.purchaseCriteria,
         rentMetric: developerProfiles.rentMetric,
         targetStates: developerProfiles.targetStates,
         compMinVintageYear: developerProfiles.compMinVintageYear,
@@ -16902,6 +16904,11 @@ RULES:
         updates.ruralLandCriteria = isRuralLand
           ? validateRuralLandCriteria(body.ruralLandCriteria ?? currentProfile.ruralLandCriteria)
           : normalizeRuralLandCriteria(body.ruralLandCriteria ?? DEFAULT_RURAL_LAND_CRITERIA);
+      }
+      if (!isGeneralSales && (body.purchaseCriteria !== undefined || currentProfile.purchaseCriteria == null)) {
+        updates.purchaseCriteria = validatePurchaseCriteria(
+          body.purchaseCriteria ?? currentProfile.purchaseCriteria ?? DEFAULT_PURCHASE_CRITERIA,
+        );
       }
 
       const stringArray = (value: any, field: string) => {

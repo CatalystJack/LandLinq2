@@ -53,6 +53,7 @@ import {
 import { DEFAULT_RURAL_LAND_CRITERIA, type RuralLandCriteria } from "@shared/rural-land-criteria";
 import { parseCountyTarget } from "@shared/county-targets";
 import { normalizeUsStateCode } from "@shared/us-states";
+import { DEFAULT_PURCHASE_CRITERIA, normalizePurchaseCriteria, type PurchaseCriteria } from "@shared/purchase-criteria";
 
 type Profile = {
   companyName: string;
@@ -60,6 +61,7 @@ type Profile = {
   assetClass: DeveloperAssetClass;
   industrialCriteria: IndustrialCriteria;
   ruralLandCriteria: RuralLandCriteria;
+  purchaseCriteria: PurchaseCriteria;
   primaryColor: string | null;
   secondaryColor: string | null;
   outreachTestModeEnabled: boolean;
@@ -283,6 +285,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
         assetClass: profile.assetClass || "multifamily",
         industrialCriteria: profile.industrialCriteria || DEFAULT_INDUSTRIAL_CRITERIA,
         ruralLandCriteria: profile.ruralLandCriteria || DEFAULT_RURAL_LAND_CRITERIA,
+        purchaseCriteria: normalizePurchaseCriteria(profile.purchaseCriteria || DEFAULT_PURCHASE_CRITERIA),
         targetStates: Array.from(new Set((profile.targetStates || []).map(normalizeUsStateCode).filter(Boolean))),
         targetCounties: profile.targetCounties || [],
         productTypes: (profile.productTypes || []).map((productType) => ({
@@ -467,6 +470,24 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
   const update = <K extends keyof Profile>(key: K, value: Profile[K]) =>
     setForm((current) => current ? { ...current, [key]: value } : current);
 
+  const updatePurchaseCriteria = (
+    section: keyof PurchaseCriteria,
+    field: string,
+    rawValue: string,
+  ) => {
+    const value = rawValue === "" ? null : Number(rawValue);
+    setForm((current) => current ? {
+      ...current,
+      purchaseCriteria: {
+        ...current.purchaseCriteria,
+        [section]: {
+          ...current.purchaseCriteria[section],
+          [field]: value,
+        },
+      } as PurchaseCriteria,
+    } : current);
+  };
+
   const updateTargetStates = (nextStates: string[]) => {
     if (!form) return;
     const normalizedNextStates = Array.from(new Set(nextStates.map(normalizeUsStateCode).filter(Boolean)));
@@ -526,6 +547,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
       saveMutation.mutate({
         assetClass: "industrial",
         industrialCriteria: form.industrialCriteria,
+        purchaseCriteria: form.purchaseCriteria,
         targetStates: form.targetStates,
         targetCounties: form.targetCounties,
         countyMarketLabels: form.countyMarketLabels,
@@ -543,6 +565,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
       saveMutation.mutate({
         assetClass: "rural_land",
         ruralLandCriteria: form.ruralLandCriteria,
+        purchaseCriteria: form.purchaseCriteria,
         targetStates: form.targetStates,
         targetCounties: form.targetCounties,
         countyMarketLabels: form.countyMarketLabels,
@@ -604,6 +627,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
       }
     }
     saveMutation.mutate({
+      purchaseCriteria: form.purchaseCriteria,
       targetStates: form.targetStates,
       targetCounties: form.targetCounties,
       rentMetric: form.rentMetric,
@@ -976,6 +1000,40 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
               <CardTitle>No criteria editor for this asset class</CardTitle>
               <CardDescription>This company’s current asset class does not have an editable criteria set on this page.</CardDescription>
             </CardHeader>
+          </Card>}
+          {form.profileType === "real_estate" && form.assetClass === "multifamily" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <CardHeader>
+              <CardTitle>Purchase criteria</CardTitle>
+              <CardDescription>
+                Set separate limits for development land and existing properties. A deal with a recorded year built or existing unit count is screened as an existing property; otherwise it is screened as land.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6 lg:grid-cols-2">
+              <section aria-labelledby="land-purchase-criteria-title" className="space-y-4 rounded-xl border border-slate-200 p-4">
+                <div>
+                  <h3 id="land-purchase-criteria-title" className="font-semibold text-slate-900">Land purchases</h3>
+                  <p className="mt-1 text-xs text-slate-500">Unit limits use the submitted maximum units allowed by zoning.</p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <NumberField label="Minimum acres" value={form.purchaseCriteria.land.minAcres?.toString() || ""} onChange={(value) => updatePurchaseCriteria("land", "minAcres", value)} />
+                  <NumberField label="Maximum acres" value={form.purchaseCriteria.land.maxAcres?.toString() || ""} onChange={(value) => updatePurchaseCriteria("land", "maxAcres", value)} placeholder="No maximum" />
+                  <NumberField label="Minimum unit capacity" value={form.purchaseCriteria.land.minUnits?.toString() || ""} onChange={(value) => updatePurchaseCriteria("land", "minUnits", value)} step={1} />
+                  <NumberField label="Maximum unit capacity" value={form.purchaseCriteria.land.maxUnits?.toString() || ""} onChange={(value) => updatePurchaseCriteria("land", "maxUnits", value)} placeholder="No maximum" step={1} />
+                </div>
+              </section>
+              <section aria-labelledby="existing-purchase-criteria-title" className="space-y-4 rounded-xl border border-slate-200 p-4">
+                <div>
+                  <h3 id="existing-purchase-criteria-title" className="font-semibold text-slate-900">Existing properties</h3>
+                  <p className="mt-1 text-xs text-slate-500">Set acceptable construction years and property unit counts. Leave a limit blank to ignore it.</p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <NumberField label="Minimum vintage year" value={form.purchaseCriteria.existing.minVintageYear?.toString() || ""} onChange={(value) => updatePurchaseCriteria("existing", "minVintageYear", value)} placeholder="No minimum" min={1800} max={2100} step={1} />
+                  <NumberField label="Maximum vintage year" value={form.purchaseCriteria.existing.maxVintageYear?.toString() || ""} onChange={(value) => updatePurchaseCriteria("existing", "maxVintageYear", value)} placeholder="No maximum" min={1800} max={2100} step={1} />
+                  <NumberField label="Minimum units" value={form.purchaseCriteria.existing.minUnits?.toString() || ""} onChange={(value) => updatePurchaseCriteria("existing", "minUnits", value)} step={1} />
+                  <NumberField label="Maximum units" value={form.purchaseCriteria.existing.maxUnits?.toString() || ""} onChange={(value) => updatePurchaseCriteria("existing", "maxUnits", value)} placeholder="No maximum" step={1} />
+                </div>
+              </section>
+            </CardContent>
           </Card>}
           {form.profileType === "real_estate" && form.assetClass === "multifamily" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>

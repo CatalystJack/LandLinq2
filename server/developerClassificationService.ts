@@ -1,6 +1,7 @@
 import type { DeveloperProductType, DeveloperProfile } from "@shared/schema";
 import { normalizeIndustrialCriteria } from "@shared/industrial-criteria";
 import { normalizeRuralLandCriteria } from "@shared/rural-land-criteria";
+import { hasConfiguredCriteria, normalizePurchaseCriteria } from "@shared/purchase-criteria";
 import { resolveStateAwareCriteria } from "@shared/criteria-overrides";
 import { countyTargetMatchesDeal } from "@shared/county-targets";
 import { normalizeUsStateCode } from "@shared/us-states";
@@ -176,6 +177,56 @@ export function classifyDealForProfile(
 
   if (!countyMatch) {
     return { classification: "passed", matchedProductTypes: [] };
+  }
+
+  const purchaseCriteria = normalizePurchaseCriteria((profile as any).purchaseCriteria);
+  const vintage = numericValue(deal?.vintage);
+  const unitCount = numericValue(deal?.unitCount);
+  const isExistingPurchase = (vintage !== null && vintage > 0) || (unitCount !== null && unitCount > 0);
+  if (isExistingPurchase && hasConfiguredCriteria(purchaseCriteria.existing)) {
+    const failures: string[] = [];
+    const missing: string[] = [];
+    const existing = purchaseCriteria.existing;
+    if (existing.minVintageYear !== null || existing.maxVintageYear !== null) {
+      if (vintage === null || vintage <= 0) missing.push("vintage is not verified");
+      else {
+        if (existing.minVintageYear !== null && vintage < existing.minVintageYear) failures.push(`Vintage ${vintage} is below minimum ${existing.minVintageYear}`);
+        if (existing.maxVintageYear !== null && vintage > existing.maxVintageYear) failures.push(`Vintage ${vintage} is above maximum ${existing.maxVintageYear}`);
+      }
+    }
+    if (existing.minUnits !== null || existing.maxUnits !== null) {
+      if (unitCount === null) missing.push("unit count is not verified");
+      else {
+        if (existing.minUnits !== null && unitCount < existing.minUnits) failures.push(`Unit count ${unitCount} is below minimum ${existing.minUnits}`);
+        if (existing.maxUnits !== null && unitCount > existing.maxUnits) failures.push(`Unit count ${unitCount} is above maximum ${existing.maxUnits}`);
+      }
+    }
+    if (failures.length) return { classification: "passed", matchedProductTypes: [`Existing-property criteria not met: ${failures.join("; ")}`] };
+    if (missing.length) return { classification: "review", matchedProductTypes: [`Existing property needs review: ${missing.join("; ")}`] };
+    return { classification: "review", matchedProductTypes: ["Existing-property acquisition criteria met"] };
+  }
+
+  if (!isExistingPurchase && hasConfiguredCriteria(purchaseCriteria.land)) {
+    const failures: string[] = [];
+    const missing: string[] = [];
+    const land = purchaseCriteria.land;
+    if (land.minAcres !== null || land.maxAcres !== null) {
+      if (dealAcreage === null) missing.push("acreage is not verified");
+      else {
+        if (land.minAcres !== null && dealAcreage < land.minAcres) failures.push(`Acreage ${dealAcreage} is below minimum ${land.minAcres}`);
+        if (land.maxAcres !== null && dealAcreage > land.maxAcres) failures.push(`Acreage ${dealAcreage} is above maximum ${land.maxAcres}`);
+      }
+    }
+    if (land.minUnits !== null || land.maxUnits !== null) {
+      const units = numericValue(deal?.maxUnitsByZoning);
+      if (units === null) missing.push("unit capacity is not verified");
+      else {
+        if (land.minUnits !== null && units < land.minUnits) failures.push(`Unit capacity ${units} is below minimum ${land.minUnits}`);
+        if (land.maxUnits !== null && units > land.maxUnits) failures.push(`Unit capacity ${units} is above maximum ${land.maxUnits}`);
+      }
+    }
+    if (failures.length) return { classification: "passed", matchedProductTypes: [`Land criteria not met: ${failures.join("; ")}`] };
+    if (missing.length) return { classification: "review", matchedProductTypes: [`Land deal needs review: ${missing.join("; ")}`] };
   }
 
   const matchedProductTypes = productTypes
