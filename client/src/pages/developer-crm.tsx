@@ -275,6 +275,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
   const [result, setResult] = useState<{
     inserted: number;
     updated: number;
+    visibilityRestored: number;
     skippedDuplicateEmailRows: number;
     skippedInvalidEmailRows: number;
   } | null>(null);
@@ -442,6 +443,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       const totalBatches = Math.ceil(importRows.length / batchSize);
       let inserted = 0;
       let updated = 0;
+      let visibilityRestored = 0;
       let completedRows = 0;
       setImportFailure(null);
       setImportProgress({
@@ -473,6 +475,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
           });
           inserted += Number(data.inserted || 0);
           updated += Number(data.updated || 0);
+          visibilityRestored += Number(data.visibilityRestored || 0);
           completedRows += batch.length;
           setImportProgress({
             completedRows,
@@ -492,6 +495,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       return {
         inserted,
         updated,
+        visibilityRestored,
         skippedDuplicateEmailRows: skippedDuplicateEmailRowIndexes.size,
         skippedInvalidEmailRows: skippedInvalidEmailRowIndexes.size,
       };
@@ -501,7 +505,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
       queryClient.invalidateQueries({ queryKey: [contactsQueryKey] });
       toast({
         title: "Contacts imported",
-        description: `${data.inserted} inserted, ${data.updated} updated, ${data.skippedDuplicateEmailRows} duplicate-email rows skipped, and ${data.skippedInvalidEmailRows} invalid-email rows skipped.`,
+        description: `${data.inserted} inserted, ${data.updated} updated, ${data.visibilityRestored} hidden contacts restored, ${data.skippedDuplicateEmailRows} duplicate-email rows skipped, and ${data.skippedInvalidEmailRows} invalid-email rows skipped.`,
       });
     },
     onError: (error: Error) => toast({ title: "Import failed", description: error.message, variant: "destructive" }),
@@ -1625,7 +1629,7 @@ export default function DeveloperCrm({ adminMode = false }: DeveloperCrmProps) {
               {parsing && <div className="flex items-center justify-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Reading spreadsheet…</div>}
             </div>
           ) : result ? (
-          <div className="py-8 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">✓</div><h3 className="font-semibold text-slate-900">Import complete</h3><p className="mt-2 text-sm text-slate-500">{result.inserted} inserted and {result.updated} updated.</p>{(result.skippedDuplicateEmailRows > 0 || result.skippedInvalidEmailRows > 0) && <p className="mt-2 text-xs text-amber-700">{result.skippedDuplicateEmailRows} duplicate-email rows and {result.skippedInvalidEmailRows} invalid-email rows were skipped.</p>}</div>
+          <div className="py-8 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">✓</div><h3 className="font-semibold text-slate-900">Import complete</h3><p className="mt-2 text-sm text-slate-500">{result.inserted} inserted and {result.updated} updated.</p>{result.visibilityRestored > 0 && <p className="mt-2 text-xs text-emerald-700">{result.visibilityRestored} previously hidden contacts restored to the CRM.</p>}{(result.skippedDuplicateEmailRows > 0 || result.skippedInvalidEmailRows > 0) && <p className="mt-2 text-xs text-amber-700">{result.skippedDuplicateEmailRows} duplicate-email rows and {result.skippedInvalidEmailRows} invalid-email rows were skipped.</p>}</div>
           ) : (
             <div className="space-y-5 py-2">
               <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">

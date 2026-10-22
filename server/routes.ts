@@ -18835,15 +18835,29 @@ RULES:
             END,
             is_active = true,
             updated_at = NOW()
-          RETURNING (xmax = 0) AS was_inserted
+          RETURNING id, (xmax = 0) AS was_inserted
+        ),
+        restored_crm_visibility AS (
+          UPDATE developer_broker_crm AS company_crm
+          SET is_removed = false, updated_at = NOW()
+          FROM upserted
+          WHERE company_crm.broker_id = upserted.id
+            AND company_crm.developer_profile_id = ${developerProfileId}
+            AND company_crm.is_removed = true
+          RETURNING company_crm.id
         )
         SELECT
           COUNT(*) FILTER (WHERE was_inserted)::int AS inserted,
-          COUNT(*) FILTER (WHERE NOT was_inserted)::int AS updated
+          COUNT(*) FILTER (WHERE NOT was_inserted)::int AS updated,
+          (SELECT COUNT(*)::int FROM restored_crm_visibility) AS visibility_restored
         FROM upserted
       `);
       const counts = ((result as any).rows || [])[0] || { inserted: 0, updated: 0 };
-      return res.json({ inserted: Number(counts.inserted || 0), updated: Number(counts.updated || 0) });
+      return res.json({
+        inserted: Number(counts.inserted || 0),
+        updated: Number(counts.updated || 0),
+        visibilityRestored: Number(counts.visibility_restored || 0),
+      });
     } catch (error: any) {
       console.error('[developer-profile/me/import-contacts] Import failed', {
         errorName: error instanceof Error ? error.name : "UnknownError",
