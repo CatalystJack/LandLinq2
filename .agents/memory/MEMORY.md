@@ -73,3 +73,4 @@
 - [Buyer acquisition CSV privacy](buyer-acquisition-csv-privacy.md) — use one selected row to draft criteria; exclude contact and CRM fields from AI input and persistence.
 - [Replit package firewall](replit-package-firewall.md) — trace blocked publish-install packages to their parent and update safe compatible releases instead of bypassing policy.
 - [Real-estate purchase criteria](real-estate-purchase-criteria.md) — support separate company criteria for land purchases and existing-property acquisitions.
+- [Grok bot access](grok-bot-access.md) — broad LandLinq operations are desired, but high-impact actions need approval; Replit code access is separate MCP authorization.

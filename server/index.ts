@@ -668,7 +668,9 @@ setTimeout(() => {
             uploaded_at TIMESTAMP DEFAULT NOW()
           );
         `);
-        await pool.query(`ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS key_plaintext TEXT;`);
+        // API keys are recoverable only at creation time. Keep existing hashes
+        // valid while permanently removing any legacy plaintext copies.
+        await pool.query(`ALTER TABLE api_keys DROP COLUMN IF EXISTS key_plaintext;`);
         await pool.query(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS net_developable_acres DECIMAL(8,2);`);
         await pool.query(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS deal_summary TEXT;`);
         await pool.query(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS senior_loan_pct DECIMAL(5,2);`);

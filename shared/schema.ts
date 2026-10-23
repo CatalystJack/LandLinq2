@@ -4323,7 +4323,6 @@ export const apiKeys = pgTable("api_keys", {
   name: varchar("name").notNull(),
   keyHash: varchar("key_hash").notNull().unique(),
   keyPrefix: varchar("key_prefix").notNull(),
-  keyPlaintext: text("key_plaintext"),
   environment: varchar("environment").notNull().default("live"), // "live" | "test"
   isActive: boolean("is_active").notNull().default(true),
   createdBy: varchar("created_by"),

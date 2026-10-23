@@ -25,7 +25,6 @@ interface ApiKeyRow {
   id: string;
   name: string;
   keyPrefix: string;
-  keyPlaintext?: string;
   environment: "live" | "test";
   isActive: boolean;
   createdBy?: string;
@@ -150,9 +149,12 @@ export default function ApiKeysAdmin() {
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const createKey = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/admin/api-keys", {
-      name: newName, environment: newEnv, notes: newNotes,
-    }),
+    mutationFn: async (): Promise<NewKeyResult> => {
+      const response = await apiRequest("POST", "/api/admin/api-keys", {
+        name: newName, environment: newEnv, notes: newNotes,
+      });
+      return response.json();
+    },
     onSuccess: (data: NewKeyResult) => {
       setRevealed(data);
       setCreateOpen(false);
@@ -424,7 +426,6 @@ export default function ApiKeysAdmin() {
                       apiKey={k}
                       onRevoke={() => revokeKey.mutate(k.id)}
                       onDelete={() => deleteKey.mutate(k.id)}
-                      onCopy={() => copyToClipboard(k.keyPlaintext ?? k.keyPrefix, "API key")}
                       revoking={revokeKey.isPending}
                       deleting={deleteKey.isPending}
                     />
@@ -446,7 +447,6 @@ export default function ApiKeysAdmin() {
                       apiKey={k}
                       onActivate={() => activateKey.mutate(k.id)}
                       onDelete={() => deleteKey.mutate(k.id)}
-                      onCopy={() => {}}
                       revoking={false}
                       deleting={deleteKey.isPending}
                       activating={activateKey.isPending}
@@ -470,7 +470,6 @@ function ApiKeyCard({
   onRevoke,
   onActivate,
   onDelete,
-  onCopy,
   revoking,
   deleting,
   activating,
@@ -479,7 +478,6 @@ function ApiKeyCard({
   onRevoke?: () => void;
   onActivate?: () => void;
   onDelete: () => void;
-  onCopy: () => void;
   revoking: boolean;
   deleting: boolean;
   activating?: boolean;
@@ -498,20 +496,8 @@ function ApiKeyCard({
             </div>
             <div className="flex items-center gap-1.5 mb-2">
               <code className="text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded font-mono select-all">
-                {k.keyPlaintext ?? k.keyPrefix}
+                {k.keyPrefix}
               </code>
-              {k.isActive && (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  className="gap-1 text-xs text-slate-500 hover:border-teal-300 hover:bg-teal-50 hover:text-teal-600"
-                  onClick={onCopy}
-                  title="Copy full key"
-                >
-                  <Copy className="h-3 w-3" />
-                  Copy
-                </Button>
-              )}
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-400">
               <span className="flex items-center gap-1">

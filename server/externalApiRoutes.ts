@@ -608,7 +608,6 @@ export function registerExternalApiRoutes(app: Express) {
           id: apiKeys.id,
           name: apiKeys.name,
           keyPrefix: apiKeys.keyPrefix,
-          keyPlaintext: apiKeys.keyPlaintext,
           environment: apiKeys.environment,
           isActive: apiKeys.isActive,
           createdBy: apiKeys.createdBy,
@@ -629,7 +628,7 @@ export function registerExternalApiRoutes(app: Express) {
   // ── ADMIN: generate key ──────────────────────────────────────────────────────
   app.post("/api/admin/api-keys", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
-      const { name, environment = "live", notes, createdBy } = req.body;
+      const { name, environment = "live", notes } = req.body;
       if (!name) return res.status(400).json({ error: "name is required" });
       if (!["live", "test"].includes(environment)) {
         return res.status(400).json({ error: "environment must be 'live' or 'test'" });
@@ -643,22 +642,20 @@ export function registerExternalApiRoutes(app: Express) {
           name,
           keyHash: hash,
           keyPrefix: prefix,
-          keyPlaintext: key,
           environment,
           notes: notes || null,
-          createdBy: createdBy || null,
+          createdBy: String((req.user as any)?.id || "").slice(0, 255) || null,
           isActive: true,
         } as any)
         .returning({
           id: apiKeys.id,
           name: apiKeys.name,
           keyPrefix: apiKeys.keyPrefix,
-          keyPlaintext: apiKeys.keyPlaintext,
           environment: apiKeys.environment,
           createdAt: apiKeys.createdAt,
         });
 
-      return res.status(201).json({ ...row, key: row.keyPlaintext });
+      return res.status(201).json({ ...row, key });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
