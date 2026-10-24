@@ -44,6 +44,17 @@ interface NewKeyResult extends ApiKeyRow {
   warning: string;
 }
 
+interface BotApproval {
+  id: string;
+  developerProfileId: string;
+  companyName: string;
+  apiKeyId: string;
+  requestType: string;
+  resourceId: string;
+  payload: Record<string, unknown> | null;
+  requestedAt: string;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtDate(s?: string | null) {
@@ -184,6 +195,26 @@ field name: "files"  (up to 10 files, 25 MB each)`,
     returns: `{ "ok": true, "campaign": { "status": "paused", "stepCount": 1 } }`,
   },
   {
+    method: "POST", path: "/api/v1/bot/developer-profiles/:profileId/campaign-drafts/:campaignId/activation-requests", desc: "Request human approval to activate a campaign",
+    body: `{ "senderId": "sender-id" }`,
+    returns: `{ "ok": true, "status": "pending", "approvalRequestId": "..." }`,
+  },
+  {
+    method: "POST", path: "/api/v1/bot/developer-profiles/:profileId/senders/:senderId/signature-change-requests", desc: "Submit a signature for human review",
+    body: `{ "signatureHtml": "<p>Approved company signature draft</p>" }`,
+    returns: `{ "ok": true, "status": "pending", "approvalRequestId": "..." }`,
+  },
+  {
+    method: "POST", path: "/api/v1/bot/developer-profiles/:profileId/senders/:senderId/outlook-connect-requests", desc: "Request approval to connect Outlook",
+    body: null,
+    returns: `{ "ok": true, "status": "pending", "approvalRequestId": "..." }`,
+  },
+  {
+    method: "POST", path: "/api/v1/bot/developer-profiles/:profileId/senders/:senderId/outlook-disconnect-requests", desc: "Request approval to disconnect Outlook",
+    body: null,
+    returns: `{ "ok": true, "status": "pending", "approvalRequestId": "..." }`,
+  },
+  {
     method: "PATCH", path: "/api/v1/investment-companies/:id/criteria", desc: "Partially update buying criteria",
     body: `{
   "targetStates": ["NC", "TN"],
@@ -253,6 +284,18 @@ export default function ApiKeysAdmin() {
   });
   const { data: developerProfiles = [] } = useQuery<Array<{ id: string; companyName: string }>>({
     queryKey: ["/api/admin/api-keys/developer-profiles"],
+  });
+  const { data: approvalsData, isLoading: approvalsLoading } = useQuery<{ approvals: BotApproval[] }>({
+    queryKey: ["/api/admin/bot-action-approvals"],
+  });
+  const decisionMutation = useMutation({
+    mutationFn: ({ id, decision }: { id: string; decision: "approve" | "reject" }) =>
+      apiRequest("POST", `/api/admin/bot-action-approvals/${id}/decision`, { decision }),
+    onSuccess: async (_response, variables) => {
+      toast({ title: variables.decision === "approve" ? "Request approved" : "Request rejected" });
+      await qc.invalidateQueries({ queryKey: ["/api/admin/bot-action-approvals"] });
+    },
+    onError: (error: any) => toast({ title: "Unable to update approval", description: error.message, variant: "destructive" }),
   });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -426,6 +469,41 @@ export default function ApiKeysAdmin() {
             </div>
           </div>
         )}
+
+        <Card className="mb-6 border-amber-200">
+          <CardHeader className="pb-2"><CardTitle className="text-base">Grok action approvals</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {approvalsLoading ? <p className="text-sm text-slate-500">Loading requests…</p>
+              : !approvalsData?.approvals?.length ? <p className="text-sm text-slate-500">No pending requests.</p>
+                : approvalsData.approvals.map((approval) => (
+                  <div key={approval.id} className="rounded-lg border border-slate-200 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm text-slate-800">
+                          {approval.requestType.replaceAll("_", " ")} · {approval.companyName}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          Resource {approval.resourceId} · requested {fmtDate(approval.requestedAt)}
+                        </div>
+                        {approval.requestType === "signature_change" && typeof approval.payload?.signatureHtml === "string" && (
+                          <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-2 text-xs">{approval.payload.signatureHtml}</pre>
+                        )}
+                        {approval.requestType === "campaign_activate" && (
+                          <p className="mt-2 text-xs text-slate-600">Approving activates this campaign for the selected connected sender.</p>
+                        )}
+                        {approval.requestType === "outlook_connect" && (
+                          <p className="mt-2 text-xs text-slate-600">Approval allows the company account owner to start the existing Microsoft OAuth flow. Tokens are never shown here or to Grok.</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => decisionMutation.mutate({ id: approval.id, decision: "approve" })} disabled={decisionMutation.isPending}>Approve</Button>
+                        <Button size="sm" variant="outline" onClick={() => decisionMutation.mutate({ id: approval.id, decision: "reject" })} disabled={decisionMutation.isPending}>Reject</Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+          </CardContent>
+        </Card>
 
         {/* API Reference */}
         {showDocs && (

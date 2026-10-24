@@ -19617,6 +19617,17 @@ RULES:
       `);
       const campaign = owned.rows?.[0] as any;
       if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+      if (body.status === "active" && String(campaign.trigger_tag || "").startsWith(`bot-draft:${developerProfileId}:`)) {
+        const approval = await db.execute(sql`
+          SELECT id FROM bot_action_approvals
+          WHERE developer_profile_id = ${developerProfileId}
+            AND resource_id = ${campaign.id}
+            AND request_type = 'campaign_activate'
+            AND status = 'approved'
+          LIMIT 1
+        `);
+        if (!approval.rows?.length) return res.status(403).json({ error: "A human must approve this bot-created campaign before activation." });
+      }
       if (body.status === "active" && campaign.status !== "active") {
         const targets = await getDeveloperOutreachTargets(developerProfileId);
         if (targets.countyCoverage.recipientsMissingCounty > 0 && req.body?.confirmMissingCounty !== true) {
@@ -19650,7 +19661,8 @@ RULES:
         `);
         await tx.execute(sql`
           UPDATE outreach_campaign_template_steps
-          SET subject = ${body.subject}, content = ${body.content}, day_number = ${body.dayNumber}, updated_at = NOW()
+          SET subject = ${body.subject}, content = ${body.content}, day_number = ${body.dayNumber},
+              is_active = ${body.status === "active"}, updated_at = NOW()
           WHERE template_id = ${templateId} AND sequence_index = 0
         `);
       });
@@ -36363,6 +36375,17 @@ RULES:
         `);
         const ownedSender = senderCheck.rows?.[0] as any;
         if (!ownedSender) return res.status(404).json({ error: 'Sender not found' });
+        const pendingBotRequest = await db.execute(sql`
+          SELECT id FROM bot_action_approvals
+          WHERE developer_profile_id = ${user.developerProfileId}
+            AND resource_id = ${senderId}
+            AND request_type = 'outlook_connect'
+            AND status = 'pending'
+          LIMIT 1
+        `);
+        if (pendingBotRequest.rows?.length) {
+          return res.status(409).json({ error: "A bot-requested Outlook connection is awaiting human approval." });
+        }
         returnUrl = DEVELOPER_OAUTH_FALLBACK_PATH;
       }
 

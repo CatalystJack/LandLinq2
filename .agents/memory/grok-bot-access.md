@@ -3,7 +3,7 @@ name: Grok bot access
 description: The user's desired scope and safety boundaries for a Grok bot integrated with LandLinq and Replit.
 ---
 
-The user wants a Grok bot to broadly control LandLinq, including developer profile management, deal reading and uploads, campaign authoring, Outlook connection management, and signatures. They chose broad access with approval gates for high-impact actions. LandLinq bot credentials must be profile-bound and operation-scoped; the bot API phase supports approved profile fields, scoped deal reads/uploads, and paused campaign drafts only. Sending and Outlook changes remain outside this API until an explicit approval flow is implemented.
+The user wants a Grok bot to broadly control LandLinq, including developer profile management, deal reading and uploads, campaign authoring, Outlook connection management, and signatures. Bot keys remain profile-bound and scope-limited. Campaign drafts stay paused until an authenticated human approves activation, and a company user must still activate them through the normal UI. Signature changes and Outlook disconnections execute only after platform-admin approval. Outlook connection approval hands off to the existing Microsoft OAuth flow; tokens stay server-side and never enter bot responses or logs.
 
 **Why:** Campaign sends, publishing, destructive changes, account access changes, and mailbox connections can have real external or irreversible effects.
 

@@ -4410,6 +4410,23 @@ export const apiChangeLog = pgTable("api_change_log", {
 ]);
 export type ApiChangeLog = typeof apiChangeLog.$inferSelect;
 
+export const botActionApprovals = pgTable("bot_action_approvals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerProfileId: varchar("developer_profile_id").notNull(),
+  apiKeyId: varchar("api_key_id").notNull(),
+  requestType: varchar("request_type").notNull(),
+  resourceId: varchar("resource_id").notNull(),
+  payload: jsonb("payload"),
+  status: varchar("status").notNull().default("pending"),
+  requestedAt: timestamp("requested_at").notNull().defaultNow(),
+  decidedAt: timestamp("decided_at"),
+  decidedBy: varchar("decided_by"),
+  decisionNote: text("decision_note"),
+}, (table) => [
+  index("bot_action_approvals_profile_status_idx").on(table.developerProfileId, table.status),
+  index("bot_action_approvals_requested_idx").on(table.requestedAt),
+]);
+
 export const leadAttachments = pgTable("lead_attachments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   dealId: varchar("deal_id").references(() => deals.id, { onDelete: "cascade" }).notNull(),

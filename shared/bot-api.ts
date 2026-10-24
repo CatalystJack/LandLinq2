@@ -4,6 +4,10 @@ export const BOT_API_SCOPES = [
   "deals:read",
   "deals:upload",
   "campaigns:draft",
+  "campaigns:request_activation",
+  "signatures:request_change",
+  "outlook:request_connection",
+  "outlook:request_disconnection",
 ] as const;
 
 export type BotApiScope = (typeof BOT_API_SCOPES)[number];

@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import {
   apiChangeLog,
+  botActionApprovals,
   brokers,
   developerBrokerCrm,
   developerCountyMarketLabels,
@@ -12,6 +13,8 @@ import {
   outreachCampaigns,
   outreachCampaignTemplates,
   outreachCampaignTemplateSteps,
+  outreachCampaignSteps,
+  outreachSenders,
   partnerDeveloperSends,
   partnerDevelopers,
 } from "@shared/schema";
@@ -27,6 +30,8 @@ import {
   isAccessibleDeveloperCrmContact,
 } from "./developerCrmContacts";
 import { createRateLimit } from "./rateLimiter";
+import { isAuthenticated } from "./auth";
+import { isPlatformAdminEmail } from "@shared/admin-auth";
 
 const adminApiLimiter = createRateLimit({ windowMs: 60_000, maxRequests: 60, message: "Too many API requests. Retry shortly." });
 const contactWriteLimiter = createRateLimit({ windowMs: 60_000, maxRequests: 20, message: "Too many contact changes. Retry shortly." });
@@ -479,6 +484,7 @@ export function registerExternalApiAdminRoutes(app: Express, requireApiKey: Requ
   });
 
   registerBotApiRoutes(app, requireBotApiKey);
+  registerBotApprovalAdminRoutes(app);
 }
 
 function registerBotApiRoutes(app: Express, requireBotApiKey: RequestHandler) {
@@ -802,6 +808,186 @@ function registerBotApiRoutes(app: Express, requireBotApiKey: RequestHandler) {
       return res.status(201).json({ ok: true, campaign });
     } catch (error: any) {
       return res.status(400).json({ error: error.message || "Invalid campaign draft." });
+    }
+  });
+
+  const requestApproval = async (req: any, requestType: string, resourceId: string, payload: any) => {
+    const existing = await db.execute(sql`
+      SELECT id FROM bot_action_approvals
+      WHERE developer_profile_id = ${req.params.profileId}
+        AND request_type = ${requestType} AND resource_id = ${resourceId} AND status = 'pending'
+      LIMIT 1
+    `);
+    if (existing.rows?.length) return { id: existing.rows[0].id, existing: true };
+    const created = await db.execute(sql`
+      INSERT INTO bot_action_approvals
+        (developer_profile_id, api_key_id, request_type, resource_id, payload)
+      VALUES (${req.params.profileId}, ${asApiKeyId(req)}, ${requestType}, ${resourceId}, ${JSON.stringify(payload)}::jsonb)
+      RETURNING id
+    `);
+    return { id: created.rows?.[0]?.id, existing: false };
+  };
+
+  app.get(`${route}/senders`, requireBotApiKey, requireScope("developer_profiles:read"), botReadLimiter, async (req: any, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, name, email, is_active AS "isActive",
+          CASE WHEN outlook_connected AND COALESCE(microsoft_identity_verified, false) THEN 'connected' ELSE 'not_connected' END AS "connectionStatus"
+        FROM outreach_senders
+        WHERE developer_profile_id = ${req.params.profileId}
+        ORDER BY created_at DESC LIMIT 100
+      `);
+      return res.json({ senders: result.rows });
+    } catch {
+      return res.status(500).json({ error: "Unable to load senders." });
+    }
+  });
+
+  app.post(`${route}/campaign-drafts/:campaignId/activation-requests`, requireBotApiKey, requireScope("campaigns:request_activation"), botWriteLimiter, payloadLimit(8 * 1024), async (req: any, res) => {
+    try {
+    const senderId = typeof req.body?.senderId === "string" ? req.body.senderId.trim() : "";
+    if (!senderId || senderId.length > 100) return res.status(400).json({ error: "senderId is required." });
+    const owned = await db.execute(sql`
+      SELECT c.id FROM outreach_campaigns c
+      JOIN outreach_campaign_templates t ON t.id = c.broker_filter->>'templateId'
+      WHERE c.id = ${req.params.campaignId} AND c.developer_profile_id = ${req.params.profileId}
+        AND c.status = 'paused' AND t.team_id = ${req.params.profileId}
+        AND t.hubspot_trigger_tag LIKE ${`bot-draft:${req.params.profileId}:%`}
+      LIMIT 1
+    `);
+    const sender = await db.execute(sql`SELECT id FROM outreach_senders WHERE id = ${senderId} AND developer_profile_id = ${req.params.profileId} LIMIT 1`);
+    if (!owned.rows?.length || !sender.rows?.length) return res.status(404).json({ error: "Campaign or sender not found." });
+    const request = await requestApproval(req, "campaign_activate", req.params.campaignId, { senderId });
+    return res.status(request.existing ? 200 : 201).json({ ok: true, approvalRequestId: request.id, status: "pending" });
+    } catch {
+      return res.status(500).json({ error: "Unable to create activation request." });
+    }
+  });
+
+  app.post(`${route}/senders/:senderId/signature-change-requests`, requireBotApiKey, requireScope("signatures:request_change"), botWriteLimiter, payloadLimit(20 * 1024), async (req: any, res) => {
+    try {
+    const signatureHtml = typeof req.body?.signatureHtml === "string" ? req.body.signatureHtml : null;
+    if (signatureHtml === null || signatureHtml.length > 12_000 || Object.keys(req.body || {}).some((key) => key !== "signatureHtml")) {
+      return res.status(400).json({ error: "Provide signatureHtml up to 12000 characters." });
+    }
+    const sender = await db.execute(sql`SELECT id FROM outreach_senders WHERE id = ${req.params.senderId} AND developer_profile_id = ${req.params.profileId} LIMIT 1`);
+    if (!sender.rows?.length) return res.status(404).json({ error: "Sender not found." });
+    const request = await requestApproval(req, "signature_change", req.params.senderId, { signatureHtml });
+    return res.status(request.existing ? 200 : 201).json({ ok: true, approvalRequestId: request.id, status: "pending" });
+    } catch {
+      return res.status(500).json({ error: "Unable to create signature request." });
+    }
+  });
+
+  for (const [action, scope] of [
+    ["connect", "outlook:request_connection"],
+    ["disconnect", "outlook:request_disconnection"],
+  ] as const) {
+    app.post(`${route}/senders/:senderId/outlook-${action}-requests`, requireBotApiKey, requireScope(scope), botWriteLimiter, payloadLimit(4 * 1024), async (req: any, res) => {
+      try {
+      const sender = await db.execute(sql`SELECT id FROM outreach_senders WHERE id = ${req.params.senderId} AND developer_profile_id = ${req.params.profileId} LIMIT 1`);
+      if (!sender.rows?.length) return res.status(404).json({ error: "Sender not found." });
+      const request = await requestApproval(req, `outlook_${action}`, req.params.senderId, null);
+      return res.status(request.existing ? 200 : 201).json({ ok: true, approvalRequestId: request.id, status: "pending" });
+      } catch {
+        return res.status(500).json({ error: "Unable to create Outlook approval request." });
+      }
+    });
+  }
+}
+
+function registerBotApprovalAdminRoutes(app: Express) {
+  const requireAdmin: RequestHandler = (req: any, res, next) => {
+    if (!isPlatformAdminEmail(req.user?.claims?.email || req.user?.email)) {
+      return res.status(403).json({ error: "Platform administrator access required." });
+    }
+    next();
+  };
+  app.get("/api/admin/bot-action-approvals", isAuthenticated, requireAdmin, async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT a.id, a.developer_profile_id AS "developerProfileId", p.company_name AS "companyName",
+          a.api_key_id AS "apiKeyId", a.request_type AS "requestType", a.resource_id AS "resourceId",
+          a.payload, a.requested_at AS "requestedAt"
+        FROM bot_action_approvals a
+        JOIN developer_profiles p ON p.id = a.developer_profile_id
+        WHERE a.status = 'pending'
+        ORDER BY a.requested_at ASC LIMIT 100
+      `);
+      return res.json({ approvals: result.rows });
+    } catch {
+      return res.status(500).json({ error: "Unable to load approval requests." });
+    }
+  });
+  app.post("/api/admin/bot-action-approvals/:id/decision", isAuthenticated, requireAdmin, async (req: any, res) => {
+    const decision = req.body?.decision;
+    if (!["approve", "reject"].includes(decision)) return res.status(400).json({ error: "decision must be approve or reject." });
+    try {
+      const saved = await db.transaction(async (tx) => {
+        const locked = await tx.execute(sql`SELECT * FROM bot_action_approvals WHERE id = ${req.params.id} FOR UPDATE`);
+        const request = locked.rows?.[0] as any;
+        if (!request || request.status !== "pending") throw Object.assign(new Error("Request is no longer pending."), { status: 409 });
+        const payload = request.payload || {};
+        if (decision === "approve" && request.request_type === "signature_change") {
+          const updated = await tx.execute(sql`
+            UPDATE outreach_senders SET signature_html = ${payload.signatureHtml}, updated_at = NOW()
+            WHERE id = ${request.resource_id} AND developer_profile_id = ${request.developer_profile_id} RETURNING id
+          `);
+          if (!updated.rows?.length) throw Object.assign(new Error("Sender not found."), { status: 404 });
+        } else if (decision === "approve" && request.request_type === "outlook_disconnect") {
+          const disconnected = await tx.execute(sql`
+            UPDATE outreach_senders SET outlook_connected = false, microsoft_access_token = NULL,
+              microsoft_refresh_token = NULL, microsoft_token_expiry = NULL, microsoft_user_id = NULL,
+              microsoft_identity_verified = false, updated_at = NOW()
+            WHERE id = ${request.resource_id} AND developer_profile_id = ${request.developer_profile_id}
+            RETURNING id
+          `);
+          if (!disconnected.rows?.length) throw Object.assign(new Error("Sender not found for this company."), { status: 404 });
+        } else if (decision === "approve" && request.request_type === "campaign_activate") {
+          const campaign = await tx.execute(sql`
+            SELECT c.id, t.id AS template_id FROM outreach_campaigns c
+            JOIN outreach_campaign_templates t ON t.id = c.broker_filter->>'templateId'
+            JOIN outreach_senders s ON s.id = ${payload.senderId}
+              AND s.developer_profile_id = c.developer_profile_id AND s.is_active = true
+              AND s.outlook_connected = true AND s.microsoft_access_token IS NOT NULL
+              AND COALESCE(s.microsoft_identity_verified, false) = true
+            WHERE c.id = ${request.resource_id} AND c.developer_profile_id = ${request.developer_profile_id}
+              AND c.status = 'paused' AND t.team_id = ${request.developer_profile_id}
+              AND t.hubspot_trigger_tag LIKE ${`bot-draft:${request.developer_profile_id}:%`}
+            LIMIT 1
+          `);
+          if (!campaign.rows?.length) throw Object.assign(new Error("Campaign or connected sender is not ready for activation."), { status: 409 });
+          // Approval records the review and selected sender, but leaves the
+          // draft paused. A company user must still activate it in the normal UI.
+          await tx.execute(sql`
+            UPDATE outreach_campaigns SET
+              broker_filter = COALESCE(broker_filter, '{}'::jsonb) || ${JSON.stringify({ senderId: payload.senderId })}::jsonb,
+              updated_at = NOW()
+            WHERE id = ${request.resource_id} AND developer_profile_id = ${request.developer_profile_id}
+          `);
+        }
+        const actorId = String(req.user?.id || req.user?.claims?.sub || "").slice(0, 255);
+        const updated = await tx.execute(sql`
+          UPDATE bot_action_approvals
+          SET status = ${decision === "approve" ? "approved" : "rejected"}, decided_at = NOW(),
+              decided_by = ${actorId || null},
+              decision_note = ${typeof req.body?.note === "string" ? req.body.note.slice(0, 1000) : null},
+              payload = CASE WHEN request_type = 'signature_change' THEN NULL ELSE payload END
+          WHERE id = ${request.id} AND status = 'pending'
+          RETURNING id, developer_profile_id AS "developerProfileId", request_type AS "requestType", status
+        `);
+        await insertAudit(tx, request.api_key_id, "/api/admin/bot-action-approvals/:id/decision",
+          "bot_action_approval", request.id, { status: "pending" }, { status: decision, requestType: request.request_type, actorId });
+        return updated.rows?.[0];
+      });
+      return res.json({ ok: true, approval: saved,
+        nextStep: saved.requestType === "outlook_connect" && decision === "approve"
+          ? "The company account owner can now initiate the existing Outlook OAuth flow. No token is returned to the bot."
+          : saved.requestType === "campaign_activate" && decision === "approve"
+            ? "Review approved. The company user must still activate the paused campaign in the normal outreach UI."
+            : undefined });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.status ? error.message : "Unable to decide approval request." });
     }
   });
 }

@@ -699,6 +699,25 @@ setTimeout(() => {
             ON api_change_log (entity_type, entity_id);
           ALTER TABLE developer_profiles ADD COLUMN IF NOT EXISTS criteria_notes TEXT;
         `);
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS bot_action_approvals (
+            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+            developer_profile_id VARCHAR NOT NULL,
+            api_key_id VARCHAR NOT NULL,
+            request_type VARCHAR NOT NULL,
+            resource_id VARCHAR NOT NULL,
+            payload JSONB,
+            status VARCHAR NOT NULL DEFAULT 'pending',
+            requested_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            decided_at TIMESTAMP,
+            decided_by VARCHAR,
+            decision_note TEXT
+          );
+          CREATE INDEX IF NOT EXISTS bot_action_approvals_profile_status_idx
+            ON bot_action_approvals (developer_profile_id, status);
+          CREATE INDEX IF NOT EXISTS bot_action_approvals_requested_idx
+            ON bot_action_approvals (requested_at);
+        `);
         await pool.query(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS net_developable_acres DECIMAL(8,2);`);
         await pool.query(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS deal_summary TEXT;`);
         await pool.query(`ALTER TABLE deals ADD COLUMN IF NOT EXISTS senior_loan_pct DECIMAL(5,2);`);
