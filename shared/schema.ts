@@ -66,6 +66,14 @@ export const developerProfiles = pgTable("developer_profiles", {
   compSearchRadiusMiles: decimal("comp_search_radius_miles").default("3"),
   compMinVintageYear: integer("comp_min_vintage_year"),
   compMinUnits: integer("comp_min_units"),
+  minCapRate: decimal("min_cap_rate", { precision: 6, scale: 3 }),
+  maxCapRate: decimal("max_cap_rate", { precision: 6, scale: 3 }),
+  minPrice: decimal("min_price", { precision: 14, scale: 2 }),
+  maxPrice: decimal("max_price", { precision: 14, scale: 2 }),
+  minUnitCount: integer("min_unit_count"),
+  maxUnitCount: integer("max_unit_count"),
+  minYearBuilt: integer("min_year_built"),
+  maxYearBuilt: integer("max_year_built"),
 
   // Legacy flat defaults retained for older integrations; classification reads
   // the product-type criteria below.
@@ -221,6 +229,54 @@ export const insertDeveloperProfileSchema = createInsertSchema(developerProfiles
 });
 export type DeveloperProfile = typeof developerProfiles.$inferSelect;
 export type InsertDeveloperProfile = z.infer<typeof insertDeveloperProfileSchema>;
+
+const nullableNonNegativeNumber = z.preprocess(
+  (value) => value === "" || value === undefined ? null : value,
+  z.coerce.number().finite().min(0).nullable(),
+);
+const nullableRatePercent = z.preprocess(
+  (value) => value === "" || value === undefined ? null : value,
+  z.coerce.number().finite().min(0).max(100).nullable(),
+);
+const nullableNonNegativeInteger = z.preprocess(
+  (value) => value === "" || value === undefined ? null : value,
+  z.coerce.number().finite().int().min(0).nullable(),
+);
+const nullableYear = z.preprocess(
+  (value) => value === "" || value === undefined ? null : value,
+  z.coerce.number().finite().int().min(1800).max(2100).nullable(),
+);
+const developerAcquisitionRangeFields = {
+  minCapRate: nullableRatePercent,
+  maxCapRate: nullableRatePercent,
+  minPrice: nullableNonNegativeNumber,
+  maxPrice: nullableNonNegativeNumber,
+  minUnitCount: nullableNonNegativeInteger,
+  maxUnitCount: nullableNonNegativeInteger,
+  minYearBuilt: nullableYear,
+  maxYearBuilt: nullableYear,
+};
+export const developerAcquisitionRangePatchSchema = z.object(developerAcquisitionRangeFields).partial();
+export const developerAcquisitionRangesSchema = z.object(developerAcquisitionRangeFields).superRefine((value, context) => {
+  const pairs = [
+    ["minCapRate", "maxCapRate", "Cap rate"],
+    ["minPrice", "maxPrice", "Price"],
+    ["minUnitCount", "maxUnitCount", "Unit count"],
+    ["minYearBuilt", "maxYearBuilt", "Year built"],
+  ] as const;
+  for (const [minimum, maximum, label] of pairs) {
+    const min = value[minimum];
+    const max = value[maximum];
+    if (min !== null && max !== null && min > max) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [maximum],
+        message: `${label} maximum must be at least the minimum`,
+      });
+    }
+  }
+});
+export type DeveloperAcquisitionRanges = z.infer<typeof developerAcquisitionRangesSchema>;
 
 // User storage table
 export const users = pgTable("users", {
@@ -578,6 +634,7 @@ export const deals = pgTable("deals", {
   totalProjectCost: decimal("total_project_cost", { precision: 12, scale: 2 }),
   projectedNOI: decimal("projected_noi", { precision: 12, scale: 2 }),
   marketCapRate: decimal("market_cap_rate", { precision: 5, scale: 3 }),
+  capRate: decimal("cap_rate", { precision: 5, scale: 3 }),
   // Excel UW extraction — additional pro-forma line items (from analyst-uploaded templates)
   projectedGPR: decimal("projected_gpr", { precision: 12, scale: 2 }),          // Gross Potential Rent (annual $)
   projectedEGI: decimal("projected_egi", { precision: 12, scale: 2 }),          // Effective Gross Income (annual $)

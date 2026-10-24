@@ -425,7 +425,20 @@ function DealStatus({ row, industrial, ruralLand = false }: { row: DeveloperDeal
       </div>
     );
   }
-  return <Badge className="border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-100">Passed</Badge>;
+  const screeningResults = (row.matchedProductTypes || []).filter((reason) => reason.startsWith("Screening:"));
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Badge className="border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-100">Passed</Badge>
+      {screeningResults.map((reason) => {
+        const tone = reason.includes(" FAIL |")
+          ? "border-red-200 bg-red-50 text-red-700"
+          : reason.includes(" UNKNOWN |")
+            ? "border-amber-200 bg-amber-50 text-amber-700"
+            : "border-emerald-200 bg-emerald-50 text-emerald-700";
+        return <Badge key={reason} variant="outline" className={tone}>{reason.replace("Screening: ", "")}</Badge>;
+      })}
+    </div>
+  );
 }
 
 type DeveloperDealsResponse = {

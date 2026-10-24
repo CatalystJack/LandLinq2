@@ -62,6 +62,14 @@ type Profile = {
   industrialCriteria: IndustrialCriteria;
   ruralLandCriteria: RuralLandCriteria;
   purchaseCriteria: PurchaseCriteria;
+  minCapRate: string;
+  maxCapRate: string;
+  minPrice: string;
+  maxPrice: string;
+  minUnitCount: string;
+  maxUnitCount: string;
+  minYearBuilt: string;
+  maxYearBuilt: string;
   primaryColor: string | null;
   secondaryColor: string | null;
   outreachTestModeEnabled: boolean;
@@ -85,9 +93,21 @@ type Profile = {
   crmSharedContactsEnabled: boolean;
 };
 
-type ProfileUpdate = Omit<Partial<Profile>, "compMinVintageYear" | "compMinUnits"> & {
+type ProfileUpdate = Omit<Partial<Profile>,
+  "compMinVintageYear" | "compMinUnits" |
+  "minCapRate" | "maxCapRate" | "minPrice" | "maxPrice" |
+  "minUnitCount" | "maxUnitCount" | "minYearBuilt" | "maxYearBuilt"
+> & {
   compMinVintageYear?: string | null;
   compMinUnits?: string | null;
+  minCapRate?: string | null;
+  maxCapRate?: string | null;
+  minPrice?: string | null;
+  maxPrice?: string | null;
+  minUnitCount?: string | null;
+  maxUnitCount?: string | null;
+  minYearBuilt?: string | null;
+  maxYearBuilt?: string | null;
 };
 
 type ContactFilterOptions = {
@@ -286,6 +306,14 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
         industrialCriteria: profile.industrialCriteria || DEFAULT_INDUSTRIAL_CRITERIA,
         ruralLandCriteria: profile.ruralLandCriteria || DEFAULT_RURAL_LAND_CRITERIA,
         purchaseCriteria: normalizePurchaseCriteria(profile.purchaseCriteria || DEFAULT_PURCHASE_CRITERIA),
+        minCapRate: profile.minCapRate == null ? "" : String(profile.minCapRate),
+        maxCapRate: profile.maxCapRate == null ? "" : String(profile.maxCapRate),
+        minPrice: profile.minPrice == null ? "" : String(profile.minPrice),
+        maxPrice: profile.maxPrice == null ? "" : String(profile.maxPrice),
+        minUnitCount: profile.minUnitCount == null ? "" : String(profile.minUnitCount),
+        maxUnitCount: profile.maxUnitCount == null ? "" : String(profile.maxUnitCount),
+        minYearBuilt: profile.minYearBuilt == null ? "" : String(profile.minYearBuilt),
+        maxYearBuilt: profile.maxYearBuilt == null ? "" : String(profile.maxYearBuilt),
         targetStates: Array.from(new Set((profile.targetStates || []).map(normalizeUsStateCode).filter(Boolean))),
         targetCounties: profile.targetCounties || [],
         productTypes: (profile.productTypes || []).map((productType) => ({
@@ -346,6 +374,14 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
         ...data.profile,
         compMinVintageYear: data.profile.compMinVintageYear == null ? "" : String(data.profile.compMinVintageYear),
         compMinUnits: data.profile.compMinUnits == null ? "" : String(data.profile.compMinUnits),
+        minCapRate: data.profile.minCapRate == null ? "" : String(data.profile.minCapRate),
+        maxCapRate: data.profile.maxCapRate == null ? "" : String(data.profile.maxCapRate),
+        minPrice: data.profile.minPrice == null ? "" : String(data.profile.minPrice),
+        maxPrice: data.profile.maxPrice == null ? "" : String(data.profile.maxPrice),
+        minUnitCount: data.profile.minUnitCount == null ? "" : String(data.profile.minUnitCount),
+        maxUnitCount: data.profile.maxUnitCount == null ? "" : String(data.profile.maxUnitCount),
+        minYearBuilt: data.profile.minYearBuilt == null ? "" : String(data.profile.minYearBuilt),
+        maxYearBuilt: data.profile.maxYearBuilt == null ? "" : String(data.profile.maxYearBuilt),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({ title: "Settings saved", description: "Your company criteria are up to date." });
@@ -488,6 +524,17 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
     } : current);
   };
 
+  const acquisitionRangePayload = (profile: Profile) => ({
+    minCapRate: profile.minCapRate === "" ? null : profile.minCapRate,
+    maxCapRate: profile.maxCapRate === "" ? null : profile.maxCapRate,
+    minPrice: profile.minPrice === "" ? null : profile.minPrice,
+    maxPrice: profile.maxPrice === "" ? null : profile.maxPrice,
+    minUnitCount: profile.minUnitCount === "" ? null : profile.minUnitCount,
+    maxUnitCount: profile.maxUnitCount === "" ? null : profile.maxUnitCount,
+    minYearBuilt: profile.minYearBuilt === "" ? null : profile.minYearBuilt,
+    maxYearBuilt: profile.maxYearBuilt === "" ? null : profile.maxYearBuilt,
+  });
+
   const updateTargetStates = (nextStates: string[]) => {
     if (!form) return;
     const normalizedNextStates = Array.from(new Set(nextStates.map(normalizeUsStateCode).filter(Boolean)));
@@ -543,8 +590,22 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
       });
       return;
     }
+    const rangePairs = [
+      ["minCapRate", "maxCapRate", "Cap rate"],
+      ["minPrice", "maxPrice", "Price"],
+      ["minUnitCount", "maxUnitCount", "Unit count"],
+      ["minYearBuilt", "maxYearBuilt", "Year built"],
+    ] as const;
+    for (const [minimum, maximum, label] of rangePairs) {
+      if (form[minimum] !== "" && form[maximum] !== "" &&
+          Number(form[minimum]) > Number(form[maximum])) {
+        toast({ title: `${label} maximum must be at least the minimum`, variant: "destructive" });
+        return;
+      }
+    }
     if (form.assetClass === "industrial") {
       saveMutation.mutate({
+        ...acquisitionRangePayload(form),
         assetClass: "industrial",
         industrialCriteria: form.industrialCriteria,
         purchaseCriteria: form.purchaseCriteria,
@@ -563,6 +624,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
     }
     if (form.assetClass === "rural_land") {
       saveMutation.mutate({
+        ...acquisitionRangePayload(form),
         assetClass: "rural_land",
         ruralLandCriteria: form.ruralLandCriteria,
         purchaseCriteria: form.purchaseCriteria,
@@ -627,6 +689,7 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
       }
     }
     saveMutation.mutate({
+      ...acquisitionRangePayload(form),
       purchaseCriteria: form.purchaseCriteria,
       targetStates: form.targetStates,
       targetCounties: form.targetCounties,
@@ -1000,6 +1063,44 @@ export default function DeveloperCriteriaSettings({ criteriaOnly = false }: { cr
               <CardTitle>No criteria editor for this asset class</CardTitle>
               <CardDescription>This company’s current asset class does not have an editable criteria set on this page.</CardDescription>
             </CardHeader>
+          </Card>}
+          {form.profileType === "real_estate" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+            <CardHeader>
+              <CardTitle>Acquisition screening ranges</CardTitle>
+              <CardDescription>
+                Optional limits for cap rate, asking price, unit count, and year built. Leave either side blank for an open-ended range. Missing deal data is reported as unknown, not as a failed criterion.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <section className="space-y-3 rounded-xl border border-slate-200 p-4">
+                <h3 className="font-semibold text-slate-900">Cap rate (%)</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <NumberField label="Minimum" value={form.minCapRate} onChange={(value) => update("minCapRate", value)} max={100} />
+                  <NumberField label="Maximum" value={form.maxCapRate} onChange={(value) => update("maxCapRate", value)} max={100} placeholder="No maximum" />
+                </div>
+              </section>
+              <section className="space-y-3 rounded-xl border border-slate-200 p-4">
+                <h3 className="font-semibold text-slate-900">Price ($)</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <NumberField label="Minimum" value={form.minPrice} onChange={(value) => update("minPrice", value)} step={1000} />
+                  <NumberField label="Maximum" value={form.maxPrice} onChange={(value) => update("maxPrice", value)} step={1000} placeholder="No maximum" />
+                </div>
+              </section>
+              <section className="space-y-3 rounded-xl border border-slate-200 p-4">
+                <h3 className="font-semibold text-slate-900">Unit count</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <NumberField label="Minimum" value={form.minUnitCount} onChange={(value) => update("minUnitCount", value)} step={1} />
+                  <NumberField label="Maximum" value={form.maxUnitCount} onChange={(value) => update("maxUnitCount", value)} step={1} placeholder="No maximum" />
+                </div>
+              </section>
+              <section className="space-y-3 rounded-xl border border-slate-200 p-4">
+                <h3 className="font-semibold text-slate-900">Year built</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <NumberField label="Minimum" value={form.minYearBuilt} onChange={(value) => update("minYearBuilt", value)} min={1800} max={2100} step={1} />
+                  <NumberField label="Maximum" value={form.maxYearBuilt} onChange={(value) => update("maxYearBuilt", value)} min={1800} max={2100} step={1} placeholder="No maximum" />
+                </div>
+              </section>
+            </CardContent>
           </Card>}
           {form.profileType === "real_estate" && form.assetClass === "multifamily" && <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
             <CardHeader>

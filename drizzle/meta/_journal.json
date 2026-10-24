@@ -29,6 +29,20 @@
       "when": 1789748641964,
       "tag": "0003_add_automated_irr_underwriting",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792867152222,
+      "tag": "0004_add_developer_acquisition_ranges",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792867200000,
+      "tag": "0005_add_deal_acquisition_cap_rate",
+      "breakpoints": true
     }
   ]
 }

@@ -16865,7 +16865,13 @@ RULES:
     try {
       const developerProfileId = getDeveloperProfileId(req, res);
       if (!developerProfileId) return;
-      const { developerCountyMarketLabels, developerProductTypes, developerProfiles } = await import('@shared/schema');
+      const {
+        developerCountyMarketLabels,
+        developerProductTypes,
+        developerProfiles,
+        developerAcquisitionRangePatchSchema,
+        developerAcquisitionRangesSchema,
+      } = await import('@shared/schema');
       const body = req.body || {};
       const updates: Record<string, any> = {};
       const [currentProfile] = await db.select({
@@ -16878,12 +16884,45 @@ RULES:
         targetStates: developerProfiles.targetStates,
         compMinVintageYear: developerProfiles.compMinVintageYear,
         compMinUnits: developerProfiles.compMinUnits,
+        minCapRate: developerProfiles.minCapRate,
+        maxCapRate: developerProfiles.maxCapRate,
+        minPrice: developerProfiles.minPrice,
+        maxPrice: developerProfiles.maxPrice,
+        minUnitCount: developerProfiles.minUnitCount,
+        maxUnitCount: developerProfiles.maxUnitCount,
+        minYearBuilt: developerProfiles.minYearBuilt,
+        maxYearBuilt: developerProfiles.maxYearBuilt,
       }).from(developerProfiles).where(and(
         eq(developerProfiles.id, developerProfileId),
         eq(developerProfiles.isActive, true),
       )).limit(1);
       if (!currentProfile) return res.status(404).json({ error: 'Investment Company profile not found' });
       const isGeneralSales = currentProfile.profileType === 'general_sales';
+      const rangeFields = [
+        "minCapRate", "maxCapRate", "minPrice", "maxPrice",
+        "minUnitCount", "maxUnitCount", "minYearBuilt", "maxYearBuilt",
+      ] as const;
+      const rangePatch = developerAcquisitionRangePatchSchema.safeParse(body);
+      if (!rangePatch.success) throw new Error(rangePatch.error.issues[0]?.message || "Invalid acquisition ranges");
+      const hasRangePatch = rangeFields.some((field) => body[field] !== undefined);
+      if (hasRangePatch) {
+        if (isGeneralSales) throw new Error("Acquisition ranges are not available to General Sales profiles");
+        const mergedRanges = Object.fromEntries(rangeFields.map((field) => [
+          field,
+          body[field] === undefined ? currentProfile[field] : body[field],
+        ]));
+        const ranges = developerAcquisitionRangesSchema.safeParse(mergedRanges);
+        if (!ranges.success) throw new Error(ranges.error.issues[0]?.message || "Invalid acquisition ranges");
+        for (const field of rangeFields) {
+          if (body[field] === undefined) continue;
+          const value = ranges.data[field];
+          updates[field] = value === null
+            ? null
+            : field === "minCapRate" || field === "maxCapRate" || field === "minPrice" || field === "maxPrice"
+              ? String(value)
+              : value;
+        }
+      }
       const effectiveAssetClass = isGeneralSales
         ? "multifamily"
         : body.assetClass ?? currentProfile.assetClass ?? "multifamily";

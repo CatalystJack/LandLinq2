@@ -65,6 +65,40 @@ function numericValue(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+type AcquisitionRangeField = "minCapRate" | "maxCapRate" | "minPrice" | "maxPrice" |
+  "minUnitCount" | "maxUnitCount" | "minYearBuilt" | "maxYearBuilt";
+
+function acquisitionRangeResults(deal: any, profile: DeveloperProfile): { reasons: string[]; failed: boolean } {
+  const checks: Array<{
+    label: string; value: unknown; min: unknown; max: unknown;
+    format: (value: number) => string;
+  }> = [
+    { label: "Cap rate", value: deal?.capRate, min: profile.minCapRate, max: profile.maxCapRate, format: (value) => `${value}%` },
+    { label: "Price", value: deal?.askingPrice, min: profile.minPrice, max: profile.maxPrice, format: (value) => `$${Math.round(value).toLocaleString("en-US")}` },
+    { label: "Unit count", value: deal?.unitCount, min: profile.minUnitCount, max: profile.maxUnitCount, format: (value) => Math.round(value).toLocaleString("en-US") },
+    { label: "Year built", value: deal?.vintage ?? deal?.yearBuilt, min: profile.minYearBuilt, max: profile.maxYearBuilt, format: (value) => String(Math.round(value)) },
+  ];
+  const reasons: string[] = [];
+  let failed = false;
+  for (const check of checks) {
+    const min = numericValue(check.min);
+    const max = numericValue(check.max);
+    if (min === null && max === null) continue;
+    const value = numericValue(check.value);
+    const range = min !== null && max !== null
+      ? `${check.format(min)}–${check.format(max)}`
+      : min !== null ? `≥ ${check.format(min)}` : `≤ ${check.format(max!)}`;
+    if (value === null) {
+      reasons.push(`Screening: ${check.label} UNKNOWN | deal value unavailable | range ${range}`);
+      continue;
+    }
+    const inRange = (min === null || value >= min) && (max === null || value <= max);
+    if (!inRange) failed = true;
+    reasons.push(`Screening: ${check.label} ${inRange ? "PASS" : "FAIL"} | deal ${check.format(value)} | range ${range}`);
+  }
+  return { reasons, failed };
+}
+
 export function isDealInProfileMarket(deal: any, profile: DeveloperProfile): boolean {
   return (profile.targetCounties || []).some((target) =>
     countyTargetMatchesDeal(target, deal?.county, deal?.state),
@@ -92,7 +126,7 @@ function hasDesignation(
  * affordable-housing rent override); "passed" means it does not. This is
  * intentionally separate from Catalyst's internal green/yellow/red grading.
  */
-export function classifyDealForProfile(
+function classifyDealForProfileCore(
   deal: any,
   profile: DeveloperProfile,
   productTypes: DeveloperProductType[],
@@ -267,5 +301,24 @@ export function classifyDealForProfile(
   return {
     classification: matchedProductTypes.length ? "review" : "passed",
     matchedProductTypes,
+  };
+}
+
+export function classifyDealForProfile(
+  deal: any,
+  profile: DeveloperProfile,
+  productTypes: DeveloperProductType[],
+): DeveloperClassificationResult {
+  const result = classifyDealForProfileCore(deal, profile, productTypes);
+  if (profile.profileType === "general_sales") return result;
+  const range = acquisitionRangeResults(deal, profile);
+  if (!range.reasons.length) return result;
+  const failureClassification: DealClassification =
+    profile.assetClass === "industrial" || profile.assetClass === "rural_land"
+      ? "red"
+      : "passed";
+  return {
+    classification: range.failed ? failureClassification : result.classification,
+    matchedProductTypes: [...result.matchedProductTypes, ...range.reasons],
   };
 }
