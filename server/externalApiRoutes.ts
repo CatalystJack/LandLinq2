@@ -26,6 +26,7 @@ import crypto from "crypto";
 import multer from "multer";
 import { createRateLimit } from "./rateLimiter";
 import { registerExternalApiAdminRoutes } from "./externalApiAdminRoutes";
+import { BOT_API_SCOPES } from "@shared/bot-api";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const parsedDealApiLimiter = createRateLimit({
@@ -50,27 +51,45 @@ function generateKey(env: "live" | "test"): { key: string; prefix: string; hash:
 
 // ── API Key middleware ────────────────────────────────────────────────────────
 
-export async function requireApiKey(req: Request, res: Response, next: NextFunction) {
+async function authenticateApiKey(req: Request, res: Response, next: NextFunction, keyType: "legacy" | "bot") {
   const rawKey = (req.headers["x-api-key"] as string) || (req.headers["authorization"] || "").replace(/^Bearer\s+/i, "");
   if (!rawKey) {
     return res.status(401).json({ error: "Missing API key. Send X-API-Key header." });
   }
 
-  const hash = sha256(rawKey);
-  const rows = await db.select().from(apiKeys).where(eq(apiKeys.keyHash, hash)).limit(1);
-  if (!rows.length || !rows[0].isActive) {
-    return res.status(401).json({ error: "Invalid or revoked API key." });
+  try {
+    const hash = sha256(rawKey);
+    const rows = await db.select().from(apiKeys).where(eq(apiKeys.keyHash, hash)).limit(1);
+    const row = rows[0];
+    if (!row || !row.isActive) {
+      return res.status(401).json({ error: "Invalid or revoked API key." });
+    }
+    if ((row.keyType || "legacy") !== keyType) {
+      return res.status(403).json({ error: keyType === "bot" ? "A scoped bot API key is required." : "This API key is restricted to the bot API." });
+    }
+    if (keyType === "bot" && (!row.developerProfileId || !Array.isArray(row.scopes) || row.scopes.some((scope) => !BOT_API_SCOPES.includes(scope as any)))) {
+      return res.status(403).json({ error: "Bot API key configuration is invalid." });
+    }
+
+    db.update(apiKeys)
+      .set({ lastUsedAt: new Date(), totalCalls: (row.totalCalls ?? 0) + 1 })
+      .where(eq(apiKeys.id, row.id))
+      .catch(() => {});
+
+    (req as any).apiKeyRow = row;
+    (req as any).isSandbox = row.environment === "test";
+    next();
+  } catch {
+    return res.status(500).json({ error: "Unable to authenticate API key." });
   }
+}
 
-  // Update usage stats (fire-and-forget)
-  db.update(apiKeys)
-    .set({ lastUsedAt: new Date(), totalCalls: (rows[0].totalCalls ?? 0) + 1 })
-    .where(eq(apiKeys.id, rows[0].id))
-    .catch(() => {});
+export function requireApiKey(req: Request, res: Response, next: NextFunction) {
+  return authenticateApiKey(req, res, next, "legacy");
+}
 
-  (req as any).apiKeyRow = rows[0];
-  (req as any).isSandbox = rows[0].environment === "test";
-  next();
+export function requireBotApiKey(req: Request, res: Response, next: NextFunction) {
+  return authenticateApiKey(req, res, next, "bot");
 }
 
 function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
@@ -118,7 +137,7 @@ async function upsertBrokerByEmail(opts: {
 // ── Register routes ────────────────────────────────────────────────────────────
 
 export function registerExternalApiRoutes(app: Express) {
-  registerExternalApiAdminRoutes(app, requireApiKey);
+  registerExternalApiAdminRoutes(app, requireApiKey, requireBotApiKey);
 
   // ── Public health check ──────────────────────────────────────────────────────
   app.get("/api/v1/ping", (_req, res) => {
@@ -618,6 +637,9 @@ export function registerExternalApiRoutes(app: Express) {
           createdAt: apiKeys.createdAt,
           revokedAt: apiKeys.revokedAt,
           notes: apiKeys.notes,
+          keyType: apiKeys.keyType,
+          developerProfileId: apiKeys.developerProfileId,
+          scopes: apiKeys.scopes,
         })
         .from(apiKeys)
         .orderBy(desc(apiKeys.createdAt));
@@ -627,13 +649,46 @@ export function registerExternalApiRoutes(app: Express) {
     }
   });
 
+  app.get("/api/admin/api-keys/developer-profiles", isAuthenticated, requirePlatformAdmin, async (_req, res) => {
+    try {
+      const profiles = await db.select({
+        id: developerProfiles.id,
+        companyName: developerProfiles.companyName,
+      }).from(developerProfiles).where(and(
+        eq(developerProfiles.isActive, true),
+        or(eq(developerProfiles.isInternal, false), isNull(developerProfiles.isInternal)),
+      )).orderBy(developerProfiles.companyName);
+      return res.json(profiles);
+    } catch {
+      return res.status(500).json({ error: "Unable to load Investment Companies." });
+    }
+  });
+
   // ── ADMIN: generate key ──────────────────────────────────────────────────────
   app.post("/api/admin/api-keys", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
-      const { name, environment = "live", notes } = req.body;
-      if (!name) return res.status(400).json({ error: "name is required" });
+      const { name, environment = "live", notes, keyType = "legacy", developerProfileId, scopes = [] } = req.body || {};
+      if (typeof name !== "string" || !name.trim() || name.length > 120) return res.status(400).json({ error: "name is required and must be 120 characters or fewer" });
       if (!["live", "test"].includes(environment)) {
         return res.status(400).json({ error: "environment must be 'live' or 'test'" });
+      }
+      if (!["legacy", "bot"].includes(keyType)) return res.status(400).json({ error: "keyType must be legacy or bot" });
+      if (!Array.isArray(scopes) || scopes.some((scope: unknown) => typeof scope !== "string" || !BOT_API_SCOPES.includes(scope as any))) {
+        return res.status(400).json({ error: "scopes contains an unsupported bot operation" });
+      }
+      let botProfileId: string | null = null;
+      if (keyType === "bot") {
+        botProfileId = typeof developerProfileId === "string" ? developerProfileId.trim() : "";
+        if (!botProfileId) return res.status(400).json({ error: "A developer profile is required for bot keys." });
+        if (scopes.length === 0) return res.status(400).json({ error: "Select at least one bot operation." });
+        const [profile] = await db.select({ id: developerProfiles.id }).from(developerProfiles).where(and(
+          eq(developerProfiles.id, botProfileId),
+          eq(developerProfiles.isActive, true),
+          or(eq(developerProfiles.isInternal, false), isNull(developerProfiles.isInternal)),
+        )).limit(1);
+        if (!profile) return res.status(404).json({ error: "Active Investment Company not found." });
+      } else if (developerProfileId || scopes.length) {
+        return res.status(400).json({ error: "Profile and scopes can only be set for bot keys." });
       }
 
       const { key, prefix, hash } = generateKey(environment as "live" | "test");
@@ -641,10 +696,13 @@ export function registerExternalApiRoutes(app: Express) {
       const [row] = await db
         .insert(apiKeys)
         .values({
-          name,
+          name: name.trim(),
           keyHash: hash,
           keyPrefix: prefix,
           environment,
+          keyType,
+          developerProfileId: botProfileId,
+          scopes: keyType === "bot" ? Array.from(new Set(scopes)) : [],
           notes: notes || null,
           createdBy: String((req.user as any)?.id || "").slice(0, 255) || null,
           isActive: true,
@@ -655,6 +713,9 @@ export function registerExternalApiRoutes(app: Express) {
           keyPrefix: apiKeys.keyPrefix,
           environment: apiKeys.environment,
           createdAt: apiKeys.createdAt,
+          keyType: apiKeys.keyType,
+          developerProfileId: apiKeys.developerProfileId,
+          scopes: apiKeys.scopes,
         });
 
       return res.status(201).json({ ...row, key });
@@ -679,6 +740,11 @@ export function registerExternalApiRoutes(app: Express) {
   // ── ADMIN: re-activate ───────────────────────────────────────────────────────
   app.patch("/api/admin/api-keys/:id/activate", isAuthenticated, requirePlatformAdmin, async (req, res) => {
     try {
+      const [existing] = await db.select({ keyType: apiKeys.keyType }).from(apiKeys)
+        .where(eq(apiKeys.id, req.params.id)).limit(1);
+      if (existing?.keyType === "bot") {
+        return res.status(409).json({ error: "Bot keys cannot be reactivated. Create a new key with fresh scopes." });
+      }
       await db
         .update(apiKeys)
         .set({ isActive: true, revokedAt: null })

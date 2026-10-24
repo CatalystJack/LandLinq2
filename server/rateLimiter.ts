@@ -24,12 +24,13 @@ export function createRateLimit(options: {
   maxRequests: number;
   message?: string;
   skipSuccessfulRequests?: boolean;
+  keyGenerator?: (req: Request) => string;
 }) {
-  const { windowMs, maxRequests, message = 'Too many requests', skipSuccessfulRequests = false } = options;
+  const { windowMs, maxRequests, message = 'Too many requests', skipSuccessfulRequests = false, keyGenerator } = options;
 
   return (req: Request, res: Response, next: NextFunction) => {
     const clientId = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = `${clientId}:${req.route?.path || req.path}`;
+    const key = `${keyGenerator ? keyGenerator(req) : clientId}:${req.route?.path || req.path}`;
     const now = Date.now();
 
     if (!store[key] || store[key].resetTime < now) {

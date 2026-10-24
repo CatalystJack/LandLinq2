@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { BOT_API_SCOPES, type BotApiScope } from "@shared/bot-api";
 import {
   Key, Plus, Copy, Trash2, ShieldOff, ShieldCheck, RefreshCw,
   Zap, FileText, AlertTriangle, CheckCircle, Clock, ExternalLink,
@@ -33,6 +34,9 @@ interface ApiKeyRow {
   createdAt: string;
   revokedAt?: string;
   notes?: string;
+  keyType: "legacy" | "bot";
+  developerProfileId?: string | null;
+  scopes?: BotApiScope[];
 }
 
 interface NewKeyResult extends ApiKeyRow {
@@ -136,6 +140,50 @@ field name: "files"  (up to 10 files, 25 MB each)`,
 }`,
   },
   {
+    method: "GET", path: "/api/v1/bot/developer-profiles/:profileId", desc: "Read the bot key's bound profile",
+    body: null,
+    returns: `{ "company": { "id": "...", "companyName": "..." }, "criteria": { "targetStates": ["NC"] } }`,
+  },
+  {
+    method: "PATCH", path: "/api/v1/bot/developer-profiles/:profileId", desc: "Update approved profile criteria",
+    body: `{
+  "targetStates": ["NC", "TN"],
+  "minAcres": 5,
+  "criteriaNotes": "Focus on infill sites"
+}`,
+    returns: `{ "ok": true, "changedFields": ["targetStates", "minAcres", "criteriaNotes"] }`,
+  },
+  {
+    method: "GET", path: "/api/v1/bot/developer-profiles/:profileId/deals", desc: "Read deals linked to the bound profile",
+    body: null,
+    returns: `{ "deals": [], "pagination": { "limit": 50, "offset": 0, "hasMore": false } }`,
+  },
+  {
+    method: "POST", path: "/api/v1/bot/developer-profiles/:profileId/deals", desc: "Upload a property deal",
+    body: `{
+  "address": "123 Oak St",
+  "city": "Charlotte",
+  "county": "Mecklenburg",
+  "state": "NC",
+  "sizeAcres": 8.5,
+  "askingPrice": 900000
+}`,
+    returns: `{ "ok": true, "deal": { "id": "...", "status": "pending_review" } }`,
+  },
+  {
+    method: "GET", path: "/api/v1/bot/developer-profiles/:profileId/campaign-drafts", desc: "List paused bot-created campaign drafts",
+    body: null,
+    returns: `{ "drafts": [] }`,
+  },
+  {
+    method: "POST", path: "/api/v1/bot/developer-profiles/:profileId/campaign-drafts", desc: "Create an inactive draft only",
+    body: `{
+  "name": "Monthly broker update",
+  "steps": [{ "dayNumber": 0, "subject": "Market update", "content": "Draft text" }]
+}`,
+    returns: `{ "ok": true, "campaign": { "status": "paused", "stepCount": 1 } }`,
+  },
+  {
     method: "PATCH", path: "/api/v1/investment-companies/:id/criteria", desc: "Partially update buying criteria",
     body: `{
   "targetStates": ["NC", "TN"],
@@ -192,6 +240,9 @@ export default function ApiKeysAdmin() {
   const [newName, setNewName] = useState("");
   const [newEnv, setNewEnv] = useState<"live" | "test">("test");
   const [newNotes, setNewNotes] = useState("");
+  const [newKeyType, setNewKeyType] = useState<"legacy" | "bot">("legacy");
+  const [newProfileId, setNewProfileId] = useState("");
+  const [newScopes, setNewScopes] = useState<BotApiScope[]>([]);
   const [revealed, setRevealed] = useState<NewKeyResult | null>(null);
   const [showDocs, setShowDocs] = useState(false);
   const [expandedEndpoint, setExpandedEndpoint] = useState<number | null>(null);
@@ -200,19 +251,23 @@ export default function ApiKeysAdmin() {
   const { data: keys = [], isLoading } = useQuery<ApiKeyRow[]>({
     queryKey: ["/api/admin/api-keys"],
   });
+  const { data: developerProfiles = [] } = useQuery<Array<{ id: string; companyName: string }>>({
+    queryKey: ["/api/admin/api-keys/developer-profiles"],
+  });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const createKey = useMutation({
     mutationFn: async (): Promise<NewKeyResult> => {
       const response = await apiRequest("POST", "/api/admin/api-keys", {
-        name: newName, environment: newEnv, notes: newNotes,
+        name: newName, environment: newEnv, notes: newNotes, keyType: newKeyType,
+        ...(newKeyType === "bot" ? { developerProfileId: newProfileId, scopes: newScopes } : {}),
       });
       return response.json();
     },
     onSuccess: (data: NewKeyResult) => {
       setRevealed(data);
       setCreateOpen(false);
-      setNewName(""); setNewNotes(""); setNewEnv("test");
+      setNewName(""); setNewNotes(""); setNewEnv("test"); setNewKeyType("legacy"); setNewProfileId(""); setNewScopes([]);
       qc.invalidateQueries({ queryKey: ["/api/admin/api-keys"] });
     },
     onError: (e: any) => toast({ title: "Failed to create key", description: e.message, variant: "destructive" }),
@@ -282,6 +337,45 @@ export default function ApiKeysAdmin() {
                       onChange={(e) => setNewName(e.target.value)} />
                   </div>
                   <div>
+                    <Label>Key type</Label>
+                    <Select value={newKeyType} onValueChange={(v) => setNewKeyType(v as "legacy" | "bot")}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="legacy">Existing external API</SelectItem>
+                        <SelectItem value="bot">Scoped bot API</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {newKeyType === "bot" && (
+                    <>
+                      <div>
+                        <Label>Bound Investment Company</Label>
+                        <Select value={newProfileId} onValueChange={setNewProfileId}>
+                          <SelectTrigger className="mt-1"><SelectValue placeholder="Choose a company" /></SelectTrigger>
+                          <SelectContent>
+                            {developerProfiles.map((profile) => <SelectItem key={profile.id} value={profile.id}>{profile.companyName}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Allowed operations</Label>
+                        {BOT_API_SCOPES.map((scope) => (
+                          <label key={scope} className="flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={newScopes.includes(scope)}
+                              onChange={(event) => setNewScopes((current) =>
+                                event.target.checked ? [...current, scope] : current.filter((item) => item !== scope),
+                              )}
+                            />
+                            {scope.replaceAll("_", " ").replace(":", " · ")}
+                          </label>
+                        ))}
+                        <p className="text-xs text-slate-500">Bot keys only work on the scoped bot API. Campaign drafts remain paused and cannot be sent.</p>
+                      </div>
+                    </>
+                  )}
+                  <div>
                     <Label>Environment</Label>
                     <Select value={newEnv} onValueChange={(v) => setNewEnv(v as "live" | "test")}>
                       <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
@@ -296,7 +390,7 @@ export default function ApiKeysAdmin() {
                     <Textarea className="mt-1 h-20" placeholder="e.g. Connected to Make.com scenario #1234"
                       value={newNotes} onChange={(e) => setNewNotes(e.target.value)} />
                   </div>
-                  <Button className="w-full" onClick={() => createKey.mutate()} disabled={createKey.isPending || !newName.trim()}>
+                  <Button className="w-full" onClick={() => createKey.mutate()} disabled={createKey.isPending || !newName.trim() || (newKeyType === "bot" && (!newProfileId || newScopes.length === 0))}>
                     {createKey.isPending ? "Generating..." : "Generate Key"}
                   </Button>
                 </div>
@@ -324,6 +418,7 @@ export default function ApiKeysAdmin() {
                 <div className="flex gap-3 mt-3 text-xs text-emerald-700">
                   <span><strong>Name:</strong> {revealed.name}</span>
                   <span><strong>Environment:</strong> {revealed.environment}</span>
+                  {revealed.keyType === "bot" && <span><strong>Scope:</strong> {revealed.scopes?.length || 0} operations</span>}
                 </div>
               </div>
               <Button variant="ghost" size="sm" className="flex-shrink-0 text-emerald-600"
@@ -546,8 +641,15 @@ function ApiKeyCard({
             <div className="flex flex-wrap items-center gap-2 mb-1.5">
               <span className="font-semibold text-slate-800 text-sm">{k.name}</span>
               <EnvBadge env={k.environment} />
+              {k.keyType === "bot" && <Badge variant="outline" className="text-xs">Scoped bot</Badge>}
               {!k.isActive && <Badge className="bg-red-100 text-red-700 text-xs">Revoked</Badge>}
             </div>
+            {k.keyType === "bot" && (
+              <div className="mb-2 text-xs text-slate-500">
+                <div>Bound profile: {k.developerProfileId || "Unbound"}</div>
+                <div>Operations: {(k.scopes || []).map((scope) => scope.replaceAll("_", " ").replace(":", " · ")).join(", ") || "None"}</div>
+              </div>
+            )}
             <div className="flex items-center gap-1.5 mb-2">
               <code className="text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded font-mono select-all">
                 {k.keyPrefix}
@@ -576,7 +678,7 @@ function ApiKeyCard({
                 <ShieldOff className="h-3.5 w-3.5 mr-1" /> Revoke
               </Button>
             )}
-            {!k.isActive && onActivate && (
+            {!k.isActive && onActivate && k.keyType !== "bot" && (
               <Button variant="outline" size="xs" className="border-emerald-200 text-emerald-600 hover:bg-emerald-50"
                 onClick={onActivate} disabled={activating}>
                 <ShieldCheck className="h-3.5 w-3.5 mr-1" /> Reactivate

@@ -4382,6 +4382,9 @@ export const apiKeys = pgTable("api_keys", {
   keyHash: varchar("key_hash").notNull().unique(),
   keyPrefix: varchar("key_prefix").notNull(),
   environment: varchar("environment").notNull().default("live"), // "live" | "test"
+  keyType: varchar("key_type").notNull().default("legacy"),
+  developerProfileId: varchar("developer_profile_id"),
+  scopes: text("scopes").array().notNull().default(sql`'{}'::text[]`),
   isActive: boolean("is_active").notNull().default(true),
   createdBy: varchar("created_by"),
   lastUsedAt: timestamp("last_used_at"),

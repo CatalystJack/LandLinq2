@@ -648,6 +648,9 @@ setTimeout(() => {
             key_hash VARCHAR NOT NULL UNIQUE,
             key_prefix VARCHAR NOT NULL,
             environment VARCHAR NOT NULL DEFAULT 'live',
+            key_type VARCHAR NOT NULL DEFAULT 'legacy',
+            developer_profile_id VARCHAR,
+            scopes TEXT[] NOT NULL DEFAULT '{}'::text[],
             is_active BOOLEAN NOT NULL DEFAULT TRUE,
             created_by VARCHAR,
             last_used_at TIMESTAMP,
@@ -667,6 +670,14 @@ setTimeout(() => {
             source VARCHAR DEFAULT 'api',
             uploaded_at TIMESTAMP DEFAULT NOW()
           );
+        `);
+        await pool.query(`
+          ALTER TABLE api_keys
+            ADD COLUMN IF NOT EXISTS key_type VARCHAR NOT NULL DEFAULT 'legacy',
+            ADD COLUMN IF NOT EXISTS developer_profile_id VARCHAR,
+            ADD COLUMN IF NOT EXISTS scopes TEXT[] NOT NULL DEFAULT '{}'::text[];
+          UPDATE api_keys SET key_type = 'legacy' WHERE key_type IS NULL;
+          UPDATE api_keys SET scopes = '{}'::text[] WHERE scopes IS NULL;
         `);
         // API keys are recoverable only at creation time. Keep existing hashes
         // valid while permanently removing any legacy plaintext copies.
