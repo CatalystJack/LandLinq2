@@ -22,6 +22,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { renderOutreachPreviewHtml, type OutreachPreviewContext } from "@shared/outreach-personalization";
 import {
   Users,
   Mail,
@@ -455,33 +456,14 @@ function CrmDailyLimitCard() {
 export function renderEmailPreview(
   content: string,
   subject?: string,
-  sender?: { name?: string | null; email?: string | null },
+  sender?: { name?: string | null; email?: string | null } | null,
+  personalization?: OutreachPreviewContext,
 ): string {
   if (!content) return '';
   
   // Helper function to apply personalization token highlighting
-  const applyPersonalizationTokens = (html: string): string => {
-    const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    }[character] || character));
-    const senderName = escapeHtml(sender?.name?.trim() || 'Your Name');
-    const senderEmail = escapeHtml(sender?.email?.trim() || 'you@company.com');
-    return html
-      .replace(/{{broker\.firstName}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">John</span>')
-      .replace(/{{broker\.lastName}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">Smith</span>')
-      .replace(/{{broker\.email}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">john@example.com</span>')
-      .replace(/{{broker\.phone}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">(555) 123-4567</span>')
-      .replace(/{{broker\.company}}/g, '<span class="bg-blue-100 text-blue-800 px-1 rounded">ABC Realty</span>')
-      .replace(/{{broker\.county}}/gi, '<span class="bg-blue-100 text-blue-800 px-1 rounded">Charleston County</span>')
-      .replace(/{{county}}/gi, '<span class="bg-blue-100 text-blue-800 px-1 rounded">Charleston County</span>')
-      .replace(/{{sender\.name}}/g, `<span class="bg-green-100 text-green-800 px-1 rounded">${senderName}</span>`)
-      .replace(/{{sender\.email}}/g, `<span class="bg-green-100 text-green-800 px-1 rounded">${senderEmail}</span>`)
-      .replace(/{{company\.name}}/g, '<span class="bg-purple-100 text-purple-800 px-1 rounded">Catalyst</span>');
-  };
+  const applyPersonalizationTokens = (html: string): string =>
+    renderOutreachPreviewHtml(html, sender, personalization);
   
   // DETECT HTML CONTENT from rich text editor
   // Rich text editor outputs content with tags like <p>, <ul>, <li>, <strong>, etc.

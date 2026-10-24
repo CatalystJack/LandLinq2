@@ -18953,7 +18953,7 @@ RULES:
     const recipients = Array.from(contactsById.values());
     const countyCoverage = summarizeCountyCoverage(recipients);
     return {
-      contacts: recipients.map(({ county: _county, ...contact }) => contact),
+      contacts: recipients,
       countyCoverage,
       targetStates,
       targetCounties: profile.target_counties || [],
@@ -19185,6 +19185,62 @@ RULES:
     } catch (error) {
       console.error('[developer outreach targets] Error:', error);
       return res.status(500).json({ error: 'Failed to load outreach contacts' });
+    }
+  });
+
+  app.post("/api/developer-profile/me/outreach/campaigns/:campaignId/preview-recipients", isAuthenticated, async (req: any, res) => {
+    try {
+      const developerProfileId = getDeveloperProfileId(req, res);
+      if (!developerProfileId) return;
+      if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
+      const campaign = await db.execute(sql`
+        SELECT id FROM outreach_campaigns
+        WHERE id = ${req.params.campaignId}
+          AND developer_profile_id = ${developerProfileId}
+          AND COALESCE(is_archived, false) = false
+        LIMIT 1
+      `);
+      if (!campaign.rows?.length) return res.status(404).json({ error: "Campaign not found" });
+
+      const query = typeof req.body?.q === "string" ? req.body.q.trim() : "";
+      if (query.length < 2 || query.length > 80) {
+        return res.status(400).json({ error: "Enter at least 2 characters to search campaign recipients" });
+      }
+      const normalizedQuery = query.replace(/[%_\\]/g, "").toLocaleLowerCase().trim();
+      if (normalizedQuery.length < 2) {
+        return res.status(400).json({ error: "Enter at least 2 searchable characters" });
+      }
+      const targets = await getDeveloperOutreachTargets(developerProfileId);
+      const matches = targets.contacts.filter((contact: any) => {
+        const searchable = [
+          contact.firstName,
+          contact.lastName,
+          `${contact.firstName || ""} ${contact.lastName || ""}`,
+          contact.email,
+          contact.phone,
+          contact.brokerage,
+          contact.county,
+        ].filter(Boolean).join(" ").toLocaleLowerCase();
+        return searchable.includes(normalizedQuery);
+      });
+      return res.json({
+        recipients: matches.slice(0, 50).map((contact: any) => ({
+          id: contact.id,
+          firstName: contact.firstName || "",
+          lastName: contact.lastName || "",
+          email: contact.email || "",
+          phone: contact.phone || "",
+          brokerage: contact.brokerage || "",
+          county: contact.county || "",
+          stateRegion: contact.stateRegion || "",
+        })),
+        hasMore: matches.length > 50,
+      });
+    } catch (error: any) {
+      console.error("[developer outreach preview recipients] Error", {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+      return res.status(500).json({ error: "Failed to search campaign recipients" });
     }
   });
 

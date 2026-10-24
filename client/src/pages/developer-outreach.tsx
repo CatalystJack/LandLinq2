@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { CheckCircle2, Edit3, Loader2, Mail, MapPin, MessageSquare, Paperclip, Rocket, Send, Sparkles, Tag, Trash2, Users } from "lucide-react";
+import { CheckCircle2, Edit3, Loader2, Mail, MapPin, MessageSquare, Paperclip, Rocket, Search, Send, Sparkles, Tag, Trash2, Users } from "lucide-react";
 import DeveloperNavigation from "@/components/developer-navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import Footer from "@/components/footer";
@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { renderEmailPreview } from "@/pages/outreach-onboarding";
+import { renderOutreachPreviewText, type OutreachPreviewContext, type OutreachPreviewRecipient } from "@shared/outreach-personalization";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,6 +68,11 @@ type CampaignAttachment = {
   size?: number;
 };
 
+type PreviewRecipient = OutreachPreviewRecipient & {
+  id: string;
+  stateRegion: string;
+};
+
 type CampaignStep = {
   id: string;
   sequenceIndex: number;
@@ -113,6 +119,9 @@ export default function DeveloperOutreach() {
   const [stepDraft, setStepDraft] = useState<CampaignStep | null>(null);
   const [testRecipientEmail, setTestRecipientEmail] = useState("");
   const [launchCampaign, setLaunchCampaign] = useState<Campaign | null>(null);
+  const [previewRecipient, setPreviewRecipient] = useState<PreviewRecipient | null>(null);
+  const [previewSearch, setPreviewSearch] = useState("");
+  const [debouncedPreviewSearch, setDebouncedPreviewSearch] = useState("");
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   const senderQuery = useQuery<{ sender: SenderAccount | null }>({
@@ -137,6 +146,18 @@ export default function DeveloperOutreach() {
     queryFn: () => jsonRequest(`/api/developer-profile/me/outreach/campaigns/${stepsCampaign!.id}/steps`),
     enabled: Boolean(stepsCampaign),
   });
+  const previewRecipientsQuery = useQuery<{ recipients: PreviewRecipient[]; hasMore: boolean }>({
+    queryKey: ["/api/developer-profile/me/outreach/preview-recipients", stepsCampaign?.id, debouncedPreviewSearch],
+    queryFn: () => jsonRequest(
+      `/api/developer-profile/me/outreach/campaigns/${stepsCampaign!.id}/preview-recipients`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q: debouncedPreviewSearch }),
+      },
+    ),
+    enabled: Boolean(stepEditorOpen && stepsCampaign?.id && debouncedPreviewSearch.length >= 2),
+  });
   const aiConversationQuery = useQuery<{ messages: AiMessage[]; suggestedDraft: SuggestedDraft | null }>({
     queryKey: ["/api/developer-profile/me/outreach/ai-conversation", editing?.id],
     queryFn: () => jsonRequest(`/api/developer-profile/me/outreach/campaigns/${editing!.id}/ai-conversations/0`),
@@ -160,6 +181,11 @@ export default function DeveloperOutreach() {
     setAiMessages(aiConversationQuery.data.messages || []);
     setAiSuggestedDraft(aiConversationQuery.data.suggestedDraft || null);
   }, [aiConversationQuery.data, dialogOpen, editing]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedPreviewSearch(previewSearch.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [previewSearch]);
 
   const connectMutation = useMutation({
     mutationFn: async () => {
@@ -282,6 +308,11 @@ export default function DeveloperOutreach() {
     if (!states.length && !counties.length) return "All available contacts";
     return [...states, ...counties].join(", ");
   }, [targetsQuery.data]);
+  const previewPersonalization: OutreachPreviewContext | undefined = previewRecipient ? {
+    recipient: previewRecipient,
+    companyName: profile?.companyName || profile?.name || "",
+    targetMarket: scopeLabel,
+  } : undefined;
 
   const openEdit = (campaign: Campaign) => {
     setEditing(campaign);
@@ -304,6 +335,8 @@ export default function DeveloperOutreach() {
     setStepsCampaign(campaign);
     setStepEditorOpen(false);
     setStepDraft(null);
+    setPreviewRecipient(null);
+    setPreviewSearch("");
   };
 
   const openStepEditor = (step: CampaignStep) => {
@@ -312,6 +345,8 @@ export default function DeveloperOutreach() {
       subject: step.subject || "",
       attachments: Array.isArray(step.attachments) ? [...step.attachments] : [],
     });
+    setPreviewRecipient(null);
+    setPreviewSearch("");
     setStepEditorOpen(true);
   };
 
@@ -687,6 +722,63 @@ export default function DeveloperOutreach() {
                   <Mail className="h-4 w-4 text-[#0078D4]" />
                   <Label className="text-xs font-medium">Outlook Preview</Label>
                 </div>
+                <div className="mb-3 space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+                  <Label htmlFor="preview-recipient-search" className="text-xs font-medium">Preview with a campaign recipient</Label>
+                  {previewRecipient ? (
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0 text-xs text-slate-700">
+                        <p className="truncate font-medium">{[previewRecipient.firstName, previewRecipient.lastName].filter(Boolean).join(" ") || "Unnamed contact"}</p>
+                        <p className="truncate text-slate-500">{[previewRecipient.brokerage, previewRecipient.county || "No county on file"].filter(Boolean).join(" · ")}</p>
+                      </div>
+                      <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => { setPreviewRecipient(null); setPreviewSearch(""); }}>Change recipient</Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Input
+                          id="preview-recipient-search"
+                          type="search"
+                          className="pl-9"
+                          value={previewSearch}
+                          onChange={(event) => setPreviewSearch(event.target.value)}
+                          placeholder="Search name, company, email, or county"
+                          maxLength={80}
+                        />
+                      </div>
+                      {previewSearch.trim().length < 2 ? (
+                        <p className="text-xs text-slate-500">Search this campaign’s eligible audience. Enter at least 2 characters.</p>
+                      ) : previewSearch.trim() !== debouncedPreviewSearch ? (
+                        <p className="flex items-center gap-2 text-xs text-slate-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Updating search…</p>
+                      ) : previewRecipientsQuery.isFetching ? (
+                        <p className="flex items-center gap-2 text-xs text-slate-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Searching audience…</p>
+                      ) : previewRecipientsQuery.isError ? (
+                        <p className="text-xs text-red-700">Could not load matching recipients.</p>
+                      ) : (
+                        <div className="max-h-40 space-y-1 overflow-y-auto" role="listbox" aria-label="Campaign audience matches">
+                          {(previewRecipientsQuery.data?.recipients || []).map((recipient) => (
+                            <button
+                              key={recipient.id}
+                              type="button"
+                              role="option"
+                              aria-selected="false"
+                              className="w-full rounded-md px-2 py-2 text-left text-sm hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                              onClick={() => { setPreviewRecipient(recipient); setPreviewSearch(""); }}
+                            >
+                              <span className="block truncate font-medium text-slate-800">{[recipient.firstName, recipient.lastName].filter(Boolean).join(" ") || "Unnamed contact"}</span>
+                              <span className="block truncate text-xs text-slate-500">{[recipient.brokerage, recipient.county || "No county on file"].filter(Boolean).join(" · ")}</span>
+                            </button>
+                          ))}
+                          {!previewRecipientsQuery.data?.recipients.length && <p className="px-2 py-3 text-xs text-slate-500">No matching eligible recipients.</p>}
+                          {previewRecipientsQuery.data?.hasMore && <p className="px-2 py-2 text-xs text-slate-500">Showing the first 50 matches. Refine your search for more specific results.</p>}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {previewRecipient && !previewRecipient.county && (
+                    <p className="text-xs text-amber-800">This contact has no saved county. County tokens will appear blank, as they will in the sent email.</p>
+                  )}
+                </div>
                 {stepDraft.channel === "email" ? (
                   <div className="flex flex-1 flex-col overflow-hidden rounded-lg border bg-white shadow-lg">
                     <div className="flex items-center gap-2 bg-[#0078D4] px-4 py-2 text-white">
@@ -704,17 +796,17 @@ export default function DeveloperOutreach() {
                             <span className="shrink-0 text-xs text-gray-500">Just now</span>
                           </div>
                           <div className="truncate text-xs text-gray-500">{senderEmail}</div>
-                          <div className="mt-1 truncate text-xs text-gray-400">To: John Smith &lt;broker@example.com&gt;</div>
+                          <div className="mt-1 truncate text-xs text-gray-400">{previewRecipient ? `To: ${[previewRecipient.firstName, previewRecipient.lastName].filter(Boolean).join(" ") || "Unnamed contact"} <${previewRecipient.email || "no email"}>` : "To: John Smith <broker@example.com>"}</div>
                         </div>
                       </div>
-                      <div className="pl-13 text-sm font-semibold text-gray-800">{stepDraft.subject || "(No subject line)"}</div>
+                      <div className="pl-13 text-sm font-semibold text-gray-800">{stepDraft.subject ? renderOutreachPreviewText(stepDraft.subject, sender, previewPersonalization) : "(No subject line)"}</div>
                     </div>
                     <div className="min-h-[320px] flex-1 overflow-auto bg-white p-4">
                       {stepDraft.content ? (
                         <div
                           className="prose prose-sm max-w-none text-gray-700"
                           style={{ lineHeight: stepDraft.lineHeight || "1.5" }}
-                          dangerouslySetInnerHTML={{ __html: renderEmailPreview(stepDraft.content, stepDraft.subject || "", sender) }}
+                           dangerouslySetInnerHTML={{ __html: renderEmailPreview(stepDraft.content, stepDraft.subject || "", sender, previewPersonalization) }}
                         />
                       ) : (
                         <p className="mt-8 text-center text-sm italic text-gray-400">Start typing to see how your email will appear in Outlook…</p>
@@ -734,7 +826,7 @@ export default function DeveloperOutreach() {
                   <div className="flex min-h-[320px] flex-1 flex-col overflow-hidden rounded-lg border bg-white shadow-lg">
                     <div className="bg-gray-900 px-4 py-2 text-center text-sm font-medium text-white">SMS Preview</div>
                     <div className="p-4">
-                      <p className="whitespace-pre-wrap text-sm text-slate-700">{stepDraft.content || "Your SMS message will appear here."}</p>
+                      <p className="whitespace-pre-wrap text-sm text-slate-700">{stepDraft.content ? renderOutreachPreviewText(stepDraft.content, sender, previewPersonalization) : "Your SMS message will appear here."}</p>
                     </div>
                   </div>
                 )}
