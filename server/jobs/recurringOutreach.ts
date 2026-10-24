@@ -574,7 +574,7 @@ export async function processDripEnrollments(): Promise<void> {
             WHERE id = ${enrollment.id}
           `);
           completed++;
-          console.log(`   ✅ [${enrollment.sender_name}] ${enrollment.contact_email}: Campaign completed (no more steps)`);
+          console.log(`   ✅ [DRIP] Enrollment ${enrollment.id}: campaign completed (no more steps)`);
           continue;
         }
         
@@ -639,10 +639,8 @@ export async function processDripEnrollments(): Promise<void> {
         
         // DRY RUN MODE: Log but don't actually send
         if (isDryRunMode) {
-          console.log(`   🧪 [DRY RUN] Would send to: ${enrollment.contact_email}`);
-          console.log(`   🧪 [DRY RUN]   Subject: ${emailSubject}`);
+          console.log(`   🧪 [DRY RUN] Would send enrollment ${enrollment.id}`);
           console.log(`   🧪 [DRY RUN]   Day: ${currentStep.day_number}, Step: ${enrollment.current_step_index}`);
-          console.log(`   🧪 [DRY RUN]   From: ${enrollment.sender_name} <${enrollment.sender_email}>`);
           
           // In dry-run mode, skip database insert entirely - just log to console
           // This prevents polluting the outreach_messages table during testing
@@ -677,7 +675,7 @@ export async function processDripEnrollments(): Promise<void> {
 
         if (!enrollment.microsoft_access_token) {
           // Sender has not connected Outlook — skip silently, leave queued for retry
-          console.log(`   ⏭️ [DRIP] [${enrollment.sender_name}] Skipping ${enrollment.contact_email} — no Microsoft token connected`);
+          console.log(`   ⏭️ [DRIP] Skipping enrollment ${enrollment.id}: no Microsoft token connected`);
           skipEmail = true;
           skipped++;
         } else {
@@ -750,7 +748,7 @@ export async function processDripEnrollments(): Promise<void> {
                   throw sendErr;
                 }
                 const waitMs = BACKOFF_SCHEDULE_MS[attempt];
-                console.warn(`   ⚠️ [DRIP] [${enrollment.sender_name}] 429 throttle (attempt ${attempt + 1}/${MAX_429_RETRIES}) — waiting ${waitMs / 1000}s then retrying ${enrollment.contact_email}`);
+                console.warn(`   ⚠️ [DRIP] Enrollment ${enrollment.id}: 429 throttle (attempt ${attempt + 1}/${MAX_429_RETRIES}), retrying after ${waitMs / 1000}s`);
                 await new Promise(r => setTimeout(r, waitMs));
                 attempt++;
               }
@@ -779,7 +777,7 @@ export async function processDripEnrollments(): Promise<void> {
               );
               continue;
             }
-            console.error(`   ❌ [DRIP] [${enrollment.sender_name}] Microsoft send failed for ${enrollment.contact_email}: ${msError.message}`);
+            console.error(`   ❌ [DRIP] Microsoft send failed for enrollment ${enrollment.id} (${msError?.name || "Error"})`);
           }
         }
         
@@ -804,7 +802,7 @@ export async function processDripEnrollments(): Promise<void> {
           const stateLabel = enrollment.target_state ? `[${enrollment.target_state}]` : '';
           const numStates = senderActiveStateCount[enrollment.sender_id] || 1;
           const effLimit = enrollment.target_state ? Math.floor((parseInt(enrollment.daily_limit_override || '0') || DAILY_SEND_LIMIT_PER_SENDER) / numStates) : DAILY_SEND_LIMIT_PER_SENDER;
-          console.log(`   📧 [${enrollment.sender_name}]${stateLabel ? ' ' + stateLabel : ''} ${enrollment.contact_email}: Day ${currentStep.day_number} sent via Microsoft Graph (state: ${senderStateSentToday[enrollment.sender_id][gs]}/${effLimit}, day total: ${senderSentToday[enrollment.sender_id]}/${DAILY_SEND_LIMIT_PER_SENDER})`);
+          console.log(`   📧 [DRIP] Enrollment ${enrollment.id}${stateLabel ? ' ' + stateLabel : ''}: day ${currentStep.day_number} sent via Microsoft Graph (state: ${senderStateSentToday[enrollment.sender_id][gs]}/${effLimit}, day total: ${senderSentToday[enrollment.sender_id]}/${DAILY_SEND_LIMIT_PER_SENDER})`);
         } else {
           // Mark as failed — the auto-retry sweep (see todayStart logic above) will
           // reset 'failed' enrollments back to 'in_progress' on the next day's run
@@ -818,7 +816,7 @@ export async function processDripEnrollments(): Promise<void> {
         }
         
       } catch (enrollmentError: any) {
-        console.error(`   ❌ Error processing enrollment ${enrollment.id}:`, enrollmentError.message);
+        console.error(`   ❌ Error processing enrollment ${enrollment.id} (${enrollmentError?.name || "Error"})`);
         failed++;
       }
     }
@@ -1249,7 +1247,7 @@ export async function processCrmTaggedContacts(): Promise<{
       `);
       totalEnrolled++;
     } catch (err: any) {
-      console.error(`   ❌ [CRM-POLL] Failed to enroll ${broker.email}: ${err.message}`);
+      console.error(`   ❌ [CRM-POLL] Failed to enroll broker ${broker.id} (${err?.name || "Error"})`);
       totalSkipped++;
     }
   }
@@ -1598,7 +1596,7 @@ export async function processOutlookBouncedEmails(): Promise<void> {
         const bouncedEmails = await pollOutlookInboxForBounces(accessToken);
         if (bouncedEmails.length === 0) continue;
 
-        console.log(`📬 [BOUNCE-POLL] Sender ${sender.name}: found ${bouncedEmails.length} bounce(s) — ${bouncedEmails.join(', ')}`);
+            console.log(`[BOUNCE-POLL] Sender ${sender.id}: found ${bouncedEmails.length} bounce(s)`);
 
         for (const email of bouncedEmails) {
           try {
@@ -1626,12 +1624,12 @@ export async function processOutlookBouncedEmails(): Promise<void> {
               developerProfileId: sender.developer_profile_id,
             });
             console.log(
-              `   ⚠️ [BOUNCE-POLL] Cancelled bounced enrollments for ${email} under sender ${sender.id}; ` +
+              `   ⚠️ [BOUNCE-POLL] Cancelled bounced enrollments under sender ${sender.id}; ` +
               `${brokerId ? `marked broker ${brokerId} inactive and tagged` : 'no scoped broker record found'}`
             );
             continue;
           } catch (bounceErr: any) {
-            console.error(`   ❌ [BOUNCE-POLL] Failed to process ${email}:`, bounceErr.message);
+            console.error(`   ❌ [BOUNCE-POLL] Failed to process bounce for sender ${sender.id} (${bounceErr?.name || "Error"})`);
           }
         }
       } catch (senderErr: any) {

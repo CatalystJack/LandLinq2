@@ -4009,6 +4009,11 @@ export default function OutreachOnboarding() {
                             </Button>
                           ))}
                         </div>
+                        {isDeveloperUser && (
+                          <p className="mt-2 text-xs text-slate-500">
+                            County may be blank when a contact has no saved county. Campaign launch shows an aggregate missing-county count before enrollment.
+                          </p>
+                        )}
                       </div>
                       {/* File Attachments */}
                       {editingStep.channel === 'email' && (() => {

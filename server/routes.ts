@@ -80,6 +80,7 @@ import {
   resolveStateAwareCriteria,
 } from "@shared/criteria-overrides";
 import { isUsStateCode, normalizeUsStateCode } from "@shared/us-states";
+import { summarizeCountyCoverage } from "@shared/outreach-county-coverage";
 import { getBrokerStateCodes, getOutOfStateCodeFromCounty } from "@shared/broker-location";
 import { countyTargetMatchesDeal, parseCountyTarget } from "@shared/county-targets";
 import { replaceBrokerCountyToken } from "@shared/outreach-personalization";
@@ -18918,7 +18919,7 @@ RULES:
     const targetCounties = (profile.target_counties || []) as string[];
     const result = await db.execute(sql`
       SELECT b.id, b.first_name as "firstName", b.last_name as "lastName",
-        b.email, b.phone, b.brokerage, b.state_region as "stateRegion",
+        b.email, b.phone, b.brokerage, b.contact_county as county, b.state_region as "stateRegion",
         b.owner_developer_profile_id as "ownerDeveloperProfileId",
         d.county as "dealCounty", d.state as "dealState"
       FROM brokers b
@@ -18949,8 +18950,11 @@ RULES:
       const { dealCounty: _dealCounty, dealState: _dealState, ...contact } = row;
       contactsById.set(contact.id, contact);
     }
+    const recipients = Array.from(contactsById.values());
+    const countyCoverage = summarizeCountyCoverage(recipients);
     return {
-      contacts: Array.from(contactsById.values()),
+      contacts: recipients.map(({ county: _county, ...contact }) => contact),
+      countyCoverage,
       targetStates,
       targetCounties: profile.target_counties || [],
     };
@@ -19172,7 +19176,12 @@ RULES:
       if (!developerProfileId) return;
       if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
       const targets = await getDeveloperOutreachTargets(developerProfileId);
-      return res.json({ ...targets, count: targets.contacts.length });
+      return res.json({
+        count: targets.contacts.length,
+        countyCoverage: targets.countyCoverage,
+        targetStates: targets.targetStates,
+        targetCounties: targets.targetCounties,
+      });
     } catch (error) {
       console.error('[developer outreach targets] Error:', error);
       return res.status(500).json({ error: 'Failed to load outreach contacts' });
@@ -19472,6 +19481,15 @@ RULES:
       if (body.status === 'active' && (!sender.outlook_connected || !sender.microsoft_access_token)) {
         return res.status(400).json({ error: 'Connect Outlook before activating a campaign' });
       }
+      if (body.status === "active") {
+        const targets = await getDeveloperOutreachTargets(developerProfileId);
+        if (targets.countyCoverage.recipientsMissingCounty > 0 && req.body?.confirmMissingCounty !== true) {
+          return res.status(409).json({
+            error: "Review the missing-county recipient count before activating",
+            ...targets.countyCoverage,
+          });
+        }
+      }
 
       const campaign = await db.transaction(async (tx) => {
         const createdCampaign = await tx.execute(sql`
@@ -19534,7 +19552,7 @@ RULES:
       if (!await requireActiveDeveloperProfile(developerProfileId, res)) return;
       const body = developerCampaignSchema.parse(req.body);
       const owned = await db.execute(sql`
-        SELECT c.id, c.broker_filter, ct.hubspot_trigger_tag as trigger_tag
+        SELECT c.id, c.broker_filter, c.status, ct.hubspot_trigger_tag as trigger_tag
         FROM outreach_campaigns c
         LEFT JOIN outreach_campaign_templates ct
           ON ct.id = (c.broker_filter->>'templateId') AND ct.team_id = ${developerProfileId}
@@ -19543,6 +19561,15 @@ RULES:
       `);
       const campaign = owned.rows?.[0] as any;
       if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+      if (body.status === "active" && campaign.status !== "active") {
+        const targets = await getDeveloperOutreachTargets(developerProfileId);
+        if (targets.countyCoverage.recipientsMissingCounty > 0 && req.body?.confirmMissingCounty !== true) {
+          return res.status(409).json({
+            error: "Review the missing-county recipient count before activating",
+            ...targets.countyCoverage,
+          });
+        }
+      }
       const templateId = campaign.broker_filter?.templateId;
       const senderId = campaign.broker_filter?.senderId;
       const triggerTag = body.triggerTag || campaign.trigger_tag;
@@ -19817,6 +19844,12 @@ RULES:
       `);
       if (!sender.rows?.length) return res.status(400).json({ error: 'Connect or reconnect Outlook before launching' });
       const targets = await getDeveloperOutreachTargets(developerProfileId);
+      if (targets.countyCoverage.recipientsMissingCounty > 0 && req.body?.confirmMissingCounty !== true) {
+        return res.status(409).json({
+          error: "Review the missing-county recipient count before launching",
+          ...targets.countyCoverage,
+        });
+      }
       let enrolled = 0;
       let skipped = 0;
       for (const contact of targets.contacts) {
@@ -19846,7 +19879,12 @@ RULES:
         UPDATE outreach_campaigns SET status = 'active', updated_at = NOW()
         WHERE id = ${campaign.id} AND developer_profile_id = ${developerProfileId}
       `);
-      return res.json({ enrolled, skipped, totalTargets: targets.contacts.length });
+      return res.json({
+        enrolled,
+        skipped,
+        totalTargets: targets.contacts.length,
+        ...targets.countyCoverage,
+      });
     } catch (error) {
       console.error('[developer outreach campaign launch] Error:', error);
       return res.status(500).json({ error: 'Failed to launch campaign' });

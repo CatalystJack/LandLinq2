@@ -112,6 +112,7 @@ export default function DeveloperOutreach() {
   const [stepEditorOpen, setStepEditorOpen] = useState(false);
   const [stepDraft, setStepDraft] = useState<CampaignStep | null>(null);
   const [testRecipientEmail, setTestRecipientEmail] = useState("");
+  const [launchCampaign, setLaunchCampaign] = useState<Campaign | null>(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   const senderQuery = useQuery<{ sender: SenderAccount | null }>({
@@ -122,7 +123,12 @@ export default function DeveloperOutreach() {
     queryKey: ["/api/developer-profile/me/outreach/campaigns"],
     queryFn: () => jsonRequest("/api/developer-profile/me/outreach/campaigns"),
   });
-  const targetsQuery = useQuery<{ contacts: any[]; count: number; targetStates: string[]; targetCounties: string[] }>({
+  const targetsQuery = useQuery<{
+    count: number;
+    targetStates: string[];
+    targetCounties: string[];
+    countyCoverage: { totalRecipients: number; recipientsWithCounty: number; recipientsMissingCounty: number };
+  }>({
     queryKey: ["/api/developer-profile/me/outreach/targets"],
     queryFn: () => jsonRequest("/api/developer-profile/me/outreach/targets"),
   });
@@ -186,10 +192,15 @@ export default function DeveloperOutreach() {
   });
 
   const launchMutation = useMutation({
-    mutationFn: (campaignId: string) => jsonRequest(`/api/developer-profile/me/outreach/campaigns/${campaignId}/launch`, { method: "POST" }),
+    mutationFn: (campaignId: string) => jsonRequest(`/api/developer-profile/me/outreach/campaigns/${campaignId}/launch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmMissingCounty: true }),
+    }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/developer-profile/me/outreach/campaigns"] });
-      toast({ title: "Campaign launched", description: `${data.enrolled} contacts enrolled; ${data.skipped} already enrolled.` });
+      setLaunchCampaign(null);
+      toast({ title: "Campaign launched", description: `${data.enrolled} contacts enrolled; ${data.skipped} already enrolled. ${data.recipientsMissingCounty} are missing a county.` });
     },
     onError: (error: Error) => toast({ title: "Could not launch campaign", description: error.message, variant: "destructive" }),
   });
@@ -424,13 +435,55 @@ export default function DeveloperOutreach() {
                     <p className="mt-1 text-sm text-slate-500">{campaign.subject}</p>
                     <p className="mt-2 text-xs text-slate-400">{campaign.enrollmentCount || 0} enrolled · starts {campaign.dayNumber ? `after ${campaign.dayNumber} day${campaign.dayNumber === 1 ? "" : "s"}` : "immediately"}</p>
                   </div>
-                    <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => openEdit(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Campaign</Button><Button variant="outline" size="sm" onClick={() => openSteps(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Steps</Button><Button variant="brand" size="sm" onClick={() => launchMutation.mutate(campaign.id)} disabled={launchMutation.isPending || sender?.connectionStatus !== "connected"}><Rocket className="mr-1.5 h-4 w-4" />Launch</Button></div>
+                    <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => openEdit(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Campaign</Button><Button variant="outline" size="sm" onClick={() => openSteps(campaign)}><Edit3 className="mr-1.5 h-4 w-4" />Steps</Button><Button variant="brand" size="sm" onClick={() => { setLaunchCampaign(campaign); void targetsQuery.refetch(); }} disabled={launchMutation.isPending || sender?.connectionStatus !== "connected"}><Rocket className="mr-1.5 h-4 w-4" />Launch</Button></div>
                 </div>
               ))}</div>
             )}
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={Boolean(launchCampaign)} onOpenChange={(open) => { if (!open) setLaunchCampaign(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Review county personalization</DialogTitle>
+            <DialogDescription>
+              {launchCampaign?.name}. These counts cover eligible recipients for this company’s saved target geography.
+            </DialogDescription>
+          </DialogHeader>
+          {targetsQuery.isFetching && !targetsQuery.data ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-slate-600"><Loader2 className="h-4 w-4 animate-spin" />Checking recipient county coverage…</div>
+          ) : targetsQuery.isError ? (
+            <p className="py-4 text-sm text-red-700">Could not check county coverage. Close this dialog and try again.</p>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 p-4">
+                  <p className="text-sm text-slate-500">Recipients with a county</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-900">{targetsQuery.data?.countyCoverage.recipientsWithCounty ?? 0}</p>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm text-amber-800">Recipients missing a county</p>
+                  <p className="mt-1 text-2xl font-semibold text-amber-900">{targetsQuery.data?.countyCoverage.recipientsMissingCounty ?? 0}</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-600">
+                County personalization will be blank for recipients missing a county. Review this count before proceeding.
+              </p>
+            </>
+          )}
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => setLaunchCampaign(null)}>Cancel</Button>
+            <Button
+              variant="brand"
+              disabled={launchMutation.isPending || targetsQuery.isFetching || targetsQuery.isError || !targetsQuery.data}
+              onClick={() => launchCampaign && launchMutation.mutate(launchCampaign.id)}
+            >
+              {launchMutation.isPending ? "Launching…" : "Launch campaign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
@@ -457,7 +510,7 @@ export default function DeveloperOutreach() {
                 />
                 <p className="mt-1 text-xs text-slate-500">Use {"{{firstName}}"}, {"{{companyName}}"}, {"{{targetMarket}}"}, or {"{{county}}"} to personalize the email with each broker’s CRM county. Your edits stay in place until you choose an assistant action.</p>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="campaign-delay">Send delay in days</Label><Input id="campaign-delay" type="number" min={0} max={365} className="mt-1.5" value={form.dayNumber} onChange={(event) => setForm({ ...form, dayNumber: Number(event.target.value) })} /></div><div><Label htmlFor="campaign-status">Status</Label><select id="campaign-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as "paused" | "active" })} className="mt-1.5 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option value="paused">Draft / paused</option><option value="active">Active</option></select></div></div>
+              <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="campaign-delay">Send delay in days</Label><Input id="campaign-delay" type="number" min={0} max={365} className="mt-1.5" value={form.dayNumber} onChange={(event) => setForm({ ...form, dayNumber: Number(event.target.value) })} /></div><div><Label htmlFor="campaign-status">Status</Label><select id="campaign-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as "paused" | "active" })} className="mt-1.5 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option value="paused">Draft / paused</option>{editing?.status === "active" && <option value="active">Active</option>}</select>{editing?.status !== "active" && <p className="mt-1 text-xs text-slate-500">Use Launch to review county coverage before activating this campaign.</p>}</div></div>
             </div>
             <Card className="flex min-h-[520px] flex-col border-slate-200 bg-slate-50/70">
               <CardHeader className="border-b border-slate-200 pb-3">
