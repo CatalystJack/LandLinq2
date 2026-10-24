@@ -62,6 +62,7 @@ export const developerProfiles = pgTable("developer_profiles", {
   rentMetric: varchar("rent_metric").notNull(), // 'psf' | 'per_unit'
   minRentPsf: decimal("min_rent_psf"),
   minRentPerUnit: decimal("min_rent_per_unit"),
+  criteriaNotes: text("criteria_notes"),
   compSearchRadiusMiles: decimal("comp_search_radius_miles").default("3"),
   compMinVintageYear: integer("comp_min_vintage_year"),
   compMinUnits: integer("comp_min_units"),
@@ -4333,6 +4334,21 @@ export const apiKeys = pgTable("api_keys", {
   notes: text("notes"),
 });
 export type ApiKey = typeof apiKeys.$inferSelect;
+
+export const apiChangeLog = pgTable("api_change_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  apiKeyId: varchar("api_key_id").notNull(),
+  route: varchar("route").notNull(),
+  entityType: varchar("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  beforeJson: jsonb("before_json"),
+  afterJson: jsonb("after_json"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("api_change_log_key_created_idx").on(table.apiKeyId, table.createdAt),
+  index("api_change_log_entity_idx").on(table.entityType, table.entityId),
+]);
+export type ApiChangeLog = typeof apiChangeLog.$inferSelect;
 
 export const leadAttachments = pgTable("lead_attachments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

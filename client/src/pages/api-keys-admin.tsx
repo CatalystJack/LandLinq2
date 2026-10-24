@@ -122,6 +122,60 @@ field name: "files"  (up to 10 files, 25 MB each)`,
 }`,
   },
   {
+    method: "GET", path: "/api/v1/investment-companies/:id/criteria", desc: "Read buying criteria",
+    body: null,
+    returns: `{
+  "company": { "id": "...", "companyName": "Example", "profileType": "real_estate" },
+  "criteria": {
+    "targetStates": ["NC"],
+    "targetCounties": ["Wake County, NC"],
+    "productTypes": [{ "name": "Multifamily", "minAcres": "5", "stateOverrides": {} }],
+    "purchaseCriteria": { "land": {}, "existing": {} },
+    "criteriaNotes": ""
+  }
+}`,
+  },
+  {
+    method: "PATCH", path: "/api/v1/investment-companies/:id/criteria", desc: "Partially update buying criteria",
+    body: `{
+  "targetStates": ["NC", "TN"],
+  "minRentPsf": 1.75,
+  "productTypes": [{
+    "name": "Multifamily",
+    "minAcres": 5,
+    "maxAcres": 40,
+    "minRentPsf": 1.75,
+    "minRentPerUnit": 1200,
+    "stateOverrides": { "TN": { "minRentPsf": 1.6 } }
+  }]
+}`,
+    returns: `{ "ok": true, "company": { ... }, "criteria": { ... } }`,
+  },
+  {
+    method: "GET", path: "/api/v1/crm-contacts?investmentCompanyId=&q=&state=&limit=&offset=", desc: "Search company-visible CRM contacts",
+    body: null,
+    returns: `{ "investmentCompanyId": "...", "contacts": [], "pagination": { "limit": 100, "offset": 0, "total": 0 } }`,
+  },
+  {
+    method: "POST", path: "/api/v1/crm-contacts", desc: "Create a contact or bulk contacts (up to 1000)",
+    body: `{
+  "investmentCompanyId": "company-uuid",
+  "contacts": [
+    { "firstName": "Jane", "lastName": "Smith", "email": "jane@example.com", "stateRegion": "NC" }
+  ]
+}`,
+    returns: `{ "ok": true, "dryRun": false, "created": 1, "skipped": 0, "results": [] }`,
+  },
+  {
+    method: "PATCH", path: "/api/v1/crm-contacts/:id", desc: "Partially update an owned contact or company CRM fields on a shared contact",
+    body: `{
+  "investmentCompanyId": "company-uuid",
+  "crmNotes": "Follow up next month",
+  "crmTags": ["multifamily"]
+}`,
+    returns: `{ "ok": true, "contact": { "id": "...", "crmTags": ["multifamily"] } }`,
+  },
+  {
     method: "GET", path: "/api/v1/ping", desc: "Health check — no auth required",
     body: null,
     returns: `{ "ok": true, "version": "v1", "service": "LandLinq API" }`,

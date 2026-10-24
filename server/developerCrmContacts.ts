@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import { acquisitionMarkets, brokers, deals, developerBrokerCrm } from "@shared/schema";
+import { acquisitionMarkets, brokers, deals, developerBrokerCrm, developerProfiles } from "@shared/schema";
 import { getOutOfStateCodeFromCounty } from "@shared/broker-location";
 import { db } from "./db";
 
@@ -16,6 +16,7 @@ type DeveloperCrmContactQuery = {
   developerProfileId: string;
   visibility: ContactVisibility;
   page: number;
+  offset?: number;
   limit: number;
   search: string;
   tag: string;
@@ -200,6 +201,73 @@ function makeAccessibleCte(developerProfileId: string, visibility: ContactVisibi
   )`;
 }
 
+export async function getDeveloperContactVisibility(developerProfileId: string): Promise<ContactVisibility> {
+  const [profile] = await db.select({
+    profileType: developerProfiles.profileType,
+    sharedContactsEnabled: developerProfiles.crmSharedContactsEnabled,
+    sectors: developerProfiles.crmContactSectors,
+    states: developerProfiles.crmContactStates,
+    counties: developerProfiles.crmContactCounties,
+    sourceTags: developerProfiles.crmContactSourceTags,
+  }).from(developerProfiles).where(and(
+    eq(developerProfiles.id, developerProfileId),
+    eq(developerProfiles.isActive, true),
+  )).limit(1);
+
+  return {
+    sectors: Array.isArray(profile?.sectors)
+      ? profile.sectors.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
+      : [],
+    states: Array.from(new Set([
+      ...(Array.isArray(profile?.states)
+        ? profile.states.map((value) => String(value).trim().toUpperCase()).filter(Boolean)
+        : []),
+      ...(Array.isArray(profile?.counties)
+        ? profile.counties.map(getOutOfStateCodeFromCounty).filter((value): value is string => Boolean(value))
+        : []),
+    ])),
+    counties: Array.isArray(profile?.counties)
+      ? profile.counties
+        .filter((value) => !getOutOfStateCodeFromCounty(value))
+        .map((value) => String(value).trim().toLowerCase())
+        .filter(Boolean)
+      : [],
+    sourceTags: Array.isArray(profile?.sourceTags)
+      ? profile.sourceTags.map((value) => String(value).trim().toLowerCase()).filter(Boolean)
+      : [],
+    allowSharedDirectory: profile?.profileType === "real_estate" && profile.sharedContactsEnabled === true,
+  };
+}
+
+export async function findAccessibleDeveloperCrmContactEmails(
+  developerProfileId: string,
+  visibility: ContactVisibility,
+  emails: string[],
+): Promise<Set<string>> {
+  if (!emails.length) return new Set();
+  const accessibleCte = makeAccessibleCte(developerProfileId, visibility);
+  const result = await db.execute(sql`
+    WITH ${accessibleCte}
+    SELECT DISTINCT LOWER(BTRIM(email)) AS email
+    FROM accessible_brokers
+    WHERE email IS NOT NULL AND LOWER(BTRIM(email)) = ANY(${textArray(emails)})
+  `);
+  return new Set((result.rows as Array<{ email: string }>).map((row) => row.email));
+}
+
+export async function isAccessibleDeveloperCrmContact(
+  developerProfileId: string,
+  visibility: ContactVisibility,
+  contactId: string,
+): Promise<boolean> {
+  const accessibleCte = makeAccessibleCte(developerProfileId, visibility);
+  const result = await db.execute(sql`
+    WITH ${accessibleCte}
+    SELECT id FROM accessible_brokers WHERE id = ${contactId} LIMIT 1
+  `);
+  return result.rows.length > 0;
+}
+
 export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
   const accessibleCte = makeAccessibleCte(query.developerProfileId, query.visibility);
   const filters: SQL[] = [];
@@ -349,7 +417,7 @@ export async function getDeveloperCrmContacts(query: DeveloperCrmContactQuery) {
       FROM filtered_brokers AS f
       ${pageEnrichmentJoins}
       ORDER BY f.created_at DESC NULLS LAST, f.id DESC
-      LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
+       LIMIT ${query.limit} OFFSET ${query.offset ?? (query.page - 1) * query.limit}
     `),
     query.idsOnly || (query.includeFilterOptions === false && !query.filterOptionsOnly)
       ? Promise.resolve({ rows: [] as any[] })

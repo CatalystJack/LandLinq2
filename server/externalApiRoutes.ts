@@ -25,6 +25,7 @@ import { eq, desc, and, isNull, or, sql } from "drizzle-orm";
 import crypto from "crypto";
 import multer from "multer";
 import { createRateLimit } from "./rateLimiter";
+import { registerExternalApiAdminRoutes } from "./externalApiAdminRoutes";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const parsedDealApiLimiter = createRateLimit({
@@ -49,7 +50,7 @@ function generateKey(env: "live" | "test"): { key: string; prefix: string; hash:
 
 // ── API Key middleware ────────────────────────────────────────────────────────
 
-async function requireApiKey(req: Request, res: Response, next: NextFunction) {
+export async function requireApiKey(req: Request, res: Response, next: NextFunction) {
   const rawKey = (req.headers["x-api-key"] as string) || (req.headers["authorization"] || "").replace(/^Bearer\s+/i, "");
   if (!rawKey) {
     return res.status(401).json({ error: "Missing API key. Send X-API-Key header." });
@@ -117,6 +118,7 @@ async function upsertBrokerByEmail(opts: {
 // ── Register routes ────────────────────────────────────────────────────────────
 
 export function registerExternalApiRoutes(app: Express) {
+  registerExternalApiAdminRoutes(app, requireApiKey);
 
   // ── Public health check ──────────────────────────────────────────────────────
   app.get("/api/v1/ping", (_req, res) => {
