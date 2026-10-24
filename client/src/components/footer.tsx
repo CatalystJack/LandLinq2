@@ -10,7 +10,7 @@ export default function Footer() {
     <footer className="bg-primary px-5 py-14 text-white sm:px-8 sm:py-20 lg:px-10">
       <div className="mx-auto grid max-w-7xl gap-12 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div>
-          <Link href="/" className="inline-flex">
+          <Link href="/" className="inline-flex ll-footer-logo-link">
             <img
               src="/assets/landlinq-white-logo.png"
               alt="LandLinq"

@@ -405,7 +405,15 @@ function AIAssistantMockup() {
 
 function DashboardMockup({ compact = false }: { compact?: boolean }) {
   const [activeFilter, setActiveFilter] = useState("STATUS");
+  const [isPhone, setIsPhone] = useState(false);
   const { ref: previewRef, shouldAnimate } = usePreviewMotion<HTMLDivElement>();
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 639px)");
+    const updateIsPhone = () => setIsPhone(media.matches);
+    updateIsPhone();
+    media.addEventListener("change", updateIsPhone);
+    return () => media.removeEventListener("change", updateIsPhone);
+  }, []);
   useEffect(() => {
     if (!shouldAnimate) return;
     const filters = ["STATUS", "PRIORITY", "TYPE", "NEXT"];
@@ -437,8 +445,8 @@ function DashboardMockup({ compact = false }: { compact?: boolean }) {
       </div>
       <div className="ll-analyst-workspace">
         <div className="ll-analyst-toolbar">
-          <label className="ll-analyst-search"><Search /><input aria-label="Search deals" placeholder="Search deals, brokers, locations..." /></label>
-          <div className="ll-analyst-views"><button type="button" className="is-selected"><Table2 /> Table</button><button type="button"><List /> Pipeline</button><button type="button"><Map /> Map</button></div>
+          <label className="ll-analyst-search"><Search /><input aria-label="Search deals" placeholder={isPhone ? "Search deals..." : "Search deals, brokers, locations..."} /></label>
+          <div className="ll-analyst-views"><button type="button" className="is-selected" aria-label="Table view" title="Table view"><Table2 /> Table</button><button type="button" aria-label="Pipeline view" title="Pipeline view"><List /> Pipeline</button><button type="button" aria-label="Map view" title="Map view"><Map /> Map</button></div>
           <button type="button" className="ll-analyst-columns">Columns <b>29/40</b></button>
           {["STATUS", "PRIORITY", "TYPE", "NEXT"].map((filter) => <button type="button" key={filter} onClick={() => setActiveFilter(filter)} className={`ll-analyst-filter ${activeFilter === filter ? "is-active" : ""}`}>{filter}</button>)}
         </div>
@@ -774,7 +782,7 @@ export default function MarketingHome() {
     <div id="landlinq-home" className="min-h-[100dvh] overflow-hidden bg-white text-[#081526]">
       <header className="absolute inset-x-0 top-0 z-30">
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10" aria-label="Main navigation">
-          <a href="/" aria-label="LandLinq home"><img src="/assets/landlinq-header-logo.png" alt="LandLinq" className="h-7 w-auto" /></a>
+          <a href="/" aria-label="LandLinq home" className="ll-home-logo-link"><img src="/assets/landlinq-header-logo.png" alt="LandLinq" className="h-7 w-auto" /></a>
           <div className="hidden items-center gap-8 md:flex"><Link href="/login" className="inline-flex items-center rounded-full border border-white bg-white px-4 py-2 text-sm font-semibold text-landlinq-blue transition-all duration-300 hover:bg-transparent hover:text-white">Log In</Link></div>
            <button type="button" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} className="ll-mobile-menu-button inline-flex h-11 w-11 items-center justify-center rounded-full text-primary-foreground md:hidden">{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
             {menuOpen && <div className="ll-mobile-menu-panel absolute inset-x-4 top-20 rounded-2xl border border-white/15 bg-primary p-4 shadow-xl md:hidden"><div className="flex flex-col gap-1"><Link href="/login" onClick={() => setMenuOpen(false)} className="ll-mobile-menu-login inline-flex items-center justify-center rounded-lg border border-white bg-white px-3 py-3 text-center text-sm font-semibold text-landlinq-blue transition-all duration-300 hover:bg-transparent hover:text-white">Log In</Link></div></div>}
@@ -870,7 +878,7 @@ export default function MarketingHome() {
                    <h3>Make the next conversation useful.</h3>
                    <p>See history, active campaigns, notes, and related deals together before your team reaches out.</p>
                  </div>
-                   <div className="ll-step-surface ll-surface-paper"><ContactDetailMockup /></div>
+                    <div className="ll-step-surface ll-surface-paper ll-contact-detail-surface"><ContactDetailMockup /></div>
                </article>
                 <article className="ll-journey-step">
                   <div className="ll-step-copy">

@@ -4430,6 +4430,301 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
     font-size: .55rem;
   }
 
+  .ll-hero-dashboard .ll-analyst-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px;
+    min-height: 0;
+    padding: .45rem;
+    overflow: visible;
+    white-space: normal;
+  }
+
+  .ll-hero-dashboard .ll-analyst-search {
+    grid-column: 1;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .ll-hero-dashboard .ll-analyst-search input {
+    font-size: .48rem;
+  }
+
+  .ll-hero-dashboard .ll-analyst-views {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .ll-hero-dashboard .ll-analyst-views button {
+    justify-content: center;
+    gap: 0;
+    min-width: 1.8rem;
+    padding-inline: .35rem;
+    font-size: 0;
+  }
+
+  .ll-hero-dashboard .ll-analyst-views button svg {
+    width: .75rem;
+    height: .75rem;
+  }
+
+  .ll-hero-dashboard .ll-analyst-columns,
+  .ll-hero-dashboard .ll-analyst-filter {
+    display: none;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table-scroll {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table tr > :nth-child(2) {
+    display: none;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table th:nth-child(1),
+  .ll-hero-dashboard .ll-analyst-table td:nth-child(1) {
+    width: 2rem;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table th:nth-child(4),
+  .ll-hero-dashboard .ll-analyst-table td:nth-child(4) {
+    width: 7rem;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table th:nth-child(6),
+  .ll-hero-dashboard .ll-analyst-table td:nth-child(6) {
+    width: 2.5rem;
+  }
+
+  .ll-hero-dashboard .ll-analyst-table th:nth-child(8),
+  .ll-hero-dashboard .ll-analyst-table td:nth-child(8) {
+    width: 5rem;
+  }
+
+  .ll-contact-detail-surface {
+    height: 34rem !important;
+  }
+
+  .ll-step-surface .ll-contact-detail {
+    font-size: .62rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .ll-detail-nav {
+    display: none;
+  }
+
+  .ll-detail-hero {
+    padding: .7rem;
+  }
+
+  .ll-detail-hero > small {
+    font-size: .55rem;
+  }
+
+  .ll-detail-person {
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+
+  .ll-detail-person b {
+    font-size: .68rem;
+  }
+
+  .ll-detail-person small {
+    font-size: .55rem;
+  }
+
+  .ll-detail-person > span {
+    display: flex;
+    flex-basis: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+    font-size: .6rem;
+  }
+
+  .ll-detail-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .55rem;
+    font-size: .55rem;
+  }
+
+  .ll-detail-meta b {
+    font-size: .65rem;
+  }
+
+  .ll-detail-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .55rem;
+    min-height: 0;
+    padding: .65rem;
+  }
+
+  .ll-detail-body aside {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .45rem;
+    width: auto;
+    flex: initial;
+    padding: .6rem;
+    border-right: 0;
+    border-bottom: 1px solid #dde8ee;
+  }
+
+  .ll-detail-body aside > small,
+  .ll-detail-body aside > b {
+    grid-column: 1 / -1;
+  }
+
+  .ll-detail-body aside > small,
+  .ll-detail-section small {
+    font-size: .5rem;
+  }
+
+  .ll-detail-body aside > b {
+    margin: 0;
+    font-size: .72rem;
+  }
+
+  .ll-detail-body label {
+    min-width: 0;
+    margin-top: 0;
+    font-size: .52rem;
+    overflow-wrap: anywhere;
+  }
+
+  .ll-detail-body label strong {
+    font-size: .62rem;
+  }
+
+  .ll-detail-body main {
+    padding: 0 .1rem .3rem;
+  }
+
+  .ll-detail-tabs {
+    justify-content: space-between;
+    gap: .35rem;
+    min-height: 2rem;
+    height: auto;
+    font-size: .62rem;
+  }
+
+  .ll-detail-tabs b {
+    padding-top: .55rem;
+  }
+
+  .ll-detail-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .4rem;
+  }
+
+  .ll-detail-cards > div,
+  .ll-detail-event,
+  .ll-detail-section {
+    padding: .55rem;
+  }
+
+  .ll-detail-cards small {
+    font-size: .5rem;
+  }
+
+  .ll-detail-cards b,
+  .ll-detail-section b {
+    font-size: .65rem;
+  }
+
+  .ll-detail-activity {
+    grid-template-columns: minmax(0, 1fr);
+    gap: .4rem;
+  }
+
+  .ll-detail-event {
+    margin-top: .4rem;
+    font-size: .62rem;
+  }
+
+  .ll-detail-event small {
+    font-size: .54rem;
+  }
+
+  .ll-detail-section {
+    margin-top: .5rem;
+  }
+
+  .ll-detail-section span {
+    height: auto;
+    overflow: visible;
+    font-size: .58rem;
+    line-height: 1.4;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .ll-drip-state label input {
+    min-width: 0;
+    padding-inline: .4rem;
+    font-size: .4rem;
+    letter-spacing: -.04em;
+  }
+
+  .ll-drip-email-steps {
+    gap: .3rem;
+  }
+
+  .ll-drip-email-steps > div {
+    padding: .38rem .32rem;
+  }
+
+  .ll-drip-email-steps b {
+    font-size: .45rem;
+  }
+
+  .ll-drip-email-steps span {
+    font-size: .44rem;
+  }
+
+  .ll-drip-email-steps strong {
+    overflow: visible;
+    font-size: .47rem;
+    line-height: 1.3;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  #landlinq-home .ll-journey {
+    padding-bottom: 1.5rem !important;
+  }
+
+  #landlinq-home #company {
+    padding-top: 2.5rem !important;
+  }
+
+  #landlinq-home .ll-home-logo-link {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    margin-block: -8px;
+    padding-block: 8px;
+  }
+
+  #landlinq-home > footer .ll-footer-logo-link {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    padding-block: 8px;
+  }
+
   #landlinq-home #contact .ll-contact-form {
     border: 0 !important;
     padding: 0 !important;
