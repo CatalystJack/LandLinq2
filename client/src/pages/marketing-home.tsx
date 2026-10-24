@@ -733,7 +733,7 @@ function HeroStats() {
 
   return (
     <section ref={sectionRef} className="ll-hero-stats" aria-label="LandLinq development statistics">
-      <div className="mx-auto grid max-w-7xl sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto grid grid-cols-2 max-w-7xl sm:grid-cols-2 lg:grid-cols-4">
         {heroStats.map((stat) => (
           <div className="ll-hero-stat" key={stat.label}>
               <strong className="font-serif" style={{ transform: `scale(${0.94 + progress * 0.06})` }}>
@@ -776,8 +776,8 @@ export default function MarketingHome() {
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10" aria-label="Main navigation">
           <a href="/" aria-label="LandLinq home"><img src="/assets/landlinq-header-logo.png" alt="LandLinq" className="h-7 w-auto" /></a>
           <div className="hidden items-center gap-8 md:flex"><Link href="/login" className="inline-flex items-center rounded-full border border-white bg-white px-4 py-2 text-sm font-semibold text-landlinq-blue transition-all duration-300 hover:bg-transparent hover:text-white">Log In</Link></div>
-           <button type="button" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} className="inline-flex h-11 w-11 items-center justify-center rounded-full text-primary-foreground md:hidden">{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
-            {menuOpen && <div className="absolute inset-x-4 top-20 rounded-2xl border border-white/15 bg-primary p-4 shadow-xl md:hidden"><div className="flex flex-col gap-1"><Link href="/login" onClick={() => setMenuOpen(false)} className="inline-flex items-center justify-center rounded-lg border border-white bg-white px-3 py-3 text-center text-sm font-semibold text-landlinq-blue transition-all duration-300 hover:bg-transparent hover:text-white">Log In</Link></div></div>}
+           <button type="button" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} className="ll-mobile-menu-button inline-flex h-11 w-11 items-center justify-center rounded-full text-primary-foreground md:hidden">{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
+            {menuOpen && <div className="ll-mobile-menu-panel absolute inset-x-4 top-20 rounded-2xl border border-white/15 bg-primary p-4 shadow-xl md:hidden"><div className="flex flex-col gap-1"><Link href="/login" onClick={() => setMenuOpen(false)} className="ll-mobile-menu-login inline-flex items-center justify-center rounded-lg border border-white bg-white px-3 py-3 text-center text-sm font-semibold text-landlinq-blue transition-all duration-300 hover:bg-transparent hover:text-white">Log In</Link></div></div>}
         </nav>
       </header>
 
@@ -926,7 +926,7 @@ export default function MarketingHome() {
                   setContactStatus("error");
                   setContactError(error instanceof Error ? error.message : "We could not send your message.");
                 }
-                }} className="w-full max-w-[680px] justify-self-end rounded-3xl border border-white/20 p-5 sm:p-6">
+                }} className="ll-contact-form w-full max-w-[680px] justify-self-end rounded-3xl border border-white/20 p-5 sm:p-6">
                 {contactStatus === "success" ? <p className="text-lg font-semibold text-white">Thanks — we’ll be in touch.</p> : <>
                    <div className="grid gap-4 sm:grid-cols-2">
                      <input aria-label="Your name" required value={contactForm.name} onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })} placeholder="Your name" className="h-14 rounded-full border border-white/25 bg-transparent px-6 text-base text-white outline-none transition-colors placeholder:text-white/40 focus:border-white/60" />

@@ -29,7 +29,7 @@ export default function Footer() {
           <h3 className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
             Platform
           </h3>
-          <div className="flex flex-col gap-3 text-sm text-white/70">
+          <div className="ll-footer-link-list flex flex-col gap-3 text-sm text-white/70">
             <a href="/#platform" className="transition-colors hover:text-white">
               Deal Dashboard
             </a>
@@ -46,7 +46,7 @@ export default function Footer() {
           <h3 className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
             Company &amp; Support
           </h3>
-          <div className="flex flex-col gap-3 text-sm text-white/70">
+          <div className="ll-footer-link-list flex flex-col gap-3 text-sm text-white/70">
             <Link href="/contact" className="transition-colors hover:text-white">
               Contact us
             </Link>
@@ -57,7 +57,7 @@ export default function Footer() {
           <h3 className="mb-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
             Legal
           </h3>
-          <div className="flex flex-col gap-3 text-sm text-white/70">
+          <div className="ll-footer-link-list flex flex-col gap-3 text-sm text-white/70">
             <Link href="/privacy" className="transition-colors hover:text-white" data-testid="footer-link-privacy">
               Privacy
             </Link>
