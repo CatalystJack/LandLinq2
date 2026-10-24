@@ -2717,6 +2717,7 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
   font-size: .58rem;
   outline: none;
 }
+.ll-drip-subject-mobile { display: none; }
 .ll-drip-audience-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; }
 .ll-drip-audience {
   min-width: 0;
@@ -4675,6 +4676,27 @@ p, span, div, h1, h2, h3, h4, h5, h6, a, button, label, section, article, header
     padding-inline: .4rem;
     font-size: .4rem;
     letter-spacing: -.04em;
+  }
+
+  .ll-drip-state label .ll-drip-subject-desktop {
+    display: none;
+  }
+
+  .ll-drip-state .ll-drip-subject-mobile {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    margin-top: .3rem;
+    border: 1px solid #dce8ed;
+    border-radius: .35rem;
+    background: rgba(255, 255, 255, .82);
+    padding: .45rem .55rem;
+    color: #496171;
+    font-size: 15px !important;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .ll-drip-email-steps {

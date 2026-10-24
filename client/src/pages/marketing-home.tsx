@@ -296,7 +296,7 @@ function DripCampaignBuilderMockup() {
             {activeStep === 1 && <div className="ll-drip-state">
               <small className="ll-drip-kicker">SEQUENCE EDITOR</small>
                <h3>Example Broker Follow-up</h3>
-               <label>Subject line<input value="A quick introduction to your demo pipeline" readOnly /></label>
+                <label>Subject line<input className="ll-drip-subject-desktop" value="A quick introduction to your demo pipeline" readOnly /><div className="ll-drip-subject-mobile" role="textbox" aria-readonly="true" aria-label="Subject line">A quick introduction to your demo pipeline</div></label>
               <div className="ll-drip-email-steps">
                 <div><b>STEP 1</b><span>Send immediately</span><strong>Introduction and deal criteria</strong></div>
                 <div><b>STEP 2</b><span>Wait 3 days</span><strong>Share current acquisition focus</strong></div>
